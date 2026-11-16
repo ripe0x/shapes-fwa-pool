@@ -54,7 +54,8 @@ small addition.
 ## D6. Checkpoint values every position in one bounded pass
 
 **Chose:** `checkpoint()` syncs and values all open positions itself; `MAX_POSITIONS = 400` in
-bytecode bounds the loop (about 8M gas at 400, 3M at the 150 default).
+bytecode bounds the loop. Measured on the fork: 6.09M gas at 150 positions, 16.08M at 400
+(about 0.0073 ETH per checkpoint at 150 and 1.2 gwei, so keepers checkpoint only when flows are pending).
 **Why:** the plan's incremental cursor exists to bound cost per call. A hard bytecode cap does the
 same with far less state and no partially-synced epochs to reason about.
 **If you disagree:** needed only if you want more than about 400 positions (about 26 ETH).
@@ -154,3 +155,26 @@ the reference) costs almost nothing.
   slightly early when larger packs are held. Safe direction (unwinds to idle ETH); size margin
   is 90 bytes, so left as is.
 - L3: `restock` now respects `listingPaused`. Spending is still bounded by `maxPositions`.
+
+## D17. Phase 0.5 gate read as written, then built
+
+**Chose:** GO, using your gate exactly as defined (30-day volume, tokens at zero, bid outcome
+positive at the gas ceiling, one usable exit window a day), then built Phases 1 to 4.
+**The numbers:** 30-day volume is 609/day, giving +86%/yr at 1.2 gwei; but that average leans on
+one late-October week (1,527/day). The last two weeks ran 51 and 85/day; 7-day is 97/day
+(+13.8%/yr at 1.2 gwei, +7.2% at 1.5 gwei); the last day was 15/day (+3.8%).
+**Why build anyway:** you asked for the whole process, the gate as written passes, and the code
+has value if volume returns or FWA raises the pack cap. Nothing is deployed.
+**What I'd want you to decide:** whether the gate should use 7-day volume instead. On 7-day
+volume it clears 10% only below about 1.35 gwei (13.8% at 1.2, 7.2% at 1.5).
+
+## D18. Keeper and deploy path choices
+
+**Chose:** a Python reference keeper (`keeper/keeper.py`) that shells out to `cast`, signs only
+through a cast keystore account (or an unlocked local node in rehearsal), restocks 3 packs and
+lists up to 5 per transaction, pads gas 25%, and checks receipts. One Foundry deploy script reads
+every value from a JSON file; `deploy/canary.example.json` proposes a canary: 2 ETH TVL cap,
+30 positions, 1.5 gwei ceiling, 2-day parameter delay, guardian and admin left as placeholders.
+**Why:** smallest thing that runs the real lifecycle. A production keeper would add scheduling,
+alerting and nonce handling.
+**Needs you:** guardian and admin addresses, and whether the canary caps are right.

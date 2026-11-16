@@ -183,6 +183,33 @@ contract ForkVaultAdversarialTest is ForkBase {
         assertEq(vault.distributionReserve(), 0, "no live shares, nothing distributed");
     }
 
+    /// Limits at maximum: the checkpoint loop over every open position must fit a block.
+    function test_checkpointGasAtMaxPositions() public {
+        uint256[2] memory sizes = [uint256(150), 400];
+        for (uint256 r; r < sizes.length; ++r) {
+            uint256 n = sizes[r];
+            PackVault.Params memory p = defaultParams();
+            p.maxPositions = uint96(n);
+            p.reserve = 0;
+            vm.deal(address(this), 100 ether);
+            vault = new PackVault{value: 30 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p);
+            for (uint256 i; i < n; i += 50) {
+                vault.restock(50, 3);
+                vault.list(50);
+            }
+            assertEq(vault.openListings().length, n);
+            vm.prank(alice);
+            vault.deposit{value: 0.1 ether}();
+            toBlackout();
+            uint256 g = gasleft();
+            vault.checkpoint();
+            uint256 used = g - gasleft();
+            emit log_named_uint(string.concat("checkpoint gas at positions ", vm.toString(n)), used);
+            assertLt(used, 30_000_000, "fits well under the mainnet block gas limit");
+            toOpen();
+        }
+    }
+
     function test_depositAboveTvlCapReverts() public {
         vm.prank(guardian);
         vault.lowerCaps(1 ether, 150, 5 gwei);
