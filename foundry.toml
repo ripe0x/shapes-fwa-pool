@@ -30,3 +30,8 @@ number_underscore = "thousands"
 
 [rpc_endpoints]
 mainnet = "https://mainnet.gateway.tenderly.co"
+
+[profile.default.invariant]
+runs = 16
+depth = 25
+fail_on_revert = false

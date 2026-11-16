@@ -59,7 +59,7 @@ contract PackVault is ReentrancyGuard {
     uint256 public constant MAX_KEEPER_FEE_BPS = 2_000;
     uint256 public constant MAX_KEEPER_SHARE_BPS = 5_000;
     uint256 public constant MAX_ALLOCATED_BOUND_BPS = 1_000;
-    uint256 public constant MAX_CLIP_SLIPPAGE_BPS = 3_000;
+    uint256 public constant MAX_CLIP_SLIPPAGE_BPS = 500;
     uint256 public constant MIN_PACK_UNITS = 3; // ShapePacks minimum pack value 0.03 ETH
     uint256 public constant MAX_PACK_UNITS = 63; // highest bit of the uint64 mask
     uint256 public constant MIN_DEPOSIT = 0.01 ether;
@@ -289,6 +289,7 @@ contract PackVault is ReentrancyGuard {
     function restock(uint256 count, uint256 units) external nonReentrant {
         uint256 g0 = gasleft();
         _requireOperating();
+        if (listingPaused) revert Paused();
         if (count == 0 || (params.packUnitsMask >> units) & 1 == 0) revert Amount();
         if (_open.length + _idlePacks.length + count > params.maxPositions) revert Amount();
         uint256 need = count * units;
@@ -470,7 +471,10 @@ contract PackVault is ReentrancyGuard {
         poolManager.unlock(abi.encode(amount));
         ethOut = address(this).balance - before;
         if (ethOut < minOut) revert Slippage();
-        params.refPrice = uint128(ethOut * 1e18 / amount);
+        // The floor only ratchets up: a sandwiched fill cannot lower the next sale's floor. A
+        // real price fall stalls sales until the admin sets a lower reference via the delay.
+        uint256 fill = ethOut * 1e18 / amount;
+        if (fill > p.refPrice) params.refPrice = uint128(fill);
         emit Converted(amount, ethOut);
         _reimburse(g0, ethOut);
     }
@@ -643,10 +647,12 @@ contract PackVault is ReentrancyGuard {
         uint256 filled;
         uint256 paid;
         if (lockedShares != 0) {
-            uint256 owed = M.mulDiv(lockedShares, nav, supply);
+            // Owed rounds up and a partial fill leaves 2 wei of headroom, so the rounded-up
+            // reserve below never exceeds the ETH actually freed.
+            uint256 owed = M.mulDivUp(lockedShares, nav, supply);
             uint256 liquid = _free() + pendingDepositTotal;
             if (liquid < owed) liquid += _liquidateInventory(owed - liquid);
-            uint256 f = owed <= liquid ? SCALE : M.mulDiv(liquid, SCALE, owed); // fill fraction
+            uint256 f = owed <= liquid ? SCALE : M.mulDiv(liquid > 2 ? liquid - 2 : 0, SCALE, owed);
             filled = M.mulDiv(lockedShares, f, SCALE);
             // ETH per locked share this checkpoint, x SCALE. Holders claim floor(shares x unit);
             // the reserve rounds the same unit up over the (never understated) locked total, so
@@ -677,7 +683,8 @@ contract PackVault is ReentrancyGuard {
             uint256 gain = M.mulDiv(perShare - highWaterMark, supply, 1e18);
             distributed = M.min(gain * params.distributionBps / BPS, _idle());
             if (distributed >= MIN_DISTRIBUTION) {
-                distPerShare += distributed * 1e18 / supply;
+                // Live shares only: the dead seed shares never claim, so their slice would strand.
+                distPerShare += distributed * 1e18 / (supply - DEAD_SHARES);
                 distributionReserve += distributed;
                 nav -= distributed;
             } else {

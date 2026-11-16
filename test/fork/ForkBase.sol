@@ -5,6 +5,13 @@ import {Test} from "forge-std/Test.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {IShapes, IShapePacks, IFWAV2, IFloorOracle} from "../../src/interfaces/External.sol";
 
+/// @dev Sends ETH by self-destruct: arrives with no call, as FWA's forceSafeTransferETH can.
+contract ForceSender {
+    constructor(address payable to) payable {
+        selfdestruct(to);
+    }
+}
+
 interface IOwnable {
     function owner() external view returns (address);
 }
@@ -64,7 +71,7 @@ abstract contract ForkBase is Test {
         p.keeperFeeBps = 500;
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 200;
-        p.clipSlippageBps = 1_000;
+        p.clipSlippageBps = 500;
         p.packUnitsMask = uint64(1) << 3;
         p.gasCeiling = 5 gwei;
         p.maxPositions = 150;

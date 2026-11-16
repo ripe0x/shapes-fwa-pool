@@ -110,13 +110,13 @@ updates it. One sale per FWA 12 h interval, at most `clipMax` tokens.
 **Why:** without a reference a keeper could sell into a sandwich. The trailing fill can drift
 down at most `clipSlippageBps` per interval.
 
-## D13. Dead shares keep their slice of distributions
+## D13. Distributions go to live shares only
 
-**Chose:** distributions accrue per share over all shares, including the 1e15 dead seed shares,
-whose slice stays in `distributionReserve` unclaimed forever.
-**Why:** excluding them adds a second supply figure to every price calculation. The amount is
-distribution x dead / supply: with a 0.01 ETH seed and 10 ETH of holders, 0.1% of each payout.
-**If you disagree:** make the seed a real claimant (a deployer-held account) instead of 0xdead.
+**Chose:** the distribution accumulator divides by supply less the 1e15 dead seed shares.
+**Why:** the reviewer flagged (L1) that the dead shares' slice would sit in
+`distributionReserve` forever, which breaks "assets never stranded". The dead seed's NAV is
+protocol-owned and unclaimable anyway, so moving its distribution slice to live holders costs
+no one.
 
 ## D14. Gas ceiling default 1.5 gwei
 
@@ -124,3 +124,33 @@ distribution x dead / supply: with a 0.01 ETH seed and 10 ETH of holders, 0.1% o
 `restock` and `list` revert and keeper pay is priced at the ceiling.
 **Why:** with measured gas (listNFT 651k), the bid outcome breaks even near 1.8 gwei; 1.5 gwei
 leaves +0.25 mETH per cycle. Tests use 5 gwei only to exercise the rule.
+
+## D15. Checkpoints can be delayed by anyone keeping FWA's queue busy (accepted)
+
+**Chose:** keep the rule that checkpoints run only in FWA's blackout with FWA's global queue
+drained. Reviewer M2: a stranger can keep `unsettledAcquisitionCount > 0` through a blackout,
+delaying deposit pricing and redemption fills by 12 h per blackout.
+**Why:** a drained queue during blackout is the only state in which no listing can be selected
+mid-pricing; pricing outside it lets a holder trade against a known pending selection. The
+attack costs the griefer about one acquisition fee (0.054 ETH at the pinned block) per blackout
+held and self-heals. Historical data: 120 of 121 blackouts had a drained queue.
+**Watch at canary:** how often real checkpoints miss their blackout.
+
+## D16. Token-sale floor ratchets up only; max slippage 5%
+
+**Chose:** after a sale, `refPrice` moves to the fill only if the fill is higher.
+`MAX_CLIP_SLIPPAGE_BPS` is 500 (was 3,000). `convert` stays permissionless.
+**Why:** reviewer M1: a keeper could sandwich a sale down to the floor and the old code then
+lowered the next floor to that fill. Token income measured on the fork is about 2.5e12 wei per
+buyback across 20 listings, so a stalled sale after a genuine price fall (until the admin lowers
+the reference) costs almost nothing.
+
+## Review findings not changed
+
+- L4: `reserve`, `tvlCap`, `clipMax`, `refPrice` have no bytecode bounds. Only the delayed admin
+  sets them; large `reserve` or `tvlCap` cannot move assets, and `refPrice` now only matters as
+  a floor that ratchets up. Left as is.
+- L5: `_redemptionShortfall` values idle packs at the 3-unit minimum, so it can allow unlisting
+  slightly early when larger packs are held. Safe direction (unwinds to idle ETH); size margin
+  is 90 bytes, so left as is.
+- L3: `restock` now respects `listingPaused`. Spending is still bounded by `maxPositions`.

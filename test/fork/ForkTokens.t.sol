@@ -42,7 +42,7 @@ contract ForkTokensTest is Test {
         p.keeperFeeBps = 500;
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 200;
-        p.clipSlippageBps = 1_000;
+        p.clipSlippageBps = 500;
         p.packUnitsMask = uint64(1) << 3;
         p.gasCeiling = 1.5 gwei;
         p.maxPositions = 150;
@@ -133,7 +133,7 @@ contract ForkTokensTest is Test {
         vault.convert(held, held * ref / 1e18 / 2);
 
         uint256 navEthBefore = address(vault).balance;
-        uint256 minOut = held * ref / 1e18 * 9_000 / 10_000;
+        uint256 minOut = held * ref / 1e18 * 9_500 / 10_000;
         uint256 out = vault.convert(held, minOut);
         assertEq(token.balanceOf(address(vault)), 0);
         assertGe(out, minOut);

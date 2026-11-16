@@ -1,16 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {ForkBase} from "./ForkBase.sol";
+import {ForkBase, ForceSender} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {ERC721} from "solady/tokens/ERC721.sol";
-
-/// @dev Sends ETH by self-destruct: arrives with no call, as FWA's forceSafeTransferETH can.
-contract ForceSender {
-    constructor(address payable to) payable {
-        selfdestruct(to);
-    }
-}
 
 /// @dev An attacker-chosen NFT collection pushing tokens at the vault.
 contract HostileNft is ERC721 {
@@ -148,7 +141,8 @@ contract ForkVaultAdversarialTest is ForkBase {
         // 20% of the 1 ETH gain, gain measured above the high-water mark.
         assertApproxEqAbs(distributed, 0.2 ether, 1e6);
         uint256 supply = vault.totalShares();
-        uint256 aliceShare = 0.2 ether * vault.shareBalance(alice) / supply;
+        // Distributions accrue to live shares only (D13): alice holds all of them.
+        uint256 aliceShare = 0.2 ether * vault.shareBalance(alice) / (supply - vault.DEAD_SHARES());
         uint256 before = alice.balance;
         vm.prank(alice);
         vault.claim();
@@ -158,8 +152,8 @@ contract ForkVaultAdversarialTest is ForkBase {
         toBlackout();
         checkpoint();
         assertApproxEqAbs(vault.distributionReserve(), distributed - (alice.balance - before), 1);
-        // The dead shares' slice of the distribution stays reserved forever (accepted, D13).
-        assertApproxEqAbs(vault.distributionReserve(), 0.2 ether * vault.DEAD_SHARES() / supply, 1e6);
+        // Nothing strands: after alice claims, only rounding dust remains reserved.
+        assertLe(vault.distributionReserve(), 1e6);
     }
 
     function test_depositAboveTvlCapReverts() public {
