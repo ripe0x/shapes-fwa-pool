@@ -94,6 +94,12 @@ contract VaultHandler is Test {
         ++calls;
     }
 
+    function liquidate(uint256 n) external {
+        vm.prank(keeper);
+        try vault.liquidate(bound(n, 1, 10)) {} catch {}
+        ++calls;
+    }
+
     function donate(uint256 amount) external {
         amount = bound(amount, 1, 0.5 ether);
         vm.deal(address(this), amount);
@@ -116,8 +122,7 @@ contract ForkVaultInvariantTest is ForkBase {
 
     /// INV01: the vault always holds every amount it owes outside the strategy.
     function invariant_reservesCovered() public view {
-        uint256 owed = vault.pendingDepositTotal() + vault.redemptionReserve() + vault.distributionReserve()
-            + vault.keeperPool();
+        uint256 owed = vault.pendingDepositTotal() + vault.redemptionReserve() + vault.distributionReserve();
         assertGe(address(vault).balance, owed);
     }
 
@@ -144,8 +149,8 @@ contract ForkVaultInvariantTest is ForkBase {
         assertLe(sum, vault.totalShares(), "never more shares owned than issued");
     }
 
-    /// INV04: with no selections, value only leaves NAV as Shapes mint fees: the value of all
-    ///        claims on the vault equals everything paid in less mint fees (rounding aside).
+    /// INV04: with no selections, value only leaves NAV as Shapes mint fees and keeper gas pay:
+    ///        everything paid in equals assets held plus those two expenses, to the wei.
     function invariant_valueConserved() public view {
         uint256 assets = address(vault).balance + vault.looseShapeCount() * 0.01 ether
             + vault.idlePacks().length * 0.03 ether;
@@ -161,6 +166,7 @@ contract ForkVaultInvariantTest is ForkBase {
         for (uint256 i; i < a.length; ++i) {
             netIn += 50 ether - a[i].balance; // holder balances only move through the vault
         }
-        assertEq(assets + handler.mintFeesPaid(), netIn, "every wei is in the vault or paid as a mint fee");
+        uint256 keeperPay = keeper.balance - 1 ether; // the keeper's balance moves only by vault pay
+        assertEq(assets + handler.mintFeesPaid() + keeperPay, netIn, "every wei is held, a mint fee or keeper pay");
     }
 }

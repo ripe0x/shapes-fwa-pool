@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {FixedPointMathLib as M} from "solady/utils/FixedPointMathLib.sol";
+import {VaultLib} from "./VaultLib.sol";
 import {
     IShapes,
     IShapePacks,
@@ -32,6 +33,11 @@ import {
 ///      B (1 - s) back, loses the pack worth P: net B (k - s) - P). `edgeOk` recomputes k and the cap
 ///      from live FWA reads, so the vault stops listing by itself when FWA's owner moves a number.
 ///
+///      Keepers are reimbursed gas from vault ETH (a holder expense, NAV-visible), never from a
+///      fee skim: the edge per selection is only about 3.85% of backing, so any fixed share of
+///      fees large enough to pay keepers exceeds it. A call is paid only when it did necessary
+///      work or realized more than its cost.
+///
 ///      Trust: FWA, its rewards module, Shapes, ShapePacks and the token's v4 pool are immutable
 ///      addresses fixed here. FWA's owner can change fees, the floor quote and admission; every
 ///      such change is read live, never cached. The guardian can only stop things and lower caps.
@@ -51,12 +57,14 @@ contract PackVault is ReentrancyGuard {
     uint256 internal constant SCALE = 1e36;
 
     /// @notice Hard bounds fixed in bytecode. Governance moves parameters only inside them.
-    uint256 public constant MAX_POSITIONS = 400; // bounds every checkpoint loop
+    /// Bounds the checkpoint loop: open plus idle positions never exceed it, and the worst-case
+    /// checkpoint must fit EIP-7825's 16,777,216 gas transaction cap with margin.
+    uint256 public constant MAX_POSITIONS = 300;
     uint256 public constant MAX_MIN_EDGE_BPS = 1_000;
     uint256 public constant MAX_BUFFER_BPS = 2_000;
     uint256 public constant MAX_GAS_CEILING = 50 gwei;
     uint256 public constant MAX_DISTRIBUTION_BPS = 5_000;
-    uint256 public constant MAX_KEEPER_FEE_BPS = 2_000;
+    uint256 public constant MAX_KEEPER_PREMIUM_BPS = 5_000;
     uint256 public constant MAX_KEEPER_SHARE_BPS = 5_000;
     uint256 public constant MAX_ALLOCATED_BOUND_BPS = 1_000;
     uint256 public constant MAX_CLIP_SLIPPAGE_BPS = 500;
@@ -66,6 +74,11 @@ contract PackVault is ReentrancyGuard {
     uint256 public constant MIN_DISTRIBUTION = 0.01 ether;
     uint256 public constant KEEPER_OVERHEAD_GAS = 30_000;
     uint256 public constant DEAD_SHARES = 1e15;
+    /// Gas a bid-outcome cycle costs the vault: relist plus its share of sync and harvest.
+    uint256 public constant CYCLE_GAS = 800_000;
+    /// Gas to build one 3-unit pack: a third of a 0.1 mint and ten-way split, plus createPack.
+    uint256 public constant RESTOCK_GAS_PER_PACK = 1_050_000;
+    uint256 public constant MAX_LIQUIDATIONS = 40; // packs redeemed per call, about 8M gas
 
     // ------------------------------------------------------------------ immutables
 
@@ -85,12 +98,13 @@ contract PackVault is ReentrancyGuard {
         uint16 minEdgeBps; // require k >= 1 + minEdge
         uint16 bufferBps; // list at cap x (1 - buffer), so a small ask cut does not trigger kicks
         uint16 distributionBps; // share of new gains above the high-water mark paid out
-        uint16 keeperFeeBps; // share of harvested FWA fees routed to the keeper pool
-        uint16 keeperShareBps; // reimbursement cap as a share of value a call realized
+        uint16 keeperPremiumBps; // paid on top of reimbursed gas
+        uint16 keeperShareBps; // optional calls are paid only if pay <= this share of value realized
         uint16 allocatedBoundBps; // checkpoint skips when Allocated value exceeds this share of NAV
         uint16 clipSlippageBps; // token sale must clear refPrice x (1 - this)
         uint64 packUnitsMask; // bit u set: packs of u x 0.01 ETH may be built and listed
         uint64 gasCeiling; // wei per gas
+        uint64 maxTip; // reimbursed price is at most basefee + this
         uint96 maxPositions;
         uint128 reserve; // ETH kept idle
         uint128 tvlCap; // deposits refused above this NAV
@@ -99,8 +113,8 @@ contract PackVault is ReentrancyGuard {
         uint128 refPrice; // wei per 1e18 token units, last fill or admin-set
     }
 
-    Params public params;
-    Params public pendingParams;
+    Params internal params;
+    Params internal pendingParams;
     uint256 public pendingParamsEta;
 
     bool public depositsPaused;
@@ -166,7 +180,6 @@ contract PackVault is ReentrancyGuard {
     mapping(address => uint256) public distDebt;
     uint256 public distributionReserve;
 
-    uint256 public keeperPool;
     uint256 public conversionInterval; // last INTERVAL index with a token sale
 
     // ------------------------------------------------------------------ events and errors
@@ -177,6 +190,8 @@ contract PackVault is ReentrancyGuard {
     event Checkpoint(uint256 indexed epoch, uint256 nav, uint256 supply, uint256 filledShares, uint256 paid, uint256 distributed);
     event Listed(uint256 indexed listingId, uint256 packId, uint256 backing);
     event Resolved(uint256 indexed listingId, uint8 status, bool packReturned);
+    event PackOwed(uint256 indexed listingId); // FWA holds the pack as a pull claim; sync retries
+    event Liquidated(uint256 packs, uint256 shapes, uint256 ethOut);
     event Unlisted(uint256 indexed listingId);
     event Restocked(uint256 packs, uint256 units);
     event Converted(uint256 tokensIn, uint256 ethOut);
@@ -250,54 +265,56 @@ contract PackVault is ReentrancyGuard {
     /// @notice Live economics from FWA. `backing` is what a new listing would post; zero when the
     ///         gate fails for a pack of `units` x 0.01 ETH.
     function edge(uint256 units) public view returns (uint256 k1e18, uint256 backing, bool ok) {
-        IFWAV2 f = fwa;
-        uint256 w = f.totalWeight();
-        if (w == 0) return (0, 0, false);
-        // FWA exposes no getter for its surcharge: acquisitionFee = (wbt / w) (1 + surcharge).
-        uint256 ev = f.weightedBackingTotal() / w;
-        uint256 oneSur = f.acquisitionFee() * 1e18 / ev; // 1e18 x (1 + surcharge), floors
-        k1e18 = oneSur * (BPS - f.ownerAcquisitionFeeBps()) / BPS * (BPS - f.topListingShareBps()) / BPS;
-
         Params memory p = params;
-        uint256 cap = _backingCap();
+        uint256 cap;
+        uint256 s;
+        (k1e18, cap, s) = VaultLib.economics(fwa, address(packs));
         backing = cap * (BPS - p.bufferBps) / BPS;
-        uint256 value = units * UNIT;
-        uint256 s = f.ownerSettlementFeeBps();
-        // Keep outcome must not lose: B (k - s) >= P. Bid outcome is B (k - 1) > 0 given k >= 1 + edge.
+        // Keep outcome must not lose: B (k - s) >= P. Bid outcome is B (k - 1) > 0 given k >= 1 +
+        // edge; spending callers also require it to clear gas (`_cycleNet`).
         ok = cap != 0 && k1e18 >= 1e18 + uint256(p.minEdgeBps) * 1e14 && k1e18 > s * 1e14
-            && backing * (k1e18 - s * 1e14) >= value * 1e18 && f.canDeposit(address(packs));
+            && backing * (k1e18 - s * 1e14) >= units * UNIT * 1e18;
         if (!ok) backing = 0;
     }
 
-    /// @dev FWA's live backing cap for packs: the oracle ask plus premium when the quote passes
-    ///      FWA's own validity rules, else zero (FWA would revert the listing).
-    function _backingCap() internal view returns (uint256) {
-        IFWAV2 f = fwa;
-        if (f.oracleExemptCollections(address(packs))) return 0; // no cap to anchor B: do not list
-        (uint256 bid, uint256 ask, uint48 observedAt, uint48 periodUsed) =
-            IFloorOracle(f.floorOracle()).getFloorRange(address(packs));
-        if (bid == 0 || bid >= ask || observedAt == 0 || observedAt > block.timestamp) return 0;
-        if (block.timestamp - observedAt > f.maxOracleAge()) return 0;
-        if (periodUsed < f.minOracleChallengePeriod()) return 0;
-        return ask * (BPS + f.oracleCeilingPremiumBps()) / BPS;
+    /// @dev Expected net of one bid-outcome cycle after its gas, zero when not positive.
+    function _cycleNet(uint256 k1e18, uint256 backing) internal view returns (uint256) {
+        if (k1e18 <= 1e18) return 0;
+        uint256 gross = backing * (k1e18 - 1e18) / 1e18;
+        uint256 gas = _gasCost(CYCLE_GAS);
+        return gross > gas ? gross - gas : 0;
+    }
+
+    /// @dev Wei the vault pays a keeper for `gasUnits`: price capped at basefee + tip and the
+    ///      ceiling, plus the premium.
+    function _gasCost(uint256 gasUnits) internal view returns (uint256) {
+        Params memory p = params;
+        uint256 price = M.min(M.min(tx.gasprice, block.basefee + p.maxTip), p.gasCeiling);
+        return gasUnits * price * (BPS + p.keeperPremiumBps) / BPS;
     }
 
     // ------------------------------------------------------------------ inventory
 
     /// @notice Build `count` packs of `units` x 0.01 ETH: mint 0.1 ETH Shapes, split each into ten
-    ///         0.01 Shapes (one mint fee per ten units), then pack them.
+    ///         0.01 Shapes (one mint fee per ten units), then pack them. Only when every new pack
+    ///         can be listed right away and its build cost is repaid by one bid cycle.
     function restock(uint256 count, uint256 units) external nonReentrant {
         uint256 g0 = gasleft();
         _requireOperating();
         if (listingPaused) revert Paused();
         if (count == 0 || (params.packUnitsMask >> units) & 1 == 0) revert Amount();
         if (_open.length + _idlePacks.length + count > params.maxPositions) revert Amount();
+        (uint256 k, uint256 backing, bool ok) = edge(units);
+        uint256 fee = shapes.mintFee();
+        if (!ok || _gasCost(RESTOCK_GAS_PER_PACK) + fee * units / SHAPES_PER_MINT > _cycleNet(k, backing)) {
+            revert EdgeGate();
+        }
         uint256 need = count * units;
         uint256 have = _looseShapes.length;
-        if (need > have) {
-            uint256 mints = (need - have + SHAPES_PER_MINT - 1) / SHAPES_PER_MINT;
-            uint256 fee = shapes.mintFee();
-            if (_idle() < mints * (0.1 ether + fee)) revert Liquidity();
+        uint256 mints = need > have ? (need - have + SHAPES_PER_MINT - 1) / SHAPES_PER_MINT : 0;
+        // Capital for the Shapes and the backing of every pack waiting to list, new ones included.
+        if (_idle() < mints * (0.1 ether + fee) + (count + _idlePacks.length) * backing) revert Liquidity();
+        if (mints != 0) {
             uint8[] memory outs = new uint8[](SHAPES_PER_MINT); // index 0 = 0.01 ETH
             for (uint256 i; i < mints; ++i) {
                 uint256 big = shapes.mint{value: 0.1 ether + fee}(0.1 ether);
@@ -329,8 +346,8 @@ contract PackVault is ReentrancyGuard {
         while (listed < maxCount && _idlePacks.length != 0 && _open.length < params.maxPositions) {
             uint256 packId = _idlePacks[_idlePacks.length - 1];
             uint256 units = packs.valueOf(packId) / UNIT;
-            (, uint256 backing, bool ok) = edge(units);
-            if (!ok) revert EdgeGate();
+            (uint256 k, uint256 backing, bool ok) = edge(units);
+            if (!ok || _cycleNet(k, backing) == 0) revert EdgeGate();
             if (_idle() < backing) break;
             _idlePacks.pop();
             uint256 listingId = fwa.listNFT{value: backing}(address(packs), packId);
@@ -346,43 +363,48 @@ contract PackVault is ReentrancyGuard {
 
     /// @notice Resolve positions FWA has moved on: reclaim allocated ones the purchaser left past
     ///         the settlement window, fold settled and withdrawn ones back into inventory.
+    ///         A pack FWA failed to deliver stays an open position until it arrives; calling sync
+    ///         again retries the pull. Paid only when something resolved.
     function sync(uint256[] calldata listingIds) external nonReentrant {
         uint256 g0 = gasleft();
-        uint256 realized;
+        uint256 resolved;
         for (uint256 i; i < listingIds.length; ++i) {
-            realized += _sync(listingIds[i]);
+            if (_sync(listingIds[i])) ++resolved;
         }
-        if (realized == 0) revert Nothing();
-        _reimburse(g0, realized);
+        if (resolved == 0) revert Nothing();
+        _reimburse(g0, type(uint256).max);
     }
 
-    /// @dev Returns the value the step made liquid or recovered, for keeper reimbursement caps.
-    function _sync(uint256 listingId) internal returns (uint256 realized) {
+    function _sync(uint256 listingId) internal returns (bool) {
         Position memory pos = positions[listingId];
-        if (_openIndex[listingId] == 0) return 0;
-        (,,,,,,,,, uint64 allocatedAt, uint8 status) = fwa.listings(listingId);
+        if (_openIndex[listingId] == 0) return false;
+        IFWAV2 f = fwa;
+        (,,,,,,,,, uint64 allocatedAt, uint8 status) = f.listings(listingId);
         if (status == LISTING_ALLOCATED) {
-            if (block.timestamp < allocatedAt + fwa.settlementWindow()) return 0;
+            if (block.timestamp < allocatedAt + f.settlementWindow()) return false;
             // Purchaser went silent: pick the better outcome for the vault.
-            uint256 back = pos.backing * (BPS - fwa.ownerSettlementFeeBps()) / BPS;
-            if (back >= pos.units * UNIT) fwa.depositorReclaimBacking(listingId);
-            else fwa.depositorReclaimNFT(listingId);
-            (,,,,,,,,,, status) = fwa.listings(listingId);
+            uint256 back = pos.backing * (BPS - f.ownerSettlementFeeBps()) / BPS;
+            if (back >= pos.units * UNIT) f.depositorReclaimBacking(listingId);
+            else f.depositorReclaimNFT(listingId);
+            (,,,,,,,,,, status) = f.listings(listingId);
         }
-        if (status != LISTING_SETTLED && status != LISTING_WITHDRAWN) return 0;
-        bool packBack = _recoverPack(listingId, pos.packId);
+        if (status != LISTING_SETTLED && status != LISTING_WITHDRAWN) return false;
+        // FWA delivers NFTs best-effort; a failed delivery is a pull claim held for the vault.
+        // The outcome comes from FWA's own record, never from inference: a pack is the vault's
+        // if the vault holds it or FWA owes it. Anything else went to the purchaser.
+        if (f.stuckNFTRecipient(listingId) == address(this)) {
+            // Reverts while the collection still fails; the claim survives for the next try.
+            (bool ok,) = address(f).call(abi.encodeCall(IFWAV2.recoverStuckNFT, (listingId)));
+            if (!ok || !_owns(pos.packId)) {
+                emit PackOwed(listingId);
+                return false;
+            }
+        }
+        bool packBack = _owns(pos.packId);
         if (packBack) _idlePacks.push(pos.packId);
         _removeOpen(listingId);
         emit Resolved(listingId, status, packBack);
-        return packBack ? pos.units * UNIT : pos.backing;
-    }
-
-    /// @dev FWA returns NFTs with plain `transferFrom` under a gas stipend; a failed delivery
-    ///      becomes a pull claim. Reconcile by ownership, never by callback.
-    function _recoverPack(uint256 listingId, uint256 packId) internal returns (bool) {
-        if (_owns(packId)) return true;
-        (bool ok,) = address(fwa).call(abi.encodeWithSignature("recoverStuckNFT(uint256)", listingId));
-        return ok && _owns(packId);
+        return true;
     }
 
     function _owns(uint256 packId) internal view returns (bool) {
@@ -403,11 +425,13 @@ contract PackVault is ReentrancyGuard {
         delete positions[listingId];
     }
 
-    /// @notice Withdraw active listings: allowed in wind-down, when the edge gate fails, or to
-    ///         cover locked redemptions idle liquidity cannot.
+    /// @notice Withdraw active listings: allowed in wind-down, when FWA's live fees leave no edge
+    ///         (k below 1 + minEdge), or to cover locked redemptions free ETH and inventory cannot.
+    ///         A stale quote or a gas spike stops new listings but never unwinds earning ones.
     function unlist(uint256[] calldata listingIds) external nonReentrant {
         uint256 g0 = gasleft();
-        (, , bool ok) = edge(MIN_PACK_UNITS);
+        (uint256 k,,) = edge(MIN_PACK_UNITS);
+        bool ok = k >= 1e18 + uint256(params.minEdgeBps) * 1e14;
         uint256 shortfall = _redemptionShortfall();
         if (!windingDown && ok && shortfall == 0) revert UnlistNotAllowed();
         uint256 realized;
@@ -427,21 +451,24 @@ contract PackVault is ReentrancyGuard {
             if (!windingDown && ok && realized >= shortfall) break;
         }
         if (realized == 0) revert Nothing();
-        _reimburse(g0, realized);
+        _reimburse(g0, type(uint256).max);
     }
 
-    /// @notice Pull settled FWA fee credit into the vault; a share funds the keeper pool.
-    function harvest() external nonReentrant {
+    /// @notice Pull FWA fees into the vault: pending fees of `activeIds` (they keep earning) and
+    ///         credited fees of resolved listings. Paid only if the pay is a small share of it.
+    function harvest(uint256[] calldata activeIds) external nonReentrant {
         uint256 g0 = gasleft();
-        uint256 amount = _harvest();
+        uint256 before = address(this).balance;
+        // One listing that moved on since the caller looked must not block the rest.
+        if (activeIds.length != 0) try fwa.claimListingFees(activeIds) {} catch {}
+        _harvest();
+        uint256 amount = address(this).balance - before;
         if (amount == 0) revert Nothing();
         _reimburse(g0, amount);
     }
 
-    function _harvest() internal returns (uint256 amount) {
-        if (fwa.feeCredit(address(this)) == 0) return 0;
-        amount = fwa.withdrawEarnings();
-        keeperPool += amount * params.keeperFeeBps / BPS;
+    function _harvest() internal {
+        if (fwa.feeCredit(address(this)) != 0) fwa.withdrawEarnings();
     }
 
     // ------------------------------------------------------------------ FWA token rewards
@@ -482,23 +509,7 @@ contract PackVault is ReentrancyGuard {
     /// @dev v4 exact-input sell of FWA (currency1) for native ETH (currency0).
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
         if (msg.sender != address(poolManager)) revert Nothing();
-        uint256 amount = abi.decode(data, (uint256));
-        PoolKey memory key = token.poolKey();
-        int256 delta = poolManager.swap(
-            key,
-            SwapParams({
-                zeroForOne: false,
-                amountSpecified: -int256(amount),
-                sqrtPriceLimitX96: 1_461_446_703_485_210_103_287_273_052_203_988_822_378_723_970_341
-            }),
-            ""
-        );
-        uint256 tokensIn = uint256(uint128(-int128(delta)));
-        uint256 ethOut = uint256(uint128(int128(delta >> 128)));
-        poolManager.sync(key.currency1);
-        address(token).safeTransfer(address(poolManager), tokensIn);
-        poolManager.settle();
-        poolManager.take(address(0), address(this), ethOut);
+        VaultLib.swapTokens(poolManager, token, abi.decode(data, (uint256)));
         return "";
     }
 
@@ -610,15 +621,16 @@ contract PackVault is ReentrancyGuard {
         uint256 interval = block.timestamp / INTERVAL;
         if (interval == lastCheckpointInterval) revert AlreadyCheckpointed();
         lastCheckpointInterval = interval;
+        // Paid only when holders have flows to settle; a no-op checkpoint is free to run, unpaid.
+        bool work = pendingDepositTotal != 0 || lockedShares != 0;
 
-        // Resolve and value every open position in one bounded pass.
+        // Value every open position from FWA state, read-only: resolving is sync's job, so the
+        // loop costs the same per position whatever FWA did to them.
         uint256 navPositions;
         uint256 allocatedValue;
         uint256 s = f.ownerSettlementFeeBps();
-        for (uint256 i = _open.length; i != 0; --i) {
-            uint256 id = _open[i - 1];
-            _sync(id);
-            if (_openIndex[id] == 0) continue;
+        for (uint256 i; i < _open.length; ++i) {
+            uint256 id = _open[i];
             Position memory pos = positions[id];
             (,,,,,,,,,, uint8 status) = f.listings(id);
             uint256 value = pos.units * UNIT;
@@ -626,14 +638,17 @@ contract PackVault is ReentrancyGuard {
                 navPositions += value + pos.backing + f.pendingFees(id);
             } else if (status == LISTING_STAGED) {
                 navPositions += value + pos.backing;
-            } else {
-                // Allocated: both outcomes pay at least the lesser of the pack and the net backing.
+            } else if (status == LISTING_ALLOCATED) {
+                // Both outcomes pay at least the lesser of the pack and the net backing.
                 uint256 floorValue = M.min(value, pos.backing * (BPS - s) / BPS);
                 navPositions += floorValue;
                 allocatedValue += floorValue;
+            } else if (_owns(pos.packId) || f.stuckNFTRecipient(id) == address(this)) {
+                // Settled or withdrawn, not yet synced: every ETH leg already reached the
+                // balance or fee credit; the pack is held or owed to the vault.
+                navPositions += value;
             }
         }
-        // Fee credit from positions the loop just resolved lands in the balance here.
         _harvest();
         uint256 inventory = _looseShapes.length * UNIT;
         for (uint256 i; i < _idlePacks.length; ++i) {
@@ -643,7 +658,8 @@ contract PackVault is ReentrancyGuard {
         if (allocatedValue * BPS > nav * params.allocatedBoundBps) revert AllocatedExposure();
 
         uint256 supply = totalShares;
-        // 1. Redemptions at the pre-flow price, funded by idle ETH, new deposits and inventory.
+        // 1. Redemptions at the pre-flow price, funded by free ETH and new deposits. Inventory is
+        //    turned into ETH beforehand by `liquidate`, so this call stays bounded.
         uint256 filled;
         uint256 paid;
         if (lockedShares != 0) {
@@ -651,23 +667,22 @@ contract PackVault is ReentrancyGuard {
             // reserve below never exceeds the ETH actually freed.
             uint256 owed = M.mulDivUp(lockedShares, nav, supply);
             uint256 liquid = _free() + pendingDepositTotal;
-            if (liquid < owed) liquid += _liquidateInventory(owed - liquid);
-            uint256 f = owed <= liquid ? SCALE : M.mulDiv(liquid > 2 ? liquid - 2 : 0, SCALE, owed);
-            filled = M.mulDiv(lockedShares, f, SCALE);
+            uint256 frac = owed <= liquid ? SCALE : M.mulDiv(liquid > 2 ? liquid - 2 : 0, SCALE, owed);
+            filled = M.mulDiv(lockedShares, frac, SCALE);
             // ETH per locked share this checkpoint, x SCALE. Holders claim floor(shares x unit);
             // the reserve rounds the same unit up over the (never understated) locked total, so
             // it always covers the sum of claims.
-            uint256 unit = M.mulDiv(f, nav, supply);
+            uint256 unit = M.mulDiv(frac, nav, supply);
             paid = M.mulDivUp(lockedShares, unit, SCALE);
             redeemQ += M.mulDiv(redeemG, unit, SCALE);
-            if (f == SCALE) {
+            if (frac == SCALE) {
                 eraFinalQ[redeemEra] = redeemQ;
                 ++redeemEra;
                 redeemG = SCALE;
                 redeemQ = 0;
                 lockedShares = 0;
             } else {
-                redeemG = M.mulDiv(redeemG, SCALE - f, SCALE);
+                redeemG = M.mulDiv(redeemG, SCALE - frac, SCALE);
                 lockedShares -= filled;
             }
             redemptionReserve += paid;
@@ -706,61 +721,78 @@ contract PackVault is ReentrancyGuard {
         lastNav = nav;
         emit Checkpoint(epoch, nav, totalShares, filled, paid, distributed);
         ++epoch;
+        _reimburse(g0, work || distributed != 0 ? type(uint256).max : 0);
+    }
+
+    /// @notice Redeem up to `maxCount` idle packs (then loose Shapes) to ETH at their exact
+    ///         backing, while locked redemptions exceed free ETH, or freely in wind-down.
+    function liquidate(uint256 maxCount) external nonReentrant {
+        uint256 g0 = gasleft();
+        if (!windingDown && _owedEstimate() <= _free() + pendingDepositTotal) revert Nothing();
+        maxCount = M.min(maxCount, MAX_LIQUIDATIONS);
+        uint256 before = address(this).balance;
+        uint256 n;
+        uint256 m;
+        while (n + m < maxCount && (windingDown || _owedEstimate() > _free() + pendingDepositTotal)) {
+            if (_idlePacks.length != 0) {
+                packs.redeem(_idlePacks[_idlePacks.length - 1]);
+                _idlePacks.pop();
+                ++n;
+            } else if (_looseShapes.length != 0) {
+                shapes.redeem(_looseShapes[_looseShapes.length - 1]);
+                _looseShapes.pop();
+                ++m;
+            } else {
+                break;
+            }
+        }
+        if (n + m == 0) revert Nothing();
+        emit Liquidated(n, m, address(this).balance - before);
         _reimburse(g0, type(uint256).max);
     }
 
-    /// @dev Redeem idle inventory to ETH at its exact backing until `needed` is covered.
-    function _liquidateInventory(uint256 needed) internal returns (uint256 got) {
-        uint256 before = address(this).balance;
-        while (got < needed && _idlePacks.length != 0) {
-            uint256 packId = _idlePacks[_idlePacks.length - 1];
-            _idlePacks.pop();
-            packs.redeem(packId);
-            got = address(this).balance - before;
-        }
-        while (got < needed && _looseShapes.length != 0) {
-            uint256 id = _looseShapes[_looseShapes.length - 1];
-            _looseShapes.pop();
-            shapes.redeem(id);
-            got = address(this).balance - before;
-        }
+    /// @dev ETH locked shares will need at the last checkpoint's price, rounded up.
+    function _owedEstimate() internal view returns (uint256) {
+        if (lockedShares == 0) return 0;
+        return M.mulDivUp(lockedShares, lastNav, totalShares);
     }
 
     function _redemptionShortfall() internal view returns (uint256) {
-        if (lockedShares == 0 || totalShares == 0) return 0;
-        uint256 owed = M.mulDiv(lockedShares, lastNav, totalShares);
-        uint256 liquid = _free() + _idlePacks.length * MIN_PACK_UNITS * UNIT
-            + _looseShapes.length * UNIT;
-        return owed > liquid ? owed - liquid : 0;
+        uint256 owed = _owedEstimate();
+        uint256 inventory = _free() + _looseShapes.length * UNIT;
+        for (uint256 i; i < _idlePacks.length; ++i) {
+            inventory += packs.valueOf(_idlePacks[i]);
+        }
+        return owed > inventory ? owed - inventory : 0;
     }
 
-    /// @dev The vault's own ETH: balance less escrowed deposits and amounts owed to holders and
-    ///      keepers. Forced ETH lands here, so it is attributed by balance, never by callback.
+    /// @dev The vault's own ETH: balance less escrowed deposits and amounts owed to holders.
+    ///      Forced ETH lands here, so it is attributed by balance, never by callback.
     function _free() internal view returns (uint256) {
-        uint256 owed = pendingDepositTotal + redemptionReserve + distributionReserve + keeperPool;
+        uint256 owed = pendingDepositTotal + redemptionReserve + distributionReserve;
         uint256 bal = address(this).balance;
         return bal > owed ? bal - owed : 0;
     }
 
-    /// @dev ETH the strategy may spend: free ETH above the reserve.
+    /// @dev ETH the strategy may spend: free ETH above the reserve and above what locked
+    ///      redemptions will need, so ETH freed for redeemers cannot be relisted.
     function _idle() internal view returns (uint256) {
         uint256 free = _free();
-        uint256 reserve = params.reserve;
-        return free > reserve ? free - reserve : 0;
+        uint256 keep = params.reserve + _owedEstimate();
+        return free > keep ? free - keep : 0;
     }
 
     // ------------------------------------------------------------------ keeper pay
 
-    /// @dev Reimburse the caller's gas from the keeper pool, at most `opGasCap` gas at a price
-    ///      capped by `gasCeiling`, and at most `keeperShareBps` of the value the call realized.
+    /// @dev Reimburse the caller's gas plus premium from vault ETH, at most `opGasCap` gas.
+    ///      `realized` is the value an optional call produced: it pays only when the pay is at
+    ///      most `keeperShareBps` of that value, so dust harvests and sales earn nothing.
+    ///      type(uint256).max marks necessary work (always paid); zero marks no work.
     function _reimburse(uint256 g0, uint256 realized) internal {
-        Params memory p = params;
-        uint256 gasUsed = M.min(g0 - gasleft() + KEEPER_OVERHEAD_GAS, p.opGasCap);
-        uint256 amount = gasUsed * M.min(tx.gasprice, p.gasCeiling);
-        if (realized != type(uint256).max) amount = M.min(amount, realized * p.keeperShareBps / BPS);
-        amount = M.min(amount, keeperPool);
+        uint256 amount = _gasCost(M.min(g0 - gasleft() + KEEPER_OVERHEAD_GAS, params.opGasCap));
+        if (realized != type(uint256).max && amount * BPS > realized * params.keeperShareBps) return;
+        amount = M.min(amount, _free());
         if (amount == 0) return;
-        keeperPool -= amount;
         msg.sender.forceSafeTransferETH(amount);
         emit KeeperPaid(msg.sender, amount);
     }
@@ -825,14 +857,22 @@ contract PackVault is ReentrancyGuard {
     function _checkBounds(Params memory p) internal pure {
         if (
             p.minEdgeBps > MAX_MIN_EDGE_BPS || p.bufferBps > MAX_BUFFER_BPS || p.distributionBps > MAX_DISTRIBUTION_BPS
-                || p.keeperFeeBps > MAX_KEEPER_FEE_BPS || p.keeperShareBps > MAX_KEEPER_SHARE_BPS
+                || p.keeperPremiumBps > MAX_KEEPER_PREMIUM_BPS || p.keeperShareBps > MAX_KEEPER_SHARE_BPS
                 || p.allocatedBoundBps > MAX_ALLOCATED_BOUND_BPS || p.clipSlippageBps > MAX_CLIP_SLIPPAGE_BPS
-                || p.gasCeiling > MAX_GAS_CEILING || p.maxPositions > MAX_POSITIONS || p.opGasCap > 10_000_000
+                || p.gasCeiling > MAX_GAS_CEILING || p.maxPositions > MAX_POSITIONS || p.opGasCap > 16_777_216
                 || p.packUnitsMask >> (MAX_PACK_UNITS + 1) != 0 || p.packUnitsMask & ((1 << MIN_PACK_UNITS) - 1) != 0
         ) revert OutOfBounds();
     }
 
     // ------------------------------------------------------------------ views
+
+    function getParams() external view returns (Params memory) {
+        return params;
+    }
+
+    function getPendingParams() external view returns (Params memory) {
+        return pendingParams;
+    }
 
     function openListings() external view returns (uint256[] memory) {
         return _open;

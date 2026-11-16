@@ -13,6 +13,7 @@ interface IFwaSettle {
     function keepNFT(uint256 listingId) external;
     function setCollectionsWhitelisted(address[] calldata collections, bool allowed) external;
     function topListingId() external view returns (uint256);
+    function processAcquisitions(uint256 maxCount) external returns (uint256 processed);
 }
 
 /// @notice Outcome paths driven by FWA's real randomness. sim/find_selection.py found historical
@@ -20,7 +21,7 @@ interface IFwaSettle {
 ///         request. Each test forks right before that request, posts the listings, then replays
 ///         the real request and fulfillment transactions. Only the purchaser's choice is ours to
 ///         drive, through the purchaser's own call.
-contract ForkSelectionTest is Test {
+abstract contract SelectionBase is Test {
     IShapes constant SHAPES = IShapes(0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0);
     IShapePacks constant PACKS = IShapePacks(0xf21514B090Da7dF4390803497d6ae673801E5cA7);
     IFWAV2 constant FWA = IFWAV2(0x958C41181182e76F221331b2755b77D9e1426A98);
@@ -69,6 +70,13 @@ contract ForkSelectionTest is Test {
     PackVault vault;
     uint256 selected;
     uint256 expectedShare; // the selecting acquisition's flat fee share per listing
+    // FWA's inputs to that share, read just before the replayed request.
+    uint256 acqFee;
+    uint256 acqCutBps;
+    uint256 acqCrownBps; // zero when no listing holds the crown
+    uint256 acqActive;
+    uint256 deployBalance; // vault balance right after deployment (seed plus any mainnet dust)
+    uint256 selectPay; // keeper pay to this contract for the restock and list in _select
 
     function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
         return this.onERC721Received.selector;
@@ -89,7 +97,8 @@ contract ForkSelectionTest is Test {
 
         PackVault.Params memory p;
         p.minEdgeBps = 100;
-        p.keeperFeeBps = 500;
+        p.keeperPremiumBps = 1_000;
+        p.maxTip = 0.05 gwei;
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 200;
         p.clipSlippageBps = 500;
@@ -102,8 +111,11 @@ contract ForkSelectionTest is Test {
         vault = new PackVault{value: 3 ether}(
             FWA, SHAPES, PACKS, makeAddr("sel-guardian"), makeAddr("sel-admin"), 2 days, p
         );
+        deployBalance = address(vault).balance;
+        uint256 b0 = address(this).balance;
         vault.restock(COUNT, 3);
         vault.list(COUNT);
+        selectPay = address(this).balance - b0;
         uint256[] memory ids = vault.openListings();
         selected = ids[c.index];
         (,,,,,,,, uint256 slot,, uint8 status) = FWA.listings(selected);
@@ -112,11 +124,13 @@ contract ForkSelectionTest is Test {
 
         // The flat share this acquisition pays each active listing, from FWA's own formula.
         uint256 fee = FWA.acquisitionFee();
-        uint256 distributable = fee - fee * FWA.ownerAcquisitionFeeBps() / 10_000;
-        if (IFwaSettle(address(FWA)).topListingId() != 0) {
-            distributable -= distributable * FWA.topListingShareBps() / 10_000;
-        }
-        expectedShare = distributable / FWA.activeListingCount();
+        acqFee = fee;
+        acqCutBps = FWA.ownerAcquisitionFeeBps();
+        acqCrownBps = IFwaSettle(address(FWA)).topListingId() != 0 ? FWA.topListingShareBps() : 0;
+        acqActive = FWA.activeListingCount();
+        uint256 distributable = fee - fee * acqCutBps / 10_000;
+        distributable -= distributable * acqCrownBps / 10_000;
+        expectedShare = distributable / acqActive;
 
         // vm.transact re-forks at the transaction and would drop our listings, so each real
         // transaction is replayed as its original call: same sender, origin, calldata, value
@@ -157,6 +171,9 @@ contract ForkSelectionTest is Test {
         }
     }
 
+}
+
+contract ForkSelectionTest is SelectionBase {
     function test_bidOutcome_packReturnsBackingSpent() public {
         Candidate memory c = late();
         _select(c);
@@ -168,15 +185,19 @@ contract ForkSelectionTest is Test {
         assertEq(address(vault).balance, vBefore, "no ETH back to the vault on a bid outcome");
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
+        uint256 keeperBefore = address(this).balance;
         vault.sync(one);
+        uint256 syncPay = address(this).balance - keeperBefore;
+        assertGt(syncPay, 0, "resolving a position is paid");
+        assertEq(vBefore - address(vault).balance, syncPay, "sync moves no ETH but its gas pay");
         assertEq(vault.idlePacks().length, 1, "pack back in inventory");
         assertEq(vault.openListings().length, COUNT - 1);
-        uint256 keeperBefore = address(this).balance;
-        vault.harvest();
-        uint256 keeperPaid = address(this).balance - keeperBefore;
-        // 5% of the harvest funds the keeper pool; this call's reimbursement is drawn from it.
-        assertApproxEqAbs(address(vault).balance - vBefore + keeperPaid, expectedShare, 2);
-        assertApproxEqAbs(vault.keeperPool() + keeperPaid, expectedShare * 500 / 10_000, 2);
+        keeperBefore = address(this).balance;
+        vault.harvest(new uint256[](0));
+        // The whole credited share reaches the vault. Its gas would cost more than 25% of it, so
+        // the harvest is unpaid: a keeper earns nothing for a dust harvest.
+        assertEq(address(this).balance, keeperBefore, "dust harvest unpaid");
+        assertApproxEqAbs(address(vault).balance + syncPay - vBefore, expectedShare, 2);
     }
 
     function test_keepOutcome_backingBackLessFee() public {
@@ -204,9 +225,10 @@ contract ForkSelectionTest is Test {
         vault.sync(one); // purchaser's window still open
         vm.warp(block.timestamp + FWA.settlementWindow());
         uint256 vBefore = address(vault).balance;
+        uint256 kBefore = address(this).balance;
         vault.sync(one);
-        // B (1 - s) = 0.035937 > P = 0.03, so the vault takes the backing (D9).
-        assertEq(address(vault).balance - vBefore, B * 9_900 / 10_000);
+        // B (1 - s) = 0.035937 > P = 0.03, so the vault takes the backing (D9), less gas pay.
+        assertEq(address(vault).balance - vBefore + (address(this).balance - kBefore), B * 9_900 / 10_000);
         assertEq(vault.openListings().length, COUNT - 1);
     }
 

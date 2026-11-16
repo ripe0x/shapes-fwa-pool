@@ -87,12 +87,13 @@ contract ForkVaultAdversarialTest is ForkBase {
         uint256 supply = vault.totalShares();
         uint256 aliceShares = vault.shareBalance(alice);
         uint256 nav = vault.lastNav();
-        // Alice's claim on NAV equals what she paid in, to the wei-scale rounding of share math.
-        assertApproxEqAbs(nav * aliceShares / supply, 5 ether, 1e10, "victim keeps her deposit");
+        // Alice's claim on NAV equals what she paid in, less her share of the last checkpoint's
+        // keeper pay (about 4e13 wei at 0.2 gwei, paid after pricing).
+        assertApproxEqAbs(nav * aliceShares / supply, 5 ether, 1e14, "victim keeps her deposit");
         // The donation is shared by everyone who held shares before it, dead shares included.
         uint256 seed = 0.01 ether + preexisting;
         uint256 attackerValue = nav * vault.shareBalance(attacker) / supply;
-        assertApproxEqAbs(attackerValue, (0.01 ether + 10 ether) - 10 ether * seed / (seed + 0.01 ether), 1e10);
+        assertApproxEqAbs(attackerValue, (0.01 ether + 10 ether) - 10 ether * seed / (seed + 0.01 ether), 1e14);
         assertLt(attackerValue, 10.01 ether, "attacker loses part of the donation to the seed");
     }
 
@@ -115,8 +116,9 @@ contract ForkVaultAdversarialTest is ForkBase {
         checkpoint();
         uint256 owed = vault.claimableEth(address(r));
         r.claim();
-        // Holder-side rounding is down: at most 1 wei short, never over.
-        assertApproxEqAbs(address(r).balance, 1 ether, 1, "claimed its redemption");
+        // The holder bears its share of keeper gas paid after its pricing (two checkpoints at
+        // 0.2 gwei, about 4e13 wei), and holder-side rounding is down: never over.
+        assertApproxEqAbs(address(r).balance, 1 ether, 1e14, "claimed its redemption");
         assertLe(address(r).balance, 1 ether);
         assertEq(owed, 0, "claimable is settled lazily inside claim");
         assertEq(r.reentryReverted(), 1, "re-entry from receive reverted");
@@ -138,11 +140,13 @@ contract ForkVaultAdversarialTest is ForkBase {
         toBlackout();
         checkpoint();
         uint256 distributed = vault.distributionReserve();
-        // 20% of the 1 ETH gain, gain measured above the high-water mark.
-        assertApproxEqAbs(distributed, 0.2 ether, 1e6);
+        // 20% of the 1 ETH gain above the high-water mark, less the first checkpoint's keeper pay
+        // (paid after pricing, so it lowers the next gain).
+        assertApproxEqAbs(distributed, 0.2 ether, 2e13);
+        assertLe(distributed, 0.2 ether);
         uint256 supply = vault.totalShares();
         // Distributions accrue to live shares only (D13): alice holds all of them.
-        uint256 aliceShare = 0.2 ether * vault.shareBalance(alice) / (supply - vault.DEAD_SHARES());
+        uint256 aliceShare = distributed * vault.shareBalance(alice) / (supply - vault.DEAD_SHARES());
         uint256 before = alice.balance;
         vm.prank(alice);
         vault.claim();
@@ -183,31 +187,140 @@ contract ForkVaultAdversarialTest is ForkBase {
         assertEq(vault.distributionReserve(), 0, "no live shares, nothing distributed");
     }
 
-    /// Limits at maximum: the checkpoint loop over every open position must fit a block.
+    uint256 constant TX_GAS_CAP = 16_777_216; // EIP-7825 (Fusaka) per-transaction gas cap
+
+    /// Limits at maximum: the checkpoint loop over every position must fit EIP-7825's per-
+    /// transaction cap with margin. Old code: 16.08M at 400 positions, 4% under the cap.
     function test_checkpointGasAtMaxPositions() public {
-        uint256[2] memory sizes = [uint256(150), 400];
-        for (uint256 r; r < sizes.length; ++r) {
-            uint256 n = sizes[r];
-            PackVault.Params memory p = defaultParams();
-            p.maxPositions = uint96(n);
-            p.reserve = 0;
-            vm.deal(address(this), 100 ether);
-            vault = new PackVault{value: 30 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p);
-            for (uint256 i; i < n; i += 50) {
-                vault.restock(50, 3);
-                vault.list(50);
-            }
-            assertEq(vault.openListings().length, n);
-            vm.prank(alice);
-            vault.deposit{value: 0.1 ether}();
-            toBlackout();
-            uint256 g = gasleft();
-            vault.checkpoint();
-            uint256 used = g - gasleft();
-            emit log_named_uint(string.concat("checkpoint gas at positions ", vm.toString(n)), used);
-            assertLt(used, 30_000_000, "fits well under the mainnet block gas limit");
-            toOpen();
+        uint256 n = vault.MAX_POSITIONS();
+        PackVault.Params memory p = defaultParams();
+        p.maxPositions = uint96(n);
+        p.reserve = 0;
+        vm.deal(address(this), 100 ether);
+        vault = new PackVault{value: 25 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p);
+        for (uint256 i; i < n; i += 10) {
+            vault.restock(10, 3);
+            vault.list(10);
         }
+        assertEq(vault.openListings().length, n);
+        vm.prank(alice);
+        vault.deposit{value: 0.1 ether}();
+        toBlackout();
+        uint256 g = gasleft();
+        vault.checkpoint{gas: TX_GAS_CAP - 100_000}();
+        uint256 used = g - gasleft();
+        emit log_named_uint("checkpoint gas at MAX_POSITIONS", used);
+        assertLt(used, TX_GAS_CAP * 80 / 100, "20% margin under the transaction cap");
+    }
+
+    /// Every keeper batch the reference keeper sends fits the transaction cap.
+    function test_keeperBatchesFitTxCap() public {
+        PackVault.Params memory p = defaultParams();
+        p.reserve = 0;
+        vm.deal(address(this), 100 ether);
+        vault = new PackVault{value: 10 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p);
+        uint256 g = gasleft();
+        vault.restock{gas: TX_GAS_CAP}(10, 3);
+        emit log_named_uint("restock 10 packs", g - gasleft());
+        g = gasleft();
+        vault.list{gas: TX_GAS_CAP}(10);
+        emit log_named_uint("list 10", g - gasleft());
+        vm.prank(guardian);
+        vault.startWindDown();
+        uint256[] memory ids = vault.openListings();
+        g = gasleft();
+        vault.unlist{gas: TX_GAS_CAP}(ids);
+        emit log_named_uint("unlist 10", g - gasleft());
+        g = gasleft();
+        vault.liquidate{gas: TX_GAS_CAP}(40);
+        emit log_named_uint("liquidate 10 packs + loose", g - gasleft());
+        assertEq(vault.idlePacks().length, 0);
+    }
+
+    /// Repair: with the old 5% keeper fee, a bid cycle lost money for holders (0.05 kB = 1.885
+    /// mETH > B (k - 1) = 1.396 mETH). Now no fee is skimmed: every harvested wei is NAV, and
+    /// the only keeper cost is reimbursed gas.
+    function test_noFeeSkimOnHarvest() public {
+        assertEq(address(vault).balance, 0.01 ether + preexisting);
+        vm.prank(alice);
+        vault.deposit{value: 1 ether}();
+        toBlackout();
+        uint256 kBefore = keeper.balance;
+        checkpoint();
+        assertGt(keeper.balance, kBefore, "a checkpoint pricing a deposit is paid");
+        // The keeper's pay came out of free ETH after pricing; nothing else is set aside from NAV.
+        assertEq(address(vault).balance + (keeper.balance - kBefore), vault.lastNav());
+    }
+
+    /// Repair: a checkpoint with no holder flows pays nothing (it cost about 6M gas at 150
+    /// positions and could be farmed every 12 hours).
+    function test_idleCheckpointUnpaid() public {
+        toBlackout();
+        uint256 kBefore = keeper.balance;
+        checkpoint();
+        assertEq(keeper.balance, kBefore);
+    }
+
+    /// Repair: restock spent ETH on packs whatever the gate said and whether or not they could be
+    /// listed. Now it needs the live edge, payback within one cycle, and capital for the backing.
+    function test_restockGated() public {
+        vm.prank(alice);
+        vault.deposit{value: 0.3 ether}();
+        toBlackout();
+        checkpoint();
+        toOpen();
+        vm.startPrank(keeper);
+        // Capital: 0.26 ETH above the reserve covers two 0.101 mints, not five packs' backing on top.
+        vm.expectRevert(PackVault.Liquidity.selector);
+        vault.restock(5, 3);
+        // Gas: at 3 gwei (under the 5 gwei ceiling) a pack's build cost exceeds one cycle's net.
+        vm.fee(3 gwei);
+        vm.txGasPrice(3 gwei);
+        vm.expectRevert(PackVault.EdgeGate.selector);
+        vault.restock(1, 3);
+        vm.fee(0.15 gwei);
+        vm.txGasPrice(0.2 gwei);
+        vault.restock(1, 3);
+        vm.stopPrank();
+    }
+
+    /// Repair: ETH freed for redeemers could be relisted, so a keeper could loop unlist -> list
+    /// and be paid both ways while redemptions never filled.
+    function test_unlistListLoopClosed() public {
+        vm.prank(alice);
+        vault.deposit{value: 1 ether}();
+        toBlackout();
+        checkpoint();
+        toOpen();
+        vm.startPrank(keeper);
+        vault.restock(6, 3);
+        vault.list(6);
+        vm.stopPrank();
+        uint256 shares = vault.shareBalance(alice);
+        vm.prank(alice);
+        vault.requestRedeem(shares);
+        uint256[] memory ids = vault.openListings();
+        vm.startPrank(keeper);
+        vault.unlist(ids);
+        // The freed backing and packs are owed to alice: nothing can be listed or restocked.
+        assertEq(vault.idleEth(), 0);
+        vm.expectRevert(PackVault.Nothing.selector);
+        vault.list(6);
+        vm.stopPrank();
+    }
+
+    /// Liquidation only runs when redeemers need ETH (or in wind-down).
+    function test_liquidateOnlyWhenNeeded() public {
+        vm.prank(alice);
+        vault.deposit{value: 1 ether}();
+        toBlackout();
+        checkpoint();
+        toOpen();
+        vm.prank(keeper);
+        vault.restock(3, 3);
+        vm.prank(keeper);
+        vm.expectRevert(PackVault.Nothing.selector);
+        vault.liquidate(10);
     }
 
     function test_depositAboveTvlCapReverts() public {

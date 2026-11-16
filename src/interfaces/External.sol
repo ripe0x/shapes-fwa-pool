@@ -53,6 +53,7 @@ interface IFWAV2 {
     function depositorReclaimBacking(uint256 listingId) external;
     function depositorReclaimNFT(uint256 listingId) external;
     function recoverStuckNFT(uint256 listingId) external;
+    function stuckNFTRecipient(uint256 listingId) external view returns (address);
     function finalizeUnsettled(uint256 listingId) external;
     function pendingFees(uint256 listingId) external view returns (uint256);
     function feeCredit(address depositor) external view returns (uint256);

@@ -68,7 +68,8 @@ abstract contract ForkBase is Test {
         p.minEdgeBps = 100;
         p.bufferBps = 0;
         p.distributionBps = 0;
-        p.keeperFeeBps = 500;
+        p.keeperPremiumBps = 1_000;
+        p.maxTip = 0.05 gwei;
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 200;
         p.clipSlippageBps = 500;
@@ -77,7 +78,7 @@ abstract contract ForkBase is Test {
         p.maxPositions = 150;
         p.reserve = 0.05 ether;
         p.tvlCap = 100 ether;
-        p.opGasCap = 3_000_000;
+        p.opGasCap = 15_000_000;
         p.clipMax = 1e24;
         p.refPrice = 0;
     }

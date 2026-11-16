@@ -39,7 +39,8 @@ contract ForkTokensTest is Test {
 
         PackVault.Params memory p;
         p.minEdgeBps = 100;
-        p.keeperFeeBps = 500;
+        p.keeperPremiumBps = 1_000;
+        p.maxTip = 0.05 gwei;
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 200;
         p.clipSlippageBps = 500;
@@ -118,10 +119,7 @@ contract ForkTokensTest is Test {
         vault.convert(held, 0);
 
         uint256 ref = _quotePrice();
-        PackVault.Params memory p;
-        (p.minEdgeBps, p.bufferBps, p.distributionBps, p.keeperFeeBps, p.keeperShareBps, p.allocatedBoundBps,
-            p.clipSlippageBps, p.packUnitsMask, p.gasCeiling, p.maxPositions, p.reserve, p.tvlCap, p.opGasCap,
-            p.clipMax, p.refPrice) = vault.params();
+        PackVault.Params memory p = vault.getParams();
         p.refPrice = uint128(ref);
         vm.prank(admin);
         vault.proposeParams(p);

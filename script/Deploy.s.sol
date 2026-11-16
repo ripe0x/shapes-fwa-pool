@@ -15,12 +15,13 @@ contract Deploy is Script {
         p.minEdgeBps = uint16(vm.parseJsonUint(v, ".minEdgeBps"));
         p.bufferBps = uint16(vm.parseJsonUint(v, ".bufferBps"));
         p.distributionBps = uint16(vm.parseJsonUint(v, ".distributionBps"));
-        p.keeperFeeBps = uint16(vm.parseJsonUint(v, ".keeperFeeBps"));
+        p.keeperPremiumBps = uint16(vm.parseJsonUint(v, ".keeperPremiumBps"));
         p.keeperShareBps = uint16(vm.parseJsonUint(v, ".keeperShareBps"));
         p.allocatedBoundBps = uint16(vm.parseJsonUint(v, ".allocatedBoundBps"));
         p.clipSlippageBps = uint16(vm.parseJsonUint(v, ".clipSlippageBps"));
         p.packUnitsMask = uint64(vm.parseJsonUint(v, ".packUnitsMask"));
         p.gasCeiling = uint64(vm.parseJsonUint(v, ".gasCeilingWei"));
+        p.maxTip = uint64(vm.parseJsonUint(v, ".maxTipWei"));
         p.maxPositions = uint96(vm.parseJsonUint(v, ".maxPositions"));
         p.reserve = uint128(vm.parseJsonUint(v, ".reserveWei"));
         p.tvlCap = uint128(vm.parseJsonUint(v, ".tvlCapWei"));
