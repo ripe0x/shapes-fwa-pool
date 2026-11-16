@@ -38,3 +38,74 @@ providers silently would break it.
 for analytics, so the refs/ provenance process (sources + sha256) is more than this needs.
 **If you disagree:** vendor its full sources under `refs/` with `fwa_refs.py` before any
 contract code imports its interface.
+
+## D5. No in-kind FWA token fallback
+
+**Chose:** the vault sells FWA tokens through the token's own Uniswap v4 pool, or holds them at
+zero NAV value. It has no "switch to in-kind and let holders pull FWA" mode (plan 2.7).
+**Why:** FWAToken transfers are locked. A transfer succeeds only when the sender or receiver is a
+distributor, the token owner, or the v4 PoolManager under the hook's transient allowance (sells
+are never gated). The vault is not a distributor, so it could never hand tokens to holders; an
+in-kind mode would strand them while claiming not to. Confirmed by `test_measureTokenRoute`.
+**Cost:** if the pool route dies, tokens stay stranded at zero value. NAV never counted them.
+**If you disagree:** FWA would need to grant the vault the distributor role; then in-kind is a
+small addition.
+
+## D6. Checkpoint values every position in one bounded pass
+
+**Chose:** `checkpoint()` syncs and values all open positions itself; `MAX_POSITIONS = 400` in
+bytecode bounds the loop (about 8M gas at 400, 3M at the 150 default).
+**Why:** the plan's incremental cursor exists to bound cost per call. A hard bytecode cap does the
+same with far less state and no partially-synced epochs to reason about.
+**If you disagree:** needed only if you want more than about 400 positions (about 26 ETH).
+
+## D7. Distributions only when no shares are waiting to exit
+
+**Chose:** a checkpoint distributes only if every locked redemption was filled in full.
+**Why:** shares locked mid-redemption would otherwise either miss the payout (redeemers lose) or
+need a second share class. Skipping the epoch keeps one price for everyone. Gains carry to the
+next checkpoint; nothing is lost.
+
+## D8. One keeper pool, no separate essential reserve
+
+**Chose:** keeper pay comes from one pool funded by `keeperFeeBps` of harvested FWA fees, excluded
+from NAV. Pay = min(gas used + 30k, opGasCap) x min(gas price, gasCeiling), capped by
+`keeperShareBps` of value the call realized where measurable (sync, unlist, harvest, convert),
+and by the pool balance. Calls that do nothing revert, so they pay nothing.
+**Why:** pausing never touches the pool, so a second reserve for "essential" calls bought nothing.
+Every call still works unpaid when the pool is empty.
+
+## D9. Silent purchaser: the vault takes the better outcome
+
+**Chose:** after FWA's 1 h settlement window, `sync` calls `depositorReclaimBacking` when
+B (1 - s) >= P (true at the cap: 0.0359 > 0.03), else `depositorReclaimNFT`.
+**Why:** at the cap the vault nets B (k - s) - P = +0.0073 on reclaiming backing versus
+B (k - 1) = +0.0014 on reclaiming the pack.
+
+## D10. Selection tests replay real VRF transactions
+
+**Chose:** no VRF double. `sim/find_selection.py` searches history for real requests whose real
+random word would select one of N vault listings posted just before the request (exact
+segment-tree and free-slot reconstruction). Fork tests post those listings, then replay the real
+request and fulfillment transactions with `vm.transact`. Purchaser choices, FWA's owner and the
+oracle owner act through their real entry points with `vm.prank`.
+**Why:** your rule forbids faking randomness. Pranking a real actor's call on the real contract
+drives the real path; it replaces no contract.
+**Judgment call:** for history before packs were admitted (block 26,415,582), the test has FWA's
+owner whitelist packs and the oracle owner set the 0.033 ask first: the same calls they made
+for real later. That widens the candidate set from about one day to about ten weeks.
+
+## D11. Unlisting rules
+
+**Chose:** keepers may withdraw active listings only in wind-down, when the live edge gate fails,
+or to cover locked redemptions that idle ETH and inventory cannot (stopping once covered). A
+listing holding FWA's crown inside its 12 h window is skipped (exit would cost 1%).
+**Why:** unlisting forfeits fee income, so it should happen only when something requires it.
+
+## D12. Token sales need an admin-set first reference price
+
+**Chose:** `convert` requires `minOut >= amount x refPrice x (1 - clipSlippageBps)`. `refPrice`
+starts at zero (no sales) until the admin sets one through the delay; after that each fill
+updates it. One sale per FWA 12 h interval, at most `clipMax` tokens.
+**Why:** without a reference a keeper could sell into a sandwich. The trailing fill can drift
+down at most `clipSlippageBps` per interval.

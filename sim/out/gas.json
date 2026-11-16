@@ -1,0 +1,10 @@
+{
+ "list": 651340,
+ "vault_overhead": 70000,
+ "harvest_per_id": 40000,
+ "earnings_batch": 45000,
+ "mint_split_per_pack": 611227,
+ "create_pack": 398882,
+ "checkpoint": 150000,
+ "source": "fork block 26424971 + estimates for vault_overhead, harvest_per_id"
+}

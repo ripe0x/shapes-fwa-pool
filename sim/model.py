@@ -34,7 +34,8 @@ GAS_ESTIMATE = dict(list=380_000, earnings_batch=45_000, harvest_per_id=12_000,
 def gas_table():
     f = OUT / "gas.json"
     if f.exists():
-        return json.loads(f.read_text()), "measured (sim/out/gas.json)"
+        g = json.loads(f.read_text())
+        return g, f"measured: {g.pop('source')}"
     return GAS_ESTIMATE, "ESTIMATED placeholders"
 
 
@@ -140,10 +141,13 @@ def main():
     for n in (1, 10, 50, 150, 500):
         md.append(row(f"{n} positions", n=n))
     md += ["", "## Volume\n", head]
-    for lam in (vol[1], 15, vol[7], vol[30], 80, 250):
+    for lam in sorted({round(vol[1]), 50, round(vol[7]), 250, round(vol[30])}):
         md.append(row(f"{lam:.0f}/day", lam=lam))
     md += ["", "## Stress (50 positions, 30-day volume)\n", head]
     md.append(row("live"))
+    md.append(row("gas 0.15 gwei (pinned block)", gwei=0.15))
+    md.append(row("gas 0.5 gwei", gwei=0.5))
+    md.append(row("gas 2 gwei", gwei=2))
     md.append(row("gas 5 gwei", gwei=5))
     md.append(row("gas 20 gwei", gwei=20))
     md.append(row("crown share back to 5%", p={**LIVE, "crown": 0.05}))
@@ -153,15 +157,20 @@ def main():
     md.append(row("floor ask cut to 0.0265", p={**LIVE, "ask": 0.0265}))
     md.append(row("20% irrational keeps", keep_irrational=0.2))
     md.append(row("15/day and 5 gwei", lam=15, gwei=5))
+    md += ["", "## Current run rate (7-day volume) by gas price, 50 positions\n", head]
+    for gw in (0.15, 0.5, 1.0, 1.2, 1.5, 2.0):
+        md.append(row(f"{gw} gwei", lam=vol[7], gwei=gw))
     sc = scenario(pool, vol[30], 50, gas=gas)
     md.append(f"\nBreak-even gas price for the bid outcome: {sc['breakeven_gwei']:.1f} gwei "
               f"(gas per cycle {(gas['list'] + gas['vault_overhead'] + gas['harvest_per_id']):,}).\n")
 
-    md += ["## Realized-return spread (Monte Carlo, one year, 30-day volume)\n",
-           "| positions | p5 | median | p95 | P(loss) |\n|---|---|---|---|---|"]
-    for n in (1, 10, 50, 150):
-        (p5, p50, p95), ploss = monte_carlo(pool, vol[30], n, gas=gas)
-        md.append(f"| {n} | {100 * p5:+.1f}% | {100 * p50:+.1f}% | {100 * p95:+.1f}% | {100 * ploss:.0f}% |")
+    md += ["## Realized-return spread (Monte Carlo, one year)\n",
+           "| volume | positions | p5 | median | p95 | P(loss) |\n|---|---|---|---|---|---|"]
+    for label, lam in (("30 d", vol[30]), ("7 d", vol[7])):
+        for n in (1, 10, 50, 150):
+            (p5, p50, p95), ploss = monte_carlo(pool, lam, n, gas=gas)
+            md.append(f"| {label} {lam:.0f}/day | {n} | {100 * p5:+.1f}% | {100 * p50:+.1f}% | {100 * p95:+.1f}% | "
+                      f"{100 * ploss:.0f}% |")
     md.append("")
     (OUT / "phase0.3.md").write_text("\n".join(md))
     print("\n".join(md))

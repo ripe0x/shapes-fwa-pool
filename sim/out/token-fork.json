@@ -1,0 +1,8 @@
+{
+  "direct_transfer_ok": 0,
+  "roundtrip_bps_1000000000000000": 9800,
+  "roundtrip_bps_10000000000000000": 9800,
+  "roundtrip_bps_100000000000000000": 9800,
+  "roundtrip_bps_1000000000000000000": 9800,
+  "sell_gas": 134028
+}
