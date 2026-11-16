@@ -88,7 +88,7 @@ back); checkpoint -> redemption reserve and distribution reserve -> holder claim
 ## Things that don't make sense
 
 1. **Volume.** The gate passes on a 30-day average driven by one week; the current rate is a
-   sixth of it. Decide which window the gate should use (D17).
+   sixth of it. Owner kept the 30-day window on 2026-11-16 (D17).
 2. **Competition.** About 238 pack listings at the cap already exist from four EOAs. One came
    from the ShapePacks admin address. If that is you, the vault competes with your own manual
    positions for the same fee flow.

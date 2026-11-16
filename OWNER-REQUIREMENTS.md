@@ -29,6 +29,7 @@ Source: "FWA Depositor Vault: live findings and implementation plan", revision 2
 9. (2026-11-15, overnight instruction) "complete the entire process e2e without asking me for
    more info ... create a list of decisions you made that you normally would have asked me
    about" (see docs/DECISIONS.md).
+10. (2026-11-16) Gate volume window: "Keep 30-day" (answer to D17; 7-day not adopted).
 
 ## B. Proposed outcomes (awaiting sign-off)
 

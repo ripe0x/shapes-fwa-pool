@@ -167,6 +167,7 @@ one late-October week (1,527/day). The last two weeks ran 51 and 85/day; 7-day i
 has value if volume returns or FWA raises the pack cap. Nothing is deployed.
 **What I'd want you to decide:** whether the gate should use 7-day volume instead. On 7-day
 volume it clears 10% only below about 1.35 gwei (13.8% at 1.2, 7.2% at 1.5).
+**Owner decision (2026-11-16):** keep 30-day volume for the gate. Gate stands at GO.
 
 ## D18. Keeper and deploy path choices
 
