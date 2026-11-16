@@ -19,7 +19,7 @@ python3 sim/model.py           # sim/out/phase0.3.md (gas from sim/out/gas.json)
 python3 sim/find_selection.py  # real requests whose VRF word selects vault listings
 python3 sim/reconcile.py       # after ForkReconcile.t.sol: Python vault model vs fork, to the wei
 python3 sim/forward.py 200     # sim/out/forward.md: expectation, backtest, forward simulation
-keeper/rehearse.sh             # deploy path + reference keeper on a local anvil fork (port 8547)
+python3 keeper/rehearse_canary.py  # exact canary values, deploy script + keeper on anvil fork (see its header)
 ```
 
 ## Rules specific to this repo
@@ -32,6 +32,8 @@ keeper/rehearse.sh             # deploy path + reference keeper on a local anvil
   hold mainnet dust; read balances, do not assume them.
 - Keeper transactions pad gas 25%: keeper pay depends on `gasleft()`. `cast send` exits 0 on a
   reverted transaction; check receipt status.
+- Rehearsal actors are fresh addresses checked clean on the fork. Never anvil's dev accounts: they
+  are real mainnet addresses and #2 carries an EIP-7702 delegation that diverts ETH it receives.
 - Keeper decisions live in `keeper/policy.py` only; the simulation imports it. Vault accounting in
   `sim/vault.py` must stay a line-for-line mirror of PackVault; rerun the reconciler after any
   accounting change. Every vault call must fit EIP-7825's 16,777,216 gas per transaction.

@@ -122,7 +122,8 @@ contract ForkVaultInvariantTest is ForkBase {
 
     /// INV01: the vault always holds every amount it owes outside the strategy.
     function invariant_reservesCovered() public view {
-        uint256 owed = vault.pendingDepositTotal() + vault.redemptionReserve() + vault.distributionReserve();
+        uint256 owed = vault.pendingDepositTotal() + vault.redemptionReserve() + vault.distributionReserve()
+            + vault.claimableTotal();
         assertGe(address(vault).balance, owed);
     }
 
@@ -133,7 +134,8 @@ contract ForkVaultInvariantTest is ForkBase {
         for (uint256 i; i < a.length; ++i) {
             claimable += vault.claimableEth(a[i]);
         }
-        // claimableEth is credited out of the reserves, so it is part of the vault balance.
+        // Settled entitlements are tracked as one liability and are all part of the vault balance.
+        assertEq(claimable, vault.claimableTotal(), "claimable total tracks every holder");
         assertGe(address(vault).balance, claimable + vault.redemptionReserve() + vault.distributionReserve());
     }
 

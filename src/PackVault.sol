@@ -79,6 +79,9 @@ contract PackVault is ReentrancyGuard {
     /// Gas to build one 3-unit pack: a third of a 0.1 mint and ten-way split, plus createPack.
     uint256 public constant RESTOCK_GAS_PER_PACK = 1_050_000;
     uint256 public constant MAX_LIQUIDATIONS = 40; // packs redeemed per call, about 8M gas
+    /// Most gas `sync` and `unlist` reimburse per position they actually moved, so padding a call
+    /// with ids it skips cannot earn the premium (measured: sync ~160k, unlist ~200k per id).
+    uint256 public constant GAS_PER_MOVED = 300_000;
 
     // ------------------------------------------------------------------ immutables
 
@@ -174,6 +177,7 @@ contract PackVault is ReentrancyGuard {
     mapping(uint256 era => uint256) public eraFinalQ;
     uint256 public redemptionReserve; // ETH owed to redeemers, excluded from NAV
     mapping(address => uint256) public claimableEth;
+    uint256 public claimableTotal; // settled to holders, not yet paid: a liability like the reserves
 
     // Distributions: per-share accumulator over all live shares.
     uint256 public distPerShare; // wei x 1e18 per share
@@ -372,7 +376,7 @@ contract PackVault is ReentrancyGuard {
             if (_sync(listingIds[i])) ++resolved;
         }
         if (resolved == 0) revert Nothing();
-        _reimburse(g0, type(uint256).max);
+        _reimburse(M.min(g0, gasleft() + resolved * GAS_PER_MOVED), type(uint256).max);
     }
 
     function _sync(uint256 listingId) internal returns (bool) {
@@ -425,6 +429,30 @@ contract PackVault is ReentrancyGuard {
         delete positions[listingId];
     }
 
+    /// @notice Activate vault listings FWA staged because its acquisition queue was busy when they
+    ///         were listed: a staged listing earns no fees or token rewards. Runs FWA's own
+    ///         permissionless FIFO activation; paid only per vault listing it actually activated.
+    function activate(uint256[] calldata listingIds, uint256 maxCount) external nonReentrant {
+        uint256 g0 = gasleft();
+        bool[] memory staged = new bool[](listingIds.length);
+        for (uint256 i; i < listingIds.length; ++i) {
+            // Strictly increasing ids: a repeated id cannot count twice toward the pay cap.
+            if (i != 0 && listingIds[i] <= listingIds[i - 1]) revert Amount();
+            if (_openIndex[listingIds[i]] == 0) continue;
+            (,,,,,,,,,, uint8 status) = fwa.listings(listingIds[i]);
+            staged[i] = status == LISTING_STAGED;
+        }
+        fwa.activateListings(maxCount);
+        uint256 moved;
+        for (uint256 i; i < listingIds.length; ++i) {
+            if (!staged[i]) continue;
+            (,,,,,,,,,, uint8 status) = fwa.listings(listingIds[i]);
+            if (status == LISTING_ACTIVE) ++moved;
+        }
+        if (moved == 0) revert Nothing();
+        _reimburse(M.min(g0, gasleft() + moved * GAS_PER_MOVED), type(uint256).max);
+    }
+
     /// @notice Withdraw active listings: allowed in wind-down, when FWA's live fees leave no edge
     ///         (k below 1 + minEdge), or to cover locked redemptions free ETH and inventory cannot.
     ///         A stale quote or a gas spike stops new listings but never unwinds earning ones.
@@ -435,6 +463,7 @@ contract PackVault is ReentrancyGuard {
         uint256 shortfall = _redemptionShortfall();
         if (!windingDown && ok && shortfall == 0) revert UnlistNotAllowed();
         uint256 realized;
+        uint256 moved;
         for (uint256 i; i < listingIds.length; ++i) {
             uint256 id = listingIds[i];
             if (_openIndex[id] == 0) continue;
@@ -448,10 +477,11 @@ contract PackVault is ReentrancyGuard {
             _removeOpen(id);
             emit Unlisted(id);
             realized += pos.backing + pos.units * UNIT;
+            ++moved;
             if (!windingDown && ok && realized >= shortfall) break;
         }
         if (realized == 0) revert Nothing();
-        _reimburse(g0, type(uint256).max);
+        _reimburse(M.min(g0, gasleft() + moved * GAS_PER_MOVED), type(uint256).max);
     }
 
     /// @notice Pull FWA fees into the vault: pending fees of `activeIds` (they keep earning) and
@@ -473,23 +503,38 @@ contract PackVault is ReentrancyGuard {
 
     // ------------------------------------------------------------------ FWA token rewards
 
-    /// @notice Claim depositor FWA token rewards for active listings and any token credit.
+    /// @notice Claim depositor FWA token rewards: pending rewards of `activeIds` and credit from
+    ///         removed or repriced listings. Unpaid; `convert` claims and sells in one paid call.
     function harvestTokens(uint256[] calldata activeIds) external nonReentrant {
-        if (activeIds.length != 0) rewards.claimDepositorTokens(activeIds);
+        _claimTokens(activeIds);
+    }
+
+    /// @dev FWA's claim reverts for the whole batch on one listing that is no longer active, or
+    ///      when nothing is pending. Neither may block the credit withdrawal or the sale.
+    function _claimTokens(uint256[] calldata activeIds) internal {
+        if (activeIds.length != 0) try rewards.claimDepositorTokens(activeIds) {} catch {}
         if (rewards.tokenCredit(address(this)) != 0) rewards.withdrawTokens();
     }
 
-    /// @notice Sell up to `params.clipMax` FWA tokens for ETH through the token's own v4 pool,
-    ///         at most once per FWA interval. FWAToken transfers are locked except into that pool
-    ///         under its hook, so selling there is the only way the vault can realize them; tokens
-    ///         count as zero in NAV until the ETH arrives.
-    function convert(uint256 amount, uint256 minOut) external nonReentrant returns (uint256 ethOut) {
+    /// @notice Claim token rewards (as `harvestTokens`), then sell min(maxAmount, clipMax, held)
+    ///         FWA tokens for ETH through the token's own v4 pool, at most once per FWA interval.
+    ///         FWAToken transfers are locked except into that pool under its hook, so selling
+    ///         there is the only way the vault can realize them; tokens count as zero in NAV
+    ///         until the ETH arrives. The sale must clear both the caller's `minOut` and the
+    ///         reference floor; the caller is paid only out of what the sale realized.
+    function convert(uint256[] calldata activeIds, uint256 maxAmount, uint256 minOut)
+        external
+        nonReentrant
+        returns (uint256 ethOut)
+    {
         uint256 g0 = gasleft();
         Params memory p = params;
         if (conversionDisabled) revert Paused();
-        if (amount == 0 || amount > p.clipMax || amount > token.balanceOf(address(this))) revert Amount();
         uint256 interval = block.timestamp / INTERVAL;
         if (interval == conversionInterval) revert TooEarly();
+        _claimTokens(activeIds);
+        uint256 amount = M.min(M.min(maxAmount, p.clipMax), token.balanceOf(address(this)));
+        if (amount == 0) revert Amount();
         if (p.refPrice == 0 || minOut < amount * p.refPrice / 1e18 * (BPS - p.clipSlippageBps) / BPS) {
             revert Slippage();
         }
@@ -560,6 +605,7 @@ contract PackVault is ReentrancyGuard {
         uint256 amount = claimableEth[msg.sender];
         if (amount == 0) revert Nothing();
         claimableEth[msg.sender] = 0;
+        claimableTotal -= amount;
         msg.sender.forceSafeTransferETH(amount);
         emit Claimed(msg.sender, amount);
     }
@@ -593,6 +639,7 @@ contract PackVault is ReentrancyGuard {
         if (paid != 0) {
             redemptionReserve -= paid;
             claimableEth[h] += paid;
+            claimableTotal += paid;
         }
         r.shares = uint128(remaining);
         r.era = uint64(redeemEra);
@@ -605,6 +652,7 @@ contract PackVault is ReentrancyGuard {
         if (owed != 0) {
             distributionReserve -= owed;
             claimableEth[h] += owed;
+            claimableTotal += owed;
             distDebt[h] += owed;
         }
     }
@@ -766,10 +814,11 @@ contract PackVault is ReentrancyGuard {
         return owed > inventory ? owed - inventory : 0;
     }
 
-    /// @dev The vault's own ETH: balance less escrowed deposits and amounts owed to holders.
+    /// @dev The vault's own ETH: balance less escrowed deposits and every amount owed to holders,
+    ///      whether still in a shared reserve or already settled to a holder's claimable balance.
     ///      Forced ETH lands here, so it is attributed by balance, never by callback.
     function _free() internal view returns (uint256) {
-        uint256 owed = pendingDepositTotal + redemptionReserve + distributionReserve;
+        uint256 owed = pendingDepositTotal + redemptionReserve + distributionReserve + claimableTotal;
         uint256 bal = address(this).balance;
         return bal > owed ? bal - owed : 0;
     }

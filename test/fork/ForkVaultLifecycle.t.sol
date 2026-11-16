@@ -108,6 +108,33 @@ contract ForkVaultLifecycleTest is ForkBase {
         assertEq(backing, 0.033 ether);
     }
 
+    /// Repair: sync and unlist skip ids they cannot act on, so a keeper padding a call with junk
+    /// ids was paid the premium on the padding. Pay is now capped per position actually moved.
+    function test_paddedSyncPaysOnlyForWorkDone() public {
+        _depositAndPrice(alice, 1 ether);
+        uint256[] memory ids = _listN(2);
+        setPackAsk(0.03 ether);
+        toBlackout();
+        IFwaAdmin(address(FWA)).kickListing(ids[0]); // a real kick: one position to resolve
+        uint256[] memory padded = new uint256[](400);
+        padded[0] = ids[0];
+        for (uint256 i = 1; i < padded.length; ++i) {
+            padded[i] = 1e9 + i; // ids the vault never held
+        }
+        uint256 before = keeper.balance;
+        uint256 g = gasleft();
+        vm.prank(keeper);
+        vault.sync(padded);
+        uint256 used = g - gasleft();
+        uint256 pay = keeper.balance - before;
+        // Price here is min(0.2 gwei, 0.15 + 0.05 tip) = 0.2 gwei, plus the 10% premium.
+        // (+2k gas: the cap is taken just before the reimbursement code itself runs.)
+        uint256 cap = (vault.GAS_PER_MOVED() + vault.KEEPER_OVERHEAD_GAS() + 2_000) * 0.2 gwei * 11_000 / 10_000;
+        assertGt(used, vault.GAS_PER_MOVED(), "the padding really cost gas");
+        assertLe(pay, cap, "paid for one moved position, not the padding");
+        assertEq(vault.idlePacks().length, 1);
+    }
+
     function test_edgeGateStopsListingWhenCrownShareRaised() public {
         _depositAndPrice(alice, 1 ether);
         uint256[] memory ids = _listN(2);
@@ -143,6 +170,34 @@ contract ForkVaultLifecycleTest is ForkBase {
         vm.prank(keeper);
         vm.expectRevert(PackVault.UnlistNotAllowed.selector);
         vault.unlist(ids);
+    }
+
+    /// Repair: unlisting read the oracle through edge(), so an oracle FWA's owner repoints to a
+    /// contract that reverts blocked wind-down and redemptions. Now a failed read means no cap.
+    function test_windDownSurvivesBrokenOracle() public {
+        _depositAndPrice(alice, 1 ether);
+        uint256[] memory ids = _listN(3);
+        // FWA's owner repoints the floor oracle (config key 64) to a contract with no such
+        // function: ShapePacks rejects unknown calls.
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setAddr(64, address(PACKS));
+        (, uint256 backing, bool ok) = vault.edge(3);
+        assertFalse(ok, "no cap: nothing new lists");
+        assertEq(backing, 0);
+        vm.prank(guardian);
+        vault.startWindDown();
+        uint256 before = address(vault).balance;
+        vm.prank(keeper);
+        vault.unlist(ids);
+        assertGe(address(vault).balance + (keeper.balance - 1 ether), before + 3 * B, "backing back");
+        vm.prank(keeper);
+        vault.liquidate(40);
+        uint256 shares = vault.shareBalance(alice);
+        vm.prank(alice);
+        vault.requestRedeem(shares);
+        toBlackout();
+        checkpoint();
+        assertEq(vault.lockedShares(), 0, "redemption completes without the oracle");
     }
 
     function test_staleQuoteStopsListing() public {

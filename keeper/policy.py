@@ -64,12 +64,21 @@ class State:
     winding_down: bool = False
     listing_paused: bool = False
     distribution_bps: int = 0
-    # Tokens: value in ETH of what a harvest would claim and of what is held, at a live quote.
-    token_pending_eth: int = 0
+    # FWA tokens. Amounts in token wei: pending on active listings, credit from removed or
+    # repriced listings, already held. `token_sale_amount` is what one convert would sell
+    # (min of the total and clipMax); `token_sale_eth` and `token_sale_gas` come from simulating
+    # that exact convert call against the live pool (0 when it would revert), never from the
+    # reference price, which is only the sale's protection floor. `token_wait` says why not.
+    token_pending: int = 0
+    token_credit: int = 0
     token_held: int = 0
-    token_held_eth: int = 0
-    token_ref_ok: bool = False
-    token_sale_open: bool = False
+    token_sale_amount: int = 0
+    token_sale_min_out: int = 0
+    token_sale_eth: int = 0
+    token_sale_gas: int = 0
+    token_wait: str = ""
+    subsidize_tokens: bool = False  # operator pays convert gas the vault will not reimburse
+    notes: list = field(default_factory=list)
     # Deployment slowdown: trailing acquisitions per day as the keeper measured them, and the
     # floor below which it stops building new packs (relisting existing ones continues).
     recent_volume: float = 0.0
@@ -142,18 +151,36 @@ def plan(s):
         if ids and need_cash:
             out.append(("liquidate", MAX_BATCH["liquidate"]))
 
+    # 3b. Listings FWA staged (its queue was busy when they were listed) earn nothing until
+    #     activated; activation needs the queue drained.
+    staged = sorted(l.id for l in s.listings if l.status == STAGED)
+    if staged and s.queue_drained:
+        out.append(("activate", staged, 200))
+
     # 4. Checkpoint in FWA's blackout with its queue drained, only when holders have flows.
     if (s.blackout and s.queue_drained and not s.checkpoint_done_this_interval
             and (s.pending_deposits or s.locked_shares)):
         out.append(("checkpoint",))
 
-    # 5. Tokens (valued at zero in NAV): claim and sell only when the sale clears its gas.
-    tcost = cost(s, GAS["harvest_tokens"])
-    if s.token_pending_eth and s.token_ref_ok and s.token_pending_eth * s.share_bps >= tcost * BPS:
-        out.append(("harvestTokens", [l.id for l in active]))
-    if (s.token_held and s.token_ref_ok and s.token_sale_open
-            and s.token_held_eth * s.share_bps >= cost(s, GAS["convert"]) * BPS):
-        out.append(("convert", s.token_held))
+    # 5. Tokens (zero in NAV): one convert claims and sells. The vault pays the caller only if
+    #    the pay is at most share_bps of the ETH realized; otherwise the call is a donation.
+    total = s.token_pending + s.token_credit + s.token_held
+    if total:
+        if s.token_wait:
+            s.notes.append(f"tokens {total / 1e18:.4f} waiting: {s.token_wait}")
+        elif s.token_sale_eth:
+            pay = cost(s, s.token_sale_gas)
+            spend = s.token_sale_gas * s.gas_price  # what the keeper's transaction costs it
+            paid = pay * BPS <= s.token_sale_eth * s.share_bps
+            if paid and pay >= spend:
+                out.append(("convert", [l.id for l in active], s.token_sale_amount, s.token_sale_min_out))
+            elif s.subsidize_tokens:
+                out.append(("convert", [l.id for l in active], s.token_sale_amount, s.token_sale_min_out))
+                s.notes.append(f"token sale subsidized: keeper spends {spend / 1e18:.8f} ETH for "
+                               f"{s.token_sale_eth / 1e18:.8f} ETH to holders")
+            else:
+                s.notes.append(f"tokens {total / 1e18:.4f} waiting: sale would realize {s.token_sale_eth / 1e18:.8f} ETH, "
+                               f"under {BPS // s.share_bps}x its {pay / 1e18:.8f} ETH gas pay, so the vault would not pay for it")
 
     # 6. Deploy: relist idle packs, then build new ones only when one cycle repays the build.
     if s.winding_down or broken or s.listing_paused or redeeming or not s.backing:

@@ -23,6 +23,7 @@ interface IOracleAdmin {
 interface IFwaAdmin {
     function setUint(uint256 key, uint256 value) external;
     function kickListing(uint256 listingId) external;
+    function setAddr(uint256 key, address value) external;
 }
 
 /// @notice Mainnet fork at a pinned block with the real FWA, rewards, oracle, Shapes, ShapePacks

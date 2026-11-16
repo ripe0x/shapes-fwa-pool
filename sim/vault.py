@@ -72,6 +72,7 @@ class Vault:
     era_final_q: dict = field(default_factory=dict)
     redemption_reserve: int = 0
     claimable: dict = field(default_factory=dict)
+    claimable_total: int = 0
     dist_per_share: int = 0
     dist_debt: dict = field(default_factory=dict)
     distribution_reserve: int = 0
@@ -92,7 +93,7 @@ class Vault:
 
     # ------------------------------------------------------------ cash buckets
     def free(self):
-        owed = self.pending_total + self.redemption_reserve + self.distribution_reserve
+        owed = self.pending_total + self.redemption_reserve + self.distribution_reserve + self.claimable_total
         return self.balance - owed if self.balance > owed else 0
 
     def owed_estimate(self):
@@ -206,6 +207,7 @@ class Vault:
         self._settle_dist(h)
         amount = self.claimable.get(h, 0)
         self.claimable[h] = 0
+        self.claimable_total -= amount
         self.balance -= amount
         return amount
 
@@ -237,6 +239,7 @@ class Vault:
         if paid:
             self.redemption_reserve -= paid
             self.claimable[h] = self.claimable.get(h, 0) + paid
+            self.claimable_total += paid
         r.shares = remaining
         r.era, r.g0, r.q0 = self.redeem_era, self.redeem_g, self.redeem_q
 
@@ -245,6 +248,7 @@ class Vault:
         if owed:
             self.distribution_reserve -= owed
             self.claimable[h] = self.claimable.get(h, 0) + owed
+            self.claimable_total += owed
             self.dist_debt[h] = self.dist_debt.get(h, 0) + owed
 
     # ------------------------------------------------------------ checkpoint

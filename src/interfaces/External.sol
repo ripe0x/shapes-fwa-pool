@@ -48,6 +48,7 @@ uint8 constant LISTING_STAGED = 5;
 interface IFWAV2 {
     function listNFT(address collection, uint256 tokenId) external payable returns (uint256 listingId);
     function withdrawListing(uint256 listingId) external;
+    function activateListings(uint256 maxCount) external;
     function claimListingFees(uint256[] calldata listingIds) external returns (uint256 total);
     function withdrawEarnings() external returns (uint256 amount);
     function depositorReclaimBacking(uint256 listingId) external;

@@ -87,6 +87,8 @@ def main():
     got = v.claim("alice")
     compare("claim")
     check("claim", "aliceReceived", got, by["aliceReceived"]["amount"])
+    v.positions["relist"].status = ACTIVE  # FWA activated the staged relist
+    compare("activate")
 
     # The ledger: every wei in equals every wei out plus what the vault still holds.
     held = (v.balance + sum(p.backing + p.units * 10**16 for p in v.positions.values())

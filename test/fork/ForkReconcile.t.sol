@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
+import {PackVault} from "../../src/PackVault.sol";
 import {LISTING_ACTIVE, LISTING_STAGED} from "../../src/interfaces/External.sol";
 
 /// @notice One full cycle on real contracts with a real VRF selection, written step by step to
@@ -148,11 +149,23 @@ contract ForkReconcileTest is SelectionBase {
         _snap("claim");
         vm.writeLine(OUT, string.concat('{"step":"aliceReceived","amount":', vm.toString(alice.balance), "}"));
 
-        // The 29 original positions are live; the relist went in while FWA's queue was busy, so
-        // FWA staged it (no fees until activated). Nothing strands.
+        // The relist went in while FWA's queue was busy, so FWA staged it: no fees, no rewards.
+        // With the queue drained, the vault activates it through FWA's own activation, paid.
+        uint256 relist = open[open.length - 1];
+        (,,,,,,,,,, uint8 st) = FWA.listings(relist);
+        assertEq(st, LISTING_STAGED, "staged while the queue was busy");
+        uint256[] memory one2 = new uint256[](1);
+        one2[0] = relist;
+        vault.activate(one2, 50);
+        (,,,,,,,,,, st) = FWA.listings(relist);
+        assertEq(st, LISTING_ACTIVE, "activated");
+        _snap("activate");
+        vm.expectRevert(PackVault.Nothing.selector);
+        vault.activate(one2, 50); // nothing left to activate: no pay for a repeat
+        // Every position is live; nothing strands.
         for (uint256 i; i < open.length; ++i) {
             (,,,,,,,,,, uint8 status) = FWA.listings(open[i]);
-            assertTrue(status == LISTING_ACTIVE || status == LISTING_STAGED);
+            assertEq(status, LISTING_ACTIVE);
         }
     }
 }

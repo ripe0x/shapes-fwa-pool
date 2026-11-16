@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {ForkBase, ForceSender} from "./ForkBase.sol";
+import {ForkBase, ForceSender, IFwaAdmin} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {ERC721} from "solady/tokens/ERC721.sol";
 
@@ -213,6 +213,41 @@ contract ForkVaultAdversarialTest is ForkBase {
         assertLt(used, TX_GAS_CAP * 80 / 100, "20% margin under the transaction cap");
     }
 
+    /// Worst supported state for the checkpoint loop: every position settled or withdrawn but not
+    /// yet synced (ownership read per position), produced here by real kicks after the oracle
+    /// owner lowers the ask, plus a pending deposit to price.
+    function test_checkpointGasAllPositionsKickedUnsynced() public {
+        uint256 n = vault.MAX_POSITIONS();
+        PackVault.Params memory p = defaultParams();
+        p.maxPositions = uint96(n);
+        p.reserve = 0;
+        vm.deal(address(this), 100 ether);
+        vault = new PackVault{value: 25 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p);
+        uint256 seed = address(vault).balance;
+        uint256 b0 = address(this).balance;
+        for (uint256 i; i < n; i += 10) {
+            vault.restock(10, 3);
+            vault.list(10);
+        }
+        uint256 buildPay = address(this).balance - b0; // this contract was the paid keeper
+        uint256[] memory ids = vault.openListings();
+        setPackAsk(0.03 ether); // cap 0.033 < posted 0.0363: every position may be kicked
+        toBlackout();
+        for (uint256 i; i < ids.length; ++i) {
+            IFwaAdmin(address(FWA)).kickListing(ids[i]);
+        }
+        vm.prank(alice);
+        vault.deposit{value: 0.1 ether}();
+        uint256 g = gasleft();
+        vault.checkpoint{gas: TX_GAS_CAP - 100_000}();
+        uint256 used = g - gasleft();
+        emit log_named_uint("checkpoint gas, 300 kicked unsynced", used);
+        assertLt(used, TX_GAS_CAP * 80 / 100);
+        // Valued at the packs held (backing already back in the balance): NAV is seed + deposit
+        // less 90 mint fees and the build's keeper pay, to the wei.
+        assertEq(vault.lastNav(), seed + 0.1 ether - 90 * 0.001 ether - buildPay);
+    }
+
     /// Every keeper batch the reference keeper sends fits the transaction cap.
     function test_keeperBatchesFitTxCap() public {
         PackVault.Params memory p = defaultParams();
@@ -307,6 +342,48 @@ contract ForkVaultAdversarialTest is ForkBase {
         vm.expectRevert(PackVault.Nothing.selector);
         vault.list(6);
         vm.stopPrank();
+    }
+
+    /// Repair (custody): a filled redemption settled into a holder's claimable balance by another
+    /// action (here a new deposit) but not yet claimed was counted as free ETH, so keepers could
+    /// list it or be paid from it, and the later claim would take other holders' ETH.
+    function test_settledUnclaimedEthIsNotDeployable() public {
+        vm.prank(alice);
+        vault.deposit{value: 1 ether}();
+        vm.prank(bob);
+        vault.deposit{value: 1 ether}();
+        toBlackout();
+        checkpoint();
+        toOpen();
+        uint256 shares = vault.shareBalance(alice);
+        vm.prank(alice);
+        vault.requestRedeem(shares);
+        toBlackout();
+        checkpoint(); // fills alice in full from free ETH
+        toOpen();
+        assertEq(vault.lockedShares(), 0);
+        uint256 reserved = vault.redemptionReserve();
+        assertGt(reserved, 0.9 ether);
+        // Alice touches the vault without claiming: her entitlement moves to claimableEth.
+        vm.prank(alice);
+        vault.deposit{value: 0.01 ether}();
+        assertEq(vault.claimableTotal(), vault.claimableEth(alice));
+        assertApproxEqAbs(vault.claimableEth(alice), reserved, 2);
+        // Idle ETH excludes it: keepers can deploy only bob's capital and the seed.
+        uint256 liabilities = vault.pendingDepositTotal() + vault.redemptionReserve()
+            + vault.distributionReserve() + vault.claimableTotal();
+        assertLe(vault.idleEth(), address(vault).balance - liabilities);
+        vm.startPrank(keeper);
+        vault.restock(10, 3);
+        vault.list(10);
+        vm.expectRevert(); // nothing more is deployable
+        vault.restock(10, 3);
+        vm.stopPrank();
+        assertGe(address(vault).balance, liabilities, "liabilities never spent");
+        uint256 before = alice.balance;
+        vm.prank(alice);
+        vault.claim();
+        assertApproxEqAbs(alice.balance - before, reserved, 2, "claim paid in full");
     }
 
     /// Liquidation only runs when redeemers need ETH (or in wind-down).

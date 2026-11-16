@@ -26,8 +26,14 @@ library VaultLib {
         k1e18 = oneSur * (BPS - f.ownerAcquisitionFeeBps()) / BPS * (BPS - f.topListingShareBps()) / BPS;
         if (!f.canDeposit(packs) || f.oracleExemptCollections(packs)) return (k1e18, 0, s);
         // The oracle ask plus premium when the quote passes FWA's own validity rules.
+        // A failing or malformed oracle means no cap (nothing new lists); it must not block
+        // unlisting, wind-down or redemptions. FWA's owner can repoint the oracle to any contract,
+        // so the read is a raw staticcall: a revert or short return data both mean "no cap".
+        (bool ok, bytes memory ret) =
+            f.floorOracle().staticcall(abi.encodeCall(IFloorOracle.getFloorRange, (packs)));
+        if (!ok || ret.length < 128) return (k1e18, 0, s);
         (uint256 bid, uint256 ask, uint48 observedAt, uint48 periodUsed) =
-            IFloorOracle(f.floorOracle()).getFloorRange(packs);
+            abi.decode(ret, (uint256, uint256, uint48, uint48));
         if (bid == 0 || bid >= ask || observedAt == 0 || observedAt > block.timestamp) return (k1e18, 0, s);
         if (block.timestamp - observedAt > f.maxOracleAge()) return (k1e18, 0, s);
         if (periodUsed < f.minOracleChallengePeriod()) return (k1e18, 0, s);

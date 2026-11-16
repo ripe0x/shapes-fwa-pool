@@ -102,46 +102,124 @@ contract ForkTokensTest is Test {
         return abi.encode(uint256(uint128(a0)));
     }
 
-    function test_claimAndConvertTokens() public {
-        uint256[] memory ids = vault.openListings();
-        uint256 pending;
+    function _pending(uint256[] memory ids) internal view returns (uint256 sum) {
         for (uint256 i; i < ids.length; ++i) {
-            pending += IFWARewards(FWA.rewards()).pendingDepositorTokens(ids[i]);
+            sum += IFWARewards(FWA.rewards()).pendingDepositorTokens(ids[i]);
         }
-        assertGt(pending, 0, "the real buyback accrued tokens to our listings");
+    }
 
-        vault.harvestTokens(ids);
-        uint256 held = token.balanceOf(address(vault));
-        assertEq(held, pending, "claimed exactly the pending amount");
-
-        // No sale without a reference price.
-        vm.expectRevert(PackVault.Slippage.selector);
-        vault.convert(held, 0);
-
-        uint256 ref = _quotePrice();
+    function _setParams(uint256 ref, uint256 clip) internal {
         PackVault.Params memory p = vault.getParams();
-        p.refPrice = uint128(ref);
+        if (ref != 0) p.refPrice = uint128(ref);
+        p.clipMax = uint128(clip);
         vm.prank(admin);
         vault.proposeParams(p);
         vm.warp(block.timestamp + 1 days);
         vault.applyParams();
+    }
 
-        // A keeper asking for less than the floor is refused.
+    function _nextInterval() internal {
+        vm.warp(block.timestamp + 12 hours);
+    }
+
+    /// Active rewards: one paid-only-if-worth-it call claims and sells; NAV gets every wei.
+    function test_convertClaimsAndSellsActiveRewards() public {
+        uint256[] memory ids = vault.openListings();
+        uint256 pending = _pending(ids);
+        assertGt(pending, 0, "the real buyback accrued tokens to our listings");
+        uint256 ref = _quotePrice();
+        _setParams(ref, type(uint128).max);
+
+        uint256 vBefore = address(vault).balance;
+        uint256 kBefore = address(this).balance;
+        uint256 minOut = pending * ref / 1e18 * 9_500 / 10_000;
+        uint256 out = vault.convert(ids, type(uint256).max, minOut);
+        assertEq(token.balanceOf(address(vault)), 0, "claimed exactly the pending amount and sold it");
+        assertEq(_pending(ids), 0);
+        assertApproxEqRel(out, pending * ref / 1e18, 0.001e18);
+        // Dust: pay would exceed 25% of 2.5e12 wei, so the sale is unpaid and NAV keeps all of it.
+        assertEq(address(this).balance, kBefore, "dust sale unpaid");
+        assertEq(address(vault).balance - vBefore, out);
+    }
+
+    /// No reference price: nothing is claimed or sold; rewards stay pending in FWA.
+    function test_noReferencePricePreservesRewards() public {
+        uint256[] memory ids = vault.openListings();
+        uint256 pending = _pending(ids);
         vm.expectRevert(PackVault.Slippage.selector);
-        vault.convert(held, held * ref / 1e18 / 2);
-
-        uint256 navEthBefore = address(vault).balance;
-        uint256 minOut = held * ref / 1e18 * 9_500 / 10_000;
-        uint256 out = vault.convert(held, minOut);
+        vault.convert(ids, type(uint256).max, 0);
+        assertEq(_pending(ids), pending);
         assertEq(token.balanceOf(address(vault)), 0);
-        assertGe(out, minOut);
-        // Absolute: within 0.1% of the round-trip reference, so the pool's ~2% round-trip cost
-        // sits on the sell side. Value is tiny: one buyback paid 20 listings about 2.5e12 wei.
-        assertApproxEqRel(out, held * ref / 1e18, 0.001e18);
-        assertLt(out, 1e13);
-        assertEq(address(vault).balance - navEthBefore, out - 0, "ETH lands in the vault");
-        // Nothing left to sell; the once-per-interval guard is checked after the balance.
+    }
+
+    /// A failed sale (caller's minOut above what the pool gives) reverts whole; a retry with a
+    /// correct quote in the same interval succeeds.
+    function test_failedSaleThenRetry() public {
+        uint256[] memory ids = vault.openListings();
+        uint256 pending = _pending(ids);
+        uint256 ref = _quotePrice();
+        _setParams(ref, type(uint128).max);
+        vm.expectRevert(PackVault.Slippage.selector);
+        vault.convert(ids, type(uint256).max, pending * ref / 1e18 * 2);
+        assertEq(_pending(ids), pending, "nothing moved");
+        uint256 out = vault.convert(ids, type(uint256).max, pending * ref / 1e18 * 9_500 / 10_000);
+        assertGt(out, 0);
+    }
+
+    /// Settled credit and a stale id: a listing removed after the keeper looked must not block the
+    /// credit its removal created, and the other listings are claimed on the next pass.
+    function test_staleIdDoesNotBlockCredit() public {
+        uint256[] memory ids = vault.openListings();
+        uint256 ref = _quotePrice();
+        _setParams(ref, type(uint128).max);
+        uint256 pendingAll = _pending(ids);
+        vm.prank(makeAddr("tok-guardian"));
+        vault.startWindDown();
+        uint256[] memory one = new uint256[](1);
+        one[0] = ids[0];
+        uint256 firstPending = IFWARewards(FWA.rewards()).pendingDepositorTokens(ids[0]);
+        vault.unlist(one); // its pending tokens become the vault's token credit
+        assertEq(IFWARewards(FWA.rewards()).tokenCredit(address(vault)), firstPending, "credit on removal");
+
+        // The keeper's stale list still includes ids[0]: FWA's batch claim reverts, the credit is
+        // still withdrawn and sold.
+        uint256 out = vault.convert(ids, type(uint256).max, firstPending * ref / 1e18 * 9_500 / 10_000);
+        assertGt(out, 0);
+        assertEq(IFWARewards(FWA.rewards()).tokenCredit(address(vault)), 0);
+        assertEq(_pending(ids), pendingAll - firstPending, "others still pending, not lost");
+
+        // Next interval, refreshed ids: the rest is claimed and sold.
+        _nextInterval();
+        uint256[] memory rest = vault.openListings();
+        uint256 left = _pending(rest);
+        vault.convert(rest, type(uint256).max, left * ref / 1e18 * 9_500 / 10_000);
+        assertEq(_pending(rest), 0);
+        assertEq(token.balanceOf(address(vault)), 0);
+    }
+
+    /// Above clipMax: one sale per interval sells at most clipMax; the remainder waits for the
+    /// next interval instead of making every attempt revert.
+    function test_balanceAboveClipMax() public {
+        uint256[] memory ids = vault.openListings();
+        uint256 pending = _pending(ids);
+        uint256 ref = _quotePrice();
+        _setParams(ref, pending / 2);
+        uint256 clip = pending / 2;
+        vault.convert(ids, type(uint256).max, clip * ref / 1e18 * 9_500 / 10_000);
+        assertEq(token.balanceOf(address(vault)), pending - clip, "only clipMax sold");
+        vm.expectRevert(PackVault.TooEarly.selector);
+        vault.convert(new uint256[](0), type(uint256).max, 0);
+        _nextInterval();
+        uint256 rest = pending - clip;
+        vault.convert(new uint256[](0), type(uint256).max, rest * ref / 1e18 * 9_500 / 10_000);
+        assertEq(token.balanceOf(address(vault)), 0);
+    }
+
+    /// Zero rewards: nothing to claim or sell reverts without moving anything.
+    function test_zeroRewards() public {
+        uint256 ref = _quotePrice();
+        _setParams(ref, type(uint128).max);
         vm.expectRevert(PackVault.Amount.selector);
-        vault.convert(1, 0);
+        vault.convert(new uint256[](0), type(uint256).max, 0);
     }
 }
