@@ -859,7 +859,7 @@ contract PackVault is ReentrancyGuard {
             p.minEdgeBps > MAX_MIN_EDGE_BPS || p.bufferBps > MAX_BUFFER_BPS || p.distributionBps > MAX_DISTRIBUTION_BPS
                 || p.keeperPremiumBps > MAX_KEEPER_PREMIUM_BPS || p.keeperShareBps > MAX_KEEPER_SHARE_BPS
                 || p.allocatedBoundBps > MAX_ALLOCATED_BOUND_BPS || p.clipSlippageBps > MAX_CLIP_SLIPPAGE_BPS
-                || p.gasCeiling > MAX_GAS_CEILING || p.maxPositions > MAX_POSITIONS || p.opGasCap > 16_777_216
+                || p.gasCeiling > MAX_GAS_CEILING || p.maxTip > p.gasCeiling || p.maxPositions > MAX_POSITIONS || p.opGasCap > 16_777_216
                 || p.packUnitsMask >> (MAX_PACK_UNITS + 1) != 0 || p.packUnitsMask & ((1 << MIN_PACK_UNITS) - 1) != 0
         ) revert OutOfBounds();
     }

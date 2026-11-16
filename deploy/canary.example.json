@@ -11,7 +11,7 @@
  "distributionBps": 0,
  "keeperPremiumBps": 1000,
  "keeperShareBps": 2500,
- "allocatedBoundBps": 200,
+ "allocatedBoundBps": 1000,
  "clipSlippageBps": 300,
  "packUnitsMask": 8,
  "gasCeilingWei": 1500000000,

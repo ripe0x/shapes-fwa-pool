@@ -179,3 +179,159 @@ every value from a JSON file; `deploy/canary.example.json` proposes a canary: 2 
 **Why:** smallest thing that runs the real lifecycle. A production keeper would add scheduling,
 alerting and nonce handling.
 **Needs you:** guardian and admin addresses, and whether the canary caps are right.
+
+# Repair review (2026-11-16)
+
+Owner request: independent engineering and economic review of the overnight build, repair what
+does not hold up, keep the 30-day gate unless evidence shows it misleads. Each entry says what
+changed, the alternatives, and the tradeoff. Supersedes D6, D8 and D11 where noted.
+
+## D19. Keeper pay is reimbursed gas, not a share of fees (supersedes D8)
+
+**Found:** `keeperFeeBps = 500` routed 5% of every harvested fee to a keeper pool excluded from
+NAV. Per bid cycle that is 0.05 x kB = 1.885 mETH against an edge of B (k - 1) = 1.396 mETH, so
+holders lost 0.49 mETH per cycle at any volume and any gas price. Unspent pool ETH never returned
+to NAV, even in wind-down. The old model subtracted estimated gas but not the skim; it overstated
+holder returns by the whole difference.
+**Chose:** no pool. Every paid call reimburses `(gasUsed + 30k) x min(tx price, basefee + maxTip,
+ceiling) x (1 + keeperPremiumBps)` from free ETH, capped at `opGasCap`. Necessary work (sync,
+list, restock, unlist, liquidate, a checkpoint with holder flows) is paid. Optional work (harvest,
+token sale) is paid only if the pay is at most `keeperShareBps` of the ETH it realized, otherwise
+nothing. A checkpoint with no flows is unpaid.
+**Alternatives:** a smaller fee share (still a fixed skim: overpays at low gas, underpays at high
+gas, strands the surplus); a pool swept back into NAV (more state, same mispricing).
+**Tradeoff:** holders pay real gas plus a 10% premium (the keeper's margin). `maxTip` (0.05 gwei)
+caps what a builder can pay itself through its own priority fee.
+
+## D20. Listing and restock must clear their own gas
+
+**Chose:** `list` requires `B (k - 1) > CYCLE_GAS x price x (1 + premium)` (800k gas: relist plus
+shares of sync and harvest, measured 0.75M on the fork). `restock` requires the same, plus the
+build (1.05M gas per pack and its mint fee share) repaid by one bid cycle, plus idle ETH for the
+Shapes and the backing of every waiting pack. Before, restock spent ETH on packs whatever the gate
+said and whether or not they could be listed.
+**Tradeoff:** gas constants live in bytecode. If FWA's listing cost rises a lot they understate;
+the hard `gasCeiling` remains as the backstop.
+
+## D21. ETH owed to redeemers is not deployable
+
+**Found:** a keeper could unlist positions to cover a redemption shortfall, then list the freed
+ETH again, be paid both ways, and repeat while redeemers waited.
+**Chose:** `_idle()` subtracts the owed estimate (`lockedShares x lastNav / totalShares`, rounded
+up). Regression: `test_unlistListLoopClosed`.
+
+## D22. Unlisting only for wind-down, redemptions, or a broken fee structure (supersedes D11)
+
+**Found:** unlisting was allowed whenever the full listing gate failed, which includes a stale
+oracle quote and (after D20) a gas spike. Anyone could then unwind every earning position and be
+paid for it, and the vault would pay again to relist.
+**Chose:** unlisting is allowed in wind-down, to cover a redemption shortfall, or when live k is
+below 1 + minEdge. The keeper unwinds in that last case because every further cycle loses.
+
+## D23. A pack FWA failed to deliver stays tracked until it arrives
+
+**Found:** `_sync` treated a failed `recoverStuckNFT` as "pack gone" and forgot the position.
+**Chose:** `_sync` reads FWA's own `stuckNFTRecipient`. If FWA owes the pack to the vault, the
+position stays open, is valued at the pack's value at checkpoints, and any later `sync` retries
+the pull (permissionless; unpaid until it succeeds). Ownership plus FWA's record decide the
+outcome, never inference.
+**Not tested for real:** with the deployed ShapePacks (no pause, no transfer hook) and FWA's
+100k delivery stipend plus its 300k notifier admission check, a delivery failure cannot be
+produced without replacing ShapePacks or FWA state, which the no-mock rule forbids. The path is
+covered by review only. Normal bid, keep and silent-purchaser outcomes run on real VRF replays.
+
+## D24. Bounded checkpoint: read-only per position, 300 positions (supersedes D6)
+
+**Found:** checkpoint gas was 16.08M at 400 positions, 4% under EIP-7825's 16,777,216 per-tx cap,
+and the loop also resolved positions and redeemed inventory, so its worst case was unbounded
+(hundreds of allocations after a busy day, or redeeming hundreds of packs at ~190k each).
+**Chose:** checkpoint values positions from FWA state only (no sync, no liquidation inside),
+`MAX_POSITIONS = 300` bounds open plus idle packs, and inventory becomes ETH through a separate
+`liquidate(maxCount)` (at most 40 per call, about 6.5M gas) that runs only while redeemers need
+ETH or in wind-down. Measured worst case at 300 positions: 9.83M gas, 41% under the cap.
+**Rejected:** incremental (cursor) reconciliation. It adds partially priced epochs and their
+edge cases; the measurement shows the simple bound suffices up to 300 positions (about 20 ETH).
+**Tradeoff:** capacity is capped at 300 positions. Section 3 of `sim/out/forward.md` shows
+returns fall with size anyway.
+
+## D25. Harvest claims active listings' fees too
+
+**Chose:** `harvest(ids)` calls FWA's `claimListingFees` for active listings (fees stay earning)
+as well as `withdrawEarnings` for credited fees, so redemptions do not need unlisting to free
+fee income. A listing that moved on since the keeper looked is skipped, not fatal.
+
+## D26. Economics read and token swap moved to a linked library (EIP-170)
+
+**Chose:** `VaultLib` (external library, delegatecall) holds the FWA economics read and the v4
+swap body. PackVault is 22,827 bytes (1,749 under the limit), VaultLib 2,928. The deploy script
+deploys and links it. Behaviour is unchanged; there are two verified addresses instead of one.
+**Alternative rejected:** dropping token conversion. The owner required it in the immutable
+deployment, even though measured token income is about 2.5e12 wei per buyback.
+
+## D27. One keeper policy for the live keeper and the simulation
+
+**Chose:** `keeper/policy.py` decides every call from observed state; `keeper/keeper.py` only reads
+the chain and sends. `sim/forward.py` runs the same policy for a simulated year, so the lifecycle
+(resolve, harvest, unlist for redemptions, liquidate, checkpoint, relist, restock, unwind on a
+broken edge, wind-down, gas above the ceiling) is exercised over long runs. `keeper/rehearse.sh`
+runs the production deploy script and the real keeper on a local anvil fork.
+
+## D28. Gate stays on 30-day volume; no on-chain volume pause
+
+**Owner decision kept:** the formal gate uses trailing 30-day volume.
+**Evaluated:** a pause triggered by short-term activity. Expected value per bid cycle,
+B (k - 1) less gas, does not depend on volume; volume sets how many cycles a year happen, so the
+return rate, not its sign. What volume can make harmful is fixed spending on new positions: a
+restock costs ~1.05M gas plus 0.0003 ETH per pack up front. D20 already requires one cycle to
+repay it, which bounds the damage at any volume. An on-chain volume signal would need new state
+fed from FWA's request counter and adds a path keepers can game. The reference keeper has
+`--slowdown-volume` (stop building new packs while 7-day volume is low; relisting continues);
+section 4 of `sim/out/forward.md` measures what it changes.
+
+## D29. Small accounting choices kept
+
+- A checkpoint's own keeper pay leaves after it prices, so holders after that checkpoint
+  (including the deposits it priced) bear it: about 4e13 wei per checkpoint at 0.2 gwei.
+- `opGasCap` bound raised to the 16,777,216 transaction cap (default 15M): real checkpoints at
+  scale use ~10M gas and the old 3M cap would have left them unpaid. Pay is still actual gas.
+- `params` is read through `getParams()`; the struct (16 fields with `maxTip`) is too wide for an
+  auto-getter.
+
+## D30. Allocated-exposure bound default 10% (was 2%)
+
+**Found (simulation):** a checkpoint reverts when positions selected but not yet settled exceed
+`allocatedBoundBps` of NAV. At 2%, 100 positions and about 70 acquisitions a day, the bound
+blocked a redemption checkpoint; at the 30-day rate (600/day) it would block most of them.
+**Why the bound can be wide:** an allocated position is valued at the lesser outcome,
+min(P, B (1 - s)) = P, which is exact when the purchaser takes the bid (the usual case). NAV is
+never overstated; on a keep it is understated by 0.0059 ETH per position. At 10% the worst
+understatement is about 2% of NAV, and only when purchasers keep packs.
+**Chose:** recommended default 1,000 bps (the bytecode maximum). The simulation counts a blocked
+checkpoint as missed and retries next blackout, as the keeper does.
+
+## D31. Independent review of the repairs (2026-11-16)
+
+A separate reviewer read b39568c, the keeper policy and the Python model against the deployed
+FWA, Shapes and ShapePacks sources. No critical or high finding. Resolution:
+- **S1 (medium, liveness): `maxTip` unbounded; a low cap underpays honest keepers when inclusion
+  needs a higher priority fee.** Now bounded `maxTip <= gasCeiling`. The cap stays: without it a
+  builder-keeper pays itself up to the ceiling through its own priority fee. Under congestion,
+  necessary calls wait until tips fall or the admin raises `maxTip` through the delay;
+  redemptions are delayed, never lost. Recommended 0.05 gwei, revisit at the canary.
+- **E1 (medium): keeper pay for necessary work is uncapped by value; old O5 no longer
+  describes it.** O5 is restated in OWNER-REQUIREMENTS B2. Lifetime gas per position (list, sync,
+  harvest and checkpoint shares) is charged call by call at measured gas in `sim/forward.py`, so
+  the reported returns already include it.
+- **E2 (low): fragmenting work earns the 30k overhead and premium per call.** The overhead
+  roughly equals a transaction's intrinsic cost; the leak is about 10k gas plus 10% per extra
+  call (about 2e12 wei at 0.15 gwei). Accepted.
+- **E3 (low): packs built while the edge held can sit idle if FWA's fees move before listing.**
+  They list again when the edge returns or are redeemed at full value; the loss is the mint fee
+  (0.0003 ETH per pack). Accepted.
+- **S2 (low): one stale id makes `claimListingFees` skip the whole batch.** Only the caller's
+  gas is wasted (unpaid when nothing arrives); the keeper passes active ids only. Accepted.
+- **S3 (info): allocated positions are understated at checkpoints.** Kept the wider 10% bound
+  (D30): the reviewer preferred 2%, which the simulation showed blocks checkpoints.
+- **Larger packs are inert at today's cap.** The keep-outcome gate B (k - s) >= P with
+  B = 0.0363 admits P <= 0.0373, so only 3-unit packs list. The allowed-P set works but has no
+  effect until the oracle ask rises.

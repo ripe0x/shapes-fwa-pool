@@ -108,6 +108,9 @@ def plan(s):
 
     active = [l for l in s.listings if l.status == ACTIVE]
     shortfall = max(0, s.owed_estimate - s.free - s.pending_deposits)
+    redeeming = shortfall > 0  # deploy nothing this pass while redeemers wait for ETH
+    # FWA's live fees leave no edge: every further cycle loses, so unwind (the vault allows it).
+    broken = s.k < 10**18 + s.min_edge_bps * 10**14
 
     # 2. Fees: claim when the vault would pay for it (pay <= share of the take), or when
     #    redeemers need ETH and fees are the cheapest source.
@@ -124,18 +127,20 @@ def plan(s):
         if s.idle_packs or s.loose_shapes:
             out.append(("liquidate", MAX_BATCH["liquidate"]))
             shortfall = max(0, shortfall - (s.idle_packs * 3 + s.loose_shapes) * UNIT)
-        if (s.winding_down or shortfall) and s.queue_drained:
-            pool = sorted((l for l in active if not l.crown_locked), key=lambda l: l.pending_fees)
-            ids = []
-            for l in pool:
-                if not s.winding_down and shortfall <= 0:
-                    break
-                ids.append(l.id)
-                shortfall -= 3 * UNIT + s.backing  # backing is close to each position's own
-            for i in range(0, len(ids), MAX_BATCH["unlist"]):
-                out.append(("unlist", ids[i:i + MAX_BATCH["unlist"]]))
-            if ids:
-                out.append(("liquidate", MAX_BATCH["liquidate"]))
+    unwind = s.winding_down or broken
+    if (unwind or shortfall) and s.queue_drained:
+        need_cash = s.winding_down or shortfall > 0
+        pool = sorted((l for l in active if not l.crown_locked), key=lambda l: l.pending_fees)
+        ids = []
+        for l in pool:
+            if not unwind and shortfall <= 0:
+                break
+            ids.append(l.id)
+            shortfall = max(0, shortfall - 3 * UNIT - s.backing)  # close to each position's own
+        for i in range(0, len(ids), MAX_BATCH["unlist"]):
+            out.append(("unlist", ids[i:i + MAX_BATCH["unlist"]]))
+        if ids and need_cash:
+            out.append(("liquidate", MAX_BATCH["liquidate"]))
 
     # 4. Checkpoint in FWA's blackout with its queue drained, only when holders have flows.
     if (s.blackout and s.queue_drained and not s.checkpoint_done_this_interval
@@ -151,7 +156,7 @@ def plan(s):
         out.append(("convert", s.token_held))
 
     # 6. Deploy: relist idle packs, then build new ones only when one cycle repays the build.
-    if s.winding_down or s.listing_paused or shortfall or not s.backing:
+    if s.winding_down or broken or s.listing_paused or redeeming or not s.backing:
         return out
     net = cycle_net(s)
     if not net:

@@ -177,6 +177,12 @@ contract ForkVaultLifecycleTest is ForkBase {
         vm.expectRevert(PackVault.OutOfBounds.selector);
         vault.proposeParams(p);
         p.distributionBps = 1_000;
+        // Review S1: the reimbursed tip can never exceed the gas ceiling itself.
+        p.maxTip = p.gasCeiling + 1;
+        vm.prank(admin);
+        vm.expectRevert(PackVault.OutOfBounds.selector);
+        vault.proposeParams(p);
+        p.maxTip = 0.05 gwei;
         vm.prank(admin);
         vault.proposeParams(p);
         vm.expectRevert(PackVault.TooEarly.selector);

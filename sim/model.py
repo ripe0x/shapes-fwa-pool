@@ -2,6 +2,10 @@
 """Phase 0.3 forward model: vault returns from injected pack positions, closed form plus
 Monte Carlo, under live parameters and the plan's stress set. Writes sim/out/phase0.3.md.
 
+SUPERSEDED by sim/forward.py (2026-11-16). This model subtracted estimated gas but not the
+contract's 5% keeper fee skim, which exceeded the edge (docs/DECISIONS.md D19), and it ignored
+cash drag between a bid outcome and the relist. Kept as the Phase 0.3 record only.
+
 Mechanics (FWAV2, validated exactly by sim/replay.py):
 - An acquisition costs F = H (1 + surcharge), H = harmonic-mean backing of active listings.
 - F (1 - protocolCut) (1 - crownShare) is split equally across active listings.

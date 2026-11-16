@@ -1,3 +1,5 @@
+> SUPERSEDED by sim/out/forward.md (2026-11-16): these returns omit the 5% keeper fee skim the contract then took (D19).
+
 # Phase 0.3 model
 
 Pool at block 26,425,092: 2,584 active listings, harmonic backing 0.0514 ETH.

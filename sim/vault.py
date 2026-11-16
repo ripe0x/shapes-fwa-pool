@@ -51,7 +51,7 @@ class Vault:
     balance: int  # deploy balance: seed plus any dust already at the address
     reserve: int = 5 * 10**16
     distribution_bps: int = 0
-    allocated_bound_bps: int = 200
+    allocated_bound_bps: int = 1_000
     settlement_fee_bps: int = 100
 
     total_shares: int = DEAD_SHARES
@@ -134,11 +134,27 @@ class Vault:
         self.balance += amount
         self.fees_received += amount
 
-    def resolve_bid(self, listing_id):
-        """Purchaser took the bid: backing gone, pack back (sync puts it idle)."""
-        p = self.positions.pop(listing_id)
+    def bid_settled(self, listing_id):
+        """Purchaser took the bid: backing gone, pack back to the vault (still an open position
+        until sync)."""
+        p = self.positions[listing_id]
+        p.status, p.pack_owned, p.pending_fees = SETTLED, True, 0
         self.backing_lost += p.backing
+
+    def kicked(self, listing_id):
+        """FWA kicked the listing (backing above a lowered cap): full backing and pack back."""
+        p = self.positions[listing_id]
+        p.status, p.pack_owned, p.pending_fees = WITHDRAWN, True, 0
+        self.balance += p.backing
+
+    def sync_owned(self, listing_id):
+        """sync of a settled or withdrawn position whose pack the vault holds: pack goes idle."""
+        p = self.positions.pop(listing_id)
         self.idle_packs.append(p.units)
+
+    def resolve_bid(self, listing_id):
+        self.bid_settled(listing_id)
+        self.sync_owned(listing_id)
 
     def resolve_keep(self, listing_id):
         """Purchaser kept the pack (or the vault reclaimed backing): backing less the fee back."""

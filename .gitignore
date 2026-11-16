@@ -4,3 +4,4 @@ __pycache__/
 /cache/
 /broadcast/*/1/run-*.json
 /broadcast/
+sim/out/acq_history.npz
