@@ -142,7 +142,8 @@ contract ForkTokensTest is Test {
         assertApproxEqRel(out, held * ref / 1e18, 0.001e18);
         assertLt(out, 1e13);
         assertEq(address(vault).balance - navEthBefore, out - 0, "ETH lands in the vault");
-        vm.expectRevert(PackVault.TooEarly.selector);
+        // Nothing left to sell; the once-per-interval guard is checked after the balance.
+        vm.expectRevert(PackVault.Amount.selector);
         vault.convert(1, 0);
     }
 }
