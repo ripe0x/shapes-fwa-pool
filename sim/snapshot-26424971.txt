@@ -1,0 +1,54 @@
+block 26424971  timestamp 1794800627  rpc https://mainnet.gateway.tenderly.co
+
+== FWA settings (latest ConfigSet; getter cross-check)
+  surchargeBps                                    500  at 25944615  
+  topListingShareBps                               10  at 26078548  getter ok
+  topThresholdBps                                1000  at 25944615  getter ok
+  settlementDiscountBps                          9000  at 25944616  getter ok
+  ownerAcquisitionFeeBps                          100  at 25944616  getter ok
+  ownerSettlementFeeBps                           100  at 25944617  getter ok
+  settlementWindow                               3600  at 25944617  getter ok
+  finalizeWindow                                 3600  at 25944617  getter ok
+  minBacking                        25000000000000000  at 25944617  
+  protocolFeeToTokenBps                          8000  at 26144054  
+  maxOracleAge                                 604800  at 25944609  getter ok
+  minOracleChallengePeriod                      21600  at 25944617  getter ok
+  oracleCeilingPremiumBps                        1000  at 25944609  getter ok
+  tokenSettlementDiscountBps                     9150  at 26126290  getter ok
+  retainedToProtocol                                1  at 25944618  
+  acquisitionsEnabled                               1  at 26126292  
+  withdrawOnly                 never set
+  whitelistEnabled                                  1  at 25944609  
+
+== Pool state
+  acquisitionFee 0.053945  harmonic backing 0.051376  active 2590
+  surcharge derived 500 bps vs event 500
+  unsettledAcquisitionCount 0  isPurchaseBlackout false
+  top listing 88207  backing 62.000000  since 1792428947  collection 0x000000000000003607fce1aC9e043a86675C5C2F  status 1
+
+== Shape packs on main pool
+  canDeposit True  oracleExempt False
+  floor bid 0.029700  ask 0.033000  observedAt 1794689375  age 111252s  periodUsed 281474976710655
+  passes _validatedFloorCap: True
+  quote expires in 137.1 h
+  backing cap 0.036300  minBacking 0.025000
+
+== Economics (P = 0.03 ETH)
+  k 1.038461  s 0.01  listing gate B >= 0.029170
+  B 0.025000  r 0.83  bid +0.00096  keep -0.00429
+  B 0.030000  r 1.00  bid +0.00115  keep +0.00085
+  B 0.033000  r 1.10  bid +0.00127  keep +0.00394
+  B 0.036300  r 1.21  bid +0.00140  keep +0.00733
+
+== Shapes and ShapePacks
+  Shapes.mintFee 0.001000
+  createPack(uint256[],uint32[])                8908adab  present
+  createPackTo(uint256[],uint32[],address)      1300844d  present
+  redeem(uint256)                               db006a75  present
+  redeemTo(uint256,address)                     52c08bb4  present
+  open(uint256)                                 690e7c09  present
+  valueOf(uint256)                              cadf338f  present
+  contentsOf(uint256)                           4f66acd3  present
+  mergePacks(uint256,uint256[])                 d8954e9d  present
+
+No stop condition.
