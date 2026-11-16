@@ -497,3 +497,84 @@ can stop things at once and change parameters after the 2-day delay. Neither rol
 moves assets to itself.
 **Cost:** with one key, nobody can cancel a malicious parameter proposal from a stolen key; holders
 must exit within the 2-day delay. Roles are immutable, so splitting them later means redeploying.
+
+## D45. Gas classes: liability work is the only work planned above the ceiling (2026-11-16)
+
+**Found:** above the vault's gas ceiling the keeper planned nothing, so a redemption requested
+during a long spike waited for gas to fall even when a keeper would accept a small loss to honour
+it. The contract never blocked that work (only `restock` and `list` check the ceiling), so this
+was a keeper rule, not a vault rule.
+**Chose:** `policy.plan` keeps every rule below the ceiling. Above it, it plans only work that
+honours an existing liability: sync, fee harvest, liquidation and unlisting while redeemers are
+short of ETH or the vault winds down, and the checkpoint that prices a redemption. New packs,
+relists, activation, optional harvests, deposit pricing (depositors can cancel) and token burns
+wait. Whether to pay the difference is the executor's choice: `--max-loss-wei` (default 0) bounds
+the loss per call. The vault still reimburses at most the ceiling price, so the vault's cost is
+unchanged and no new extractable pay exists.
+**Per operation (classes):** new inventory: only when one bid cycle repays the build (below about
+0.54 gwei) and under the ceiling. Relist existing packs: when a bid cycle nets positive (break-even
+1.59 gwei), under the ceiling. Harvest: when pay <= 25% of fees realized, or for redemption cash.
+Token burn: operator opt-in, unpaid, under the ceiling. Checkpoint: in FWA's blackout with flows;
+above the ceiling only for redemptions. Recovery (sync) and liquidity release: below the ceiling
+when due; above it only for redemptions or wind-down. Wind-down: always planned.
+**Evidence:** canary rehearsal step 7 at 1.05 gwei: a no-loss keeper waits (status
+GAS_ABOVE_CEILING, two calls skipped for loss); a keeper allowing 0.01 ETH per call released
+0.96 ETH of liquidity and priced the redemption for a total keeper loss of 0.00078 ETH.
+
+## D46. Reserve: keep the fixed parameter, size it from obligations (2026-11-16)
+
+**Compared:** the balancer's `requiredReserve()` derives its reserve from a target board the
+creator must keep restored. The vault has no target to restore, and its liabilities are already
+exact and excluded from every spend path (`_free` subtracts escrow, redemption and distribution
+reserves and settled claimables; `_idle` also keeps the owed estimate for unpriced redemptions).
+What the reserve buys is keeper pay for necessary work when everything else is deployed: unlists
+and syncs pay from the backing they return, so only a checkpoint and a listing batch need it.
+**Chose:** no contract change. The canary reserve drops from 0.05 to 0.005 ETH: one checkpoint
+at 30 positions plus one 10-pack listing batch at the 0.5 gwei ceiling needs 0.0038 ETH
+(`policy.reserve_need`). The keeper reports RESERVE_BELOW_NEED when the parameter falls under the
+need for the current ceiling and position limit (raising the ceiling should raise the reserve in
+the same proposal).
+**Result:** the 2 ETH canary builds 29 positions instead of 28 (rehearsal). A dynamic on-chain
+reserve would track the ceiling automatically but costs a contract change, a mirror change in
+`sim/vault.py` and reconciliation for about 0.004 ETH of difference at canary scale; rejected.
+
+## D47. Keeper execution: extend the Python keeper with a persistent transaction manager (2026-11-16)
+
+**Compared:** the balancer's TypeScript/viem keeper (one function, `performUpkeep`, whose
+simulation returns the reward) against this keeper (many functions chosen by `keeper/policy.py`,
+which `sim/forward.py` also imports). Moving to TypeScript would split the policy from the
+simulation or require porting both; the balancer's transaction code is about 150 lines inside its
+Keeper class, not a library, so no shared package exists to reuse.
+**Chose:** `keeper/tx.py` ports the balancer's execution design to Python: pending entry saved
+before broadcast, same-nonce +25% replacement after 3 blocks (5 at most, under a bid cap, only
+while the call still preflights), receipts reconciled against `KeeperPaid`, reorg re-check of
+counted receipts, a lock per state file, `/health` and `--status`. Kept from this keeper: one call
+at a time with a fresh read after each, the policy as the only economic logic.
+**Cost:** the two repositories keep separate transaction managers; they share the design and its
+test list, not code. Extracting a shared package is worth it only if a third keeper appears.
+**Evidence:** `keeper/test_tx.py`, 10 scenarios on a local anvil; rehearsal: the state file's
+keeper pay and gas spent equal the chain's to the wei over 18 transactions.
+
+## D48. Inventory planning stays in the policy (2026-11-16)
+
+**Reviewed:** the balancer keeps a target board and restocks deficits in bounded batches because
+its creator chooses a fixed prize mix. The vault has no target mix; its target is "every position
+the capital, the position limit and the gas allow". The policy already relists returned packs
+before building, builds only in whole 0.1 ETH Shape mints split into packs, sizes each build to
+the capital check, stops building while trailing volume is under the slowdown floor, and deploys
+nothing in a pass that frees redemption cash. No waste found in the rehearsal (9 mints for 29
+packs: 87 Shapes used of 90 minted, 3 loose Shapes carried to the next build). No change.
+
+## D49. Asset-flow verification uses the owner's kit (2026-11-16)
+
+**Chose:** the same asset-flow kit the balancer uses (`~/.agents/guidance/asset-flow-kit`):
+`test/utils/FlowBreakdown.sol`, regime scenarios in `test/scenario/`, `asset-flow.json` with
+DRAFT outcomes for the owner to sign, scorecards in `docs/receipts/flow/`, and
+`docs/SYSTEM-MAP.md`. Not imported: the balancer's creator profit, player price, prize restocking
+and board-shape regimes.
+
+## D50. The burn calls stay unpaid and public (owner, 2026-11-16)
+
+**Owner:** "we shouldn't reimburse for the claim and burn calls. just make that public that anyone
+can call whenever they want." Already so since D43: `burnTokens` has no caller check and pays
+nothing. The keeper sends it only with `--burn-tokens`, at the operator's own cost.

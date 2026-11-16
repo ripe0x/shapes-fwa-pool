@@ -2,6 +2,7 @@
 
 PackVault: pooled depositor vault listing Shape packs on the FWA V2 main pool. Owner
 requirements: `OWNER-REQUIREMENTS.md`. Decisions: `docs/DECISIONS.md`. Status: `docs/REPORT.md`.
+Keeper operations: `docs/KEEPER.md`. Gas: `docs/GAS.md`. Assets: `docs/SYSTEM-MAP.md`, `asset-flow.json`.
 
 ## Commands
 
@@ -20,6 +21,11 @@ python3 sim/find_selection.py  # real requests whose VRF word selects vault list
 python3 sim/reconcile.py       # after ForkReconcile.t.sol: Python vault model vs fork, to the wei
 python3 sim/forward.py 200     # sim/out/forward.md: expectation, backtest, forward simulation
 python3 keeper/rehearse_canary.py  # exact canary values, deploy script + keeper on anvil fork (see its header)
+python3 keeper/test_policy.py      # gas classes, reserve need, status codes (no chain)
+python3 keeper/test_tx.py          # keeper tx manager: restart, replacement, lost response, reorg (plain anvil)
+forge test --match-path test/scenario/VaultFlow.t.sol --rpc-url https://mainnet.gateway.tenderly.co \
+  --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100   # 16 asset-flow regimes
+python3 ~/.agents/guidance/asset-flow-kit/asset_gate.py .   # PASS needs the owner's signature on asset-flow.json
 ```
 
 ## Rules specific to this repo

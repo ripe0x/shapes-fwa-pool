@@ -5,6 +5,13 @@ same rules the live keeper does.
 A call is planned only when the vault pays for it (necessary work, or value well above its cost)
 or when holders need it (redemption liquidity, wind-down). Everything is recomputed each pass, so
 an interrupted keeper resumes from chain state alone.
+
+Gas classes (D45). Below the vault's gas ceiling the keeper is reimbursed at its bid, so every
+planned call pays for itself. Above the ceiling, reimbursement is priced at the ceiling, so only
+liability work is planned: redemption liquidity, the checkpoint that prices a redemption, and
+wind-down. Everything else (new packs, relists, fee harvests, activation, deposit pricing, token
+burns) waits for gas to fall. Whether a keeper accepts the loss on liability work above the
+ceiling is the executor's choice (keeper.py --max-loss-wei), not the vault's.
 """
 from dataclasses import dataclass, field
 
@@ -76,6 +83,8 @@ class State:
     # floor below which it stops building new packs (relisting existing ones continues).
     recent_volume: float = 0.0
     slowdown_volume: float = 0.0
+    reserve: int = 0  # the vault's `reserve` parameter
+    op_gas_cap: int = 15_000_000
 
 
 def price(s):
@@ -97,19 +106,21 @@ def cycle_net(s):
 def plan(s):
     """Ordered list of calls for this pass. Each is a tuple: (function, args...)."""
     out = []
-    if s.gas_price > s.gas_ceiling:
-        return out  # pay is capped at the ceiling: wait for gas to fall
+    spike = s.gas_price > s.gas_ceiling
+    if spike and not (s.winding_down or s.locked_shares):
+        return out  # nothing owed to anyone waits on this pass: wait for gas to fall
 
     # 1. Resolve what FWA moved on: settled, withdrawn (kicked), or allocated past the window,
     #    and retry any pack FWA still owes.
     due = [l.id for l in s.listings
            if l.status in (SETTLED, WITHDRAWN)
            or (l.status == ALLOCATED and s.now >= l.allocated_at + s.settlement_window)]
-    for i in range(0, len(due), MAX_BATCH["sync"]):
-        out.append(("sync", due[i:i + MAX_BATCH["sync"]]))
-
     active = [l for l in s.listings if l.status == ACTIVE]
     shortfall = max(0, s.owed_estimate - s.free - s.pending_deposits)
+    if not spike or s.winding_down or shortfall:  # above the ceiling, only when ETH is owed
+        for i in range(0, len(due), MAX_BATCH["sync"]):
+            out.append(("sync", due[i:i + MAX_BATCH["sync"]]))
+
     redeeming = shortfall > 0  # deploy nothing this pass while redeemers wait for ETH
     # FWA's live fees leave no edge: every further cycle loses, so unwind (the vault allows it).
     broken = s.k < 10**18 + s.min_edge_bps * 10**14
@@ -119,7 +130,7 @@ def plan(s):
     earning = sorted((l for l in active if l.pending_fees), key=lambda l: -l.pending_fees)[:MAX_BATCH["harvest"]]
     amount = s.fee_credit + sum(l.pending_fees for l in earning)
     hcost = cost(s, GAS["harvest_base"] + GAS["harvest_per"] * len(earning))
-    if amount and (hcost * BPS <= amount * s.share_bps or shortfall):
+    if amount and ((hcost * BPS <= amount * s.share_bps and not spike) or shortfall):
         out.append(("harvest", [l.id for l in earning]))
         shortfall = max(0, shortfall - amount)
 
@@ -147,24 +158,24 @@ def plan(s):
     # 3b. Listings FWA staged (its queue was busy when they were listed) earn nothing until
     #     activated; activation needs the queue drained.
     staged = sorted(l.id for l in s.listings if l.status == STAGED)
-    if staged and s.queue_drained:
+    if staged and s.queue_drained and not spike:
         out.append(("activate", staged, 200))
 
     # 4. Checkpoint in FWA's blackout with its queue drained, only when holders have flows.
     if (s.blackout and s.queue_drained and not s.checkpoint_done_this_interval
-            and (s.pending_deposits or s.locked_shares)):
+            and (s.locked_shares or (s.pending_deposits and not spike))):
         out.append(("checkpoint",))
 
     # 5. Tokens (zero in NAV, never sold): claim and burn when the operator opts in.
     total = s.token_pending + s.token_credit + s.token_held
-    if total and s.burn_tokens:
+    if total and s.burn_tokens and not spike:
         # Only ids with pending tokens, in harvest-sized batches: bounds gas well under EIP-7825.
         out.append(("burnTokens", s.token_ids[:MAX_BATCH["harvest"]]))
     elif total:
         s.notes.append(f"tokens {total / 1e18:.4f} unburned (run with --burn-tokens; operator pays the gas)")
 
     # 6. Deploy: relist idle packs, then build new ones only when one cycle repays the build.
-    if s.winding_down or broken or s.listing_paused or redeeming or not s.backing:
+    if spike or s.winding_down or broken or s.listing_paused or redeeming or not s.backing:
         return out
     net = cycle_net(s)
     if not net:
@@ -189,4 +200,59 @@ def plan(s):
         if build <= net and n:
             out.append(("restock", n, 3))
             out.append(("list", n))
+    return out
+
+
+def reserve_need(s):
+    """ETH the reserve should hold for necessary paid work when everything else is deployed: one
+    checkpoint at maximum positions plus one full listing batch, at the gas ceiling (D46). Unlisting
+    and syncs pay from the backing they return, so they need none."""
+    gas = (GAS["checkpoint_base"] + GAS["checkpoint_per"] * s.max_positions + GAS["overhead"]
+           + GAS["list_per"] * MAX_BATCH["list"] + GAS["overhead"])
+    return gas * s.gas_ceiling * (BPS + s.premium_bps) // BPS
+
+
+def status(s, planned=None):
+    """Operational states for monitoring: (code, kind, detail). kind is "ok", "wait" (normal,
+    clears by itself), "info", or "action" (someone must intervene)."""
+    planned = plan(s) if planned is None else planned
+    out = []
+    spike = s.gas_price > s.gas_ceiling
+    shortfall = max(0, s.owed_estimate - s.free - s.pending_deposits)
+    if s.winding_down:
+        out.append(("WINDING_DOWN", "info", f"{len(s.listings)} positions, {s.idle_packs} idle packs left to unwind"))
+    if spike:
+        out.append(("GAS_ABOVE_CEILING", "wait", f"bid {s.gas_price / 1e9:.3f} gwei > ceiling {s.gas_ceiling / 1e9:.3f}; "
+                    + ("liability work only" if planned else "nothing owed waits")))
+    if any(l.status == ALLOCATED and s.now < l.allocated_at + s.settlement_window for l in s.listings):
+        out.append(("WAITING_SETTLEMENT", "wait", "a purchaser is inside FWA's settlement window"))
+    if (s.pending_deposits or s.locked_shares) and not s.checkpoint_done_this_interval \
+            and not (s.blackout and s.queue_drained):
+        out.append(("WAITING_CHECKPOINT_WINDOW", "wait", "flows wait for FWA's blackout with a drained queue"))
+    if not s.backing and not s.winding_down:
+        out.append(("QUOTE_UNAVAILABLE", "wait", "FWA admission or its floor quote refuses a listing: nothing new lists"))
+    if s.k < 10**18 + s.min_edge_bps * 10**14 and not s.winding_down:
+        out.append(("EDGE_GATE_FAILED", "action", f"k {s.k / 1e18:.4f} below 1 + minEdge: positions unwinding; "
+                    "consider wind-down"))
+    elif s.backing and not spike and not s.winding_down and not s.idle_packs and not cycle_net(s):
+        out.append(("BID_CYCLE_UNPROFITABLE", "wait", "gas too high for a bid cycle to repay itself"))
+    staged = [l.id for l in s.listings if l.status == STAGED]
+    if staged:
+        out.append(("STAGED_PENDING_ACTIVATION", "wait", f"{len(staged)} listings staged; activate once FWA's queue drains"))
+    if shortfall:
+        out.append(("REDEMPTION_LIQUIDITY_SHORT", "wait" if planned else "action",
+                    f"{shortfall / 1e18:.4f} ETH owed to redeemers beyond free ETH"))
+    if s.token_pending + s.token_credit + s.token_held and not s.burn_tokens:
+        out.append(("TOKENS_UNBURNED", "info", f"{(s.token_pending + s.token_credit + s.token_held) / 1e18:.4f} FWA tokens; "
+                    "anyone may call burnTokens"))
+    owed = [l.id for l in s.listings if l.pack_owed]
+    if owed:
+        out.append(("RECOVERY_REQUIRED", "action", f"FWA holds packs owed to the vault for listings {owed[:5]}"))
+    if s.listing_paused and not s.winding_down:
+        out.append(("LISTING_PAUSED", "action", "guardian paused listing"))
+    if s.reserve < reserve_need(s) and not s.winding_down:
+        out.append(("RESERVE_BELOW_NEED", "action", f"reserve {s.reserve / 1e18:.4f} ETH < {reserve_need(s) / 1e18:.4f} "
+                    "needed at the ceiling; admin raises it through the delay"))
+    if not out:
+        out.append(("OK", "ok", "operating normally"))
     return out

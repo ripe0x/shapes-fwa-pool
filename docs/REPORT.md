@@ -197,10 +197,15 @@ events through block 26,425,500.
 
 ## 7. Decisions for the owner
 
-Answered 2026-11-16 (section 8): canary approved; no gas stop rule; tokens burned; gate at the
-0.5 gwei ceiling. Open:
+Answered 2026-11-16 (sections 8, 9): canary approved; no gas stop rule; tokens burned, unpaid,
+public; gate at the 0.5 gwei ceiling. Open:
 1. **Guardian and admin addresses** (one address may hold both, D44).
-2. Sign off section B2 of `OWNER-REQUIREMENTS.md`.
+2. **Sign `asset-flow.json`** (10 DRAFT outcomes, all OK in 16 regimes; hash
+   `3e04f791afa1d96fa2736270b7fe6ae470e0319e7648189a05999d54df213c04`; signing commands in
+   `~/.agents/guidance/asset-flow-kit/README.md`). Until signed the gate reports INCOMPLETE.
+3. **Keeper loss allowance** for liability work above the ceiling: recommended
+   `--max-loss-wei 2000000000000000` (0.002 ETH per call; the rehearsal's whole spike cost 0.00078 ETH).
+4. Sign off section B2 of `OWNER-REQUIREMENTS.md`.
 
 ## 8. Owner decisions applied (2026-11-16)
 
@@ -219,3 +224,42 @@ the keeper now passes only listings with pending tokens, 60 per call (a 20-listi
 whenever anything is pending and only at or under the gas ceiling (operator cost about 3.4e13 wei
 per burn at canary size). Open question from it: purchasers can take an FWA-token bid; the
 simulation assumes ETH bids, as before this change.
+
+## 9. Balancer review pass (2026-11-16, D45 to D50)
+
+Compared with shapes-pool-balancer `05e6b60`; full table in `docs/BALANCER-COMPARISON.md`.
+
+**Changed**
+- **Keeper execution (`keeper/tx.py`, D47).** Persistent in-flight transaction saved before
+  broadcast, same-nonce +25% replacement, lost-response lookup, receipts reconciled against
+  `KeeperPaid`, reorg re-check, file lock, `/health`, `--status`, 14 status codes (wait vs action).
+  Python kept: the simulation imports the policy.
+- **Gas classes (D45).** Above the ceiling the keeper plans only liability work (redemptions,
+  wind-down); a keeper pays the difference only within `--max-loss-wei`. Thresholds per operation
+  in `docs/GAS.md`.
+- **Reserve (D46).** Canary reserve 0.05 to 0.005 ETH, sized from obligations (0.0038 ETH need);
+  no contract change. The 2 ETH canary builds 29 positions instead of 28.
+- **Asset flow (D49).** The owner's asset-flow kit, 16 regimes on a real fork, ETH conserved to
+  the wei in each, `docs/SYSTEM-MAP.md`, 10 DRAFT outcomes awaiting signature.
+- **Unchanged:** contract bytecode, inventory planning (D48), token burn (unpaid, public, D50).
+
+**Verified** (this commit; Tenderly fork, canary values unless stated)
+| Check | Result |
+|---|---|
+| `python3 keeper/test_policy.py` | pass (gas classes, reserve need, status codes) |
+| `python3 keeper/test_tx.py` (plain anvil) | 10 scenarios pass: preflight classes, receipt + pay, lock, restart with tx in flight, same-nonce replacement, lost response not broadcast, lost response broadcast, nonce used externally, work done by another keeper, reorg removal |
+| `keeper/rehearse_canary.py` (fork 26,418,539) | 29 positions; ledger gap 0; keeper state file equals chain pay and gas to the wei (18 tx, net +0.000353 ETH); spike at 1.05 gwei: no-loss keeper waits, bounded-loss keeper releases 0.96 ETH and prices the redemption (keeper loss 0.00078 ETH); holder -0.0201 ETH on 1.99 ETH with zero acquisitions |
+| `forge test --match-path test/scenario/VaultFlow.t.sol` | 16 regimes pass, 0 mismatches |
+| asset-flow gate | INCOMPLETE only for the missing owner signature; all outcomes OK |
+| `python3 sim/forward.py 400` | gate +116% (0.15 gwei) and +73% (0.5 gwei, p5 -10%); last 14 d, 100 positions +22.8%, P(loss) 16% [13-20]; whole year at the 0.5 gwei ceiling +12.0%, P(loss) 27%. Differences from the previous run are within about 2 standard errors (the reserve change deploys 0.6% more capital at 100 positions) |
+| Independent keeper review | no double-send or fund-safety issue; fixed: reorg relocation recounted instead of uncounted, lost-response lookup covers downtime, expected reverts matched by selector, declined liability work raised as action, first broadcast counted as sent |
+
+**Not tested:** a reorg that re-includes the same transaction elsewhere (anvil drops reorged
+transactions and re-signing needs a key on the command line); several real selections in one fork
+(only two VRF fixtures exist; the simulation covers bursts statistically); fees accruing while a
+keeper sleeps (no real acquisition at the pinned rehearsal block).
+
+**Canary readiness:** technically ready for the small private canary once the owner supplies the
+role address(es) and signs the outcomes. No open defect. The economic case is unchanged: modest at
+current activity (about +20% a year at 100 positions, 16% chance of a losing year), dependent on
+gas staying under the ceiling.

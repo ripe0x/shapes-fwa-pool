@@ -18,10 +18,12 @@ request block hash, which a local chain cannot reproduce); those run in test/for
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 RPC = "http://127.0.0.1:8547"
+KEEPER_STATE = tempfile.mkdtemp(prefix="pack-vault-keeper-") + "/state.json"  # fresh per run
 VALUES = json.loads((ROOT / "deploy/canary.example.json").read_text())
 FWA = VALUES["fwa"]
 PACKS = VALUES["packs"]
@@ -86,9 +88,20 @@ def warp_to(offset):  # seconds into FWA's 12 h interval: 42,360 = 11:46 (blacko
 
 
 def keeper(*extra):
-    out = sh("python3", "keeper/keeper.py", VAULT, "--send", "--from", KEEPER, "--rpc", RPC, *extra, check=False)
+    out = sh("python3", "keeper/keeper.py", VAULT, "--send", "--from", KEEPER, "--rpc", RPC, "--state", KEEPER_STATE,
+             *extra, check=False)
     print("  " + out.replace("\n", "\n  "))
     return out
+
+
+def spike():  # basefee 1 gwei, twice the ceiling (empty blocks decay it ~12.5% each)
+    cast("rpc", "anvil_setNextBlockBaseFeePerGas", hex(10**9))
+    cast("rpc", "evm_mine")
+
+
+def calm():
+    cast("rpc", "anvil_setNextBlockBaseFeePerGas", hex(150_000_000))
+    cast("rpc", "evm_mine")
 
 
 def state(tag):
@@ -193,13 +206,22 @@ def main():
     keeper()
     state("after kick, sync, relist")
 
-    # 7. Partial withdrawal, with the keeper interrupted after one call and restarted.
+    # 7. Partial withdrawal during a gas spike above the 0.5 gwei ceiling. Liability work only:
+    #    a keeper accepting no loss waits; one accepting a bounded loss releases liquidity, is
+    #    interrupted after one call and restarts from its state file, then prices the redemption.
     shares = num(call(VAULT, "shareBalance(address)(uint256)", HOLDER))
     send(HOLDER, VAULT, "requestRedeem(uint256)", shares // 2)
-    keeper("--max-steps", "1")  # interrupted
-    keeper()  # restarted from chain state alone
+    spike()
+    out_spike_wait = keeper()
+    if "GAS_ABOVE_CEILING" not in out_spike_wait or "sent " in out_spike_wait:
+        sys.exit("a no-loss keeper must wait above the ceiling")
+    loss = ["--max-loss-wei", str(10**16)]
+    keeper(*loss, "--max-steps", "1")  # interrupted
+    out_spike_work = keeper(*loss)  # restarted: resumes from its state file and chain state
     warp_to(42360)
-    keeper()
+    spike()
+    keeper(*loss)
+    calm()
     send(HOLDER, VAULT, "claim()")
     state("partial withdrawal")
 
@@ -241,11 +263,18 @@ def main():
         staged_before_activation=staged0, staged_after_activation=staged1,
         token_burned=burned, token_burn_keeper_cost=token_burn_cost,
         end_balance=end["balance"], end_lastNav=end["lastNav"], ledger_in=ins, ledger_out=outs,
-        ledger_gap=ins - outs, keeper_out=dict(tokens_idle=out_idle, tokens_burn=out_burn), log=log)
+        ledger_gap=ins - outs, keeper_tx=json.load(open(KEEPER_STATE))["stats"],
+        keeper_out=dict(tokens_idle=out_idle, tokens_burn=out_burn, spike_wait=out_spike_wait,
+                        spike_work=out_spike_work), log=log)
     (ROOT / "sim/out/canary-rehearsal.json").write_text(json.dumps(report, indent=1, default=str))
     print(json.dumps({k: v for k, v in report.items() if k not in ("log", "keeper_out", "values")}, indent=1))
     if ins != outs:
         sys.exit(f"ledger does not close: in {ins} out {outs}")
+    kt = report["keeper_tx"]
+    if kt["paid_wei"] != pay or kt["spent_wei"] != report["keeper_gas_spent"]:
+        sys.exit(f"keeper accounting differs from chain: tracked paid {kt['paid_wei']} spent {kt['spent_wei']}, "
+                 f"chain paid {pay} spent {report['keeper_gas_spent']}")
+    print("keeper state file matches the chain: pay and gas spent to the wei")
     print("ledger closes to the wei: seed + deposits = claims + keeper pay + mint fees + balance")
     del holder_start
 

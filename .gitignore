@@ -6,3 +6,6 @@ __pycache__/
 /broadcast/
 sim/out/acq_history.npz
 sim/out/audit_events.npz
+keeper/state-*.json
+keeper/state-*.json.lock
+keeper/state-*.json.tmp

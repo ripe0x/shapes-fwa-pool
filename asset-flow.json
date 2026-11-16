@@ -1,0 +1,23 @@
+{
+  "source_paths": ["src", "script", "foundry.toml"],
+  "evidence_paths": ["test/scenario/VaultFlow.t.sol", "test/utils/FlowBreakdown.sol", "test/fork/ForkSelection.t.sol", "test/fork/ForkBase.sol"],
+  "scorecard_dir": "docs/receipts/flow",
+  "review_dir": "audit",
+  "required_regimes": ["init", "max_load", "inactive_short", "inactive_long", "gas_spike", "oracle_change", "keeper_delay", "withdrawals", "settled_unclaimed", "distributions", "wind_down", "acquire_bid", "acquire_keep", "acquire_silent", "staged_activation", "tokens"],
+  "drift_groups": [["inactive_short", "inactive_long"]],
+  "drift_threshold_bps": 500,
+  "test_command": "forge test --match-path test/scenario/VaultFlow.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100",
+  "outcomes": [
+    {"id": "O1", "text": "DRAFT. Where a bid ends: on a bid outcome the vault keeps the pack and the whole backing leaves (0.9 to the purchaser, 0.1 to FWA), about 0.0363 ETH per selection; the vault's edge is the fee share it keeps.", "metric": "destinations.backing to purchaser and FWA on a bid", "max_wei": "40000000000000000", "regimes": ["acquire_bid", "staged_activation"]},
+    {"id": "O2", "text": "DRAFT. What a keeper earns and the cheapest way to game it: only reimbursed gas plus the 10% premium, capped per position moved (D35), so padding a call earns nothing; the whole 28-position canary build pays at most about 0.0128 ETH.", "metric": "destinations.paid to keepers (gas + premium)", "max_wei": "15000000000000000", "regimes": ["max_load"]},
+    {"id": "O3", "text": "DRAFT. How it ends for holders: wind-down returns every holder's NAV share, with no shares left locked.", "metric": "facts.locked_shares_at_end", "max": 0, "regimes": ["wind_down"]},
+    {"id": "O4", "text": "DRAFT. What is left at the end: only the dead-share seed slice remains in the vault, about 0.0105 ETH (the 0.01 ETH seed plus deploy-address dust).", "metric": "facts.vault_eth_at_end_wei", "max": 12000000000000000, "regimes": ["wind_down"]},
+    {"id": "O5", "text": "DRAFT. Liabilities are never deployable (D32): settled-but-unclaimed ETH, escrow and the reserves stay out of idle ETH, so keepers can never list or be paid from a holder's owed ETH.", "metric": "facts.claimable_not_deployable_guard", "min": 1, "regimes": ["settled_unclaimed"]},
+    {"id": "O6", "text": "DRAFT. Can it stall and what restarts it (gas): above the 0.5 gwei ceiling new listings refuse, but a checkpoint, claims and unlisting still run and the keeper pay is priced at the ceiling, not the spike (about 0.00013 ETH for a checkpoint at 2 gwei, a quarter of the uncapped cost). Anyone can checkpoint or raise the ceiling (2-day delay) to restart listing.", "metric": "facts.checkpoint_pay_wei", "max": 200000000000000, "regimes": ["gas_spike"]},
+    {"id": "O7", "text": "DRAFT. FWA token rewards (D43): claimed and burned, never sold. Supply falls by exactly the claimed amount and the burn pays the caller no ETH, so holders pay no gas and get no token value.", "metric": "facts.burn_paid_any_eth", "max": 0, "regimes": ["tokens"]},
+    {"id": "O8", "text": "DRAFT. Oracle failure cannot trap assets (D34): a repointed or broken oracle yields no cap so nothing new lists, yet packs are still recovered to inventory and redemptions proceed.", "metric": "facts.edge_ok_after_repoint", "max": 0, "regimes": ["oracle_change"]},
+    {"id": "O9", "text": "DRAFT. What a holder gets on gains (distributions on, a stated variation; the canary ships distributions off): 20% of a gain above the high-water mark is paid to live shares, 0.2 ETH of a 1 ETH gain less the first checkpoint's keeper pay.", "metric": "facts.distributed_wei", "min": 190000000000000000, "max": 200000000000000000, "regimes": ["distributions"]},
+    {"id": "O10", "text": "DRAFT. A relist staged while FWA's queue is busy earns nothing until activated; with the queue drained the vault activates it through FWA's own permissionless activation, so a relist never sits staged forever (D36).", "metric": "facts.relist_active_after_activate", "min": 1, "regimes": ["staged_activation"]}
+  ],
+  "explained": []
+}

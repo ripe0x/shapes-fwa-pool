@@ -158,8 +158,8 @@ def run(sc, n_target, seed, days=365):
         others = rng.choice(POOL, int(len(POOL) * sc["pool_scale"]))
     W_o, N_o = float(np.sum(1 / others)), len(others)
     g_of = sc.get("gwei", 0.15)  # gwei, or a function of the day (gas changing after deployment)
-    deposit = int((n_target * (0.0363 + 0.03) + 0.06 + 0.11) * E)  # positions + reserve + mint room
-    v = Vault(seed=10**16, balance=10**16, reserve=5 * 10**16)
+    deposit = int((n_target * (0.0363 + 0.03) + 0.06 + 0.11) * E)  # positions + mint room + slack
+    v = Vault(seed=10**16, balance=10**16, reserve=9 * 10**15)  # policy.reserve_need at 300 positions, 0.5 gwei (D46)
     v.deposit("h", deposit)
     nav0_per_share = None
     next_id = 0

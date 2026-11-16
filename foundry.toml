@@ -11,7 +11,7 @@ optimizer_runs = 200
 via_ir = true
 bytecode_hash = "none"
 cbor_metadata = false
-fs_permissions = [{access = "read", path = "./deploy"}, {access = "read-write", path = "./sim/out"}, {access = "read", path = "./test/fixtures"}]
+fs_permissions = [{access = "read", path = "./deploy"}, {access = "read-write", path = "./sim/out"}, {access = "read", path = "./test/fixtures"}, {access = "read-write", path = "./docs/receipts/flow"}]
 # Cache fork state. Tenderly's public gateway throttles bursts, so run fork tests with
 # --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100.
 rpc_storage_caching = { chains = ["mainnet"], endpoints = "all" }

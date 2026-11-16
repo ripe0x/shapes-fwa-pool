@@ -16,7 +16,7 @@
  "gasCeilingWei": 500000000,
  "maxTipWei": 50000000,
  "maxPositions": 30,
- "reserveWei": 50000000000000000,
+ "reserveWei": 5000000000000000,
  "tvlCapWei": 2000000000000000000,
  "opGasCap": 15000000
 }
