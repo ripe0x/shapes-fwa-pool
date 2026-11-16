@@ -109,3 +109,18 @@ starts at zero (no sales) until the admin sets one through the delay; after that
 updates it. One sale per FWA 12 h interval, at most `clipMax` tokens.
 **Why:** without a reference a keeper could sell into a sandwich. The trailing fill can drift
 down at most `clipSlippageBps` per interval.
+
+## D13. Dead shares keep their slice of distributions
+
+**Chose:** distributions accrue per share over all shares, including the 1e15 dead seed shares,
+whose slice stays in `distributionReserve` unclaimed forever.
+**Why:** excluding them adds a second supply figure to every price calculation. The amount is
+distribution x dead / supply: with a 0.01 ETH seed and 10 ETH of holders, 0.1% of each payout.
+**If you disagree:** make the seed a real claimant (a deployer-held account) instead of 0xdead.
+
+## D14. Gas ceiling default 1.5 gwei
+
+**Chose:** recommended deployment `gasCeiling` = 1.5 gwei (bytecode max 50 gwei). Above it,
+`restock` and `list` revert and keeper pay is priced at the ceiling.
+**Why:** with measured gas (listNFT 651k), the bid outcome breaks even near 1.8 gwei; 1.5 gwei
+leaves +0.25 mETH per cycle. Tests use 5 gwei only to exercise the rule.

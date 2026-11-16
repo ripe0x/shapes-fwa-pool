@@ -141,6 +141,7 @@ contract PackVault is ReentrancyGuard {
     uint256 public pendingDepositTotal; // ETH escrowed, excluded from NAV
     mapping(uint256 epoch => uint256) public epochNav; // post-flow NAV used to price deposits
     mapping(uint256 epoch => uint256) public epochSupply;
+    mapping(uint256 epoch => uint256) public epochDistPerShare; // accumulator when deposits were priced
 
     // Pro-rata redemption index. Each checkpoint fills fraction f of all locked shares at the
     // checkpoint price; g tracks the surviving fraction, q the ETH paid per original share.
@@ -555,7 +556,8 @@ contract PackVault is ReentrancyGuard {
             _settleDist(h);
             uint256 minted = uint256(d.amount) * epochSupply[d.epoch] / epochNav[d.epoch];
             sharesOf[h] += minted;
-            distDebt[h] = sharesOf[h] * distPerShare / 1e18;
+            // New shares earn every distribution after their pricing, even if converted later.
+            distDebt[h] += minted * epochDistPerShare[d.epoch] / 1e18;
             delete pendingDeposits[h];
         }
         Redemption storage r = redemptions[h];
@@ -688,6 +690,7 @@ contract PackVault is ReentrancyGuard {
         // 3. Deposits at the post-flow price.
         epochNav[epoch] = nav;
         epochSupply[epoch] = supply;
+        epochDistPerShare[epoch] = distPerShare;
         if (pendingDepositTotal != 0) {
             totalShares += pendingDepositTotal * supply / nav;
             nav += pendingDepositTotal;
