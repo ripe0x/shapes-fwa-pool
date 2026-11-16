@@ -290,10 +290,18 @@ contract ForkVaultAdversarialTest is ForkBase {
     /// Repair: a checkpoint with no holder flows pays nothing (it cost about 6M gas at 150
     /// positions and could be farmed every 12 hours).
     function test_idleCheckpointUnpaid() public {
+        // Review LOW-1: with no flows and distributions off, a checkpoint is refused, so nobody
+        // can use up the interval's slot ahead of a deposit arriving later in the blackout.
         toBlackout();
+        vm.prank(keeper);
+        vm.expectRevert(PackVault.Nothing.selector);
+        vault.checkpoint();
+        vm.prank(alice);
+        vault.deposit{value: 1 ether}();
         uint256 kBefore = keeper.balance;
-        checkpoint();
-        assertEq(keeper.balance, kBefore);
+        checkpoint(); // the same blackout still prices the deposit, paid
+        assertGt(keeper.balance, kBefore);
+        assertGt(vault.shareBalance(alice), 0);
     }
 
     /// Repair: restock spent ETH on packs whatever the gate said and whether or not they could be
@@ -409,6 +417,8 @@ contract ForkVaultAdversarialTest is ForkBase {
     }
 
     function test_checkpointWindowRules() public {
+        vm.prank(alice);
+        vault.deposit{value: 0.1 ether}();
         vm.expectRevert(PackVault.NotCheckpointWindow.selector);
         vault.checkpoint();
         toBlackout();

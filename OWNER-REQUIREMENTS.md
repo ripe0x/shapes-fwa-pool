@@ -57,12 +57,14 @@ block 26,424,971 unless stated; P = 0.03 ETH pack, B = 0.0363 ETH backing, k = 1
 
 | # | Outcome | Proposed number | Measured by |
 |---|---|---|---|
-| O1 | Holder return at the gate | >= 10%/yr at trailing-30-day volume, tokens zero, after every expense | sim/out/forward.md sections 2 and 3 |
+| O1 | Holder return at the gate | >= 10%/yr at trailing-30-day volume of successful acquisitions, tokens zero, after every expense; met at 0.15 gwei (+123% simulated), not from a cold start at 1.2 or 1.5 gwei | sim/out/forward.md section 1 |
 | O2 | Edge per bid cycle | B (k - 1) = 1.396 mETH before gas; cycle gas 0.8M: net 1.264 mETH at 0.15 gwei, 0.516 at 1.0, 0.076 at 1.5; break-even 1.59 gwei | fork gas (ForkReconcile), D20 |
 | O3 | Purchaser on a bid outcome | receives 0.9 B = 0.03267 ETH; the vault keeps the pack | ForkSelection bid test (absolute) |
 | O4 | Vault on a keep or silent outcome | B (1 - s) = 0.035937 ETH back; pack goes to purchaser | ForkSelection keep and silent tests |
-| O5 | Keeper pay | (gas + 30k) x min(tx price, basefee + 0.05 gwei, 1.5 gwei) x 1.10, from vault ETH; harvest and token sales paid only if pay <= 25% of ETH realized; idle checkpoints unpaid | ForkVaultAdversarial, ForkSelection |
+| O5 | Keeper pay | (gas + 30k) x min(tx price, basefee + 0.05 gwei, 1.5 gwei) x 1.10, from vault ETH; at most 300k gas per position moved for sync, unlist and activate; harvest and token sales paid only if pay <= 25% of ETH realized; no-op checkpoints refused. Rehearsal: keeper +18% over gas spent | ForkVaultAdversarial, ForkSelection, canary rehearsal |
 | O6 | New packs | built only when one bid cycle repays the build (1.05M gas + 0.0003 ETH): below ~0.54 gwei | D20, test_restockGated |
 | O7 | User pays | mint fee 0.001 ETH per 0.1 ETH of Shapes; keeper gas; no vault fee | lifecycle round trip (absolute, every wei) |
 | O8 | End state | wind-down returns every holder's NAV share; only the seed's dead-share slice remains | lifecycle wind-down test, keeper rehearsal |
-| O9 | Size | at most 300 positions (about 20 ETH); worst-case checkpoint 9.83M gas | test_checkpointGasAtMaxPositions |
+| O9 | Size | at most 300 positions (about 20 ETH); worst-case checkpoint 10.17M gas; the 2 ETH canary holds 28 positions | checkpoint gas tests, canary rehearsal |
+| O10 | Liabilities | escrow, redemption and distribution reserves and settled claimables are never deployable or payable to keepers | test_settledUnclaimedEthIsNotDeployable, invariants |
+| O11 | Token rewards | claimed and sold only when the sale pays for itself, or by operator subsidy; never lost by waiting | ForkTokens, canary rehearsal |

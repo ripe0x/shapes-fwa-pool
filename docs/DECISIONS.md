@@ -263,7 +263,7 @@ fee income. A listing that moved on since the keeper looked is skipped, not fata
 ## D26. Economics read and token swap moved to a linked library (EIP-170)
 
 **Chose:** `VaultLib` (external library, delegatecall) holds the FWA economics read and the v4
-swap body. PackVault is 22,827 bytes (1,749 under the limit), VaultLib 2,928. The deploy script
+swap body. PackVault was 22,827 bytes then (23,904 after D32 to D41), VaultLib 2,945. The deploy script
 deploys and links it. Behaviour is unchanged; there are two verified addresses instead of one.
 **Alternative rejected:** dropping token conversion. The owner required it in the immutable
 deployment, even though measured token income is about 2.5e12 wei per buyback.
@@ -335,3 +335,122 @@ FWA, Shapes and ShapePacks sources. No critical or high finding. Resolution:
 - **Larger packs are inert at today's cap.** The keep-outcome gate B (k - s) >= P with
   B = 0.0363 admits P <= 0.0373, so only 3-unit packs list. The allowed-P set works but has no
   effect until the oracle ask rises.
+
+# Validation and repair pass (2026-11-16, second review)
+
+Owner request: verify the automation, the performance claims and whether a small private canary
+is technically justified. Hypotheses were checked against code and chain before fixing.
+
+## D32. Settled but unclaimed ETH is a liability (critical custody fix)
+
+**Found:** `_settleHolder` and `_settleDist` move an entitlement from `redemptionReserve` or
+`distributionReserve` into `claimableEth[h]`, but `_free()` subtracted only the reserves. Any
+holder action that settles without claiming (a new deposit, a cancel, another redeem) turned
+that ETH into deployable capital and keeper pay. Reproduced on 847b3fe: 1.0 ETH owed to a holder,
+`idleEth` 0.96 ETH, and after one keeper restock and list the vault held 0.35 ETH.
+**Chose:** `claimableTotal`, maintained wherever `claimableEth` changes, counted in `_free()`.
+Mirrored in `sim/vault.py`; regression `test_settledUnclaimedEthIsNotDeployable`; the invariant
+suite now asserts `claimableTotal == sum(claimableEth)`.
+
+## D33. Token rewards: one paid call that claims and sells, valued by simulation
+
+**Found:** the keeper never read pending rewards (`token_pending_eth` stayed zero), valued held
+tokens at `refPrice` (a protection floor, not a price), proposed selling the whole balance even
+above `clipMax` (a sale that can only revert), and `harvestTokens` reverted for the whole batch
+on one stale listing id, which also blocked credit from removed listings. Harvesting was unpaid.
+**Chose:** `convert(ids, maxAmount, minOut)` claims active rewards (FWA's batch claim in a
+try, so a stale id skips only that claim), withdraws settled credit, then sells
+`min(maxAmount, clipMax, held)` once per interval against both the caller's `minOut` and the
+reference floor. It is paid only if the pay is at most `keeperShareBps` of the ETH realized.
+The keeper reads pending, credit and held amounts from the deployed rewards and token
+contracts and values a sale by simulating that exact `convert` call from its own address
+(pool fee, price impact, hook and transfer rules included). It plans a sale only when the vault
+would pay for it, otherwise it states why it waits; `--subsidize-tokens` lets an operator pay.
+**Result:** at canary size, token sales are not self-funding: one buyback paid 28 listings
+8.2e12 wei of tokens against 5.0e13 wei of gas pay. Selling needs an operator subsidy or must
+wait until enough accumulates. Rewards are never lost by waiting.
+
+## D34. Oracle failure cannot block unlisting, wind-down or redemptions
+
+**Found:** `unlist` read FWA's oracle through `edge()`. FWA's owner can repoint the oracle to any
+contract (config key 64); one that reverts or returns malformed data made unlisting revert,
+which also blocks wind-down and redemption liquidity.
+**Chose:** the oracle read is a raw `staticcall`; a revert or short return means "no cap".
+Unlisting needs only k. Regression `test_windDownSurvivesBrokenOracle` repoints the oracle
+through FWA's real owner setter.
+
+## D35. Pay for necessary work is bounded per position actually moved
+
+**Found:** `sync` and `unlist` skip ids they cannot act on and reimbursed all gas used, so a keeper
+could pad a call with junk ids and earn the 10% premium on the padding.
+**Chose:** each pays at most `GAS_PER_MOVED` (300k) per position resolved or unlisted. The new
+`activate` (D36) uses the same cap and requires strictly increasing ids. Regression
+`test_paddedSyncPaysOnlyForWorkDone` (400 ids, one real kick).
+
+## D36. Staged listings are activated by the vault
+
+**Found:** FWA stages a new listing whenever its acquisition queue is not empty. A staged listing
+earns no fees and no token rewards until FWA activates it, which happens through later
+acquisitions' reserved batches or FWA's permissionless `activateListings`. At low volume a
+relist can sit staged indefinitely.
+**Chose:** `activate(ids, maxCount)` runs FWA's activation and pays per vault listing that moved
+from staged to active. The keeper plans it whenever a vault listing is staged and the queue is
+drained. Tested on a listing FWA really staged (ForkReconcile).
+
+## D37. Keeper bids what the vault reimburses; re-reads after every call
+
+**Found:** the keeper sent at the node's suggested price, which on anvil included a 1 gwei tip;
+the vault reimburses at most basefee + `maxTip`, so the keeper lost money on every call. Its
+plan was also computed once per pass, so dependent steps used stale state.
+**Chose:** the keeper bids basefee + `maxTip` explicitly and sends one call at a time, re-reading
+chain state before choosing the next. A call that fails is not retried in the same pass.
+**Tradeoff:** when inclusion needs a priority fee above `maxTip`, an unsubsidized keeper waits
+(redemptions are delayed, never lost). Each extra gwei of tip costs the keeper about 1 mETH per
+million gas: a checkpoint at 100 positions (~3.4M gas) costs 3.4 mETH more per gwei.
+
+## D38. Revenue counts only acquisitions that reached a selection
+
+**Found:** the gate, the closed form, the backtest and the forward simulation counted acquisition
+requests. In the last 30 days 28% of requests (5,090 of 18,281) were refunded, mostly during the
+Oct 31 drain, and distributed no fees. Successful volume is 442 a day, not 611.
+**Chose:** every volume figure uses NFTAllocated (successful selections). The owner's 30-day
+window is unchanged; only what it counts is corrected.
+
+## D39. The published backtest is a theoretical comparison, not a return estimate
+
+**Found:** the historical backtest kept n vault listings active at all times. On Oct 31 FWA's pool
+drained from about 2,100 active listings to 18; constantly relisted vault positions would have
+taken up to 84% of selections, about 110 cycles per position in a day. The real vault cannot do
+that: settlement takes minutes to hours, each relist needs fresh backing, and a relist made while
+FWA's queue is busy is staged. `sim/out/backtest_audit.md` replays the event log removing each
+assumption: the published +2,865% (30 positions, last 30 days) falls to +169% when only
+successful acquisitions count and settlement, keeper timing, cash and staging apply; outside
+Oct 31 every model agrees within noise.
+**Chose:** holder-return claims use only the forward simulation (real cash, inventory, delays,
+limits, liabilities) and the executable replay. The instant-relist replay stays only as a
+labelled theoretical comparison.
+
+## D40. Rehearsal actors are fresh addresses
+
+**Found:** the overnight `keeper/rehearse.sh` used anvil's dev accounts. Those are real mainnet
+addresses; dev account #2 carries an EIP-7702 delegation (`0xef0100...`), so ETH paid to it was
+diverted and the keeper's economics in that rehearsal were wrong.
+**Chose:** `keeper/rehearse_canary.py` uses keccak-derived addresses it checks are clean on the
+fork. `rehearse.sh` is removed.
+
+## D41. Second independent review (2026-11-16)
+
+A separate reviewer read 9a9198b, the keeper, the Python mirror and the economic code against
+the deployed sources; it confirmed the D32 custody fix complete and found no critical or high
+issue. Resolution:
+- **LOW-1: a no-op checkpoint used up the interval's only slot**, so anyone could delay a
+  deposit or redemption that arrived later in the same blackout by 12 hours. Now a checkpoint
+  reverts unless holders have flows or distributions are on. `test_idleCheckpointUnpaid`
+  covers the refusal and the same-blackout pricing that follows.
+- **LOW-2: `activate` drains FWA's global staging FIFO but pays only for vault listings**; with
+  a long foreign backlog a keeper may pay for others' activations, or revert if `maxCount` does
+  not reach the vault's. Accepted: nothing is stuck (FWA's activation is permissionless) and
+  acquisitions also activate staged listings.
+- **LOW-3: the 30k per-call overhead rewards splitting batches** (worst case about 0.015 ETH a
+  year at the ceiling). Accepted, as in D31.
+- **ECON-1 and ECON-2** (gas regime, Oct 31 sensitivity) are reported in docs/REPORT.md.

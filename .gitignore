@@ -5,3 +5,4 @@ __pycache__/
 /broadcast/*/1/run-*.json
 /broadcast/
 sim/out/acq_history.npz
+sim/out/audit_events.npz

@@ -1,157 +1,204 @@
-# PackVault: repair review report
+# PackVault: validation and repair report
 
-2026-11-16. Independent engineering and economic review of the overnight build, with repairs.
-Decisions: `docs/DECISIONS.md` (D19 to D31 are new). Owner requirements and proposed outcomes:
-`OWNER-REQUIREMENTS.md` (B2 supersedes B). Economics: `sim/out/forward.md`. The overnight
-report this replaces is in git history (commit 1b8cf91).
+2026-11-16, second pass. Scope: does the automation work, are the performance claims supported,
+is a small private canary technically justified. Decisions D32 to D41 in `docs/DECISIONS.md`;
+proposed outcomes in `OWNER-REQUIREMENTS.md` section B2; economics in `sim/out/forward.md` and
+`sim/out/backtest_audit.md`. Earlier reports are in git history (1b8cf91, 847b3fe).
 
 ## Bottom line
 
-- **The overnight contract lost money for holders on every bid cycle.** Its 5% keeper fee skim
-  (1.885 mETH per cycle) exceeded the whole edge (1.396 mETH), and the skimmed ETH never returned
-  to holders. The overnight model left the skim out, so its +86%/yr was wrong. Fixed (D19).
-- **Corrected, the strategy is positive in expectation** wherever gas is below 1.59 gwei. Net
-  per bid cycle is +1.264 mETH at 0.15 gwei (live gas 0.14 gwei). Volume sets how often cycles
-  happen, so it sets the return rate, not its sign.
-- **Returns are volatile and depend on FWA activity.** At the last 14 days' rate (71 a day), 100
-  positions: mean +23%/yr, 15% chance of a losing year. At the 30-day gate rate: +118%. At 15 a
-  day: +3%. Each selection costs 55% of a position's capital.
-- **Recommendation: a funded canary is justified, small and capped**, after you set guardian and
-  admin addresses and sign off B2. No critical or high custody or accounting defect is open.
-  External audit and legal review remain before any launch beyond the canary.
-- Implementation, tests and model now agree: the Python vault model matches a real-VRF fork cycle
-  to the wei, and the simulation uses that model and the live keeper's policy.
+- **A critical custody defect was open and is fixed.** ETH settled to a holder but not yet
+  claimed counted as free, so keepers could deploy it or be paid from it (reproduced: 1.0 ETH
+  owed, 0.35 ETH left). It is now a tracked liability (D32).
+- **The token lifecycle now runs through the production keeper**, but at canary size selling is
+  not self-funding: one real buyback paid 28 listings 8.2e12 wei of tokens against 5.0e13 wei
+  of gas pay. Rewards wait safely or an operator subsidizes the sale (D33).
+- **The published backtest (+2,731%) was not a return estimate.** It counted refunded requests as
+  revenue and relisted vault positions instantly while FWA's pool drained on Oct 31. With only
+  successful acquisitions and real settlement, keeper timing, cash and staging, the same 30 days
+  give +169% annualized, matching the closed form (+166%) at the true volume (D38, D39).
+- **Returns at current activity:** 100 positions, last 14 days' activity (71 a day), 0.15 gwei:
+  mean +21% a year, 18% chance of a losing year (95% interval 14 to 22%).
+- **Gas is the binding risk.** The vault starts only below about 0.54 gwei. If gas rises to 1.0
+  gwei after it has deployed, the year's mean falls to +2% with a 46% chance of loss.
+- **Recommendation: proceed with a private canary**, capped as proposed (28 positions fit, not 30),
+  with your own keeper and an explicit stop rule on gas. No critical or high defect is open;
+  every lifecycle step except acquisitions selecting vault listings ran through the production
+  keeper on a local fork, and those ran on real VRF in the Solidity fork tests.
 
-## 1. Confirmed findings
+## 1. Findings
 
-| # | Severity | Finding | Fix |
-|---|---|---|---|
-| F1 | Critical (economic) | 5% keeper fee skim exceeded the per-cycle edge; holders lost 0.49 mETH per bid cycle; skim stranded outside NAV forever | Keeper pay is reimbursed gas plus 10% from vault ETH (D19) |
-| F2 | High | Unlist to cover redemptions, relist the freed ETH, be paid both ways, repeat while redeemers wait | ETH owed to redeemers excluded from idle ETH (D21) |
-| F3 | High | Anyone could unwind every earning position (paid) when the oracle quote went stale | Unlisting only in wind-down, for redemptions, or when FWA's k gives no edge (D22) |
-| F4 | High (liveness) | Checkpoint resolved and liquidated inside its loop: 16.08M gas at 400 positions (4% under EIP-7825's cap) and unbounded after a busy day; deposits and redemptions could stall | Read-only checkpoint, 300 positions (9.83M worst case), separate bounded `liquidate` (D24) |
-| F5 | Medium | `restock` spent ETH on packs regardless of the edge, gas, or capital to list them | Restock needs live edge, one-cycle payback, backing capital (D20) |
-| F6 | Medium | A failed pack recovery made the vault forget the pack | Position stays open on FWA's `stuckNFTRecipient` record; any `sync` retries (D23) |
-| F7 | Medium | Checkpoints with no holder flows were paid (about 6M gas at 150 positions, every 12 h) | Unpaid unless flows (D19) |
-| F8 | Medium | Allocated-exposure bound of 2% blocks checkpoints at normal busy-day volume | Recommended 10% (D30) |
-| F9 | Medium | `opGasCap` 3M left necessary large calls (checkpoint at scale, restock batches) underpaid | Bound raised to 16,777,216, default 15M (D29) |
-| F10 | Medium (review S1) | `maxTip` unbounded | `maxTip <= gasCeiling` (D31) |
-| F11 | Low | Dust harvests paid up to 25% of what they collected; active fees needed unlisting to become ETH | All-or-nothing pay rule; `harvest(ids)` claims active fees (D19, D25) |
-| F12 | Low (tests) | Gas test assumed a 30M transaction limit | Asserts 80% of 16,777,216 for checkpoint; every keeper batch run under the cap |
-| F13 | Keeper | Did not harvest active fees, free redemption liquidity, liquidate, unwind, wind down or loop; broke on the ABI change | `keeper/policy.py` shared with the simulation (D27) |
+### Confirmed and fixed
 
-Root causes: keeper compensation was designed as a share of revenue instead of a cost; spending
-paths checked capital or the edge but not both together with gas; the checkpoint did unbounded
-work; the overnight model and the contract were never reconciled against each other.
+| # | Severity | Finding | Fix | Regression |
+|---|---|---|---|---|
+| V1 | Critical | Settled-but-unclaimed ETH counted as free: deployable and payable to keepers | `claimableTotal` liability in `_free()` | `test_settledUnclaimedEthIsNotDeployable`, invariant |
+| V2 | High | Keeper never harvested token rewards (`token_pending_eth` never set); valued tokens at the reference floor; proposed sales above `clipMax` that could only revert; one stale id blocked the claim and the credit | `convert(ids, maxAmount, minOut)` claims (stale-safe), withdraws credit, sells at most `clipMax`; keeper reads real entitlements and simulates the exact sale | 6 token fork tests; canary rehearsal |
+| V3 | High | Unlisting (and so wind-down and redemption liquidity) reverted when FWA's owner repointed the oracle to a failing contract | Raw `staticcall` oracle read; failure means no cap | `test_windDownSurvivesBrokenOracle` |
+| V4 | High (economic) | Revenue counted acquisition requests; 28% of the last 30 days' requests were refunded and paid nothing | Successful selections only, everywhere | `sim/out/backtest_audit.md` section 1 |
+| V5 | High (reporting) | Backtest assumed instant, free, unlimited relisting during a pool drain | Executable replay; instant replay labelled theoretical | `sim/out/backtest_audit.md` sections 2 to 4 |
+| V6 | Medium | Staged listings (listed while FWA's queue is busy) earn nothing and the keeper never activated them | Paid `activate(ids, maxCount)` | ForkReconcile (a listing FWA really staged) |
+| V7 | Medium | `sync` and `unlist` reimbursed padding (junk ids) at the 10% premium | Pay capped at 300k gas per position moved | `test_paddedSyncPaysOnlyForWorkDone` |
+| V8 | Medium | Keeper bid the node's price (1 gwei tip on anvil) but is reimbursed at basefee + 0.05 gwei: lost money every call | Keeper bids basefee + `maxTip` | canary rehearsal: keeper net +0.0011 ETH |
+| V9 | Medium | Keeper planned a whole pass from one read; dependent steps used stale state | One call at a time, re-read after each | canary rehearsal |
+| V10 | Low | A no-op checkpoint used up the 12 h slot ahead of later flows (second review) | Refused unless flows or distributions | `test_idleCheckpointUnpaid` |
+| V11 | Medium (evidence) | Overnight rehearsal used anvil dev accounts; one is a real mainnet address with an EIP-7702 delegation that diverted keeper pay | Fresh checked addresses; `rehearse.sh` removed | `keeper/rehearse_canary.py` |
+| V12 | Low (presentation) | `nan` percentiles, segment percentiles averaged, raw vs annualized mixed, 200 runs | Removed; continuous P&L; raw and annualized separate; 400 runs and 95% intervals | `sim/out/forward.md` |
 
-## 2. Verification
+### Verified, no defect
 
-All on a mainnet fork of the real contracts, `vm.fee`/`vm.txGasPrice` set, no mocks.
+- Liabilities: every spend path (restock, list, distribution, keeper pay) is gated on `_idle()` or
+  `_free()`, which subtract all four liabilities (both independent reviews).
+- Worst supported checkpoint: 300 positions all kicked and unsynced, 10.17M gas (39% under the
+  16,777,216 cap), NAV exact to the wei (`test_checkpointGasAllPositionsKickedUnsynced`); all
+  active, 9.83M.
+- Admission changes: FWA's `canDeposit` makes no oracle call; with admission off the vault stops
+  listing and still unlists by k.
+- Withdrawals never redeploy cash owed to exiting holders (`_idle` excludes the owed estimate and
+  claimables; the keeper deploys nothing in a pass that frees redemption cash).
 
-| Suite | Tests | Covers |
+### Rejected or reclassified
+
+- "Annualized below -100% is a bug": not by itself. Short-window annualization of a raw loss can
+  go below -100%; every raw loss in the simulations stays above -100% (worst raw year -50.5%).
+- "Oct 31 is a reconstruction error": rejected. Rebuilt pool weight matches FWA's `totalWeight`
+  at all 18,377 requests (max error 0.0000%); the drain was real. What a vault could not do is
+  capture it.
+
+## 2. Backtest versus closed form, explained
+
+Same window (last 30 days), 30 positions, 0.15 gwei, annualized means, 300 draws:
+
+| Model | Annualized | What it assumes |
 |---|---|---|
-| ForkVaultLifecycle | 11 | round trip (every wei, keeper pay included), kick, crown raise, stale quote cannot unlock unlisting, guardian, delay and `maxTip` bound, cancel, pro rata, wind-down |
-| ForkVaultAdversarial | 15 | gas ceiling, forced ETH, hostile NFT, reentrancy, distributions, all-holders-exit, checkpoint at 300 positions (9.83M), keeper batches under the tx cap, no fee skim, idle checkpoint unpaid, restock gates, unlist/list loop closed, liquidation only when needed |
-| ForkSelection | 4 | real VRF replays: bid, keep, silent purchaser, pre-admission; sync pay, dust harvest unpaid |
-| ForkReconcile | 1 | full real-VRF cycle traced; `sim/reconcile.py` matches every vault number to the wei |
-| ForkTokens | 1 | real buyback, claim, sale, floor guards |
-| ForkMeasure | 2 | gas table, token route, transfer lock |
-| ForkVaultInvariant | 4 invariants | reserves covered, claims within reserves, shares conserved, every wei held or paid as mint fee or keeper pay |
+| A. Published backtest | +2,865% | requests are revenue; 30 listings always active |
+| B. Successful selections only | +700% | fees only where FWA distributed them |
+| C. + real settlement delay, 10 min keeper | +362% | packs wait for the purchaser (median 2 min, 99th pct 5 h) |
+| D. + relists funded by earned fees | +314% | no outside capital |
+| E. + staging while FWA's queue is busy | **+169%** | a relist earns nothing until activated |
+| Closed form, today's pool, 442 successful/day | +166% | stationary pool |
 
-- Local rehearsal (`keeper/rehearse.sh`, anvil fork): production deploy script, keeper only:
-  pricing, 20 positions built and listed, full redemption (unlist, liquidate, checkpoint, claim),
-  redeploy, wind-down to empty. Anvil gas was ~1 gwei.
-- Independent review of the repairs: no critical or high finding; resolutions in D31.
-- Measured gas: sync 158k, harvest of 29 listings 496k, list 499k to 570k, restock 921k per pack,
-  unlist 201k, liquidate about 160k per pack, checkpoint 0.22M plus 32k per position.
-- Not tested for real: a failed pack delivery (unreachable with the deployed ShapePacks and FWA's
-  stipend rules without mocks, D23); live keeper competition, mempool congestion, behaviour after
-  block 26,427,553.
+Oct 31 (UTC) explains the gap. Between 02:00 and 05:00 FWA's active listings fell from 2,084 to
+18 and its pool weight from 31,412 to 161 (1/ETH); 30 always-active vault listings would have
+taken 62% to 84% of selections. A to C let a position cycle many times in those hours. In reality
+FWA's queue never drained that day, so a relist stayed staged (E), and the day contributes +4%
+raw (E) instead of +217% (A). Outside Oct 31 every model agrees within noise (+113% to +135%
+annualized at 312 successful/day vs +117% closed form). Residual: over the full window B is 16%
+below the closed form on the window's own pool, because FWA prices the fee at request time and
+sets selection odds at processing, and the pool shrank in between during the drain.
 
-## 3. Economic model
+## 3. Returns and downside (forward simulation)
 
-Three kinds of numbers, kept apart (`sim/out/forward.md`): expectation (closed form), backtest
-(real FWA history with the vault inserted), forward simulation (a year through the reconciled
-vault model and the live keeper policy). Realized performance: none.
+One year, 400 runs per row, reconciled vault model, live keeper policy, real cash, inventory,
+settlement, position limits and withdrawal liabilities; tokens at zero; raw year = annual.
 
-The simulator itself was checked: fees per selection reproduce k (1.032 to 1.044 vs 1.0385 over
-tens of thousands of selections), and at constant volume its mean return sits below the closed
-form only by measured cash drag (after a bid outcome a pack waits for fee income to relist).
-Bugs found in it and fixed before use: over-selection by 2.7%, overpaid fees on very busy days, a
-keeper that relisted too slowly, a double-counted deposit.
+| Scenario | Positions target/mean/max | Mean | p5 | P(losing year) [95%] |
+|---|---|---|---|---|
+| Gate window (trailing 30 d, successful), 0.15 gwei | 100/131/262 | +123% | +23% | 3% [2-5] |
+| Same without Oct 31 | 100/136/238 | +105% | +12% | 2% [1-5] |
+| Last 7 d (97/day) | 100/111/148 | +32% | -9% | 12% [9-16] |
+| Last 14 d (71/day) | 30/31/46 | +20% | -36% | 34% [29-39] |
+| Last 14 d | 100/105/136 | +21% | -14% | 18% [14-22] |
+| Last 14 d | 300/297/300 | +20% | +3% | 2% [1-4] |
+| 15/day | 100/98/109 | +2% | -12% | 42% [38-47] |
+| Decline 97 to 10/day | 100/104/120 | +11% | -11% | 26% [22-31] |
+| Inactive after 60 days | 100/97/112 | +3% | -9% | 37% [33-42] |
+| Enter at 0.15 gwei, 1.0 gwei from day 30 | 100/95/109 | +2% | -27% | 46% [41-50] |
+| Enter at 0.15, 2.0 gwei (above ceiling) days 30-120 | 100/103/131 | +17% | -13% | 19% [15-23] |
+| 1.2 gwei with a cheap day every 7 | 100/92/119 | +1% | -26% | 50% [45-55] |
+| 50% redemption at day 120 in 7 congested days | 100/66/117 | +14% | -13% | 22% [19-27] |
+| Crown share to 5% at day 90 (vault unwinds) | 100/24/114 | +4% | -12% | 33% [29-38] |
+| 11% of purchasers keep | 100/118/149 | +38% | 0% | 5% [3-8] |
 
-**Per bid cycle (expectation):** B (k - 1) = 1.396 mETH; cycle gas 0.8M: net +1.264 mETH at 0.15
-gwei, +0.516 at 1.0, +0.076 at 1.5; break-even 1.59 gwei. New packs only below about 0.54 gwei
-(one-cycle payback). Only 3-unit packs pass the keep-outcome gate at the 0.0363 cap.
+Positions grow above the target as NAV compounds (cap 300). Worst single year in any row: -50.5%
+raw (30 positions). A gas spike above the ceiling while deployed costs little: the keeper stops,
+positions keep earning. Sustained gas near 1 gwei is what hurts: keeper gas becomes 21% of
+deposits a year and eats most of the edge.
 
-## 4. Projections
+**Formal gate (owner's definition, trailing 30 days, tokens zero):**
 
-Forward simulation, one year, 200 runs per row, holder return after every expense, gas 0.15
-gwei unless stated, tokens at zero. Full table and backtest: `sim/out/forward.md`.
+| Gas | Net per bid cycle | Closed form | Forward simulation (cold start) | 10%? |
+|---|---|---|---|---|
+| 0.15 gwei (spot at pinned block) | +1.264 mETH | +160% | +123% (p5 +23%) | yes |
+| 1.2 gwei (overnight assumption) | +0.340 mETH | +43% | 0% (nothing builds above ~0.54 gwei) | closed form only |
+| 1.5 gwei (configured ceiling) | +0.076 mETH | +9.6% | 0% | no |
 
-| Activity | Positions | Mean | p5 | Median | P(losing year) |
-|---|---|---|---|---|---|
-| Trailing 30 days (611/day, the gate) | 100 | +118% | +22% | +113% | 2% |
-| Trailing 30 days without Oct 31 (311/day) | 100 | +109% | +6% | +102% | 4% |
-| Last 7 days (97/day) | 100 | +34% | -8% | +34% | 10% |
-| Last 14 days (71/day) | 30 | +24% | -33% | +21% | 28% |
-| Last 14 days (71/day) | 100 | +23% | -11% | +23% | 15% |
-| Last 14 days (71/day) | 300 | +20% | +5% | +21% | 2% |
-| Decline from 97 to 10/day over the year | 100 | +11% | -11% | +11% | 26% |
-| 15/day | 100 | +3% | -10% | +2% | 40% |
-| Inactive after 60 days | 100 | +3% | -9% | +3% | 37% |
-| Holder redeems 50% at day 120 | 100 | +15% | -13% | +13% | 24% |
-| Crown share raised to 5% at day 90 (vault unwinds) | 100 | +4% | -10% | +4% | 32% |
-| Gas 1.0 gwei or more, sustained | 100 | 0% | 0% | 0% | (nothing deployed) |
+The gate passes at current gas only. The 30-day figure is about 6x the return at the current run
+rate and should not be shown to holders as expected.
 
-Backtest of the real last 14 days: expected +34% (30 positions) and +28% (300) annualized; 14
-days is too short to annualize safely (p5 to p95 spans -332% to +384% at 30 positions).
+**Thresholds revalidated against measured gas:** bid cycle 0.8M gas (sync 158k + relist 499k to
+570k + harvest share + 2 x 30k overhead): break-even 1.59 gwei. New pack build measured 921k +
+30k: payback in one cycle below 0.58 gwei (0.54 with the contract's conservative 1.05M constant).
 
-**What these say:**
-- **30-day gate (owner's definition): passes**, with or without the Oct 31 day of 9,315.
-- **The 30-day window does not mislead the go/no-go decision, but it overstates the return by
-  about 4x.** At the current run rate (71 to 97 a day) the mean is about +20 to +34% with a 10 to
-  28% chance of a losing year. The 30-day figure should not be shown to holders as expected.
-- **Below about 15 acquisitions a day the vault is barely worth running** (+3%, 40% chance of a
-  losing year), though it never loses its expected edge per cycle.
-- **Volume-triggered pause: not worth adding (D28).** A keeper slowdown at 30 or 60 a day changed
-  returns by under 1 point in every scenario tested; the one-cycle payback rule already stops
-  new packs when gas makes them costly.
-- **Gas is the binding constraint.** At 1.0 gwei sustained a new vault builds nothing (packs need
-  gas below ~0.54 gwei); existing positions keep cycling until 1.59 gwei.
-- **Size:** larger vaults are less volatile (P(loss) 28% at 30 positions, 2% at 300) with slightly
-  lower mean returns. Keeper gas is 3 to 13% of deposits a year against fees of 7x to 36x
-  deposits; mint fees under 1.4%.
+**Keeper economics:** in the canary rehearsal the keeper was paid 0.00715 ETH for 0.00605 ETH of
+gas actually spent (+18%: 10% premium plus the 30k overhead). When inclusion needs a priority
+fee above `maxTip` (0.05 gwei), every call loses about 1 mETH per million gas per extra gwei of
+tip (a 100-position checkpoint, 3.4M gas, costs 3.4 mETH more per gwei); an unsubsidized keeper
+waits and redemptions are delayed, not lost. The admin can raise `maxTip` through the delay.
 
-## 5. Remaining risks and limitations
+**Tokens (separate from the base case):** realized token income at canary size is below 0.01% of
+deposits a year and not self-funding to sell; the base case stays at zero.
 
-- FWA dependency: FWA's owner can move fees, the crown share, the oracle cap or admission at any
-  time. The vault reads them live and stops or unwinds, but positions are exposed until it does.
-- Variance: each selection costs 0.0363 ETH against a 3.85% edge; short windows and small vaults
-  can lose.
-- Purchaser behaviour is assumed rational (take the bid); keeps help the vault.
-- Selection anomaly (overnight): listings backed 0.02 to 0.04 ETH were picked 1.5 to 6% less than
-  weight predicts. Unexplained; it helps the vault; the model uses the theoretical weights.
-- Gas constants (`CYCLE_GAS`, `RESTOCK_GAS_PER_PACK`) are in bytecode.
-- Keeper liveness under congestion depends on `maxTip`; redemptions are delayed, never lost.
-- Bytecode margin 1,712 bytes; VaultLib is a second address to verify.
-- Not done: external audit, legal review, mainnet rehearsal and canary (owner authority).
+## 4. Canary configuration, validated
 
-## 6. Decisions for owner review
+`deploy/canary.example.json` exactly (2 ETH TVL cap, 0.01 ETH seed, 0.05 ETH reserve, 30-position
+limit, 1.5 gwei ceiling, 0.05 gwei maxTip, 10% premium, 10% allocation bound, 2-day delay)
+through `script/Deploy.s.sol` and `keeper/keeper.py` on an anvil fork of block 26,418,539
+(`keeper/rehearse_canary.py`, result in `sim/out/canary-rehearsal.json`), rerun on the final
+contract:
 
-1. Sign off the outcomes in OWNER-REQUIREMENTS B2 (O1 to O9), especially O5 (keeper pay) and O6
-   (no new packs above ~0.54 gwei).
-2. D30: allocated-exposure bound 10% (the reviewer preferred tighter; 2% blocks checkpoints).
-3. D24: 300-position cap (about 20 ETH).
-4. D28: no on-chain volume pause.
-5. Guardian and admin addresses; canary caps in `deploy/canary.example.json`.
-6. Disclosure to holders: returns are volatile; the 30-day figure is not an expected return.
+- Deposit 1.99 ETH accepted; a further 0.02 ETH refused by the cap. **28 positions** built and
+  listed (30 do not fit: 30 x 0.0663 + mints and reserve exceed 2 ETH); 0.018 ETH stays idle.
+- Real permissionless fee payout and buyback: 4.87 FWA tokens to the 28 listings; the keeper
+  waited without a reference price, waited again because the sale (8.2e12 wei) was below 4x its
+  gas pay, and sold only with the operator subsidy flag (keeper cost 3.9e13 wei).
+- Oracle owner lowered the ask, anyone kicked a listing: the keeper synced and relisted it.
+- Partial withdrawal with the keeper interrupted after one call and restarted from chain state;
+  full withdrawal; wind-down to empty.
+- Ledger to the wei: seed + deposits + token ETH = claims + keeper pay + mint fees + balance.
+  Holder: -0.016 ETH on 1.99 ETH (-0.8%) with no acquisitions in the window, i.e. the entry and
+  exit cost (9 mints = 0.009 ETH, keeper gas 0.0071 ETH). Keeper: +0.0011 ETH net.
+- Not reachable locally: acquisitions selecting vault listings (VRF proofs bind the original
+  block hash). Covered by the Solidity fork tests on real VRF replays (bid, keep, silent
+  purchaser, fee shares) and the to-the-wei reconciliation.
 
-## 7. Canary recommendation
+## 5. Reproduce
 
-**Justified, as a capped canary only:** 2 ETH TVL cap, 30 positions, 1.5 gwei ceiling,
-`maxTip` 0.05 gwei, 10% keeper premium, allocated bound 10%, run by your own keeper. Its purpose
-is to observe what no fork can show: real keeper competition and priority fees, checkpoint misses
-when FWA's queue is busy, purchaser choices on vault packs, and FWA owner changes. Stop and wind
-down if live gas holds above 1 gwei, if k falls below 1.01, or if realized fees per selection fall
-materially below k. The canary is a mainnet broadcast and needs your authority.
+```sh
+forge build --sizes   # PackVault 23,904 bytes (672 under EIP-170), VaultLib 2,945
+forge test --match-path "test/fork/*.t.sol" --rpc-url https://mainnet.gateway.tenderly.co \
+  --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100   # 44 pass
+python3 sim/reconcile.py              # after ForkReconcile: model = fork, to the wei
+python3 sim/backtest_audit.py 300 && python3 sim/backtest_audit.py --compare
+python3 sim/forward.py 400
+anvil --fork-url https://mainnet.gateway.tenderly.co --fork-block-number 26418539 --port 8547 --base-fee 150000000
+python3 keeper/rehearse_canary.py
+```
+
+Pinned blocks: 26,424,971 (lifecycle and adversarial suites), 26,417,086 and 26,405,703 (VRF
+replays), 26,423,454 (buyback), 26,418,539 (canary rehearsal). Data: `sim/data/fwa.sqlite`,
+events through block 26,425,500.
+
+## 6. Remaining limitations and untested paths
+
+- A failed pack delivery (FWA's stuck-NFT path) cannot be produced with the deployed ShapePacks
+  without mocks; covered by review only (D23).
+- Live keeper competition, mempool congestion and real priority fees: canary only.
+- Acquisitions selecting vault listings through the production keeper: not reachable locally.
+- Staging and `activate` under a long foreign backlog (review LOW-2): pays for others' listings.
+- Simulations assume a stationary pool apart from the stated scenarios, rational purchasers,
+  theoretical selection weights (history shows low-backing listings picked 1.5 to 6% less, which
+  would help the vault), and a daily step (one selection per position per day).
+- Invariant campaigns are shallow (16 x 25); defect V1 was found by review, not by fuzzing.
+- External audit, legal review and a mainnet canary are not done.
+
+## 7. Decisions for the owner
+
+1. **Approve the private canary** with the values in `deploy/canary.example.json` (expect 28
+   positions), your keeper, and guardian and admin addresses.
+2. **Stop rule:** wind down if gas holds above 1.0 gwei for a week or k falls below 1.01.
+3. **Token sales:** accept that they need an operator subsidy at canary size, or leave rewards
+   accruing until a sale pays for itself.
+4. **Gate reading:** the gate passes only at current gas; confirm whether the gate's gas
+   assumption is spot, 1.2 gwei or the ceiling.
+5. Sign off section B2 of `OWNER-REQUIREMENTS.md`.

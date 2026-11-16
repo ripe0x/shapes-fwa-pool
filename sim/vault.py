@@ -272,6 +272,8 @@ class Vault:
         """Mirror of PackVault.checkpoint. `credit` is FWA fee credit harvested inside it.
         Returns True when holder flows made it a paid call."""
         work = self.pending_total != 0 or self.locked_shares != 0
+        if not work and not self.distribution_bps:
+            raise RuntimeError("Nothing")
         nav_pos, alloc = self.nav_positions()
         if credit:
             self.receive_fees(credit)

@@ -668,9 +668,11 @@ contract PackVault is ReentrancyGuard {
         if (!f.isPurchaseBlackout() || f.unsettledAcquisitionCount() != 0) revert NotCheckpointWindow();
         uint256 interval = block.timestamp / INTERVAL;
         if (interval == lastCheckpointInterval) revert AlreadyCheckpointed();
-        lastCheckpointInterval = interval;
-        // Paid only when holders have flows to settle; a no-op checkpoint is free to run, unpaid.
+        // Only with holder flows to settle, or with distributions on: a no-op checkpoint would
+        // use up the interval's one slot and delay flows that arrive later in the blackout.
         bool work = pendingDepositTotal != 0 || lockedShares != 0;
+        if (!work && params.distributionBps == 0) revert Nothing();
+        lastCheckpointInterval = interval;
 
         // Value every open position from FWA state, read-only: resolving is sync's job, so the
         // loop costs the same per position whatever FWA did to them.
