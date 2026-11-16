@@ -679,7 +679,7 @@ contract PackVault is ReentrancyGuard {
         // 2. Distribution of new gains, only when no shares are waiting to exit.
         uint256 distributed;
         uint256 perShare = nav * 1e18 / supply;
-        if (lockedShares == 0 && perShare > highWaterMark && params.distributionBps != 0) {
+        if (lockedShares == 0 && supply > DEAD_SHARES && perShare > highWaterMark && params.distributionBps != 0) {
             uint256 gain = M.mulDiv(perShare - highWaterMark, supply, 1e18);
             distributed = M.min(gain * params.distributionBps / BPS, _idle());
             if (distributed >= MIN_DISTRIBUTION) {

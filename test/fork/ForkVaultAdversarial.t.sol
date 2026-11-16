@@ -156,6 +156,33 @@ contract ForkVaultAdversarialTest is ForkBase {
         assertLe(vault.distributionReserve(), 1e6);
     }
 
+    /// Review finding (repair of L1): after every holder exits, a gain with distributions on
+    /// divided by zero live shares and bricked checkpoints for new depositors.
+    function test_checkpointAfterAllHoldersExitAndGain() public {
+        PackVault.Params memory p = defaultParams();
+        p.distributionBps = 2_000;
+        vault = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p);
+        vm.prank(alice);
+        vault.deposit{value: 1 ether}();
+        toBlackout();
+        checkpoint();
+        toOpen();
+        uint256 shares = vault.shareBalance(alice);
+        vm.prank(alice);
+        vault.requestRedeem(shares);
+        toBlackout();
+        checkpoint();
+        assertEq(vault.totalShares(), vault.DEAD_SHARES());
+        toOpen();
+        new ForceSender{value: 0.5 ether}(payable(address(vault)));
+        vm.prank(bob);
+        vault.deposit{value: 1 ether}();
+        toBlackout();
+        checkpoint(); // must not revert
+        assertGt(vault.shareBalance(bob), 0);
+        assertEq(vault.distributionReserve(), 0, "no live shares, nothing distributed");
+    }
+
     function test_depositAboveTvlCapReverts() public {
         vm.prank(guardian);
         vault.lowerCaps(1 ether, 150, 5 gwei);
