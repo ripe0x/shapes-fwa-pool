@@ -16,8 +16,7 @@ ACTIVE, ALLOCATED, WITHDRAWN, SETTLED, STAGED = 1, 2, 3, 4, 5
 # vault's 30k reimbursement overhead per call.
 GAS = dict(sync_base=60_000, sync_per=100_000, harvest_base=90_000, harvest_per=15_000,
            list_per=570_000, restock_per_pack=921_000, unlist_per=201_000, liquidate_per=160_000,
-           checkpoint_base=220_000, checkpoint_per=32_100, harvest_tokens=250_000, convert=350_000,
-           overhead=30_000)
+           checkpoint_base=220_000, checkpoint_per=32_100, overhead=30_000)
 CYCLE_GAS = 800_000
 RESTOCK_GAS_PER_PACK = 1_050_000
 MAX_BATCH = dict(sync=20, harvest=60, list=10, restock=10, unlist=20, liquidate=40)
@@ -64,20 +63,14 @@ class State:
     winding_down: bool = False
     listing_paused: bool = False
     distribution_bps: int = 0
-    # FWA tokens. Amounts in token wei: pending on active listings, credit from removed or
-    # repriced listings, already held. `token_sale_amount` is what one convert would sell
-    # (min of the total and clipMax); `token_sale_eth` and `token_sale_gas` come from simulating
-    # that exact convert call against the live pool (0 when it would revert), never from the
-    # reference price, which is only the sale's protection floor. `token_wait` says why not.
+    # FWA tokens in token wei: pending on active listings, credit from removed or repriced
+    # listings, already held. The vault burns them (D43); burning is unpaid, so the keeper does
+    # it only when its operator opts in.
     token_pending: int = 0
     token_credit: int = 0
     token_held: int = 0
-    token_sale_amount: int = 0
-    token_sale_min_out: int = 0
-    token_sale_eth: int = 0
-    token_sale_gas: int = 0
-    token_wait: str = ""
-    subsidize_tokens: bool = False  # operator pays convert gas the vault will not reimburse
+    token_ids: list = field(default_factory=list)  # active listings with pending tokens
+    burn_tokens: bool = False  # operator pays burnTokens gas; the vault reimburses nothing
     notes: list = field(default_factory=list)
     # Deployment slowdown: trailing acquisitions per day as the keeper measured them, and the
     # floor below which it stops building new packs (relisting existing ones continues).
@@ -162,25 +155,13 @@ def plan(s):
             and (s.pending_deposits or s.locked_shares)):
         out.append(("checkpoint",))
 
-    # 5. Tokens (zero in NAV): one convert claims and sells. The vault pays the caller only if
-    #    the pay is at most share_bps of the ETH realized; otherwise the call is a donation.
+    # 5. Tokens (zero in NAV, never sold): claim and burn when the operator opts in.
     total = s.token_pending + s.token_credit + s.token_held
-    if total:
-        if s.token_wait:
-            s.notes.append(f"tokens {total / 1e18:.4f} waiting: {s.token_wait}")
-        elif s.token_sale_eth:
-            pay = cost(s, s.token_sale_gas)
-            spend = s.token_sale_gas * s.gas_price  # what the keeper's transaction costs it
-            paid = pay * BPS <= s.token_sale_eth * s.share_bps
-            if paid and pay >= spend:
-                out.append(("convert", [l.id for l in active], s.token_sale_amount, s.token_sale_min_out))
-            elif s.subsidize_tokens:
-                out.append(("convert", [l.id for l in active], s.token_sale_amount, s.token_sale_min_out))
-                s.notes.append(f"token sale subsidized: keeper spends {spend / 1e18:.8f} ETH for "
-                               f"{s.token_sale_eth / 1e18:.8f} ETH to holders")
-            else:
-                s.notes.append(f"tokens {total / 1e18:.4f} waiting: sale would realize {s.token_sale_eth / 1e18:.8f} ETH, "
-                               f"under {BPS // s.share_bps}x its {pay / 1e18:.8f} ETH gas pay, so the vault would not pay for it")
+    if total and s.burn_tokens:
+        # Only ids with pending tokens, in harvest-sized batches: bounds gas well under EIP-7825.
+        out.append(("burnTokens", s.token_ids[:MAX_BATCH["harvest"]]))
+    elif total:
+        s.notes.append(f"tokens {total / 1e18:.4f} unburned (run with --burn-tokens; operator pays the gas)")
 
     # 6. Deploy: relist idle packs, then build new ones only when one cycle repays the build.
     if s.winding_down or broken or s.listing_paused or redeeming or not s.backing:

@@ -12,9 +12,6 @@ import {
     IFWARewards,
     IFWAToken,
     IFloorOracle,
-    IPoolManager,
-    PoolKey,
-    SwapParams,
     LISTING_ACTIVE,
     LISTING_ALLOCATED,
     LISTING_WITHDRAWN,
@@ -38,7 +35,7 @@ import {
 ///      fees large enough to pay keepers exceeds it. A call is paid only when it did necessary
 ///      work or realized more than its cost.
 ///
-///      Trust: FWA, its rewards module, Shapes, ShapePacks and the token's v4 pool are immutable
+///      Trust: FWA, its rewards module, Shapes, ShapePacks and the FWA token are immutable
 ///      addresses fixed here. FWA's owner can change fees, the floor quote and admission; every
 ///      such change is read live, never cached. The guardian can only stop things and lower caps.
 ///      The admin can move parameters inside bytecode bounds after `PARAM_DELAY`. Neither role has
@@ -67,7 +64,6 @@ contract PackVault is ReentrancyGuard {
     uint256 public constant MAX_KEEPER_PREMIUM_BPS = 5_000;
     uint256 public constant MAX_KEEPER_SHARE_BPS = 5_000;
     uint256 public constant MAX_ALLOCATED_BOUND_BPS = 1_000;
-    uint256 public constant MAX_CLIP_SLIPPAGE_BPS = 500;
     uint256 public constant MIN_PACK_UNITS = 3; // ShapePacks minimum pack value 0.03 ETH
     uint256 public constant MAX_PACK_UNITS = 63; // highest bit of the uint64 mask
     uint256 public constant MIN_DEPOSIT = 0.01 ether;
@@ -90,7 +86,6 @@ contract PackVault is ReentrancyGuard {
     IShapePacks public immutable packs;
     IFWARewards public immutable rewards;
     IFWAToken public immutable token;
-    IPoolManager public immutable poolManager;
     address public immutable guardian;
     address public immutable admin;
     uint256 public immutable paramDelay;
@@ -104,7 +99,6 @@ contract PackVault is ReentrancyGuard {
         uint16 keeperPremiumBps; // paid on top of reimbursed gas
         uint16 keeperShareBps; // optional calls are paid only if pay <= this share of value realized
         uint16 allocatedBoundBps; // checkpoint skips when Allocated value exceeds this share of NAV
-        uint16 clipSlippageBps; // token sale must clear refPrice x (1 - this)
         uint64 packUnitsMask; // bit u set: packs of u x 0.01 ETH may be built and listed
         uint64 gasCeiling; // wei per gas
         uint64 maxTip; // reimbursed price is at most basefee + this
@@ -112,8 +106,6 @@ contract PackVault is ReentrancyGuard {
         uint128 reserve; // ETH kept idle
         uint128 tvlCap; // deposits refused above this NAV
         uint128 opGasCap; // reimbursed gas per call
-        uint128 clipMax; // tokens per conversion
-        uint128 refPrice; // wei per 1e18 token units, last fill or admin-set
     }
 
     Params internal params;
@@ -122,7 +114,6 @@ contract PackVault is ReentrancyGuard {
 
     bool public depositsPaused;
     bool public listingPaused;
-    bool public conversionDisabled;
     bool public windingDown;
 
     // ------------------------------------------------------------------ positions and inventory
@@ -184,7 +175,6 @@ contract PackVault is ReentrancyGuard {
     mapping(address => uint256) public distDebt;
     uint256 public distributionReserve;
 
-    uint256 public conversionInterval; // last INTERVAL index with a token sale
 
     // ------------------------------------------------------------------ events and errors
 
@@ -198,7 +188,7 @@ contract PackVault is ReentrancyGuard {
     event Liquidated(uint256 packs, uint256 shapes, uint256 ethOut);
     event Unlisted(uint256 indexed listingId);
     event Restocked(uint256 packs, uint256 units);
-    event Converted(uint256 tokensIn, uint256 ethOut);
+    event TokensBurned(uint256 amount);
     event KeeperPaid(address indexed keeper, uint256 amount);
     event ParamsProposed(uint256 eta);
     event ParamsApplied();
@@ -220,7 +210,6 @@ contract PackVault is ReentrancyGuard {
     error Nothing();
     error Liquidity();
     error UnlistNotAllowed();
-    error Slippage();
     error UnknownNft();
 
     // ------------------------------------------------------------------ construction
@@ -240,7 +229,6 @@ contract PackVault is ReentrancyGuard {
         packs = packs_;
         rewards = IFWARewards(fwa_.rewards());
         token = IFWAToken(fwa_.token());
-        poolManager = IPoolManager(token.poolManager());
         guardian = guardian_;
         admin = admin_;
         paramDelay = paramDelay_;
@@ -503,59 +491,19 @@ contract PackVault is ReentrancyGuard {
 
     // ------------------------------------------------------------------ FWA token rewards
 
-    /// @notice Claim depositor FWA token rewards: pending rewards of `activeIds` and credit from
-    ///         removed or repriced listings. Unpaid; `convert` claims and sells in one paid call.
-    function harvestTokens(uint256[] calldata activeIds) external nonReentrant {
-        _claimTokens(activeIds);
-    }
-
-    /// @dev FWA's claim reverts for the whole batch on one listing that is no longer active, or
-    ///      when nothing is pending. Neither may block the credit withdrawal or the sale.
-    function _claimTokens(uint256[] calldata activeIds) internal {
+    /// @notice Claim depositor FWA token rewards (pending on `activeIds`, plus credit from removed
+    ///         or repriced listings) and burn every FWA token the vault holds. Holders get no
+    ///         token value: tokens never count in NAV and the vault never sells them. Unpaid:
+    ///         burning realizes nothing for holders to reimburse from.
+    function burnTokens(uint256[] calldata activeIds) external nonReentrant {
+        // FWA's claim reverts for the whole batch on one listing that is no longer active, or
+        // when nothing is pending. Neither may block the credit withdrawal or the burn.
         if (activeIds.length != 0) try rewards.claimDepositorTokens(activeIds) {} catch {}
         if (rewards.tokenCredit(address(this)) != 0) rewards.withdrawTokens();
-    }
-
-    /// @notice Claim token rewards (as `harvestTokens`), then sell min(maxAmount, clipMax, held)
-    ///         FWA tokens for ETH through the token's own v4 pool, at most once per FWA interval.
-    ///         FWAToken transfers are locked except into that pool under its hook, so selling
-    ///         there is the only way the vault can realize them; tokens count as zero in NAV
-    ///         until the ETH arrives. The sale must clear both the caller's `minOut` and the
-    ///         reference floor; the caller is paid only out of what the sale realized.
-    function convert(uint256[] calldata activeIds, uint256 maxAmount, uint256 minOut)
-        external
-        nonReentrant
-        returns (uint256 ethOut)
-    {
-        uint256 g0 = gasleft();
-        Params memory p = params;
-        if (conversionDisabled) revert Paused();
-        uint256 interval = block.timestamp / INTERVAL;
-        if (interval == conversionInterval) revert TooEarly();
-        _claimTokens(activeIds);
-        uint256 amount = M.min(M.min(maxAmount, p.clipMax), token.balanceOf(address(this)));
-        if (amount == 0) revert Amount();
-        if (p.refPrice == 0 || minOut < amount * p.refPrice / 1e18 * (BPS - p.clipSlippageBps) / BPS) {
-            revert Slippage();
-        }
-        conversionInterval = interval;
-        uint256 before = address(this).balance;
-        poolManager.unlock(abi.encode(amount));
-        ethOut = address(this).balance - before;
-        if (ethOut < minOut) revert Slippage();
-        // The floor only ratchets up: a sandwiched fill cannot lower the next sale's floor. A
-        // real price fall stalls sales until the admin sets a lower reference via the delay.
-        uint256 fill = ethOut * 1e18 / amount;
-        if (fill > p.refPrice) params.refPrice = uint128(fill);
-        emit Converted(amount, ethOut);
-        _reimburse(g0, ethOut);
-    }
-
-    /// @dev v4 exact-input sell of FWA (currency1) for native ETH (currency0).
-    function unlockCallback(bytes calldata data) external returns (bytes memory) {
-        if (msg.sender != address(poolManager)) revert Nothing();
-        VaultLib.swapTokens(poolManager, token, abi.decode(data, (uint256)));
-        return "";
+        uint256 amount = token.balanceOf(address(this));
+        if (amount == 0) revert Nothing();
+        token.burn(amount);
+        emit TokensBurned(amount);
     }
 
     // ------------------------------------------------------------------ holders
@@ -865,21 +813,17 @@ contract PackVault is ReentrancyGuard {
 
     function applyParams() external {
         if (pendingParamsEta == 0 || block.timestamp < pendingParamsEta) revert TooEarly();
-        Params memory p = pendingParams;
-        // refPrice follows fills; a proposal moves it only when it names a nonzero value.
-        if (p.refPrice == 0) p.refPrice = params.refPrice;
-        params = p;
+        params = pendingParams;
         delete pendingParams;
         pendingParamsEta = 0;
         emit ParamsApplied();
     }
 
     /// @notice Guardian stops: each flag can only be raised, and wind-down is one-way.
-    function guard(bool pauseDeposits, bool pauseListing, bool disableConversion, bool cancelProposal) external {
+    function guard(bool pauseDeposits, bool pauseListing, bool cancelProposal) external {
         if (msg.sender != guardian) revert NotGuardian();
         if (pauseDeposits) depositsPaused = true;
         if (pauseListing) listingPaused = true;
-        if (disableConversion) conversionDisabled = true;
         if (cancelProposal) {
             delete pendingParams;
             pendingParamsEta = 0;
@@ -909,7 +853,7 @@ contract PackVault is ReentrancyGuard {
         if (
             p.minEdgeBps > MAX_MIN_EDGE_BPS || p.bufferBps > MAX_BUFFER_BPS || p.distributionBps > MAX_DISTRIBUTION_BPS
                 || p.keeperPremiumBps > MAX_KEEPER_PREMIUM_BPS || p.keeperShareBps > MAX_KEEPER_SHARE_BPS
-                || p.allocatedBoundBps > MAX_ALLOCATED_BOUND_BPS || p.clipSlippageBps > MAX_CLIP_SLIPPAGE_BPS
+                || p.allocatedBoundBps > MAX_ALLOCATED_BOUND_BPS
                 || p.gasCeiling > MAX_GAS_CEILING || p.maxTip > p.gasCeiling || p.maxPositions > MAX_POSITIONS || p.opGasCap > 16_777_216
                 || p.packUnitsMask >> (MAX_PACK_UNITS + 1) != 0 || p.packUnitsMask & ((1 << MIN_PACK_UNITS) - 1) != 0
         ) revert OutOfBounds();

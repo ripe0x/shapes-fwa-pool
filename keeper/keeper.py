@@ -27,7 +27,7 @@ import policy  # noqa: E402
 RPC = "https://mainnet.gateway.tenderly.co"
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 SHAPES = "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0"
-PARAMS_T = "(uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint96,uint128,uint128,uint128,uint128,uint128)"
+PARAMS_T = "(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint96,uint128,uint128,uint128)"
 LISTING_T = "(address,address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint64,uint8)"
 
 
@@ -54,50 +54,21 @@ def ids_of(out):
     return [num(x.strip()) for x in out.split(",") if x.strip()]
 
 
-SALE_TOLERANCE_BPS = 50  # minOut sits 0.5% under the simulated fill: room for block-to-block drift
 
 
-def read_tokens(vault, active_ids, interval, sender, ref_price, slip_bps, clip, disabled):
-    """Token entitlements and a sale estimate from the deployed rewards and token contracts.
-    The estimate simulates the exact convert call (claims, clipMax, pool fee, price impact,
-    hook, transfer rules) from the keeper's address; the reference price only sets the floor."""
+def read_tokens(vault, active_ids):
+    """Token entitlements from the deployed rewards and token contracts."""
     rewards = call(FWA, "rewards()(address)")
     token = call(FWA, "token()(address)")
-    pending = sum(num(call(rewards, "pendingDepositorTokens(uint256)(uint256)", i)) for i in active_ids)
-    credit = num(call(rewards, "tokenCredit(address)(uint256)", vault))
-    held = num(call(token, "balanceOf(address)(uint256)", vault))
-    out = dict(token_pending=pending, token_credit=credit, token_held=held)
-    total = pending + credit + held
-    if not total:
-        return out
-    amount = min(total, clip)
-    out["token_sale_amount"] = amount
-    if disabled:
-        out["token_wait"] = "conversion disabled by the guardian"
-    elif ref_price == 0:
-        out["token_wait"] = "no reference price set (admin sets one through the parameter delay)"
-    elif num(call(vault, "conversionInterval()(uint256)")) == interval:
-        out["token_wait"] = "already sold once this 12 h interval"
-    else:
-        floor = amount * ref_price // 10**18 * (10_000 - slip_bps) // 10_000
-        args = ["convert(uint256[],uint256,uint256)(uint256)", "[" + ",".join(map(str, active_ids)) + "]",
-                amount, floor]
-        try:
-            eth = num(cast("call", vault, *args, "--from", sender))
-            gas = int(cast("estimate", vault, "convert(uint256[],uint256,uint256)", *args[1:], "--from", sender).split()[0])
-            out.update(token_sale_eth=eth, token_sale_gas=gas,
-                       token_sale_min_out=max(floor, eth * (10_000 - SALE_TOLERANCE_BPS) // 10_000))
-        except subprocess.CalledProcessError as e:
-            msg = (e.output or "").strip()
-            out["token_wait"] = ("pool price below the reference floor" if "Slippage" in msg or "0x7dd37f70" in msg
-                                 else f"sale simulation reverted: {msg[:120]}")
-    return out
+    pend = {i: num(call(rewards, "pendingDepositorTokens(uint256)(uint256)", i)) for i in active_ids}
+    return dict(token_pending=sum(pend.values()), token_ids=[i for i, v in pend.items() if v],
+                token_credit=num(call(rewards, "tokenCredit(address)(uint256)", vault)),
+                token_held=num(call(token, "balanceOf(address)(uint256)", vault)))
 
 
-def read_state(vault, slowdown, sender="0x000000000000000000000000000000000000dEaD", subsidize=False):
+def read_state(vault, slowdown, burn=False):
     p = [num(x) for x in call(vault, f"getParams()({PARAMS_T})").strip("()").split(", ")]
-    (min_edge, _buf, dist_bps, premium, share, _alloc, _slip, _mask, ceiling, tip, max_pos, _res, _tvl,
-     _opcap, _clip, ref_price) = p
+    (min_edge, _buf, dist_bps, premium, share, _alloc, _mask, ceiling, tip, max_pos, _res, _tvl, _opcap) = p
     k, backing, _ok = lines(call(vault, "edge(uint256)(uint256,uint256,bool)", 3))
     now = num(cast("block", "latest", "--field", "timestamp"))
     window = num(call(FWA, "settlementWindow()(uint256)"))
@@ -126,8 +97,7 @@ def read_state(vault, slowdown, sender="0x000000000000000000000000000000000000dE
     head = num(cast("block-number"))
     seq_now = num(call(FWA, "lastIssuedSequence()(uint64)"))
     seq_then = num(call(FWA, "lastIssuedSequence()(uint64)", block=max(head - 7 * 7200, 1)))
-    tokens = read_tokens(vault, [l.id for l in listings if l.status == policy.ACTIVE], interval, sender,
-                         ref_price, _slip, _clip, call(vault, "conversionDisabled()(bool)") == "true")
+    tokens = read_tokens(vault, [l.id for l in listings if l.status == policy.ACTIVE])
     return policy.State(
         # The keeper bids basefee + maxTip (run_pass), so that is its price.
         now=now, gas_price=num(cast("base-fee")) + tip, base_fee=num(cast("base-fee")), gas_ceiling=ceiling,
@@ -144,14 +114,14 @@ def read_state(vault, slowdown, sender="0x000000000000000000000000000000000000dE
         open_positions=len(listings), max_positions=max_pos,
         winding_down=call(vault, "windingDown()(bool)") == "true",
         listing_paused=call(vault, "listingPaused()(bool)") == "true", distribution_bps=dist_bps,
-        recent_volume=(seq_now - seq_then) / 7, slowdown_volume=slowdown, subsidize_tokens=subsidize,
+        recent_volume=(seq_now - seq_then) / 7, slowdown_volume=slowdown, burn_tokens=burn,
         **tokens,
     )
 
 
 def to_cast(step):
     fn, *args = step
-    if fn in ("sync", "harvest", "unlist", "harvestTokens"):
+    if fn in ("sync", "harvest", "unlist", "burnTokens"):
         return [f"{fn}(uint256[])", "[" + ",".join(map(str, args[0])) + "]"]
     if fn == "activate":
         return ["activate(uint256[],uint256)", "[" + ",".join(map(str, args[0])) + "]", args[1]]
@@ -159,20 +129,18 @@ def to_cast(step):
         return [f"{fn}(uint256)", args[0]]
     if fn == "restock":
         return ["restock(uint256,uint256)", args[0], args[1]]
-    if fn == "convert":
-        return ["convert(uint256[],uint256,uint256)", "[" + ",".join(map(str, args[0])) + "]", args[1], args[2]]
     return [f"{fn}()"]
 
 
 def run_pass(a):
     """Send one call at a time and re-read the chain before choosing the next, so each decision
     sees the effect of the last (a sync frees a pack to list, a harvest frees ETH, a claim feeds
-    a sale). A call that fails is not retried in the same pass; the next pass reads afresh."""
+    a burn). A call that fails is not retried in the same pass; the next pass reads afresh."""
     sender = a.sender or (cast("wallet", "address", "--account", a.account) if a.account else
                           "0x000000000000000000000000000000000000dEaD")
     failed, skip, sent = 0, set(), 0
     for _ in range(a.max_steps):
-        state = read_state(a.vault, a.slowdown_volume, sender, a.subsidize_tokens)
+        state = read_state(a.vault, a.slowdown_volume, a.burn_tokens)
         steps = [st for st in policy.plan(state) if st[0] not in skip]
         if sent == 0:
             print(f"gas {state.gas_price / 1e9:.3f} gwei, {len(state.listings)} open, {state.idle_packs} idle packs, "
@@ -221,8 +189,8 @@ def main():
     ap.add_argument("--loop", type=int, default=0, help="seconds between passes; 0 runs once")
     ap.add_argument("--slowdown-volume", type=float, default=0.0)
     ap.add_argument("--max-steps", type=int, default=40, help="calls per pass, each after a fresh read")
-    ap.add_argument("--subsidize-tokens", action="store_true",
-                    help="sell tokens even when the vault will not reimburse the gas (operator pays)")
+    ap.add_argument("--burn-tokens", action="store_true",
+                    help="claim and burn FWA token rewards; unpaid, the operator pays the gas")
     a = ap.parse_args()
     globals()["RPC"] = a.rpc
     if a.send and not (a.account or a.sender):

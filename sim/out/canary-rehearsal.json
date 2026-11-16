@@ -13,42 +13,37 @@
   "keeperPremiumBps": 1000,
   "keeperShareBps": 2500,
   "allocatedBoundBps": 1000,
-  "clipSlippageBps": 300,
   "packUnitsMask": 8,
-  "gasCeilingWei": 1500000000,
+  "gasCeilingWei": 500000000,
   "maxTipWei": 50000000,
   "maxPositions": 30,
   "reserveWei": 50000000000000000,
   "tvlCapWei": 2000000000000000000,
-  "opGasCap": 15000000,
-  "clipMax": 1000000000000000000000000,
-  "refPrice": 0
+  "opGasCap": 15000000
  },
  "positions_built": 28,
  "positions_listed": 28,
- "capital_idle_after_build": 68326313216044207,
+ "capital_idle_after_build": 68335772557116714,
  "deposited": 1990000000000000000,
- "claimed": 1973954688269141463,
- "holder_result": -16045311730858537,
- "keeper_pay": 7147364420914067,
- "keeper_net": 1097535558910346,
- "keeper_gas_spent": 6049828862003721,
+ "claimed": 1973920915391125527,
+ "holder_result": -16079084608874473,
+ "keeper_pay": 7173332137998345,
+ "keeper_net": 1110942409610569,
+ "keeper_gas_spent": 6062389728387776,
  "mints": 9,
  "mint_fees": 9000000000000000,
  "staged_before_activation": 0,
  "staged_after_activation": 0,
- "token_pending": 4866922439539889484,
- "token_eth": 8169873439352,
- "token_sale_keeper_cost": 38891769805854,
- "end_balance": 9906117183383822,
- "end_lastNav": 9917312948038356,
- "ledger_in": 2000008169873439352,
- "ledger_out": 2000008169873439352,
+ "token_burned": 4866922439539889484,
+ "token_burn_keeper_cost": 33634159421940,
+ "end_balance": 9905752470876128,
+ "end_lastNav": 9917100515299844,
+ "ledger_in": 2000000000000000000,
+ "ledger_out": 2000000000000000000,
  "ledger_gap": 0,
- "waits": {
-  "no_ref": "gas 0.088 gwei, 28 open, 0 idle packs, idle 0.0183 ETH, cycle net 1.319 mETH, 7d volume 96/day\nnote: tokens 4.8669 waiting: no reference price set (admin sets one through the parameter delay)\nnothing to do",
-  "dust": "gas 0.076 gwei, 28 open, 0 idle packs, idle 0.0183 ETH, cycle net 1.330 mETH, 7d volume 96/day\nnote: tokens 4.8669 waiting: sale would realize 0.00000817 ETH, under 4x its 0.00005019 ETH gas pay, so the vault would not pay for it\nnothing to do",
-  "subsidized": "gas 0.076 gwei, 28 open, 0 idle packs, idle 0.0183 ETH, cycle net 1.330 mETH, 7d volume 96/day\nnote: token sale subsidized: keeper spends 0.00004336 ETH for 0.00000817 ETH to holders\nsent convert status 1 gas 537201 cost 0.00003889 ETH\ndone: 1 sent, 0 failed"
+ "keeper_out": {
+  "tokens_idle": "gas 0.088 gwei, 28 open, 0 idle packs, idle 0.0183 ETH, cycle net 1.319 mETH, 7d volume 96/day\nnote: tokens 4.8669 unburned (run with --burn-tokens; operator pays the gas)\nnothing to do",
+  "tokens_burn": "gas 0.088 gwei, 28 open, 0 idle packs, idle 0.0183 ETH, cycle net 1.319 mETH, 7d volume 96/day\nsent burnTokens status 1 gas 403755 cost 0.00003363 ETH\ndone: 1 sent, 0 failed"
  },
  "log": [
   {
@@ -65,75 +60,75 @@
   },
   {
    "tag": "priced",
-   "balance": 68326313216044207,
+   "balance": 68335772557116714,
    "lastNav": 2000000000000000000,
    "totalShares": 200000000000000000,
    "open": 28,
    "idle": 0,
    "loose": 6,
    "tokens": 0,
-   "keeper": 10000922756499435742,
-   "holder": 8009981912606241330
+   "keeper": 10000921825363139421,
+   "holder": 8009981974253857908
   },
   {
    "tag": "deployed capital",
-   "balance": 68326313216044207,
+   "balance": 68335772557116714,
    "lastNav": 2000000000000000000,
    "totalShares": 200000000000000000,
    "open": 28,
    "idle": 0,
    "loose": 6,
    "tokens": 0,
-   "keeper": 10000922756499435742,
-   "holder": 8009981912606241330
+   "keeper": 10000921825363139421,
+   "holder": 8009981974253857908
   },
   {
-   "tag": "after token sale",
-   "balance": 68334483089483559,
+   "tag": "after token burn",
+   "balance": 68335772557116714,
    "lastNav": 2000000000000000000,
    "totalShares": 200000000000000000,
    "open": 28,
    "idle": 0,
    "loose": 6,
    "tokens": 0,
-   "keeper": 10000883864729629888,
-   "holder": 8009981912606241330
+   "keeper": 10000888191203717481,
+   "holder": 8009981974253857908
   },
   {
    "tag": "after kick, sync, relist",
-   "balance": 71569245595149067,
+   "balance": 71565286605166956,
    "lastNav": 2000000000000000000,
    "totalShares": 200000000000000000,
    "open": 28,
    "idle": 0,
    "loose": 6,
    "tokens": 0,
-   "keeper": 10000890247521020895,
-   "holder": 8009981912606241330
+   "keeper": 10000895245123791413,
+   "holder": 8009981974253857908
   },
   {
    "tag": "partial withdrawal",
-   "balance": 12161434377897323,
-   "lastNav": 997103477576906102,
+   "balance": 12146929274526759,
+   "lastNav": 997090714763200971,
    "totalShares": 100500000000000000,
    "open": 14,
    "idle": 2,
    "loose": 0,
    "tokens": 0,
-   "keeper": 10000997225644594462,
-   "holder": 8997151959817761319
+   "keeper": 10001008481675730053,
+   "holder": 8997138690933065487
   },
   {
    "tag": "wound down",
-   "balance": 9906117183383822,
-   "lastNav": 9917312948038356,
+   "balance": 9905752470876128,
+   "lastNav": 9917100515299844,
    "totalShares": 1000000000000000,
    "open": 0,
    "idle": 0,
    "loose": 0,
    "tokens": 0,
-   "keeper": 10001097535558910346,
-   "holder": 9983916063758027820
+   "keeper": 10001110942409610569,
+   "holder": 9983881495728465217
   }
  ]
 }

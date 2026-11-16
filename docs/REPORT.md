@@ -1,7 +1,8 @@
 # PackVault: validation and repair report
 
 2026-11-16, second pass. Scope: does the automation work, are the performance claims supported,
-is a small private canary technically justified. Decisions D32 to D41 in `docs/DECISIONS.md`;
+is a small private canary technically justified. Owner decisions applied the same day (D42 to
+D44) are in section 8. Decisions D32 to D44 in `docs/DECISIONS.md`;
 proposed outcomes in `OWNER-REQUIREMENTS.md` section B2; economics in `sim/out/forward.md` and
 `sim/out/backtest_audit.md`. Earlier reports are in git history (1b8cf91, 847b3fe).
 
@@ -10,19 +11,21 @@ proposed outcomes in `OWNER-REQUIREMENTS.md` section B2; economics in `sim/out/f
 - **A critical custody defect was open and is fixed.** ETH settled to a holder but not yet
   claimed counted as free, so keepers could deploy it or be paid from it (reproduced: 1.0 ETH
   owed, 0.35 ETH left). It is now a tracked liability (D32).
-- **The token lifecycle now runs through the production keeper**, but at canary size selling is
-  not self-funding: one real buyback paid 28 listings 8.2e12 wei of tokens against 5.0e13 wei
-  of gas pay. Rewards wait safely or an operator subsidizes the sale (D33).
+- **FWA token rewards are now claimed and burned, never sold** (owner, D43). Selling was not
+  self-funding at canary size (8.2e12 wei of tokens against 5.0e13 wei of gas pay); the sale
+  path is deleted and PackVault shrank to 22,206 bytes.
 - **The published backtest (+2,731%) was not a return estimate.** It counted refunded requests as
   revenue and relisted vault positions instantly while FWA's pool drained on Oct 31. With only
   successful acquisitions and real settlement, keeper timing, cash and staging, the same 30 days
   give +169% annualized, matching the closed form (+166%) at the true volume (D38, D39).
 - **Returns at current activity:** 100 positions, last 14 days' activity (71 a day), 0.15 gwei:
   mean +21% a year, 18% chance of a losing year (95% interval 14 to 22%).
-- **Gas is the binding risk.** The vault starts only below about 0.54 gwei. If gas rises to 1.0
-  gwei after it has deployed, the year's mean falls to +2% with a 46% chance of loss.
-- **Recommendation: proceed with a private canary**, capped as proposed (28 positions fit, not 30),
-  with your own keeper and an explicit stop rule on gas. No critical or high defect is open;
+- **Gas is the binding risk.** The gas ceiling is now 0.5 gwei and the gate passes there (+121%
+  closed form, +76% simulated; D42). Above it the keeper waits instead of spending: with 1.0
+  gwei from day 30 the year is +2.9% (36% chance of loss), against +2% (46%) at the old 1.5
+  ceiling.
+- **Recommendation: proceed with the approved private canary** (28 positions fit, not 30), with
+  your own keeper running `--burn-tokens`. No critical or high defect is open;
   every lifecycle step except acquisitions selecting vault listings ran through the production
   keeper on a local fork, and those ran on real VRF in the Solidity fork tests.
 
@@ -103,28 +106,29 @@ settlement, position limits and withdrawal liabilities; tokens at zero; raw year
 | 15/day | 100/98/109 | +2% | -12% | 42% [38-47] |
 | Decline 97 to 10/day | 100/104/120 | +11% | -11% | 26% [22-31] |
 | Inactive after 60 days | 100/97/112 | +3% | -9% | 37% [33-42] |
-| Enter at 0.15 gwei, 1.0 gwei from day 30 | 100/95/109 | +2% | -27% | 46% [41-50] |
+| Last 14 d at the 0.5 gwei ceiling | 100/98/126 | +9% | -23% | 32% [28-37] |
+| Enter at 0.15 gwei, 0.4 gwei from day 30 | 100/101/130 | +14% | -17% | 26% [22-30] |
+| Enter at 0.15 gwei, 1.0 gwei (above ceiling) from day 30 | 100/100/108 | +3% | -9% | 36% [31-40] |
 | Enter at 0.15, 2.0 gwei (above ceiling) days 30-120 | 100/103/131 | +17% | -13% | 19% [15-23] |
-| 1.2 gwei with a cheap day every 7 | 100/92/119 | +1% | -26% | 50% [45-55] |
+| 1.2 gwei with a cheap day every 7 | 100/107/132 | +22% | -12% | 14% [11-18] |
 | 50% redemption at day 120 in 7 congested days | 100/66/117 | +14% | -13% | 22% [19-27] |
 | Crown share to 5% at day 90 (vault unwinds) | 100/24/114 | +4% | -12% | 33% [29-38] |
 | 11% of purchasers keep | 100/118/149 | +38% | 0% | 5% [3-8] |
 
 Positions grow above the target as NAV compounds (cap 300). Worst single year in any row: -50.5%
-raw (30 positions). A gas spike above the ceiling while deployed costs little: the keeper stops,
-positions keep earning. Sustained gas near 1 gwei is what hurts: keeper gas becomes 21% of
-deposits a year and eats most of the edge.
+raw (30 positions). Gas above the 0.5 gwei ceiling costs little: the keeper stops, listed
+positions keep earning, sold ones wait to relist. Sustained gas just under the ceiling is what
+hurts: at 0.5 gwei all year keeper gas is 13% of deposits and the year is +9%.
 
 **Formal gate (owner's definition, trailing 30 days, tokens zero):**
 
 | Gas | Net per bid cycle | Closed form | Forward simulation (cold start) | 10%? |
 |---|---|---|---|---|
 | 0.15 gwei (spot at pinned block) | +1.264 mETH | +160% | +123% (p5 +23%) | yes |
-| 1.2 gwei (overnight assumption) | +0.340 mETH | +43% | 0% (nothing builds above ~0.54 gwei) | closed form only |
-| 1.5 gwei (configured ceiling) | +0.076 mETH | +9.6% | 0% | no |
+| 0.5 gwei (gas ceiling, D42) | +0.956 mETH | +121% | +76% (p5 -8%) | yes |
 
-The gate passes at current gas only. The 30-day figure is about 6x the return at the current run
-rate and should not be shown to holders as expected.
+The gate passes at the ceiling. The 30-day figure is several times the return at the current run
+rate (+9% to +21% at last-14-day activity) and should not be shown to holders as expected.
 
 **Thresholds revalidated against measured gas:** bid cycle 0.8M gas (sync 158k + relist 499k to
 570k + harvest share + 2 x 30k overhead): break-even 1.59 gwei. New pack build measured 921k +
@@ -136,26 +140,25 @@ fee above `maxTip` (0.05 gwei), every call loses about 1 mETH per million gas pe
 tip (a 100-position checkpoint, 3.4M gas, costs 3.4 mETH more per gwei); an unsubsidized keeper
 waits and redemptions are delayed, not lost. The admin can raise `maxTip` through the delay.
 
-**Tokens (separate from the base case):** realized token income at canary size is below 0.01% of
-deposits a year and not self-funding to sell; the base case stays at zero.
+**Tokens:** claimed and burned (D43); zero in NAV as before.
 
 ## 4. Canary configuration, validated
 
 `deploy/canary.example.json` exactly (2 ETH TVL cap, 0.01 ETH seed, 0.05 ETH reserve, 30-position
-limit, 1.5 gwei ceiling, 0.05 gwei maxTip, 10% premium, 10% allocation bound, 2-day delay)
+limit, 0.5 gwei ceiling, 0.05 gwei maxTip, 10% premium, 10% allocation bound, 2-day delay)
 through `script/Deploy.s.sol` and `keeper/keeper.py` on an anvil fork of block 26,418,539
 (`keeper/rehearse_canary.py`, result in `sim/out/canary-rehearsal.json`), rerun on the final
 contract:
 
 - Deposit 1.99 ETH accepted; a further 0.02 ETH refused by the cap. **28 positions** built and
   listed (30 do not fit: 30 x 0.0663 + mints and reserve exceed 2 ETH); 0.018 ETH stays idle.
-- Real permissionless fee payout and buyback: 4.87 FWA tokens to the 28 listings; the keeper
-  waited without a reference price, waited again because the sale (8.2e12 wei) was below 4x its
-  gas pay, and sold only with the operator subsidy flag (keeper cost 3.9e13 wei).
+- Real permissionless fee payout and buyback: 4.87 FWA tokens to the 28 listings; without the
+  opt-in the keeper left them and said so; with `--burn-tokens` it claimed and burned all of
+  them (supply fell by exactly that amount, vault ETH unchanged, keeper gas 3.4e13 wei).
 - Oracle owner lowered the ask, anyone kicked a listing: the keeper synced and relisted it.
 - Partial withdrawal with the keeper interrupted after one call and restarted from chain state;
   full withdrawal; wind-down to empty.
-- Ledger to the wei: seed + deposits + token ETH = claims + keeper pay + mint fees + balance.
+- Ledger to the wei: seed + deposits = claims + keeper pay + mint fees + balance.
   Holder: -0.016 ETH on 1.99 ETH (-0.8%) with no acquisitions in the window, i.e. the entry and
   exit cost (9 mints = 0.009 ETH, keeper gas 0.0071 ETH). Keeper: +0.0011 ETH net.
 - Not reachable locally: acquisitions selecting vault listings (VRF proofs bind the original
@@ -165,9 +168,9 @@ contract:
 ## 5. Reproduce
 
 ```sh
-forge build --sizes   # PackVault 23,904 bytes (672 under EIP-170), VaultLib 2,945
+forge build --sizes   # PackVault 22,206 bytes (2,370 under EIP-170), VaultLib 1,929
 forge test --match-path "test/fork/*.t.sol" --rpc-url https://mainnet.gateway.tenderly.co \
-  --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100   # 44 pass
+  --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100   # 41 pass
 python3 sim/reconcile.py              # after ForkReconcile: model = fork, to the wei
 python3 sim/backtest_audit.py 300 && python3 sim/backtest_audit.py --compare
 python3 sim/forward.py 400
@@ -194,11 +197,25 @@ events through block 26,425,500.
 
 ## 7. Decisions for the owner
 
-1. **Approve the private canary** with the values in `deploy/canary.example.json` (expect 28
-   positions), your keeper, and guardian and admin addresses.
-2. **Stop rule:** wind down if gas holds above 1.0 gwei for a week or k falls below 1.01.
-3. **Token sales:** accept that they need an operator subsidy at canary size, or leave rewards
-   accruing until a sale pays for itself.
-4. **Gate reading:** the gate passes only at current gas; confirm whether the gate's gas
-   assumption is spot, 1.2 gwei or the ceiling.
-5. Sign off section B2 of `OWNER-REQUIREMENTS.md`.
+Answered 2026-11-16 (section 8): canary approved; no gas stop rule; tokens burned; gate at the
+0.5 gwei ceiling. Open:
+1. **Guardian and admin addresses** (one address may hold both, D44).
+2. Sign off section B2 of `OWNER-REQUIREMENTS.md`.
+
+## 8. Owner decisions applied (2026-11-16)
+
+| Decision | Change | Evidence |
+|---|---|---|
+| Gate tested at the gas ceiling, 0.5 gwei (D42) | `gasCeilingWei` 0.5 gwei in `deploy/canary.example.json`; simulation ceiling and gate at 0.5 | gate passes (section 3); canary rehearsal reran on the new values |
+| No wind-down on gas; admin raises the ceiling (D42) | none: `proposeParams` plus the 2-day delay already does this | `test_paramsDelayAndBounds` |
+| Claim and burn tokens, never sell (D43) | `convert`, the v4 swap and its three parameters removed; `burnTokens` added; keeper `--burn-tokens` | ForkTokens (3 tests: active, stale id plus credit, zero); canary rehearsal |
+| One address for both roles (D44) | none | deploy takes the same address twice |
+
+Verification after these changes (HEAD of this commit): `forge build --force` and `--sizes`; all
+fork test suites, 41 pass; `sim/reconcile.py` exact; `sim/forward.py 400`; canary rehearsal
+ledger gap 0. A separate reviewer read the burn diff: no critical or high issue. Fixed from it:
+the keeper now passes only listings with pending tokens, 60 per call (a 20-listing burn measured
+1.13M gas), and the rehearsal snapshots pending right before the burn. Accepted: the keeper burns
+whenever anything is pending and only at or under the gas ceiling (operator cost about 3.4e13 wei
+per burn at canary size). Open question from it: purchasers can take an FWA-token bid; the
+simulation assumes ETH bids, as before this change.

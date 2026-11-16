@@ -38,6 +38,7 @@ SUR, CUT, S_FEE, BID_RATE = 0.05, 0.01, 0.01, 0.90
 ASK, PREMIUM = 0.033, 0.10
 MINT_FEE = 10**15
 DAY = 86_400
+CEILING = 0.5  # gwei: canary gasCeiling; above it the keeper waits and nothing builds or lists
 
 
 # ---------------------------------------------------------------- history
@@ -247,7 +248,7 @@ def run(sc, n_target, seed, days=365):
                         for i, p in v.positions.items()]
             # The simulator settles allocations at day granularity: nothing waits on the window.
             st = policy.State(
-                now=d * DAY, gas_price=gas, base_fee=gas, gas_ceiling=int(1.5 * GWEI), max_tip=5 * 10**7,
+                now=d * DAY, gas_price=gas, base_fee=gas, gas_ceiling=int(CEILING * GWEI), max_tip=5 * 10**7,
                 premium_bps=1_000, share_bps=2_500, k=k, backing=backing, min_edge_bps=100, mint_fee=MINT_FEE,
                 settlement_window=10**12, blackout=(step == 1), queue_drained=blackout_ok or step == 0,
                 checkpoint_done_this_interval=False, listings=listings, idle_packs=len(v.idle_packs),
@@ -422,33 +423,32 @@ def main():
           f"per day: last 7 d {last7.mean():.0f}, last 14 d {last14.mean():.0f}, last 30 d {last30.mean():.0f} "
           f"({last30_ex.mean():.0f} without the {last30.max():.0f} of Oct 31), 30-day median {np.median(last30):.0f}.",
           "Vault: 3-unit packs (P = 0.03 ETH) at the 0.0363 cap; k = 1.0385; keeper premium 10%; maxTip 0.05 gwei; "
-          "gas ceiling 1.5 gwei; FWA tokens at zero; purchasers take the bid unless stated (keeps pay the vault more).\n"]
+          f"gas ceiling {CEILING} gwei; FWA tokens at zero; purchasers take the bid unless stated (keeps pay the vault more).\n"]
 
     # 1. The formal gate, as approved: trailing 30-day volume, tokens at zero.
     md += ["## 1. Formal economic gate (owner's definition)\n",
-           "Gate: 10%/yr net of gas at trailing-30-day volume, tokens at zero; bid outcome positive at the gas ceiling; "
-           "a usable exit window each day. Gas stated per row: 0.15 gwei is spot at the pinned block, 1.2 gwei the "
-           "overnight assumption, 1.5 gwei the configured ceiling.\n",
+           f"Gate: 10%/yr net of gas at trailing-30-day volume, tokens at zero, at the {CEILING} gwei gas ceiling (D42); "
+           "bid outcome positive at the ceiling; a usable exit window each day. 0.15 gwei is spot at the pinned block. "
+           "Above the ceiling nothing builds or lists and the keeper waits.\n",
            "| gas | net per bid cycle (mETH) | closed form, 100 positions | forward sim mean, 100 positions | passes 10%? |",
            "|---|---|---|---|---|"]
     gate = {}
-    for g in (0.15, 1.2, 1.5):
+    for g in (0.15, CEILING):
         x = expectation(100, last30.mean(), g)
         sm = summarize(Scenario(volume=boot(last30), gwei=g), 100, runs)
         gate[g] = (x, sm)
         md.append(f"| {g} gwei | {x['net_meth']:+.3f} | {pct(x['apr'])} | {pct(sm['mean'])} (p5 {pct(sm['p5'])}) | "
                   f"{'yes' if x['apr'] >= 0.10 else 'no'} (closed form); {'yes' if sm['mean'] >= 0.10 else 'no'} (sim) |")
         print(md[-1], flush=True)
-    md.append("\nThe forward simulation at 1.2 and 1.5 gwei deploys nothing from a cold start: new packs need gas below "
-              "~0.54 gwei (one bid cycle must repay the build). The closed form assumes positions already exist. Bid "
-              "outcome at the 1.5 gwei ceiling: +0.076 mETH, positive. Exit windows: 59 of the last 60 blackouts had a "
-              "drained queue (Phase 0.2).\n")
+    md.append(f"\nBid outcome at the {CEILING} gwei ceiling: {gate[CEILING][0]['net_meth']:+.3f} mETH per cycle. New packs "
+              "need gas below ~0.54 gwei (one bid cycle must repay the build); the closed form assumes positions already "
+              "exist. Exit windows: 59 of the last 60 blackouts had a drained queue (Phase 0.2).\n")
 
     md += ["## 2. Expectation (closed form, per position, no variance)\n",
            "| volume/day | gas gwei | positions | cycle days | net per cycle mETH | APR | selection share |",
            "|---|---|---|---|---|---|---|"]
     for v_ in (15, last7.mean(), last30_ex.mean(), last30.mean()):
-        for g in (0.15, 1.0, 1.5):
+        for g in (0.15, CEILING, 1.0):
             for n in (30, 300):
                 x = expectation(n, v_, g)
                 md.append(f"| {v_:.0f} | {g} | {n} | {x['cycle_days']:.1f} | {x['net_meth']:+.3f} | {pct(x['apr'])} | "
@@ -473,7 +473,9 @@ def main():
         ("15/day", dict(volume=const(15), gwei=0.15), (100,)),
         ("decline 97 -> 10/day over the year", dict(volume=decline(97, 10), gwei=0.15), (100,)),
         ("inactive after 60 days", dict(volume=stop_after(last14, 60), gwei=0.15), (100,)),
-        ("enter at 0.15 gwei, 1.0 gwei from day 30 on", dict(volume=boot(last14), gwei=g_path(0.15, 1.0, 30)), (100,)),
+        ("last 14 d at the 0.5 gwei ceiling", dict(volume=boot(last14), gwei=0.5), (100,)),
+        ("enter at 0.15 gwei, 0.4 gwei from day 30 on", dict(volume=boot(last14), gwei=g_path(0.15, 0.4, 30)), (100,)),
+        ("enter at 0.15 gwei, 1.0 gwei (above ceiling) from day 30 on", dict(volume=boot(last14), gwei=g_path(0.15, 1.0, 30)), (100,)),
         ("enter at 0.15 gwei, 2.0 gwei (above ceiling) days 30-120", dict(volume=boot(last14), gwei=g_path(0.15, 2.0, 30, 120)), (100,)),
         ("1.2 gwei with a 0.1 gwei day every 7", dict(volume=boot(last14), gwei=cheap_windows(1.2, 0.1, 7)), (100,)),
         ("50% redemption at day 120 during 7 congested days", dict(volume=boot(last14), gwei=0.15, redeem=[(120, 0.5)],
@@ -515,11 +517,8 @@ def main():
                       f"{100 * sm['m_mint']:.2f}% | {100 * sm['m_keeper']:.2f}% |")
             print(md[-1], flush=True)
 
-    md += ["\n## 5. FWA tokens (separate from the base case, which counts them at zero)\n",
-           "Measured in `keeper/rehearse_canary.py`: one real buyback (0.0096 ETH budget) paid the canary's 28 "
-           "listings 4.87 FWA tokens, which sold for 8.2e12 wei. A sale's gas pay at 0.08 gwei was 5.0e13 wei, so the "
-           "vault does not pay for selling dust and the keeper waits (or an operator subsidizes, as the rehearsal "
-           "shows). Realized token income is under 0.01% of deposits a year at canary size.\n"]
+    md += ["\n## 5. FWA tokens (burned, never sold; D43)\n",
+           "Holders get no token value by design: the vault claims FWA token rewards and burns them, at the operator's gas cost (`burnTokens`, unpaid). Measured in `keeper/rehearse_canary.py`: one real buyback paid the canary's 28 listings 4.87 FWA tokens (a pool sale would have realized about 8.2e12 wei), all claimed and burned.\n"]
     (OUT / "forward.md").write_text("\n".join(md) + "\n")
     json.dump(results, open(OUT / "forward.json", "w"), indent=1)
     print("wrote sim/out/forward.md")

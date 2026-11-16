@@ -25,7 +25,6 @@ RPC = "http://127.0.0.1:8547"
 VALUES = json.loads((ROOT / "deploy/canary.example.json").read_text())
 FWA = VALUES["fwa"]
 PACKS = VALUES["packs"]
-QUOTER = "0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203"  # Uniswap v4 Quoter, mainnet
 # Actors: fresh addresses (keccak of a label). Never anvil's dev accounts: those are real mainnet
 # addresses, and dev account #2 carries an EIP-7702 delegation that diverts ETH it receives.
 DEPLOYER = "0xe0980b9f7F5fB4a98813552894f4E980836cDa7c"  # keccak("pack-vault-rehearsal-deployer")
@@ -165,35 +164,23 @@ def main():
     listed = ids()
     pending = sum(num(call(rewards, "pendingDepositorTokens(uint256)(uint256)", i)) for i in listed)
     print(f"  real buyback accrued {pending} token wei to {len(listed)} listings")
-    out_noref = keeper()
-
-    # 4. The admin sets a reference floor from a live quote (parameter delay applies).
-    pk = cast("call", TOKEN, "poolKey()((address,address,uint24,int24,address))")
-    q = cast("call", QUOTER, "quoteExactInputSingle(((address,address,uint24,int24,address),bool,uint128,bytes))(uint256,uint256)",
-             f"({pk},false,{10**18},0x)")
-    ref = num(q.splitlines()[0]) if q else 0
-    raw = cast("call", VAULT, "getParams()((uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint96,uint128,uint128,uint128,uint128,uint128))")
-    fields = [f.split(" ")[0] for f in raw.strip("()").split(", ")]
-    fields[-1] = str(ref)
-    tup = "(" + ",".join(fields) + ")"
-    impersonate(VALUES["admin"])
-    send(VALUES["admin"], VAULT, "proposeParams((uint16,uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint96,uint128,uint128,uint128,uint128,uint128))", tup)
-    cast("rpc", "evm_increaseTime", str(VALUES["paramDelay"] + 60))
-    cast("rpc", "evm_mine")
-    send(KICKER, VAULT, "applyParams()")
-    print(f"  reference floor set from a live quote: {ref} wei per 1e18 tokens")
-
-    # 5. Keeper decides on its own: dust rewards are not worth the vault's gas pay.
-    out_dust = keeper()
-    # 6. The operator chooses to subsidize: the same production keeper sells, unpaid.
+    # 4. Without the opt-in the keeper leaves tokens alone and says so.
+    out_idle = keeper()
+    # 5. With --burn-tokens the same production keeper claims and burns them, unpaid.
+    pending = sum(num(call(rewards, "pendingDepositorTokens(uint256)(uint256)", i)) for i in listed) + \
+        num(call(rewards, "tokenCredit(address)(uint256)", VAULT)) + num(call(TOKEN, "balanceOf(address)(uint256)", VAULT))
+    supply0 = num(call(TOKEN, "totalSupply()(uint256)"))
     before_eth = num(cast("balance", VAULT))
     kb = num(cast("balance", KEEPER))
-    out_sub = keeper("--subsidize-tokens")
-    sold = state("after token sale")
-    token_eth = sold["balance"] - before_eth
-    token_keeper_cost = kb - sold["keeper"]
+    out_burn = keeper("--burn-tokens")
+    burned = supply0 - num(call(TOKEN, "totalSupply()(uint256)"))
+    after = state("after token burn")
+    if burned != pending or after["balance"] != before_eth or num(call(TOKEN, "balanceOf(address)(uint256)", VAULT)):
+        sys.exit(f"burn mismatch: pending {pending} burned {burned} vault ETH {before_eth} -> {after['balance']}")
+    token_burn_cost = kb - after["keeper"]
+    print(f"  burned {burned} token wei (supply fell by exactly the pending amount); keeper paid {token_burn_cost} wei gas")
 
-    # 7. Settlement-like transition: the oracle owner lowers the ask; anyone kicks in the blackout;
+    # 6. Settlement-like transition: the oracle owner lowers the ask; anyone kicks in the blackout;
     #    the keeper resolves and relists at the new cap.
     oracle = call(FWA, "floorOracle()(address)")
     owner = call(oracle, "owner()(address)")
@@ -206,7 +193,7 @@ def main():
     keeper()
     state("after kick, sync, relist")
 
-    # 8. Partial withdrawal, with the keeper interrupted after one call and restarted.
+    # 7. Partial withdrawal, with the keeper interrupted after one call and restarted.
     shares = num(call(VAULT, "shareBalance(address)(uint256)", HOLDER))
     send(HOLDER, VAULT, "requestRedeem(uint256)", shares // 2)
     keeper("--max-steps", "1")  # interrupted
@@ -216,7 +203,7 @@ def main():
     send(HOLDER, VAULT, "claim()")
     state("partial withdrawal")
 
-    # 9. Full withdrawal, then wind-down.
+    # 8. Full withdrawal, then wind-down.
     warp_to(60)
     shares = num(call(VAULT, "shareBalance(address)(uint256)", HOLDER))
     send(HOLDER, VAULT, "requestRedeem(uint256)", shares)
@@ -234,9 +221,6 @@ def main():
     claim_logs = json.loads(sh("cast", "logs", "--rpc-url", RPC, "--json", "--address", VAULT,
                                "Claimed(address indexed,uint256)") or "[]")
     claims = sum(int(l["data"], 16) for l in claim_logs)
-    conv = json.loads(sh("cast", "logs", "--rpc-url", RPC, "--json", "--address", VAULT,
-                         "Converted(uint256,uint256)") or "[]")
-    token_out = sum(int(l["data"][66:], 16) for l in conv)
     restocks = json.loads(sh("cast", "logs", "--rpc-url", RPC, "--json", "--address", VAULT,
                              "Restocked(uint256,uint256)") or "[]")
     loose, mints = 0, 0
@@ -247,7 +231,7 @@ def main():
         mints += m
         loose += 10 * m - need
     mint_fees = mints * 10**15
-    ins = s0["balance"] + deposited + token_out
+    ins = s0["balance"] + deposited
     outs = claims + pay + mint_fees + end["balance"]
     report = dict(
         values=VALUES, positions_built=built["open"] + built["idle"], positions_listed=built["open"],
@@ -255,15 +239,15 @@ def main():
         holder_result=claims - deposited, keeper_pay=pay, keeper_net=end["keeper"] - keeper_start,
         keeper_gas_spent=pay - (end["keeper"] - keeper_start), mints=mints, mint_fees=mint_fees,
         staged_before_activation=staged0, staged_after_activation=staged1,
-        token_pending=pending, token_eth=token_out, token_sale_keeper_cost=token_keeper_cost,
+        token_burned=burned, token_burn_keeper_cost=token_burn_cost,
         end_balance=end["balance"], end_lastNav=end["lastNav"], ledger_in=ins, ledger_out=outs,
-        ledger_gap=ins - outs, waits=dict(no_ref=out_noref, dust=out_dust, subsidized=out_sub), log=log)
+        ledger_gap=ins - outs, keeper_out=dict(tokens_idle=out_idle, tokens_burn=out_burn), log=log)
     (ROOT / "sim/out/canary-rehearsal.json").write_text(json.dumps(report, indent=1, default=str))
-    print(json.dumps({k: v for k, v in report.items() if k not in ("log", "waits", "values")}, indent=1))
+    print(json.dumps({k: v for k, v in report.items() if k not in ("log", "keeper_out", "values")}, indent=1))
     if ins != outs:
         sys.exit(f"ledger does not close: in {ins} out {outs}")
-    print("ledger closes to the wei: seed + deposits + token ETH = claims + keeper pay + mint fees + balance")
-    del token_eth, holder_start
+    print("ledger closes to the wei: seed + deposits = claims + keeper pay + mint fees + balance")
+    del holder_start
 
 
 if __name__ == "__main__":

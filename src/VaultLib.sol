@@ -1,17 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
-import {
-    IFWAV2, IFWAToken, IFloorOracle, IPoolManager, PoolKey, SwapParams
-} from "./interfaces/External.sol";
+import {IFWAV2, IFloorOracle} from "./interfaces/External.sol";
 
-/// @notice Linked library for PackVault: the live FWA economics read and the token pool swap.
-///         Split out only to keep PackVault under EIP-170; both run in the vault's context
-///         (delegatecall) and hold no state of their own.
+/// @notice Linked library for PackVault: the live FWA economics read. Split out only to keep
+///         PackVault under EIP-170; it runs in the vault's context and holds no state.
 library VaultLib {
-    using SafeTransferLib for address;
-
     uint256 internal constant BPS = 10_000;
 
     /// @notice Live k (1e18 scale) and FWA's backing cap for `packs` (zero when FWA would refuse
@@ -38,26 +32,5 @@ library VaultLib {
         if (block.timestamp - observedAt > f.maxOracleAge()) return (k1e18, 0, s);
         if (periodUsed < f.minOracleChallengePeriod()) return (k1e18, 0, s);
         cap = ask * (BPS + f.oracleCeilingPremiumBps()) / BPS;
-    }
-
-    /// @notice v4 exact-input sell of FWA (currency1) for native ETH (currency0), run inside the
-    ///         pool manager's unlock callback. Pays the tokens in and takes the ETH out.
-    function swapTokens(IPoolManager pm, IFWAToken token, uint256 amount) external {
-        PoolKey memory key = token.poolKey();
-        int256 delta = pm.swap(
-            key,
-            SwapParams({
-                zeroForOne: false,
-                amountSpecified: -int256(amount),
-                sqrtPriceLimitX96: 1_461_446_703_485_210_103_287_273_052_203_988_822_378_723_970_341
-            }),
-            ""
-        );
-        uint256 tokensIn = uint256(uint128(-int128(delta)));
-        uint256 ethOut = uint256(uint128(int128(delta >> 128)));
-        pm.sync(key.currency1);
-        address(token).safeTransfer(address(pm), tokensIn);
-        pm.settle();
-        pm.take(address(0), address(this), ethOut);
     }
 }

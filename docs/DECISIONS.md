@@ -454,3 +454,46 @@ issue. Resolution:
 - **LOW-3: the 30k per-call overhead rewards splitting batches** (worst case about 0.015 ETH a
   year at the ceiling). Accepted, as in D31.
 - **ECON-1 and ECON-2** (gas regime, Oct 31 sensitivity) are reported in docs/REPORT.md.
+
+## D42. Gas ceiling 0.5 gwei; the gate is tested at the ceiling; no gas stop rule (owner, 2026-11-16)
+
+**Owner:** "is the gate the max gas? if so use 0.5 gwei to start"; on a wind-down rule for high
+gas: "no, don't wind down. admin should be able to raise the gwei limit as needed."
+**Chose:** canary `gasCeiling` = 0.5 gwei, and the formal gate is evaluated at the ceiling, the
+highest gas at which the vault builds or lists. No automatic or recommended wind-down on gas.
+**Mechanism (unchanged code):** above the ceiling `restock` and `list` revert, keeper pay is
+priced at most at the ceiling, and the keeper waits. Unlisting, sync, checkpoints and claims stay
+callable by anyone. The admin raises the ceiling through `proposeParams` and the 2-day delay (up
+to the 50 gwei bytecode bound); the guardian can lower it at once.
+**Result:** gate passes at 0.5 gwei: +0.956 mETH per bid cycle, closed form +121%, forward
+simulation +76% (p5 -8%) at 100 positions. 0.5 sits under the ~0.54 gwei build threshold, so
+building stays viable at the ceiling. The low ceiling also protects holders when gas rises: with
+1.0 gwei from day 30 the year is +2.9% (36% loss) instead of +2% (46%) at the old 1.5 ceiling,
+because the keeper stops spending instead of running unprofitable cycles.
+**Cost:** while gas sits above 0.5 gwei, redemptions wait for cheaper gas or for someone to
+checkpoint at a loss, and raising the ceiling takes 2 days.
+
+## D43. FWA token rewards are claimed and burned, never sold (owner, 2026-11-16)
+
+**Owner:** "we shouldn't sell" ... "i'd rather claim + burn them". Supersedes requirement A2's
+"token conversion" and D33.
+**Chose:** `convert`, the v4 swap (`VaultLib.swapTokens`, `unlockCallback`), the `refPrice`,
+`clipMax` and `clipSlippageBps` parameters and the guardian's conversion switch are removed.
+`burnTokens(activeIds)` claims pending rewards (stale ids tolerated), withdraws token credit and
+calls `token.burn` on the whole balance. It is permissionless and unpaid: burning realizes no ETH,
+so holders never pay gas for it. The keeper burns only with `--burn-tokens` (operator pays).
+**Why burn works:** FWAToken transfers are locked for non-distributors (D5), but probing the fork
+showed `burn(uint256)` and transfers to the zero or dead address succeed from a non-distributor
+contract; `test_burnClaimsActiveRewards` asserts total supply falls by exactly the claimed amount.
+**Result:** PackVault 22,206 bytes (was 23,904); holders' economics unchanged (tokens were
+already zero in NAV). Canary rehearsal: 4.87 tokens burned, keeper gas 3.4e13 wei.
+**Cost:** holders forgo token value (about 8.2e12 wei per buyback at canary size).
+
+## D44. One address may hold both roles (owner, 2026-11-16)
+
+**Owner:** "why do we need both? seems overly complex".
+**Chose:** no code change; the deploy takes the same address for `guardian` and `admin`. That key
+can stop things at once and change parameters after the 2-day delay. Neither role has a path that
+moves assets to itself.
+**Cost:** with one key, nobody can cancel a malicious parameter proposal from a stolen key; holders
+must exit within the 2-day delay. Roles are immutable, so splitting them later means redeploying.

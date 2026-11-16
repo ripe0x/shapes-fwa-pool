@@ -18,7 +18,6 @@ contract Deploy is Script {
         p.keeperPremiumBps = uint16(vm.parseJsonUint(v, ".keeperPremiumBps"));
         p.keeperShareBps = uint16(vm.parseJsonUint(v, ".keeperShareBps"));
         p.allocatedBoundBps = uint16(vm.parseJsonUint(v, ".allocatedBoundBps"));
-        p.clipSlippageBps = uint16(vm.parseJsonUint(v, ".clipSlippageBps"));
         p.packUnitsMask = uint64(vm.parseJsonUint(v, ".packUnitsMask"));
         p.gasCeiling = uint64(vm.parseJsonUint(v, ".gasCeilingWei"));
         p.maxTip = uint64(vm.parseJsonUint(v, ".maxTipWei"));
@@ -26,8 +25,6 @@ contract Deploy is Script {
         p.reserve = uint128(vm.parseJsonUint(v, ".reserveWei"));
         p.tvlCap = uint128(vm.parseJsonUint(v, ".tvlCapWei"));
         p.opGasCap = uint128(vm.parseJsonUint(v, ".opGasCap"));
-        p.clipMax = uint128(vm.parseJsonUint(v, ".clipMax"));
-        p.refPrice = uint128(vm.parseJsonUint(v, ".refPrice"));
         vm.startBroadcast();
         vault = new PackVault{value: vm.parseJsonUint(v, ".seedWei")}(
             IFWAV2(vm.parseJsonAddress(v, ".fwa")),

@@ -107,6 +107,7 @@ interface IFWARewards {
 
 interface IERC20Min {
     function balanceOf(address account) external view returns (uint256);
+    function totalSupply() external view returns (uint256);
     function transfer(address to, uint256 amount) external returns (bool);
 }
 
@@ -130,6 +131,8 @@ interface IFWAToken is IERC20Min {
     function poolManager() external view returns (address);
     function poolKey() external view returns (PoolKey memory);
     function isDistributor(address account) external view returns (bool);
+    /// Allowed for any holder, though transfers are otherwise locked (probed on a fork).
+    function burn(uint256 amount) external;
 }
 
 interface IPoolManager {

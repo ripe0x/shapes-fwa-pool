@@ -212,7 +212,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         uint256 bal = address(vault).balance;
         uint256 gBal = guardian.balance;
         vm.startPrank(guardian);
-        vault.guard(true, true, true, true);
+        vault.guard(true, true, true);
         vault.lowerCaps(1 ether, 10, 1 gwei);
         vault.startWindDown();
         vm.expectRevert(PackVault.OutOfBounds.selector);

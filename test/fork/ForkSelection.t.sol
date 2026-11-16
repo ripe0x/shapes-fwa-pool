@@ -101,7 +101,6 @@ abstract contract SelectionBase is Test {
         p.maxTip = 0.05 gwei;
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 200;
-        p.clipSlippageBps = 500;
         p.packUnitsMask = uint64(1) << 3;
         p.gasCeiling = 50 gwei;
         p.maxPositions = 150;

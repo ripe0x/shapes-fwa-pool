@@ -73,15 +73,12 @@ abstract contract ForkBase is Test {
         p.maxTip = 0.05 gwei;
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 200;
-        p.clipSlippageBps = 500;
         p.packUnitsMask = uint64(1) << 3;
         p.gasCeiling = 5 gwei;
         p.maxPositions = 150;
         p.reserve = 0.05 ether;
         p.tvlCap = 100 ether;
         p.opGasCap = 15_000_000;
-        p.clipMax = 1e24;
-        p.refPrice = 0;
     }
 
     /// @dev Warp to the next FWA purchase blackout (no new acquisitions can open).
