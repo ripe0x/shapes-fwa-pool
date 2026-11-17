@@ -201,7 +201,7 @@ Answered 2026-11-16 (sections 8, 9): canary approved; no gas stop rule; tokens b
 public; gate at the 0.5 gwei ceiling. Open:
 1. **Guardian and admin addresses** (one address may hold both, D44).
 2. **Sign `asset-flow.json`** (10 DRAFT outcomes, all OK in 16 regimes; hash
-   `0a0900c44b0b48597a16ced1aef789d1f216ec78f2bcfcbafe5a25a105d9d1a3`; signing commands in
+   `1fda6b45c1dc3ef783b21ec41c89d4e6a28a3de371ca7ff8fc857eac334f51e9`; signing commands in
    `~/.agents/guidance/asset-flow-kit/README.md`). Until signed the gate reports INCOMPLETE.
 3. ~~Keeper loss allowance~~: answered: the keeper stops above the ceiling (`--max-loss-wei 0`, the
    default); holders or anyone may still call any step, reimbursed at the ceiling price (D51).
@@ -274,4 +274,22 @@ one-pack build at 2 gwei paid exactly gas x 0.5 gwei x 1.10), `sim/reconcile.py`
 asset-flow regimes with no mismatch (gate INCOMPLETE only for the signature; outcome hash
 `0a0900c4...d9d1a3`), canary rehearsal unchanged (29 positions, ledger gap 0, keeper books equal
 the chain). The DRAFT outcome tightening proposed in chat (O3, O5, O8 checks, O2 count, O9 as
-information, a zero-demand holder cost bound) is not done yet.
+information, a zero-demand holder cost bound) is done in section 11.
+
+## 11. Outcomes tightened (D52)
+
+All 10 DRAFT outcomes hold in all 16 regimes; gate INCOMPLETE only for the signature. Outcome
+hash to sign: `1fda6b45c1dc3ef783b21ec41c89d4e6a28a3de371ca7ff8fc857eac334f51e9`.
+
+| # | Outcome | Measured |
+|---|---|---|
+| O1 | bid: backing leaves, vault keeps the pack | 0.0363 ETH |
+| O2 | keeper pay for a full canary build | 0.0128 ETH (bound 0.015) |
+| O3 | wind-down claim = holder's value share | 0 wei gap |
+| O4 | left after wind-down | 0.0105 ETH (seed slice) |
+| O5 | liabilities never spendable | 0 wei overlap; asserted after every keeper call |
+| O6 | checkpoint pay at 2 gwei, priced at the ceiling | 0.000137 ETH |
+| O7 | ETH paid for burning tokens | 0 |
+| O8 | redemption paid with the oracle broken | 0.9975 of 1 ETH |
+| O9 | holder cost with zero acquisitions | 0.46% (bound 1.5%) |
+| O10 | staged relist activated | yes |

@@ -64,6 +64,7 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
     uint256 settlementCutCum; // outflow: FWA settlement fee kept on a keep/silent outcome
     uint256 packToPurchaserCum; // outflow: pack value delivered to a purchaser (keep/silent)
     uint256 claimsCum; // outflow: redemptions and distributions paid to holders
+    uint256 guardChecks; // O5: liability checks run after every keeper call in this regime
     uint256 cancelsCum; // outflow: cancelled deposits refunded
 
     // ---- flow-only cumulatives (reported, not in the conservation sum)
@@ -202,10 +203,25 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         vm.prank(IOwnable(address(FWA)).owner());
         IFwaAdmin(address(FWA)).setAddr(64, address(PACKS));
         (, uint256 backing, bool ok) = vault.edge(3);
+        uint256 packsBack = vault.idlePacks().length;
+        assertGe(packsBack, 1, "kicked pack recovered to inventory");
+        // With the oracle broken, alice redeems everything: the vault unlists the rest, liquidates
+        // and pays her (D34).
+        _toOpen();
+        uint256 aShares = vault.shareBalance(alice);
+        vm.prank(alice);
+        vault.requestRedeem(aShares);
+        _kUnlist(keeper, vault.openListings());
+        _kLiquidate(keeper, 40);
+        _toBlackout();
+        _kCheckpoint(keeper);
+        uint256 c0 = claimsCum;
+        _claim(alice);
         Fact[] memory f = _facts("open_listings", vault.openListings().length);
         f[1] = Fact("edge_ok_after_repoint", ok ? 1 : 0);
         f[2] = Fact("cap_after_repoint_wei", backing);
-        f[3] = Fact("packs_back_in_inventory", vault.idlePacks().length);
+        f[3] = Fact("packs_back_in_inventory", packsBack);
+        f[4] = Fact("redemption_paid_after_repoint_wei", claimsCum - c0);
         flowReport("oracle_change", a, f);
     }
 
@@ -294,11 +310,15 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         _kList(keeper, 10);
         // Checked before the claim, while the entitlement is still a liability: idle ETH excludes
         // it, and the vault balance never falls below its liabilities.
-        bool guardOk = address(vault).balance >= liabilities && vault.idleEth() <= address(vault).balance - liabilities;
+        uint256 spendable = vault.idleEth();
+        assertGt(vault.claimableTotal(), 0, "alice's entitlement settled to claimable (state reached)");
+        // The gap is the margin by which spendable ETH stays under the unowed balance: never negative.
+        uint256 unowed = address(vault).balance - liabilities;
         _claim(alice);
         Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("claimable_not_deployable_guard", guardOk ? 1 : 0);
+        f[1] = Fact("spendable_over_unowed_wei", spendable > unowed ? spendable - unowed : 0);
         f[2] = Fact("liabilities_wei", liabilities);
+        f[3] = Fact("guard_checks", guardChecks);
         flowReport("settled_unclaimed", a, f);
     }
 
@@ -350,13 +370,27 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         vault.requestRedeem(bShares);
         _kLiquidate(keeper, 40);
         _toBlackout();
+        // Independent expectation: with every position unlisted and liquidated, the vault's whole
+        // value is its ETH. The checkpoint prices redemptions first and pays its keeper after, so
+        // each holder is owed (balance before that pay) x their shares / all shares, the seed's
+        // dead shares included; the pay falls on the shares that stay (here the seed slice).
+        uint256 total = vault.totalShares();
+        uint256 kb = keeper.balance;
         _kCheckpoint(keeper);
+        uint256 nav = address(vault).balance + (keeper.balance - kb);
+        uint256 expA = nav * aShares / total;
+        uint256 expB = nav * bShares / total;
+        uint256 c0 = claimsCum;
         _claim(alice);
+        uint256 gotA = claimsCum - c0;
         _claim(bob);
+        uint256 gotB = claimsCum - c0 - gotA;
+        uint256 gap = (gotA > expA ? gotA - expA : expA - gotA) + (gotB > expB ? gotB - expB : expB - gotB);
         Fact[] memory f = _facts("open_listings", vault.openListings().length);
         f[1] = Fact("locked_shares_at_end", vault.lockedShares());
         f[2] = Fact("vault_eth_at_end_wei", address(vault).balance);
-        f[3] = Fact("last_nav_wei", vault.lastNav());
+        f[3] = Fact("holder_claim_gap_wei", gap);
+        f[4] = Fact("holder_loss_bps", (1.5 ether - (gotA + gotB)) * 10_000 / 1.5 ether);
         flowReport("wind_down", a, f);
     }
 
@@ -617,6 +651,7 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         uint256 mints = need > loose ? (need - loose + 9) / 10 : 0;
         mintFeesCum += mints * SHAPES.mintFee();
         mintedValueCum += mints * 0.1 ether;
+        _guard();
     }
 
     function _kList(address who, uint256 n) internal returns (uint256 listed) {
@@ -627,6 +662,7 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         keeperPaidCum += who.balance - b;
         listed = vault.openListings().length - open;
         backingPostedCum += listed * B;
+        _guard();
     }
 
     function _kSync(address who, uint256[] memory ids) internal {
@@ -634,6 +670,7 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         vm.prank(who);
         vault.sync(ids);
         keeperPaidCum += who.balance - b;
+        _guard();
     }
 
     function _kUnlist(address who, uint256[] memory ids) internal {
@@ -644,6 +681,7 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         uint256 pay = who.balance - b;
         keeperPaidCum += pay;
         backingReturnedCum += (address(vault).balance - vb) + pay; // backing freed into the balance
+        _guard();
     }
 
     function _kLiquidate(address who, uint256 maxCount) internal {
@@ -654,6 +692,7 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         uint256 pay = who.balance - b;
         keeperPaidCum += pay;
         redeemedCum += (address(vault).balance - vb) + pay; // redeemed value into the balance
+        _guard();
     }
 
     function _kHarvest(address who, uint256[] memory ids) internal {
@@ -664,6 +703,7 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         uint256 pay = who.balance - b;
         keeperPaidCum += pay;
         feeHarvestedCum += (address(vault).balance + pay) - vb; // fees in, less keeper pay out
+        _guard();
     }
 
     function _kActivate(address who, uint256[] memory ids) internal {
@@ -671,6 +711,7 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         vm.prank(who);
         vault.activate(ids, 50);
         keeperPaidCum += who.balance - b;
+        _guard();
     }
 
     function _kCheckpoint(address who) internal {
@@ -681,6 +722,21 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         uint256 pay = who.balance - b;
         keeperPaidCum += pay;
         feeHarvestedCum += (address(vault).balance + pay) - vb; // checkpoint harvests credited fees
+        _guard();
+    }
+
+    /// @dev O5 (D32): what the vault may spend never reaches what it owes. Checked after every
+    ///      keeper call: balance >= liabilities, and idle ETH is zero or idle ETH + liabilities + the
+    ///      owed estimate for unpriced redemptions + the reserve fit inside the balance.
+    function _guard() internal {
+        uint256 liab = vault.pendingDepositTotal() + vault.redemptionReserve() + vault.distributionReserve()
+            + vault.claimableTotal();
+        uint256 bal = address(vault).balance;
+        assertGe(bal, liab, "balance below liabilities");
+        // While redeemers are short of ETH (owed + reserve > free) nothing is spendable at all.
+        uint256 idle = vault.idleEth();
+        if (idle != 0) assertLe(idle + liab + _owed() + vault.getParams().reserve, bal, "spendable reaches owed ETH");
+        ++guardChecks;
     }
 
     function _deposit(address who, uint256 amt) internal {

@@ -595,3 +595,21 @@ same day); anyone may still call any step.
 **Evidence:** `test_buildAboveCeilingPaidAtCeilingPrice` (built at 6 gwei with a 5 gwei ceiling,
 pay = gas x 5 gwei x 1.10 exactly); VaultFlow `gas_spike` (build and checkpoint at 2 gwei, both
 paid at 0.5 gwei x 1.10). PackVault 22,171 bytes.
+
+## D52. Asset-flow outcomes tightened before signature (2026-11-16)
+
+Three DRAFT outcomes checked a weaker fact than they stated; now each measures the claim itself:
+- **O3 (wind-down):** each holder's claim equals their share of the vault's value to the wei
+  (measured gap 0), against an independent calculation from the vault's ETH.
+- **O5 (liabilities):** after every keeper call in every regime the test asserts the balance covers
+  liabilities and spendable ETH is zero or fits under balance less liabilities, owed estimate and
+  reserve; the settled-unclaimed regime reports 0 wei of overlap.
+- **O8 (oracle failure):** after the oracle is repointed the kicked pack is in inventory and a
+  holder redeeming everything is paid 0.9975 ETH of a 1 ETH deposit.
+Also: O2 states the bound, not a position count; O9 (distributions on, not the canary setting)
+is replaced by the zero-demand holder cost, at most 1.5% of deposits (measured 0.46%).
+
+**Found while tightening O3:** a checkpoint prices redemptions before paying its own keeper, so
+that pay (about 0.00005 ETH per checkpoint at 0.2 gwei) falls on the shares that stay, not on
+those leaving or entering. Kept: it is one call's gas, bounded by the ceiling price, and moving
+the payment ahead of pricing would change the checkpoint's accounting for no material gain.

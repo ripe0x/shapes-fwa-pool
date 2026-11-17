@@ -51,7 +51,7 @@
   },
   {
    "id": "O2",
-   "text": "DRAFT. What a keeper earns and the cheapest way to game it: only reimbursed gas plus the 10% premium, capped per position moved (D35), so padding a call earns nothing; the whole 28-position canary build pays at most about 0.0128 ETH.",
+   "text": "DRAFT. What a keeper earns and the cheapest way to game it: only reimbursed gas plus the 10% premium, capped per position moved (D35), so padding a call earns nothing; building and listing a full 2 ETH canary pays keepers at most 0.015 ETH (measured 0.0128 ETH).",
    "metric": "destinations.paid to keepers (gas + premium)",
    "max_wei": "15000000000000000",
    "regimes": [
@@ -60,8 +60,8 @@
   },
   {
    "id": "O3",
-   "text": "DRAFT. How it ends for holders: wind-down returns every holder's NAV share, with no shares left locked.",
-   "metric": "facts.locked_shares_at_end",
+   "text": "DRAFT. How it ends for holders: after wind-down each holder's claim equals their share of the vault's value to the wei (value priced before that checkpoint's keeper pay, which falls on the shares that stay), and no shares are left locked.",
+   "metric": "facts.holder_claim_gap_wei",
    "max": 0,
    "regimes": [
     "wind_down"
@@ -78,12 +78,12 @@
   },
   {
    "id": "O5",
-   "text": "DRAFT. Liabilities are never deployable (D32): settled-but-unclaimed ETH, escrow and the reserves stay out of idle ETH, so keepers can never list or be paid from a holder's owed ETH.",
-   "metric": "facts.claimable_not_deployable_guard",
-   "min": 1,
+   "text": "DRAFT. Liabilities are never deployable (D32): escrowed deposits, redemption and distribution reserves and settled-but-unclaimed ETH never become spendable. Checked after every keeper call in every regime (the test fails otherwise) and measured here with an entitlement settled to claimable: spendable ETH above the unowed balance is 0 wei.",
+   "metric": "facts.spendable_over_unowed_wei",
    "regimes": [
     "settled_unclaimed"
-   ]
+   ],
+   "max": 0
   },
   {
    "id": "O6",
@@ -105,21 +105,20 @@
   },
   {
    "id": "O8",
-   "text": "DRAFT. Oracle failure cannot trap assets (D34): a repointed or broken oracle yields no cap so nothing new lists, yet packs are still recovered to inventory and redemptions proceed.",
-   "metric": "facts.edge_ok_after_repoint",
-   "max": 0,
+   "text": "DRAFT. Oracle failure cannot trap assets (D34): with FWA's floor oracle repointed so no quote can be read, nothing new lists, yet the kicked pack is back in inventory and a holder redeeming everything is paid (measured 0.9975 ETH of a 1 ETH deposit).",
+   "metric": "facts.redemption_paid_after_repoint_wei",
    "regimes": [
     "oracle_change"
-   ]
+   ],
+   "min": 950000000000000000
   },
   {
    "id": "O9",
-   "text": "DRAFT. What a holder gets on gains (distributions on, a stated variation; the canary ships distributions off): 20% of a gain above the high-water mark is paid to live shares, 0.2 ETH of a 1 ETH gain less the first checkpoint's keeper pay.",
-   "metric": "facts.distributed_wei",
-   "min": 190000000000000000,
-   "max": 200000000000000000,
+   "text": "DRAFT. What a holder pays if nothing is ever bought: entering, building, unwinding and exiting with zero acquisitions costs holders at most 1.5% of deposits (measured 0.46%: Shapes mint fees and keeper gas).",
+   "metric": "facts.holder_loss_bps",
+   "max": 150,
    "regimes": [
-    "distributions"
+    "wind_down"
    ]
   },
   {
