@@ -578,3 +578,20 @@ and board-shape regimes.
 **Owner:** "we shouldn't reimburse for the claim and burn calls. just make that public that anyone
 can call whenever they want." Already so since D43: `burnTokens` has no caller check and pays
 nothing. The keeper sends it only with `--burn-tokens`, at the operator's own cost.
+
+## D51. No gas-price refusal; the ceiling only caps reimbursement (owner, 2026-11-16)
+
+**Owner:** on new positions refused above the ceiling: "can't those still go through, just not gas
+reimbursed?" ... "remove it". Supersedes the gas-price revert described in D42.
+**Chose:** `_requireOperating` no longer reverts when `tx.gasprice > gasCeiling` (error `GasPrice`
+removed). `restock` and `list` are accepted at any gas price and, like every paid call, reimbursed
+at `min(tx price, basefee + maxTip, gasCeiling)`; the caller pays the rest. The build's own
+profitability gate (`EdgeGate`) prices gas the same capped way.
+**Effect:** holders' cost per build is capped at the ceiling price, the same as a build at 0.5
+gwei, which the policy already accepts. The keeper still does not build or list above the ceiling
+(D45). The guardian can no longer stop building by lowering the ceiling; `guard(pauseListing)`
+does that. Keeper default `--max-loss-wei 0`: above the ceiling it waits for all work (owner,
+same day); anyone may still call any step.
+**Evidence:** `test_buildAboveCeilingPaidAtCeilingPrice` (built at 6 gwei with a 5 gwei ceiling,
+pay = gas x 5 gwei x 1.10 exactly); VaultFlow `gas_spike` (build and checkpoint at 2 gwei, both
+paid at 0.5 gwei x 1.10). PackVault 22,171 bytes.

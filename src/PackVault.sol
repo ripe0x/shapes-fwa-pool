@@ -202,7 +202,6 @@ contract PackVault is ReentrancyGuard {
     error Paused();
     error WindingDown();
     error EdgeGate();
-    error GasPrice();
     error NotCheckpointWindow();
     error AlreadyCheckpointed();
     error AllocatedExposure();
@@ -796,9 +795,10 @@ contract PackVault is ReentrancyGuard {
         emit KeeperPaid(msg.sender, amount);
     }
 
+    /// @dev No gas-price gate: above `gasCeiling` a call is still accepted, and `_reimburse` pays
+    ///      its gas at the ceiling price; the caller covers the rest (D51).
     function _requireOperating() internal view {
         if (windingDown) revert WindingDown();
-        if (tx.gasprice > params.gasCeiling) revert GasPrice();
     }
 
     // ------------------------------------------------------------------ roles

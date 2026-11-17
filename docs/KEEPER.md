@@ -12,7 +12,7 @@ python3 keeper/keeper.py <vault> --rpc https://mainnet.gateway.tenderly.co
 
 # operate: signs through a cast keystore (cast prompts for its password or reads ETH_PASSWORD)
 python3 keeper/keeper.py <vault> --send --account <keystore> --rpc https://mainnet.gateway.tenderly.co \
-  --loop 300 --confirmations 2 --health-port 8788 --burn-tokens --max-loss-wei 2000000000000000
+  --loop 300 --confirmations 2 --health-port 8788 --burn-tokens
 
 # status, in-flight transaction and keeper P&L from the state file
 python3 keeper/keeper.py <vault> --status
@@ -40,7 +40,7 @@ anvil's public dev keys carry on mainnet) passes the vault's pay on.
 2. Read the vault, FWA and rewards state; `policy.plan` returns the calls worth making, in order.
 3. For the first call: preflight (`eth_estimateGas` from the keeper's address). A vault error that
    means the state moved on (Nothing, TooEarly, NotCheckpointWindow, AlreadyCheckpointed,
-   GasPrice, Paused, WindingDown, AllocatedExposure) is a quiet skip; any other revert is an error.
+   Paused, WindingDown, AllocatedExposure) is a quiet skip; any other revert is an error.
 4. Expected pay = min(estimate, opGasCap) x min(bid, basefee + maxTip, ceiling) x 1.10. Send when
    pay + `--max-loss-wei` covers estimate x bid (always below the ceiling).
 5. Save the pending entry, broadcast at basefee + maxTip (max fee 2 x basefee + maxTip), wait for

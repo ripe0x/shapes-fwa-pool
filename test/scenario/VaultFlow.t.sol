@@ -146,8 +146,8 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
     }
 
     /// @dev Gas spike after deployment: a position is listed at low gas (setup), then the price is
-    ///      lifted above the 0.5 gwei ceiling. New listings refuse (GasPrice); a checkpoint, claims
-    ///      and unlisting still work; keeper pay is capped at the ceiling price.
+    ///      lifted above the 0.5 gwei ceiling. Every call is still accepted (D51): a build and a
+    ///      checkpoint run, each reimbursed at the 0.5 gwei ceiling price, not the spike.
     function test_flow_gas_spike() public {
         _forkPinned();
         _deploy(0.01 ether, _canary());
@@ -162,9 +162,10 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         _kList(keeper, 3);
         // The spike: 2 gwei, four times the ceiling.
         Snap memory a = flowBegin(2 gwei, 1.95 gwei, PINNED);
-        vm.prank(keeper);
-        vm.expectRevert(PackVault.GasPrice.selector);
-        vault.restock(1, 3);
+        uint256 kb0 = keeper.balance;
+        _kRestock(keeper, 1, 3); // accepted above the ceiling (D51); paid at the ceiling price
+        uint256 buildPay = keeper.balance - kb0;
+        assertEq(buildPay % 0.55 gwei, 0, "build reimbursed at 0.5 gwei x 1.10");
         _deposit(bob, 0.5 ether);
         _toBlackout();
         uint256 kb = keeper.balance;
@@ -173,6 +174,7 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         Fact[] memory f = _facts("open_listings", vault.openListings().length);
         f[1] = Fact("gas_price_gwei_x100", 200);
         f[2] = Fact("checkpoint_pay_wei", pay);
+        f[3] = Fact("build_pay_wei", buildPay);
         flowReport("gas_spike", a, f);
     }
 

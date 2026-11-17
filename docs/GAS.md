@@ -13,7 +13,7 @@ Bounds on what a caller can extract:
 - A no-op call pays nothing:
   - every paid call reverts `Nothing` without work;
   - `checkpoint` refuses when no flows or distributions are pending.
-- `restock` and `list` revert above the ceiling.
+- No call is refused for gas price (D51). Above the ceiling every call is paid at the ceiling price and the caller pays the rest.
 - `burnTokens` pays nothing.
 - Splitting work into more calls earns at most the 30,000-gas overhead per call. Worst case is about
   0.015 ETH a year at the ceiling (D41 LOW-3).

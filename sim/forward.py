@@ -38,7 +38,7 @@ SUR, CUT, S_FEE, BID_RATE = 0.05, 0.01, 0.01, 0.90
 ASK, PREMIUM = 0.033, 0.10
 MINT_FEE = 10**15
 DAY = 86_400
-CEILING = 0.5  # gwei: canary gasCeiling; above it the keeper waits and nothing builds or lists
+CEILING = 0.5  # gwei: canary gasCeiling; above it the keeper waits (D45, D51)
 
 
 # ---------------------------------------------------------------- history
@@ -429,7 +429,7 @@ def main():
     md += ["## 1. Formal economic gate (owner's definition)\n",
            f"Gate: 10%/yr net of gas at trailing-30-day volume, tokens at zero, at the {CEILING} gwei gas ceiling (D42); "
            "bid outcome positive at the ceiling; a usable exit window each day. 0.15 gwei is spot at the pinned block. "
-           "Above the ceiling nothing builds or lists and the keeper waits.\n",
+           "Above the ceiling the keeper waits; calls are still accepted, paid at the ceiling price (D51).\n",
            "| gas | net per bid cycle (mETH) | closed form, 100 positions | forward sim mean, 100 positions | passes 10%? |",
            "|---|---|---|---|---|"]
     gate = {}

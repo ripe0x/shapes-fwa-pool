@@ -201,10 +201,10 @@ Answered 2026-11-16 (sections 8, 9): canary approved; no gas stop rule; tokens b
 public; gate at the 0.5 gwei ceiling. Open:
 1. **Guardian and admin addresses** (one address may hold both, D44).
 2. **Sign `asset-flow.json`** (10 DRAFT outcomes, all OK in 16 regimes; hash
-   `3e04f791afa1d96fa2736270b7fe6ae470e0319e7648189a05999d54df213c04`; signing commands in
+   `0a0900c44b0b48597a16ced1aef789d1f216ec78f2bcfcbafe5a25a105d9d1a3`; signing commands in
    `~/.agents/guidance/asset-flow-kit/README.md`). Until signed the gate reports INCOMPLETE.
-3. **Keeper loss allowance** for liability work above the ceiling: recommended
-   `--max-loss-wei 2000000000000000` (0.002 ETH per call; the rehearsal's whole spike cost 0.00078 ETH).
+3. ~~Keeper loss allowance~~: answered: the keeper stops above the ceiling (`--max-loss-wei 0`, the
+   default); holders or anyone may still call any step, reimbursed at the ceiling price (D51).
 4. Sign off section B2 of `OWNER-REQUIREMENTS.md`.
 
 ## 8. Owner decisions applied (2026-11-16)
@@ -263,3 +263,15 @@ keeper sleeps (no real acquisition at the pinned rehearsal block).
 role address(es) and signs the outcomes. No open defect. The economic case is unchanged: modest at
 current activity (about +20% a year at 100 positions, 16% chance of a losing year), dependent on
 gas staying under the ceiling.
+
+## 10. Gas-price refusal removed (D51, 2026-11-16)
+
+Owner decision: no call is refused for gas price; the ceiling only caps reimbursement. `restock`
+and `list` now run at any gas price, paid at the 0.5 gwei ceiling price with the caller paying the
+rest. The keeper still waits above the ceiling (`--max-loss-wei 0`). PackVault 22,171 bytes.
+Verified after the change: 41 fork tests (new `test_buildAboveCeilingPaidAtCeilingPrice`: a
+one-pack build at 2 gwei paid exactly gas x 0.5 gwei x 1.10), `sim/reconcile.py` exact, 16
+asset-flow regimes with no mismatch (gate INCOMPLETE only for the signature; outcome hash
+`0a0900c4...d9d1a3`), canary rehearsal unchanged (29 positions, ledger gap 0, keeper books equal
+the chain). The DRAFT outcome tightening proposed in chat (O3, O5, O8 checks, O2 count, O9 as
+information, a zero-demand holder cost bound) is not done yet.

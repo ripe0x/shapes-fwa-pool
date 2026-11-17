@@ -53,19 +53,34 @@ contract ReentrantHolder {
 }
 
 contract ForkVaultAdversarialTest is ForkBase {
-    function test_gasPriceAboveCeilingBlocksSpending() public {
+    /// D51: above the gas ceiling a build is accepted and reimbursed at the ceiling price only; the
+    ///      caller pays the rest. The guardian lowers the ceiling to the canary's 0.5 gwei (at 5 gwei
+    ///      a build fails its own payback gate). Exact pay: (gas measured + 30k) x 0.5 gwei x 1.10.
+    function test_buildAboveCeilingPaidAtCeilingPrice() public {
         vm.prank(alice);
         vault.deposit{value: 1 ether}();
         toBlackout();
         checkpoint();
         toOpen();
-        vm.txGasPrice(6 gwei); // ceiling is 5 gwei
+        vm.prank(guardian);
+        vault.lowerCaps(100 ether, 150, 0.5 gwei);
+        vm.fee(1.9 gwei);
+        vm.txGasPrice(2 gwei); // four times the ceiling; basefee + maxTip is above it too
+        uint256 idle0 = vault.idlePacks().length;
+        uint256 kb = keeper.balance;
+        vm.recordLogs();
         vm.prank(keeper);
-        vm.expectRevert(PackVault.GasPrice.selector);
         vault.restock(1, 3);
+        assertEq(vault.idlePacks().length, idle0 + 1, "built above the ceiling");
+        uint256 pay = keeper.balance - kb;
+        assertGt(pay, 0);
+        assertEq(pay % 0.55 gwei, 0, "priced at 0.5 gwei x 1.10 per gas, a whole number of gas units");
+        uint256 gasPaid = pay / 0.55 gwei;
+        // One pack from no loose Shapes: a whole 0.1 ETH mint split into ten, then packed (~2.77M).
+        assertGt(gasPaid, 2_000_000);
+        assertLt(gasPaid, 3_200_000);
+        vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
-        vm.prank(keeper);
-        vault.restock(1, 3);
     }
 
     function test_forcedEthAccruesToHolders_firstDepositorCannotInflate() public {

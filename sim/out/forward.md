@@ -7,7 +7,7 @@ Vault: 3-unit packs (P = 0.03 ETH) at the 0.0363 cap; k = 1.0385; keeper premium
 
 ## 1. Formal economic gate (owner's definition)
 
-Gate: 10%/yr net of gas at trailing-30-day volume, tokens at zero, at the 0.5 gwei gas ceiling (D42); bid outcome positive at the ceiling; a usable exit window each day. 0.15 gwei is spot at the pinned block. Above the ceiling nothing builds or lists and the keeper waits.
+Gate: 10%/yr net of gas at trailing-30-day volume, tokens at zero, at the 0.5 gwei gas ceiling (D42); bid outcome positive at the ceiling; a usable exit window each day. 0.15 gwei is spot at the pinned block. Above the ceiling the keeper waits; calls are still accepted, paid at the ceiling price (D51).
 
 | gas | net per bid cycle (mETH) | closed form, 100 positions | forward sim mean, 100 positions | passes 10%? |
 |---|---|---|---|---|

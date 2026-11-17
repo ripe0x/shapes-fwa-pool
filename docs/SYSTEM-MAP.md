@@ -64,5 +64,5 @@ bucket: it leaves `_free` after a call does necessary work or realizes more than
 - Backing on a bid never returns (the vault keeps the pack instead); the 1% FWA settlement fee on keep/silent never
   returns.
 - A staged relist earns nothing until activated; FWA's activation is permissionless, so it never sticks (D36).
-- Unlisting, sync, checkpoints, claims and `burnTokens` stay callable by anyone even above the gas ceiling or when
-  the oracle is broken (D34); only `restock`/`list` gate on the ceiling and the edge.
+- Every call stays callable by anyone above the gas ceiling, reimbursed at the ceiling price (D51); unlisting, sync,
+  checkpoints, claims and `burnTokens` also when the oracle is broken (D34). `restock`/`list` gate on the edge only.
