@@ -211,7 +211,7 @@ def main():
     oracle = call(FWA, "floorOracle()(address)")
     owner = call(oracle, "owner()(address)")
     impersonate(owner)
-    send(owner, oracle, "setFloor(address,uint256)", PACKS, 3 * 10**16)
+    send(owner, oracle, "setFloor(address,uint256)", PACKS, 25 * 10**15)  # cap 0.0275 < posted backing (D62 floor 0.0303)
     warp_to(42360)
     impersonate(KICKER)
     send(KICKER, FWA, "kickListing(uint256)", listed[0])

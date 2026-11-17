@@ -13,6 +13,7 @@ wind-down. Everything else (new packs, relists, fee harvests, activation, deposi
 burns) waits for gas to fall. Whether a keeper accepts the loss on liability work above the
 ceiling is the executor's choice (keeper.py --max-loss-wei), not the vault's.
 """
+import math
 from dataclasses import dataclass, field
 
 BPS = 10_000
@@ -116,6 +117,30 @@ def pay_v1(s, gas, units=0, essential=False):
     ceiling) plus the work fee per unit, no markup. The live keeper reads pay by simulating the
     call instead, so it follows whatever policy is active."""
     return min(gas * price(s, essential) + units * s.work_fee, quote(s, gas, units, essential))
+
+def edge_backing(k, cap, s_bps, units, gas_ceiling, markup_bps, work_fee, spread=0, buffer_bps=0, min_edge_bps=100,
+                 discount_bps=9_000, price=None, mint_fee=10**15):
+    """Mirror of VaultLib.edge (D62): backing for a new listing, 0 when it must not list. `cap` is
+    FWA's oracle cap (None when FWA exempts the collection, 0 when no quote); `price` the quoted
+    price now (default: the ceiling)."""
+    value = units * UNIT
+    floor = max(-(-value * BPS // (BPS - s_bps)), -(-value * BPS // discount_bps))
+    backing = max(floor, spread)
+    if k > 10**18:
+        a = k - 10**18
+        cyc = Q["synced"] + Q["listed"] + Q["harvested"]
+        c = cyc * gas_ceiling * (BPS + markup_bps) // BPS + 2 * work_fee
+        backing = max(backing, (c + math.isqrt(c * c + a * c // 10**18 * value)) * 10**18 // a)
+        pr = gas_ceiling if price is None else price
+        q = lambda g, u: g * pr * (BPS + markup_bps) // BPS + u * work_fee  # noqa: E731
+        build = q(Q["pack"] + Q["mint"] * units // 10 + Q["listed"], 2) + mint_fee * units // 10
+        backing = max(backing, -(-(build + q(cyc, 2)) * 10**18 // a))
+    if cap is not None:
+        backing = min(backing, cap * (BPS - buffer_bps) // BPS)
+    ok = cap != 0 and k >= 10**18 + min_edge_bps * 10**14 and k > s_bps * 10**14 and backing >= floor \
+        and backing * (k - s_bps * 10**14) >= value * 10**18
+    return backing if ok else 0
+
 
 def cycle_net(s):
     """PackVault._cycleNet: a bid cycle's edge after the keeper pay it causes."""

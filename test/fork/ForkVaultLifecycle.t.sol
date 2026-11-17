@@ -109,21 +109,24 @@ contract ForkVaultLifecycleTest is ForkBase {
     function test_kickReturnsFullBackingAndPack() public {
         _depositAndPrice(alice, 1 ether);
         uint256[] memory ids = _listN(2);
-        // FWA's oracle owner lowers the ask: 0.030 x 1.10 = 0.033 < 0.0363 posted backing.
+        (,, uint128 posted) = vault.positions(ids[0]);
+        // FWA's oracle owner lowers the ask: 0.030 x 1.10 = 0.033 < the posted backing (D62 floor
+        // 0.0333 or more).
+        assertGt(posted, 0.033 ether);
         setPackAsk(0.03 ether);
         toBlackout();
         uint256 before = address(vault).balance;
         IFwaAdmin(address(FWA)).kickListing(ids[0]);
-        assertEq(address(vault).balance - before, B, "kick returns full backing");
+        assertEq(address(vault).balance - before, posted, "kick returns full backing");
         (,,,,,,,,,, uint8 status) = FWA.listings(ids[0]);
         assertEq(status, LISTING_WITHDRAWN);
         vault.sync(ids, 0);
         assertEq(vault.openListings().length, 1);
         assertEq(vault.idlePacks().length, 1);
-        // New cap 0.033 still clears the keep gate B (k - s) >= P: 0.033 x 1.0285 > 0.03.
+        // New cap 0.033 is below the floor at which a purchaser takes the bid (P / 0.9): no relist.
         (, uint256 backing, bool ok) = vault.edge(3);
-        assertTrue(ok);
-        assertEq(backing, 0.033 ether);
+        assertFalse(ok);
+        assertEq(backing, 0);
     }
 
     /// D56: pay is the quote for completed work. Padding a sync with 399 ids the vault never held

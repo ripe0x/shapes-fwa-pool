@@ -19,7 +19,7 @@ proposed outcomes in `OWNER-REQUIREMENTS.md` section B2; economics in `sim/out/f
   successful acquisitions and real settlement, keeper timing, cash and staging, the same 30 days
   give +169% annualized, matching the closed form (+166%) at the true volume (D38, D39).
 - **Returns at current activity:** 100 positions, last 14 days' activity (71 a day), 0.15 gwei:
-  mean +18.7% a year, 22% chance of a losing year (95% interval 19 to 27%), with quoted keeper
+  mean +20.3% a year, 17% chance of a losing year (95% interval 13 to 21%), with quoted keeper
   pay and request charges (D56).
 - **Keeper pay is a fixed quote paid through a replaceable policy contract (D56, D57).** Caller
   gas and tip change nothing; budgets cap all pay at 0.041 ETH a day at canary values. Two High
@@ -406,3 +406,14 @@ busy, waits up to 4.7 h). Gate at trailing-30-day volume, 100 positions, 400 run
 **0.5 gwei ceiling +76.6% mean (p5 -13.0%), was +78.5%; 0.15 gwei +107.5% (p5 +8.0%).** The gate
 (10%) passes. At last-14-day activity: +18.7% mean, 22% chance of a losing year (was +20.3%, 20%);
 at the 0.5 gwei ceiling +12.0%, 31%. With 1.0 gwei from day 30: +2.4%, 41%. Closed form unchanged.
+
+## 19. Backing rule and oracle exemption (D62, 2026-11-17)
+
+FWA made ShapePacks oracle-exempt; the vault would have listed nothing on mainnet (found by the
+current-block rehearsal). Backing is now computed by the vault: floor max(P / 0.9, P / 0.99) =
+0.0333 ETH so purchasers take the bid and packs keep cycling; raised so one cycle repays a build at
+today's price (0.0360 ETH at 0.5 gwei); gas-optimal above ~1 gwei; spare capital spread when the
+position count binds; FWA's oracle cap only when not exempt. Forward simulation, 100 positions,
+400 runs: gate window at 0.5 gwei **+76.8%** (p5 -12.0%); last 14 days **+20.3%, 17% chance of a
+losing year** (was +18.7%, 22%); 1.0 gwei from day 30 +6.1%, 22% (was +2.4%, 41%). 98 tests;
+reconciler exact; rehearsals at the pinned and the current block list 30 positions, ledgers exact.

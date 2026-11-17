@@ -787,3 +787,33 @@ lowered: 300 positions at full volume could need about 0.02 ETH a day of routine
 **Evidence:** `test_requestChargeTopsUpOnce`, `test_cancelKeepsPoolForOtherFlows`,
 `test_essentialCeilingPaysExitsInSpikes`, `test_cancelCyclesRetainNothing`; 95 fork, audit and
 scenario tests; reconciler exact; rehearsal closes to the wei; invariant campaign 64 x 64.
+
+## D62. Backing rule: floor, gas-optimal, spare capital; oracle exemption (owner, 2026-11-17)
+
+**Context:** FWA's owner made ShapePacks oracle-exempt (no floor cap, no kicks). PackVault read
+exemption as "no price" and would have listed nothing on mainnet (found by the current-block
+rehearsal, launch step D). FWA's minimum backing is 0.025 ETH (owner-set; the source default is
+0.01).
+**Analysis:** FWA splits each fee evenly across listings and selects by 1/B, so a position's
+profit per acquisition, (k - 1)/W, does not depend on its backing; capital per position is B + P.
+Backing only matters through capital (lower is better), gas per cycle (fewer cycles is better)
+and idle capital when the position count, not capital, binds. Mixed pack sizes never help:
+larger packs only add capital.
+**Chose (owner: "do your rec. don't add the list argument"):** the vault computes backing at
+listing, no new argument, as the largest of:
+- the floor max(P / d, P / (1 - s)), d = FWA's bid payout rate (90%): a purchaser then prefers
+  the bid to keeping a pack worth P, so packs keep cycling (a keep forces a rebuild), and a keep
+  never loses. 0.0333 ETH for a 3-unit pack;
+- build repayment (build + cycle cost) / (k - 1) at today's quoted price, so one bid cycle repays
+  a new pack (the approved build gate) as gas rises: 0.0360 ETH at 0.5 gwei;
+- the gas-optimal (c + sqrt(c^2 + a c P)) / a at the routine ceiling (binds above ~1 gwei);
+- spare capital spread over open slots when the position count binds;
+capped at FWA's oracle cap less the buffer unless the collection is exempt. 3-unit packs.
+**Corrected the same day:** the first version used only P / (1 - s) = 0.0303; the forward model
+then built nothing at 0.5 gwei, and at 0.0303 a rational purchaser keeps the pack (0.9 x 0.0303
+< 0.03), so every cycle would need a rebuild. Lower backing also sits below most oracle cuts, so
+listings are rarely kickable.
+**Evidence:** `test/fork/ForkBacking.t.sol` (exempt lists at the floor; spread when count binds;
+oracle cap when not exempt; gas-optimal above the floor at a 1 gwei ceiling); 98 fork, audit and
+scenario tests; reconciler exact; pinned rehearsal; current-block rehearsal lists 30 positions,
+ledger exact.

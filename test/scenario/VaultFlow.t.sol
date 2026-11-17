@@ -519,8 +519,8 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _kList(keeper, 3);
         // The spike: 2 gwei, four times the ceiling.
         Snap memory a = flowBegin(2 gwei, 1.95 gwei, PINNED);
-        // No gas-price refusal (D51). The gate prices the build at the ceiling (D56); at the canary
-        // envelope (no markup) one pack repays it, so the build runs and pay stops at 0.5 gwei.
+        // No gas-price refusal (D51). The gate prices the build at the 0.5 gwei ceiling (D56); backing
+        // rises with the price so one bid cycle still repays the build (D62), and pay stops at 0.5 gwei.
         uint256 paid0 = keeperPaidCum;
         _kRestock(keeper, 1, 3);
         uint256 buildPay = keeperPaidCum - paid0;
@@ -552,7 +552,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _toOpen();
         _kRestock(keeper, 3, 3);
         uint256[] memory ids = _idsOf(_kList(keeper, 3));
-        _setPackAsk(0.03 ether); // cap 0.033 < 0.0363 posted: FWA may kick
+        _setPackAsk(0.025 ether); // cap 0.0275 < 0.0303 posted (D62 floor): FWA may kick
         _toBlackout();
         uint256 vb = address(vault).balance;
         IFwaAdmin(address(FWA)).kickListing(ids[0]);

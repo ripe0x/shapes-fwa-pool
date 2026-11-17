@@ -241,8 +241,24 @@ contract PackVault is ReentrancyGuard {
 
     /// @notice Live economics from FWA. `backing` is what a new listing would post; zero when the
     ///         gate fails for a pack of `units` x 0.01 ETH.
+    /// @dev Spare capital per open slot (listed idle packs plus packs still to build) once every
+    ///      slot to build has its Shapes, mint fee share and one mint of rounding: what each
+    ///      position's backing can be when the position cap, not capital, binds (D62).
+    function _spread(uint256 units) internal view returns (uint256) {
+        uint256 idle = _idlePacks.length;
+        uint256 used = _open.length + idle;
+        uint256 room = params.maxPositions > used ? params.maxPositions - used : 0;
+        if (idle + room == 0) return 0;
+        uint256 fee = shapes.mintFee();
+        uint256 build = room == 0 ? 0 : room * (units * UNIT + fee * units / SHAPES_PER_MINT) + 0.1 ether + fee;
+        uint256 a = _idle();
+        return a > build ? (a - build) / (idle + room) : 0;
+    }
+
     function edge(uint256 units) public view returns (uint256, uint256, bool) {
-        return VaultLib.edge(params, fwa, address(packs), units);
+        uint256 build = VaultLib.quote(params, VaultLib.Q_PACK + VaultLib.Q_MINT * units / SHAPES_PER_MINT + VaultLib.Q_LISTED, 2, false)
+            + shapes.mintFee() * units / SHAPES_PER_MINT;
+        return VaultLib.edge(params, fwa, address(packs), units, _spread(units), build);
     }
 
     /// @dev Expected net of one bid-outcome cycle after the full keeper pay it causes (resolve,

@@ -289,7 +289,19 @@ library VaultLib {
 
     /// @notice Live edge for a pack of `units` x 0.01 ETH: k, the backing a new listing would post
     ///         (cap less the buffer, zero when the gate fails) and whether the gate passes.
-    function edge(Params storage p, IFWAV2 f, address packs, uint256 units)
+    /// @notice Backing for a new listing and whether to list (D62). Every position earns the same
+    ///         per acquisition whatever its backing (FWA splits fees evenly and selects by 1/B), so
+    ///         backing only moves capital per position and gas per cycle:
+    ///         - floor: P / d, so a purchaser prefers FWA's bid payout d x B to keeping a pack worth P
+    ///           and the pack keeps cycling (a keep forces a rebuild), and P / (1 - s), so a keep
+    ///           never loses;
+    ///         - `build`: enough that one bid cycle repays building a pack at today's price (the
+    ///           build gate), so new packs stay possible as gas rises;
+    ///         - gas-optimal (c + sqrt(c^2 + a c P)) / a, with a = k - 1 and c a cycle's pay at the
+    ///           routine ceiling: above the floor only when gas is high;
+    ///         - `spread`: spare capital per open slot when the position count, not capital, binds;
+    ///         capped at FWA's oracle cap less the buffer unless FWA exempts the collection.
+    function edge(Params storage p, IFWAV2 f, address packs, uint256 units, uint256 spread, uint256 build)
         public
         view
         returns (uint256 k1e18, uint256 backing, bool ok)
@@ -297,13 +309,23 @@ library VaultLib {
         uint256 cap;
         uint256 s;
         (k1e18, cap, s) = economics(f, packs);
-        backing = cap * (BPS - p.bufferBps) / BPS;
-        // Keep outcome must not lose: B (k - s) >= P. Bid outcome is B (k - 1) > 0 given k >= 1 +
-        // edge; spending callers also require it to clear the keeper pay it causes (cycleNet).
-        ok = cap != 0 && k1e18 >= 1e18 + uint256(p.minEdgeBps) * 1e14 && k1e18 > s * 1e14
-            && backing * (k1e18 - s * 1e14) >= units * UNIT * 1e18;
+        uint256 value = units * UNIT;
+        uint256 floor = M.max(M.divUp(value * BPS, BPS - s), M.divUp(value * BPS, f.settlementDiscountBps()));
+        backing = M.max(floor, spread);
+        if (k1e18 > 1e18) {
+            uint256 a = k1e18 - 1e18;
+            uint256 c = (Q_SYNCED + Q_LISTED + Q_HARVESTED) * p.gasCeiling * (BPS + p.payMarkupBps) / BPS + 2 * p.workFee;
+            backing = M.max(backing, (c + M.sqrt(c * c + a * c / 1e18 * value)) * 1e18 / a);
+            backing = M.max(backing, M.divUp((build + quote(p, Q_SYNCED + Q_LISTED + Q_HARVESTED, 2, false)) * 1e18, a));
+        }
+        if (cap != type(uint256).max) backing = M.min(backing, cap * (BPS - p.bufferBps) / BPS);
+        // Bid outcome B (k - 1) > 0 given k >= 1 + edge; spending callers also require it to clear
+        // the keeper pay it causes (cycleNet). Keep outcome B (k - s) >= P holds from the floor.
+        ok = cap != 0 && k1e18 >= 1e18 + uint256(p.minEdgeBps) * 1e14 && k1e18 > s * 1e14 && backing >= floor
+            && backing * (k1e18 - s * 1e14) >= value * 1e18;
         if (!ok) backing = 0;
     }
+
 
     /// @notice Revert before the work when `minPay` already exceeds what could be paid.
     function precheck(Params storage p, Budget storage b, uint256 minPay, bool essential, uint256 free)
@@ -398,7 +420,9 @@ library VaultLib {
         uint256 ev = f.weightedBackingTotal() / w;
         uint256 oneSur = f.acquisitionFee() * 1e18 / ev; // 1e18 x (1 + surcharge), floors
         k1e18 = oneSur * (BPS - f.ownerAcquisitionFeeBps()) / BPS * (BPS - f.topListingShareBps()) / BPS;
-        if (!f.canDeposit(packs) || f.oracleExemptCollections(packs)) return (k1e18, 0, s);
+        if (!f.canDeposit(packs)) return (k1e18, 0, s);
+        // FWA exempts the collection from its floor cap: no cap applies (D62).
+        if (f.oracleExemptCollections(packs)) return (k1e18, type(uint256).max, s);
         // The oracle ask plus premium when the quote passes FWA's own validity rules.
         // A failing or malformed oracle means no cap (nothing new lists); it must not block
         // unlisting, wind-down or redemptions. FWA's owner can repoint the oracle to any contract,

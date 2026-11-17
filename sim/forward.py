@@ -250,11 +250,14 @@ def run(sc, n_target, seed, days=365):
                     ask = val
                     cap = int(ask * (1 + PREMIUM) * E)
                     for i, p in list(v.positions.items()):
-                        if p.status == ACTIVE and p.backing > cap:
+                        if not sc.get("exempt", True) and p.status == ACTIVE and p.backing > cap:
                             v.kicked(i)  # anyone may kick it in the next blackout
         cap = int(ask * (1 + PREMIUM) * E)
         k = int(k_of(crown) * E)
-        backing = cap if (k >= E + 100 * 10**14 and cap * (k - S_FEE * 1e4 * 10**14) >= P * E) else 0
+        # D62: ShapePacks is oracle-exempt on FWA (no cap) unless the scenario says otherwise.
+        backing = policy.edge_backing(k, None if sc.get("exempt", True) else cap, int(S_FEE * 1e4), 3,
+                                      int(CEILING * GWEI), 0, WORK_FEE,
+                                      price=min(gas + 5 * 10**7, int(CEILING * GWEI)), mint_fee=MINT_FEE)
 
         # Purchasers resolve yesterday's allocations: bid unless they keep (vault prefers keep).
         for i, d0 in list(allocated_day.items()):
