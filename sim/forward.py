@@ -40,6 +40,7 @@ MINT_FEE = 10**15
 DAY = 86_400
 WORK_FEE = 2 * 10**13  # wei per unit of work, canary value (D55)
 CEILING = 0.5  # gwei: canary gasCeiling; above it the keeper waits (D45, D51)
+ESSENTIAL_CEILING = 2.0  # gwei: canary essentialCeiling (redemption and wind-down work)
 
 
 # ---------------------------------------------------------------- history
@@ -154,12 +155,13 @@ class Scenario(dict):
     elasticity; checkpoint miss rate; holder flows."""
 
 
-def charge_state(gas, open_positions):
+def charge_state(gas, open_positions, pool=0):
     """Minimal policy state for the request charges at `gas` wei basefee (canary parameters)."""
     return policy.State(now=0, gas_price=gas, base_fee=gas, gas_ceiling=int(CEILING * GWEI), max_tip=5 * 10**7,
                         markup_bps=0, share_bps=2_500, k=0, backing=0, min_edge_bps=100, mint_fee=MINT_FEE,
                         settlement_window=0, blackout=False, queue_drained=True, checkpoint_done_this_interval=False,
-                        open_positions=open_positions, work_fee=WORK_FEE)
+                        open_positions=open_positions, work_fee=WORK_FEE,
+                        essential_ceiling=int(ESSENTIAL_CEILING * GWEI), processing_pool=pool)
 
 
 def run(sc, n_target, seed, days=365):
@@ -271,7 +273,8 @@ def run(sc, n_target, seed, days=365):
                 loose_shapes=v.loose_shapes, free=v.free(), idle_eth=v.idle(), owed_estimate=v.owed_estimate(),
                 pending_deposits=v.pending_total, locked_shares=v.locked_shares, fee_credit=credit,
                 open_positions=len(v.positions), max_positions=300, recent_volume=recent, work_fee=WORK_FEE,
-                slowdown_volume=sc.get("slowdown", 0.0))
+                slowdown_volume=sc.get("slowdown", 0.0), essential_ceiling=int(ESSENTIAL_CEILING * GWEI),
+                processing_pool=v.processing_pool)
             planned = policy.plan(st)
             if step == 1:
                 step = 2
@@ -349,7 +352,7 @@ def run(sc, n_target, seed, days=365):
         for (day, frac) in sc.get("redeem", []):
             if day == d:
                 sh = v.share_balance("h") * frac // 1
-                st1 = charge_state(gas, len(v.positions))
+                st1 = charge_state(gas, len(v.positions), v.processing_pool)
                 ck = policy.request_charge(st1)
                 unwind = (sh * v.last_nav // v.total_shares) * policy.unwind_charge(st1) // policy.POSITION_VALUE
                 v.request_redeem("h", sh, ck, unwind)

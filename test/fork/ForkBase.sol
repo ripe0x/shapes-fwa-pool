@@ -77,6 +77,7 @@ abstract contract ForkBase is Test {
         p.allocatedBoundBps = 200;
         p.packUnitsMask = uint64(1) << 3;
         p.gasCeiling = 5 gwei;
+        p.essentialCeiling = 5 gwei;
         p.maxPositions = 150;
         p.reserve = 0.05 ether;
         p.tvlCap = 100 ether;
@@ -89,7 +90,7 @@ abstract contract ForkBase is Test {
     /// @dev Owner sets caps and pay limits (everything else unchanged); the tip follows a lower ceiling.
     function lowerTo(uint128 tvl, uint96 maxPos, uint64 ceiling, uint64 fee) internal {
         VaultLib.Params memory q = vault.getParams();
-        (q.tvlCap, q.maxPositions, q.gasCeiling, q.workFee) = (tvl, maxPos, ceiling, fee);
+        (q.tvlCap, q.maxPositions, q.gasCeiling, q.essentialCeiling, q.workFee) = (tvl, maxPos, ceiling, ceiling, fee);
         if (q.maxTip > ceiling) q.maxTip = ceiling;
         vm.prank(owner);
         vault.setParams(q);

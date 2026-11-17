@@ -111,15 +111,17 @@ contract ForkKeeperPayTest is ForkBase {
         assertEq(vault.processingPool(), 0);
 
         toOpen();
-        uint256 ck2 = vault.requestCharge();
-        _deposit(attacker, 0.01 ether);
+        uint256 b = attacker.balance;
+        uint256 gross = _deposit(attacker, 0.01 ether);
         vm.prank(attacker);
         vault.cancelDeposit();
+        assertEq(attacker.balance, b + gross, "deposit and charge refunded in full");
+        assertGt(gross, 0.01 ether);
         toBlackout();
         vm.prank(attacker);
         vm.expectRevert(PackVault.Nothing.selector);
         vault.checkpoint(0);
-        assertEq(vault.processingPool(), ck2, "the cancelled request's charge stays");
+        assertEq(vault.processingPool(), 0, "a cancelled request leaves no paid work and no charge");
     }
 
     /// 7: a tiny redemption pays its checkpoint charge: the checkpoint it triggers pays back at
@@ -153,6 +155,7 @@ contract ForkKeeperPayTest is ForkBase {
         p.payMarkupBps = 1_000;
         p.workFee = uint64(vault.MAX_WORK_FEE());
         p.gasCeiling = 50 gwei;
+        p.essentialCeiling = 50 gwei;
         p.maxTip = 0.05 gwei;
         vm.prank(owner);
         vault.setParams(p);
@@ -352,5 +355,71 @@ contract ForkKeeperPayTest is ForkBase {
         vm.revertToState(snap);
         vm.prank(keeper);
         assertEq(vault.list(1, quote), quote);
+    }
+
+    /// Requests in one interval share one checkpoint: the first tops the pool up to one
+    /// checkpoint's cost, later ones pay nothing; the checkpoint pays its measured-gas quote.
+    function test_requestChargeTopsUpOnce() public {
+        uint256 full = vault.requestCharge();
+        assertEq(full % 1 gwei, 0, "whole gwei");
+        // 225k base, no positions, at basefee 0.15 + tip 0.05, plus one work fee; rounded up.
+        assertEq(full, ((225_000 * PRICE + vault.getParams().workFee) + 1 gwei - 1) / 1 gwei * 1 gwei);
+        _deposit(alice, 1 ether);
+        assertEq(vault.processingPool(), full);
+        assertEq(vault.requestCharge(), 0, "pool already funded");
+        uint256 b = bob.balance;
+        vm.prank(bob);
+        vault.deposit{value: 1 ether}();
+        (uint96 amount,,, uint32 ckGwei) = vault.pendingDeposits(bob);
+        assertEq(amount, 1 ether, "no checkpoint charge taken");
+        assertEq(ckGwei, 0);
+        assertEq(b - bob.balance, 1 ether);
+        toBlackout();
+        vm.prank(keeper);
+        uint256 pay = vault.checkpoint(0);
+        assertEq(pay, 225_000 * PRICE + vault.getParams().workFee, "measured-gas quote");
+        assertEq(vault.processingPool(), 0);
+    }
+
+    /// A cancel refunds its checkpoint charge only beyond what other waiting flows still need.
+    function test_cancelKeepsPoolForOtherFlows() public {
+        uint256 ckA = vault.requestCharge();
+        uint256 grossA = _deposit(alice, 1 ether);
+        vm.prank(bob);
+        vault.deposit{value: 1 ether}(); // pays no checkpoint charge
+        uint256 a0 = alice.balance;
+        vm.prank(alice);
+        vault.cancelDeposit();
+        assertEq(alice.balance - a0, grossA - ckA, "escrow back; charge kept for bob's checkpoint");
+        assertEq(vault.processingPool(), ckA);
+        uint256 b0 = bob.balance;
+        vm.prank(bob);
+        vault.cancelDeposit();
+        assertEq(bob.balance - b0, 1 ether, "bob paid no charge, gets none");
+        assertEq(vault.processingPool(), ckA, "alice's charge stays: she cancelled while bob waited");
+    }
+
+    /// Redemption and wind-down work is paid up to the essential ceiling; routine work stops at
+    /// the routine ceiling. Canary: 0.5 and 2 gwei.
+    function test_essentialCeilingPaysExitsInSpikes() public {
+        VaultLib.Params memory p = vault.getParams();
+        (p.gasCeiling, p.essentialCeiling, p.payMarkupBps) = (0.5 gwei, 2 gwei, 0);
+        vm.prank(owner);
+        vault.setParams(p);
+        _priced(alice, 1 ether);
+        _restock(4);
+        vm.fee(1 gwei);
+        vm.txGasPrice(1.05 gwei);
+        vm.prank(keeper);
+        uint256 listPay = vault.list(2, 0);
+        assertEq(listPay, (255_000 + 2 * 530_000) * 0.5 gwei + 2 * p.workFee, "routine: capped at 0.5 gwei");
+        vm.prank(owner);
+        vault.startWindDown();
+        uint256[] memory ids = vault.openListings();
+        vm.prank(keeper);
+        uint256 unlistPay = vault.unlist(ids, 0);
+        assertEq(unlistPay, (240_000 + 2 * 170_000) * 1.05 gwei + 2 * p.workFee, "essential: basefee + tip under 2 gwei");
+        vm.fee(0.15 gwei);
+        vm.txGasPrice(0.2 gwei);
     }
 }

@@ -22,6 +22,7 @@ contract Deploy is Script {
         p.allocatedBoundBps = uint16(vm.parseJsonUint(v, ".allocatedBoundBps"));
         p.packUnitsMask = uint64(vm.parseJsonUint(v, ".packUnitsMask"));
         p.gasCeiling = uint64(vm.parseJsonUint(v, ".gasCeilingWei"));
+        p.essentialCeiling = uint64(vm.parseJsonUint(v, ".essentialCeilingWei"));
         p.maxTip = uint64(vm.parseJsonUint(v, ".maxTipWei"));
         p.workFee = uint64(vm.parseJsonUint(v, ".workFeeWei"));
         p.maxPositions = uint96(vm.parseJsonUint(v, ".maxPositions"));

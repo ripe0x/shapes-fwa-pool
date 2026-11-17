@@ -10,6 +10,7 @@ contract AuditOwnerExtraction is ForkBase {
         p.tvlCap = 2 ether;
         p.maxPositions = 30;
         p.gasCeiling = 0.5 gwei;
+        p.essentialCeiling = 0.5 gwei;
         p.maxTip = 0.05 gwei;
         p.workFee = 0.00002 ether;
         p.payMarkupBps = 0;
@@ -36,6 +37,7 @@ contract AuditOwnerExtraction is ForkBase {
         p = vault.getParams();
         p.minEdgeBps = 1_000; // legal value makes unlisting permissionless
         p.gasCeiling = 50 gwei;
+        p.essentialCeiling = 50 gwei;
         p.maxTip = 50 gwei;
         p.workFee = 0.00005 ether;
         p.payMarkupBps = 1_000;

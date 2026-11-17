@@ -32,6 +32,7 @@ contract AuditRoleAndKeeperTest is ForkBase {
         VaultLib.Params memory p = defaultParams();
         p.payMarkupBps = 1_000; // MAX_PAY_MARKUP_BPS
         p.gasCeiling = 50 gwei;
+        p.essentialCeiling = 50 gwei;
         p.maxTip = 50 gwei;
         p.workFee = uint64(vault.MAX_WORK_FEE());
         vm.prank(owner);

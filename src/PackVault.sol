@@ -123,8 +123,9 @@ contract PackVault is ReentrancyGuard {
     struct PendingDeposit {
         // uint96 holds 7.9e10 ETH, more than exists, so neither field can truncate.
         uint96 amount; // escrowed, deployment charge included
-        uint64 epoch; // priced at the checkpoint that ends this epoch
+        uint32 epoch; // priced at the checkpoint that ends this epoch
         uint96 charge; // deployment charge: escrowed with the deposit, earns no shares
+        uint32 checkpointGwei; // checkpoint charge paid, in gwei (at most ~0.51 ETH at the maxima)
     }
 
     mapping(address => PendingDeposit) public pendingDeposits;
@@ -474,7 +475,8 @@ contract PackVault is ReentrancyGuard {
         PendingDeposit storage d = pendingDeposits[msg.sender];
         d.amount += uint96(amount);
         d.charge += uint96(charge);
-        d.epoch = uint64(epoch);
+        d.epoch = uint32(epoch);
+        d.checkpointGwei += uint32(ck / 1 gwei);
         pendingDepositTotal += amount;
         pendingChargeTotal += charge;
         emit Deposited(msg.sender, amount, epoch);
@@ -488,8 +490,12 @@ contract PackVault is ReentrancyGuard {
         delete pendingDeposits[msg.sender];
         pendingDepositTotal -= amount;
         pendingChargeTotal -= d.charge;
-        msg.sender.forceSafeTransferETH(amount);
-        emit DepositCancelled(msg.sender, amount);
+        // Refund the checkpoint charge, keeping the pool funded for any flows still waiting.
+        uint256 keep = pendingDepositTotal != 0 || lockedShares != 0 ? VaultLib.requestCharge(params, _open.length) : 0;
+        uint256 back = M.min(uint256(d.checkpointGwei) * 1 gwei, processingPool > keep ? processingPool - keep : 0);
+        processingPool -= back;
+        msg.sender.forceSafeTransferETH(amount + back);
+        emit DepositCancelled(msg.sender, amount + back);
     }
 
     /// @notice Lock shares for redemption. Filled pro rata at checkpoints as ETH frees up; the
@@ -735,10 +741,13 @@ contract PackVault is ReentrancyGuard {
 
     // ------------------------------------------------------------------ keeper pay
 
-    /// @notice What a deposit or redemption request is charged: one checkpoint at its quote now
-    ///         (at cost plus one work unit). It funds the checkpoint that settles the request.
+    /// @notice What a deposit or redemption request is charged now: what tops `processingPool` up
+    ///         to one checkpoint at its quote (cost plus one work unit), rounded up to whole gwei;
+    ///         0 when the pool already holds it. Requests in one interval share one checkpoint.
     function requestCharge() public view returns (uint256) {
-        return VaultLib.requestCharge(params, _open.length);
+        uint256 full = VaultLib.requestCharge(params, _open.length);
+        uint256 topUp = full > processingPool ? full - processingPool : 0;
+        return (topUp + 1 gwei - 1) / 1 gwei * 1 gwei;
     }
 
     /// @notice Deployment charge per VaultLib.POSITION_VALUE deposited: building and listing one position at

@@ -103,6 +103,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         p.allocatedBoundBps = 1_000;
         p.packUnitsMask = uint64(8); // bit 3 set: 3-unit packs
         p.gasCeiling = 0.5 gwei;
+        p.essentialCeiling = 2 gwei; // canary: redemption work paid up to 2 gwei
         p.maxTip = 0.05 gwei;
         p.workFee = 0.00002 ether;
         p.maxPositions = 30;

@@ -41,7 +41,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         uint256 ck = vault.requestCharge();
         vm.prank(alice);
         vault.deposit{value: ck + 2 ether}();
-        (,, uint96 charge) = vault.pendingDeposits(alice);
+        (,, uint96 charge,) = vault.pendingDeposits(alice);
         toBlackout();
         checkpoint();
         toOpen();
@@ -261,16 +261,16 @@ contract ForkVaultLifecycleTest is ForkBase {
     }
 
     function test_cancelDepositBeforePricing() public {
-        {
-            uint256 gross_ = Charges.grossFor(vault, 1 ether);
-            vm.prank(alice);
-            vault.deposit{value: gross_}();
-        }
+        uint256 gross_ = Charges.grossFor(vault, 1 ether);
+        vm.prank(alice);
+        vault.deposit{value: gross_}();
         uint256 before = alice.balance;
         vm.prank(alice);
         vault.cancelDeposit();
-        assertEq(alice.balance - before, 1 ether);
+        // Escrow and checkpoint charge both come back: no other flow needs the pool.
+        assertEq(alice.balance - before, gross_);
         assertEq(vault.pendingDepositTotal(), 0);
+        assertEq(vault.processingPool(), 0);
     }
 
     function test_proRataRedemptionAcrossCheckpoints() public {

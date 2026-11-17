@@ -186,23 +186,28 @@ class Vault:
     def deposit(self, h, amount, ck=0, charge=0):
         """`amount` escrowed (deployment `charge` included), `ck` to the processing pool."""
         self._settle_holder(h)
-        d = self.pending.setdefault(h, [0, 0, 0])
+        d = self.pending.setdefault(h, [0, 0, 0, 0])
         d[0] += amount
         d[1] = self.epoch
         d[2] += charge
+        d[3] += ck // 10**9
         self.pending_total += amount
         self.pending_charge_total += charge
         self.processing_pool += ck
         self.balance += amount + ck
 
-    def cancel(self, h):
+    def cancel(self, h, keep=0):
+        """`keep`: one checkpoint's cost when other flows still wait (VaultLib.requestCharge)."""
         self._settle_holder(h)
-        d = self.pending.pop(h, [0, 0, 0])
+        d = self.pending.pop(h, [0, 0, 0, 0])
         amount = d[0]
         self.pending_total -= amount
         self.pending_charge_total -= d[2]
-        self.balance -= amount
-        return amount
+        keep = keep if self.pending_total or self.locked_shares else 0
+        back = min(d[3] * 10**9, self.processing_pool - keep if self.processing_pool > keep else 0)
+        self.processing_pool -= back
+        self.balance -= amount + back
+        return amount + back
 
     def request_redeem(self, h, amount, ck=0, unwind=0):
         """Charges paid in ETH: `ck` to the processing pool, `unwind` to the vault."""

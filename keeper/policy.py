@@ -90,17 +90,21 @@ class State:
     essential_budget: int = 10**30
     distribution_due: bool = False  # a no-flow checkpoint would distribute now (simulated)
     pack_units_mask: int = 8  # PackVault packUnitsMask; this keeper builds 3-unit packs only
+    essential_ceiling: int = None  # redemption and wind-down work; None = same as gas_ceiling
+    processing_pool: int = 0  # request charges already held for the next checkpoint
 
 
-def price(s):
-    """The price the vault quotes at: basefee + maxTip, capped at the ceiling (never the bid)."""
-    return min(s.base_fee + s.max_tip, s.gas_ceiling)
+def price(s, essential=False):
+    """The price the vault quotes at: basefee + maxTip, capped at the routine or the essential
+    ceiling (never the bid)."""
+    ceiling = s.essential_ceiling if essential and s.essential_ceiling is not None else s.gas_ceiling
+    return min(s.base_fee + s.max_tip, ceiling)
 
 
 def quote(s, gas, units=0, essential=False):
     """VaultLib.quote, the vault's envelope: quoted gas at the price, markup on routine work, plus
     work fees. Gates and charges use it; pay never exceeds it."""
-    q = gas * price(s)
+    q = gas * price(s, essential)
     if not essential:
         q = q * (BPS + s.markup_bps) // BPS
     return q + units * s.work_fee
@@ -111,7 +115,7 @@ def pay_v1(s, gas, units=0, essential=False):
     """What KeeperPolicyV1 offers, capped by the envelope: quoted gas at min(basefee + maxTip,
     ceiling) plus the work fee per unit, no markup. The live keeper reads pay by simulating the
     call instead, so it follows whatever policy is active."""
-    return min(gas * price(s) + units * s.work_fee, quote(s, gas, units, essential))
+    return min(gas * price(s, essential) + units * s.work_fee, quote(s, gas, units, essential))
 
 def cycle_net(s):
     """PackVault._cycleNet: a bid cycle's edge after the keeper pay it causes."""
@@ -127,9 +131,15 @@ def build_cost(s):
     return quote(s, Q["pack"] + Q["mint"] * 3 // 10 + Q["listed"], 2) + s.mint_fee * 3 // 10
 
 
-def request_charge(s):
-    """PackVault.requestCharge: one checkpoint at cost plus one work unit."""
+def checkpoint_cost(s):
+    """VaultLib.requestCharge: one checkpoint at cost plus one work unit."""
     return quote(s, Q["checkpoint"] + Q["checkpoint_pos"] * s.open_positions, 1, True)
+
+
+def request_charge(s):
+    """PackVault.requestCharge: what tops the processing pool up to one checkpoint, whole gwei."""
+    top = max(0, checkpoint_cost(s) - s.processing_pool)
+    return -(-top // 10**9) * 10**9
 
 
 def deploy_charge(s):

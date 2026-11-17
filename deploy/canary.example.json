@@ -12,6 +12,7 @@
  "allocatedBoundBps": 1000,
  "packUnitsMask": 8,
  "gasCeilingWei": 500000000,
+ "essentialCeilingWei": 2000000000,
  "maxTipWei": 50000000,
  "workFeeWei": 20000000000000,
  "maxPositions": 30,

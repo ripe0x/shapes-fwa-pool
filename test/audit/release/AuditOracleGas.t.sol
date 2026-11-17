@@ -35,6 +35,7 @@ contract AuditOracleGas is ForkBase {
         p.tvlCap = 2 ether;
         p.maxPositions = 30;
         p.gasCeiling = 0.5 gwei;
+        p.essentialCeiling = 0.5 gwei;
         p.payMarkupBps = 0;
         p.reserve = 0.005 ether;
         vm.prank(owner);
@@ -76,6 +77,7 @@ contract AuditOracleGas is ForkBase {
         p.tvlCap = 2 ether;
         p.maxPositions = 30;
         p.gasCeiling = 0.5 gwei;
+        p.essentialCeiling = 0.5 gwei;
         p.payMarkupBps = 0;
         p.reserve = 0.005 ether;
         vm.prank(owner);

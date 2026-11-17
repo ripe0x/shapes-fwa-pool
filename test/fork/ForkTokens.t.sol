@@ -45,6 +45,7 @@ contract ForkTokensTest is Test {
         p.allocatedBoundBps = 200;
         p.packUnitsMask = uint64(1) << 3;
         p.gasCeiling = 0.5 gwei;
+        p.essentialCeiling = 0.5 gwei;
         p.maxPositions = 150;
         p.tvlCap = 100 ether;
         p.routineCap = 0.3 ether; // bytecode maxima: these suites test mechanics, not budgets

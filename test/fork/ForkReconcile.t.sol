@@ -102,8 +102,8 @@ contract ForkReconcileTest is SelectionBase {
         vm.deal(bob, 0.5 ether + ckB);
         vm.prank(bob);
         vault.deposit{value: 0.5 ether + ckB}();
-        (,, uint96 chA) = vault.pendingDeposits(alice);
-        (,, uint96 chB) = vault.pendingDeposits(bob);
+        (,, uint96 chA,) = vault.pendingDeposits(alice);
+        (,, uint96 chB,) = vault.pendingDeposits(bob);
         vm.writeLine(
             OUT,
             string.concat(

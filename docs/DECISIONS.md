@@ -764,3 +764,26 @@ Pack sizes above 30 units are out of bounds (E11). The oracle read cannot revert
 call's gas (S1).
 **Open, owner's call:** E7 (return gate unvalidated until the forward model handles FWA staging),
 E8 (owner-compromise bound and raisable TVL cap), E9 (outcome signature).
+
+## D61. Checkpoint quote, essential ceiling, shared checkpoint charge (owner, 2026-11-17)
+
+**Owner:** "yes approved. do your recs."
+**Chose:**
+- Checkpoint quoted at measured billed gas: 225,000 + 33,000 per position (was 180,000 + 32,000).
+  One checkpoint per interval cannot be split, so the split-proof discount does not apply.
+- `essentialCeiling` (canary 2 gwei, bytecode max 50 gwei): essential work (redemption and
+  wind-down: unlist, liquidate, checkpoints with redemptions, syncs during them) is priced at
+  `min(basefee + maxTip, essentialCeiling)`; routine work stays at `gasCeiling`. Paid only from
+  the essential budget, so worst-case spend is unchanged.
+- `requestCharge()` tops `processingPool` up to one checkpoint's cost (whole gwei); later
+  requests in the interval pay 0. A cancel refunds its charge beyond what still-waiting flows
+  need. `PendingDeposit` stores the charge as `uint32` gwei (max ~4.29 ETH; a checkpoint at the
+  maxima costs ~0.51 ETH).
+**E8 accepted (owner):** a compromised owner can take at most the budgets' balance plus refill
+at the bytecode maxima (canary: 0.055 ETH the first day, 0.015 ETH a day after); raising
+`tvlCap` exposes more holders to bad settings but does not raise that rate. Mitigation is
+operational: the owner key is a multisig or hardware wallet. Bytecode budget maxima are not
+lowered: 300 positions at full volume could need about 0.02 ETH a day of routine pay.
+**Evidence:** `test_requestChargeTopsUpOnce`, `test_cancelKeepsPoolForOtherFlows`,
+`test_essentialCeilingPaysExitsInSpikes`, `test_cancelCyclesRetainNothing`; 95 fork, audit and
+scenario tests; reconciler exact; rehearsal closes to the wei; invariant campaign 64 x 64.

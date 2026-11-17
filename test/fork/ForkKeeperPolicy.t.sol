@@ -245,6 +245,7 @@ contract ForkKeeperPolicyTest is ForkBase {
     function test_largeDepositChargeNotTruncated() public {
         VaultLib.Params memory p = defaultParams();
         p.gasCeiling = 50 gwei;
+        p.essentialCeiling = 50 gwei;
         p.maxTip = 50 gwei;
         p.tvlCap = 1_000 ether;
         vm.fee(50 gwei);
@@ -254,7 +255,7 @@ contract ForkKeeperPolicyTest is ForkBase {
         vm.deal(alice, gross);
         vm.prank(alice);
         v.deposit{value: gross}();
-        (uint96 amount,, uint96 charge) = v.pendingDeposits(alice);
+        (uint96 amount,, uint96 charge,) = v.pendingDeposits(alice);
         uint256 deploy = v.deployCharge();
         assertEq(charge, uint256(amount) * deploy / (VaultLib.POSITION_VALUE + deploy), "charge stored whole");
         assertGt(charge, type(uint64).max, "above the old uint64 width");
@@ -262,7 +263,7 @@ contract ForkKeeperPolicyTest is ForkBase {
         vm.prank(alice);
         v.cancelDeposit();
         assertEq(v.pendingDepositTotal(), 0);
-        assertEq(alice.balance, amount, "full escrow refunded");
+        assertEq(alice.balance, gross, "escrow and checkpoint charge refunded");
         vm.revertToState(snap);
         toBlackout();
         vm.prank(keeper);

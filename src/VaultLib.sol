@@ -29,7 +29,8 @@ library VaultLib {
         uint16 keeperShareBps; // optional calls are paid only if pay <= this share of value realized
         uint16 allocatedBoundBps; // checkpoint skips when Allocated value exceeds this share of NAV
         uint64 packUnitsMask; // bit u set: packs of u x 0.01 ETH may be built and listed
-        uint64 gasCeiling; // wei per gas
+        uint64 gasCeiling; // wei per gas, routine work
+        uint64 essentialCeiling; // wei per gas, redemption and wind-down work (essential budget)
         uint64 maxTip; // reimbursed price is at most basefee + this
         uint64 workFee; // flat wei per unit of work done: position listed, resolved, activated,
         //                 unlisted, item liquidated, or a checkpoint that priced flows
@@ -67,8 +68,9 @@ library VaultLib {
     /// Quoted gas schedule: a base per call plus a marginal amount per completed unit, from billed
     /// gas on real receipts (keeper/measure_gas.py, docs/GAS.md). Each base sits at most at the
     /// measured fixed cost of a call divided by 1.1, so splitting a job never earns a second base.
-    uint256 internal constant Q_CHECKPOINT = 180_000;
-    uint256 internal constant Q_CHECKPOINT_POS = 32_000; // per open position valued
+    // One checkpoint per interval cannot be split, so it is quoted at measured billed gas.
+    uint256 internal constant Q_CHECKPOINT = 225_000;
+    uint256 internal constant Q_CHECKPOINT_POS = 33_000; // per open position valued
     uint256 internal constant Q_RESTOCK = 280_000;
     uint256 internal constant Q_PACK = 200_000; // createPack
     uint256 internal constant Q_MINT = 2_200_000; // one 0.1 ETH mint split ten ways (2.10M-2.26M by block)
@@ -197,7 +199,7 @@ library VaultLib {
     /// @notice The vault's envelope for work: quoted gas at basefee + maxTip, capped at the
     ///         ceiling, markup on routine work, plus work fees. The most this work may ever pay.
     function quote(Params storage p, uint256 gasQ, uint256 units, bool essential) public view returns (uint256 q) {
-        q = gasQ * M.min(block.basefee + p.maxTip, p.gasCeiling);
+        q = gasQ * M.min(block.basefee + p.maxTip, essential ? p.essentialCeiling : p.gasCeiling);
         if (!essential) q = q * (BPS + p.payMarkupBps) / BPS;
         q += units * p.workFee;
     }
@@ -230,7 +232,8 @@ library VaultLib {
         uint256 free
     ) external returns (uint256 amount) {
         (uint256 r, uint256 e) = budgetNow(p, b);
-        uint256 o = offer(policy, op, units, gasQ, essential, p.gasCeiling, p.maxTip, p.workFee);
+        uint256 o =
+            offer(policy, op, units, gasQ, essential, essential ? p.essentialCeiling : p.gasCeiling, p.maxTip, p.workFee);
         amount = M.min(M.min(o, M.min(quote(p, gasQ, units, essential), cap)), M.min(free, essential ? e : r));
         if (amount < minPay) revert Payment();
         (b.routine, b.essential, b.at) =
@@ -249,7 +252,7 @@ library VaultLib {
             p.minEdgeBps > MAX_MIN_EDGE_BPS || p.bufferBps > MAX_BUFFER_BPS || p.distributionBps > MAX_DISTRIBUTION_BPS
                 || p.payMarkupBps > MAX_PAY_MARKUP_BPS || p.workFee > MAX_WORK_FEE || p.keeperShareBps > MAX_KEEPER_SHARE_BPS
                 || p.allocatedBoundBps > MAX_ALLOCATED_BOUND_BPS
-                || p.gasCeiling > MAX_GAS_CEILING || p.maxTip > p.gasCeiling || p.maxPositions > MAX_POSITIONS
+                || p.gasCeiling > MAX_GAS_CEILING || p.essentialCeiling > MAX_GAS_CEILING || p.maxTip > p.gasCeiling || p.maxPositions > MAX_POSITIONS
                 || p.routineCap > MAX_ROUTINE_CAP || p.routineRate > MAX_ROUTINE_RATE || p.essentialCap > MAX_ESSENTIAL_CAP
                 || p.essentialRate > MAX_ESSENTIAL_RATE
                 || p.packUnitsMask >> (MAX_PACK_UNITS + 1) != 0 || p.packUnitsMask & ((1 << MIN_PACK_UNITS) - 1) != 0

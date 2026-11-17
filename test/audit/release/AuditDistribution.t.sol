@@ -16,6 +16,7 @@ contract AuditDistribution is ForkBase {
         p.tvlCap = 2 ether;
         p.maxPositions = 30;
         p.gasCeiling = 0.5 gwei;
+        p.essentialCeiling = 0.5 gwei;
         p.payMarkupBps = 0;
         p.distributionBps = 5_000;
         vm.prank(owner);

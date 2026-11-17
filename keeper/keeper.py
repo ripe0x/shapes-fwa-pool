@@ -32,7 +32,7 @@ import tx as txm  # noqa: E402
 RPC = "https://mainnet.gateway.tenderly.co"
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 SHAPES = "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0"
-PARAMS_T = "(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint96,uint128,uint128)"
+PARAMS_T = "(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint96,uint128,uint128)"
 LISTING_T = "(address,address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint64,uint8)"
 
 
@@ -73,7 +73,7 @@ def read_tokens(vault, active_ids):
 
 def read_state(vault, slowdown, burn=False):
     p = [num(x) for x in call(vault, f"getParams()({PARAMS_T})").strip("()").split(", ")]
-    (min_edge, _buf, dist_bps, premium, share, _alloc, mask, ceiling, tip, wfee, _rc, _rr, _ec, _er, max_pos, res,
+    (min_edge, _buf, dist_bps, premium, share, _alloc, mask, ceiling, ess_ceiling, tip, wfee, _rc, _rr, _ec, _er, max_pos, res,
      _tvl) = p
     rbud, ebud = lines(call(vault, "budget()(uint256,uint256)"))
     k, backing, _ok = lines(call(vault, "edge(uint256)(uint256,uint256,bool)", 3))
@@ -127,6 +127,7 @@ def read_state(vault, slowdown, burn=False):
         loose_shapes=num(call(vault, "looseShapeCount()(uint256)")),
         free=max(0, balance - reserves), idle_eth=num(call(vault, "idleEth()(uint256)")), owed_estimate=owed,
         pending_deposits=pending, locked_shares=locked, distribution_due=due, pack_units_mask=mask,
+        essential_ceiling=ess_ceiling, processing_pool=num(call(vault, "processingPool()(uint256)")),
         fee_credit=num(call(FWA, "feeCredit(address)(uint256)", vault)),
         open_positions=len(listings), max_positions=max_pos,
         winding_down=call(vault, "windingDown()(bool)") == "true",
