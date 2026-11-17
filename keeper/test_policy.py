@@ -78,6 +78,33 @@ def main():
     assert status(state(backing=0, listings=act, open_positions=10))[0][0] == "QUOTE_UNAVAILABLE"
     assert ("EDGE_GATE_FAILED", "action") in {(c, k) for c, k, _ in status(state(k=E, listings=act))}
     assert status(state(listings=act, open_positions=10, free=E, idle_eth=0))[0][0] == "OK"
+    # Audit E5: 100 staged listings activate in batches that fit one transaction.
+    many = [Listing(1000 + i, STAGED) for i in range(100)]
+    acts = [st for st in plan(state(listings=many, open_positions=100, free=E)) if st[0] == "activate"]
+    assert len(acts) == 5 and all(len(st[1]) == 20 and st[2] == 20 for st in acts), acts
+    assert sorted(i for st in acts for i in st[1]) == [l.id for l in many]
+
+    # Audit E2: a due distribution schedules a checkpoint with no holder flows; not above the ceiling.
+    assert "checkpoint" in fns(plan(state(distribution_due=True, listings=act, open_positions=10)))
+    assert "checkpoint" not in fns(plan(state(listings=act, open_positions=10)))
+    assert "checkpoint" not in fns(plan(state(distribution_due=True, listings=act, open_positions=10, **spike)))
+
+    # Audit E11: a mask without 3-unit packs builds nothing (this keeper builds 3-unit packs only).
+    build = dict(listings=act, open_positions=10, idle_eth=E, free=E, loose_shapes=0)
+    assert "restock" in fns(plan(state(**build)))
+    assert "restock" not in fns(plan(state(pack_units_mask=1 << 4, **build)))
+
+    # Audit E6: above the ceiling, a redemption checkpoint is preceded by syncing expired allocations.
+    expired = [Listing(5, ALLOCATED, allocated_at=10**6 - 7200)]
+    got = fns(plan(state(listings=expired, locked_shares=10**18, owed_estimate=10**15, free=E, open_positions=1, **spike)))
+    assert got.index("sync") < got.index("checkpoint"), got
+    # Audit E4: with processingPool subtracted, the auditor's fork balances show the real
+    # 0.000624 ETH shortfall and the keeper releases liquidity before the checkpoint.
+    s = state(markup_bps=0, listings=[Listing(1, ACTIVE)], loose_shapes=7, free=873_337_920_659_858_602,
+              owed_estimate=873_961_920_659_858_594, locked_shares=86_597_063_493_129_589, idle_eth=0,
+              open_positions=1, work_fee=20_000_000_000_000)
+    got = fns(plan(s))
+    assert "liquidate" in got and got.index("liquidate") < got.index("checkpoint"), got
     print("keeper/test_policy.py: pass")
 
 

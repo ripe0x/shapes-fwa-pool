@@ -24,7 +24,7 @@ python3 keeper/keeper.py <vault> --status
 | `--confirmations` | 1 | blocks before a receipt counts; use 2+ on mainnet |
 | `--replace-after` / `--max-replacements` | 3 / 5 | same-nonce replacement at +25% fees |
 | `--max-fee-gwei` | none | never bid a max fee above this |
-| `--max-loss-wei` | 0 | loss accepted per call; only matters above the vault's gas ceiling |
+| `--max-loss-wei` | 0 | expected loss accepted per call, judged at the signed fees. Not an absolute bound: a state change between the final check and inclusion can still revert a sent call and cost its gas |
 | `--burn-tokens` | off | claim and burn FWA token rewards; unpaid, the operator pays |
 | `--pending-timeout` | 120 s | how long a pass waits for a receipt before leaving it for the next pass |
 | `--health-port` | off | `GET /health` on 127.0.0.1: 200 healthy, 503 stale or errors in the last pass |
@@ -45,7 +45,10 @@ anvil's public dev keys carry on mainnet) passes the vault's pay on.
    policy and the vault's caps give), so a policy swap needs no keeper change. Execution cost is
    the estimate x the billed/estimate ratio calibrated from the keeper's own receipts, at the bid.
    Send when pay + `--max-loss-wei` covers that cost; `minPay` is 80% of the simulated pay, and a
-   replacement re-quotes before re-bidding. `--status` and `/health` show the active policy and
+   replacement re-quotes before re-bidding. Pay is simulated, and the final call (minPay included)
+   re-estimated, with the fee fields the keeper signs, so a policy that prices on `tx.gasprice`
+   is seen as it will act (audit E1). Activation goes in batches of 20; a distribution-only
+   checkpoint is planned when simulating it succeeds. `--status` and `/health` show the active policy and
    any queued replacement.
 5. Save the pending entry, broadcast at basefee + maxTip (max fee 2 x basefee + maxTip), wait for
    the receipt, count it, re-read the chain, repeat.

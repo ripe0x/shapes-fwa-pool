@@ -27,7 +27,7 @@ Q = dict(checkpoint=180_000, checkpoint_pos=32_000, restock=280_000, pack=200_00
          harvest=80_000, harvested=15_000)
 POSITION_VALUE = 663 * 10**14  # 0.0663 ETH: what request charges are scaled by
 CYCLE_GAS = Q["synced"] + Q["listed"] + Q["harvested"]  # a bid cycle's quoted gas (gates)
-MAX_BATCH = dict(sync=20, harvest=60, list=10, restock=10, unlist=20, liquidate=40)
+MAX_BATCH = dict(sync=20, harvest=60, list=10, restock=10, unlist=20, liquidate=40, activate=20)  # activate: ~264k gas each (audit E5)
 
 
 @dataclass
@@ -88,6 +88,8 @@ class State:
     work_fee: int = 0  # flat wei per unit of work (D55)
     routine_budget: int = 10**30  # keeper budgets available now (PackVault.budget())
     essential_budget: int = 10**30
+    distribution_due: bool = False  # a no-flow checkpoint would distribute now (simulated)
+    pack_units_mask: int = 8  # PackVault packUnitsMask; this keeper builds 3-unit packs only
 
 
 def price(s):
@@ -156,7 +158,9 @@ def plan(s):
            or (l.status == ALLOCATED and s.now >= l.allocated_at + s.settlement_window)]
     active = [l for l in s.listings if l.status == ACTIVE]
     shortfall = max(0, s.owed_estimate - s.free - s.pending_deposits)
-    if not spike or s.winding_down or shortfall:  # above the ceiling, only when ETH is owed
+    # Above the ceiling, only when ETH is owed or a redemption checkpoint needs expired
+    # allocations resolved first (the vault refuses to price them unsynced).
+    if not spike or s.winding_down or shortfall or s.locked_shares:
         for i in range(0, len(due), MAX_BATCH["sync"]):
             out.append(("sync", due[i:i + MAX_BATCH["sync"]]))
 
@@ -198,11 +202,13 @@ def plan(s):
     #     activated; activation needs the queue drained.
     staged = sorted(l.id for l in s.listings if l.status == STAGED)
     if staged and s.queue_drained and not spike:
-        out.append(("activate", staged, 200))
+        n = MAX_BATCH["activate"]  # one call must fit EIP-7825 (audit E5)
+        for i in range(0, len(staged), n):
+            out.append(("activate", staged[i:i + n], n))
 
     # 4. Checkpoint in FWA's blackout with its queue drained, only when holders have flows.
     if (s.blackout and s.queue_drained and not s.checkpoint_done_this_interval
-            and (s.locked_shares or (s.pending_deposits and not spike))):
+            and (s.locked_shares or (s.pending_deposits and not spike) or (s.distribution_due and not spike))):
         out.append(("checkpoint",))
 
     # 5. Tokens (zero in NAV, never sold): claim and burn when the operator opts in.
@@ -227,7 +233,7 @@ def plan(s):
             out.append(("list", n))
             idle -= n * s.backing
             room -= n
-    elif s.recent_volume >= s.slowdown_volume:
+    elif s.recent_volume >= s.slowdown_volume and (s.pack_units_mask >> 3) & 1:
         build = build_cost(s)
         n = 0  # largest batch the vault's capital check accepts: whole 0.1 mints plus backing
         for c in range(min(room, MAX_BATCH["restock"]), 0, -1):

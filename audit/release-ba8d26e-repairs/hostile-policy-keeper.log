@@ -1,0 +1,11 @@
+vault 0xedaa92f049d3daaaafea4668ba61b18f012a4583
+policy 0xDab551661dE7965f8217f3C4B64583e7Ef289254
+keeper exit 0
+policy 0xDab551661dE7965f8217f3C4B64583e7Ef289254 v1
+gas 0.140 gwei, 0 open, 0 idle packs, idle 0.0050 ETH, cycle net 1.143 mETH, 7d volume 96/day
+status OK [ok] operating normally
+skip checkpoint: pay 0 wei < cost ~33494765016960 wei beyond --max-loss-wei 0
+
+
+counted []
+keeper sent nothing; gas lost 0 wei

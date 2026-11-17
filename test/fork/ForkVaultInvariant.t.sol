@@ -163,12 +163,13 @@ contract ForkVaultInvariantTest is ForkBase {
         }
         // Paid in: seed, pre-existing dust, holder deposits net of cancels and claims, donations.
         // Tracked as: assets + mint fees == seed + preexisting + net holder inflow + donations.
-        uint256 netIn = 0.01 ether + preexisting + handler.donated();
+        // Signed: a holder can end above the 50 ETH start when the vault gains (audit V1).
+        int256 netIn = int256(0.01 ether + preexisting + handler.donated());
         address[3] memory a = [alice, bob, carol];
         for (uint256 i; i < a.length; ++i) {
-            netIn += 50 ether - a[i].balance; // holder balances only move through the vault
+            netIn += int256(50 ether) - int256(a[i].balance); // holder balances only move through the vault
         }
         uint256 keeperPay = keeper.balance - 1 ether; // the keeper's balance moves only by vault pay
-        assertEq(assets + handler.mintFeesPaid() + keeperPay, netIn, "every wei is held, a mint fee or keeper pay");
+        assertEq(int256(assets + handler.mintFeesPaid() + keeperPay), netIn, "every wei is held, a mint fee or keeper pay");
     }
 }

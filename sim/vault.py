@@ -7,6 +7,7 @@ take (fees, backing, mint fees, keeper pay). The ledger splits every wei into in
 amounts owed to holders (escrow, redemption and distribution reserves) and expenses (keeper gas
 pay, Shapes mint fees, backing lost to purchasers, FWA settlement fees).
 """
+import copy
 from dataclasses import dataclass, field
 
 E = 10**18
@@ -35,6 +36,7 @@ class Position:
     status: int = ACTIVE
     pending_fees: int = 0  # FWA pendingFees for an active listing
     pack_owned: bool = False  # settled or withdrawn: pack held or owed to the vault
+    expired: bool = False  # allocated and past FWA's settlement window (sync can resolve it)
 
 
 @dataclass
@@ -266,6 +268,7 @@ class Vault:
     # ------------------------------------------------------------ checkpoint
     def nav_positions(self):
         nav = alloc = 0
+        expired = False
         for p in self.positions.values():
             value = p.units * UNIT
             if p.status == ACTIVE:
@@ -273,12 +276,13 @@ class Vault:
             elif p.status == STAGED:
                 nav += value + p.backing
             elif p.status == ALLOCATED:
+                expired = expired or p.expired
                 floor = min(value, p.backing * (BPS - self.settlement_fee_bps) // BPS)
                 nav += floor
                 alloc += floor
             elif p.pack_owned:
                 nav += value
-        return nav, alloc
+        return nav, alloc, expired
 
     def checkpoint(self, credit=0):
         """Mirror of PackVault.checkpoint. `credit` is FWA fee credit harvested inside it.
@@ -286,7 +290,10 @@ class Vault:
         work = self.pending_total != 0 or self.locked_shares != 0
         if not work and not self.distribution_bps:
             raise RuntimeError("Nothing")
-        nav_pos, alloc = self.nav_positions()
+        snap = copy.deepcopy(self.__dict__)  # the contract reverts the whole call
+        nav_pos, alloc, expired = self.nav_positions()
+        if expired:
+            raise RuntimeError("SyncFirst")
         if credit:
             self.receive_fees(credit)
         inventory = self.loose_shapes * UNIT + sum(self.idle_packs) * UNIT
@@ -343,10 +350,13 @@ class Vault:
         self.epoch += 1
         if work:
             self.processing_pool = 0  # keeper pay comes out of it (pay_keeper); the rest is free ETH
+        elif distributed == 0:
+            self.__dict__.update(snap)
+            raise RuntimeError("Nothing")
         return work or distributed != 0
 
     # ------------------------------------------------------------ reporting
     def nav_now(self):
         """NAV as a checkpoint would compute it now (before flows)."""
-        nav_pos, _ = self.nav_positions()
+        nav_pos, _, _ = self.nav_positions()
         return self.free() + nav_pos + self.loose_shapes * UNIT + sum(self.idle_packs) * UNIT

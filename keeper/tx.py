@@ -81,10 +81,10 @@ class TxManager:
 
     # ------------------------------------------------------------------ preflight and send
 
-    def preflight(self, to, args):
+    def preflight(self, to, args, fees=()):
         """Gas estimate from the keeper's address, or (None, reason, expected?)."""
         try:
-            return int(self.cast("estimate", to, *args, "--from", self.sender).split()[0]), "", True
+            return int(self.cast("estimate", to, *args, "--from", self.sender, *fees).split()[0]), "", True
         except subprocess.CalledProcessError as e:
             msg = (e.output or "").strip()
             for sel, name in EXPECTED.items():

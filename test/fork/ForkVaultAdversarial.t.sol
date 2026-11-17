@@ -199,10 +199,12 @@ contract ForkVaultAdversarialTest is ForkBase {
         vm.prank(alice);
         vault.claim();
         assertApproxEqAbs(alice.balance - before, aliceShare, 1e6);
-        // Next checkpoint with no new gain pays nothing more.
+        // Next checkpoint with no new gain distributes nothing: it reverts and leaves the slot free (E3).
         toOpen();
         toBlackout();
-        checkpoint();
+        vm.prank(keeper);
+        vm.expectRevert(PackVault.Nothing.selector);
+        vault.checkpoint(0);
         assertApproxEqAbs(vault.distributionReserve(), distributed - (alice.balance - before), 1);
         // Nothing strands: after alice claims, only rounding dust remains reserved.
         assertLe(vault.distributionReserve(), 1e6);

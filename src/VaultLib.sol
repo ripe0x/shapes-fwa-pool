@@ -60,7 +60,7 @@ library VaultLib {
     uint256 internal constant MAX_ROUTINE_RATE = 0.01 ether;
     uint256 internal constant MAX_ESSENTIAL_CAP = 0.1 ether;
     uint256 internal constant MAX_ESSENTIAL_RATE = 0.005 ether;
-    uint256 internal constant MAX_PACK_UNITS = 63; // highest bit of the uint64 mask
+    uint256 internal constant MAX_PACK_UNITS = 30; // a first build from empty inventory fits EIP-7825 (audit E11)
     uint256 internal constant MIN_PACK_UNITS = 3;
     uint256 internal constant SHAPES_PER_MINT = 10;
 
@@ -102,19 +102,23 @@ library VaultLib {
     function valueOpen(IFWAV2 f, IShapePacks packs, mapping(uint256 => Position) storage positions, uint256[] storage open)
         external
         view
-        returns (uint256 nav, uint256 allocated)
+        returns (uint256 nav, uint256 allocated, bool expired)
     {
         uint256 s = f.ownerSettlementFeeBps();
+        uint256 window = f.settlementWindow();
         for (uint256 i; i < open.length; ++i) {
             uint256 id = open[i];
             Position memory pos = positions[id];
-            (,,,,,,,,,, uint8 status) = f.listings(id);
+            (,,,,,,,,, uint64 allocatedAt, uint8 status) = f.listings(id);
             uint256 value = pos.units * UNIT;
             if (status == LISTING_ACTIVE) {
                 nav += value + pos.backing + f.pendingFees(id);
             } else if (status == LISTING_STAGED) {
                 nav += value + pos.backing;
             } else if (status == LISTING_ALLOCATED) {
+                // Past the window the vault can resolve it with sync (the purchaser may still act
+                // first, so the value is not certain); pricing waits for that (audit E6).
+                if (block.timestamp >= allocatedAt + window) expired = true;
                 uint256 floorValue = value < pos.backing * (BPS - s) / BPS ? value : pos.backing * (BPS - s) / BPS;
                 nav += floorValue;
                 allocated += floorValue;
@@ -144,6 +148,7 @@ library VaultLib {
 
     /// Gas a keeper policy's quote may use: enough for arithmetic and reads, not for griefing.
     uint256 internal constant POLICY_GAS = 50_000;
+    uint256 internal constant ORACLE_GAS = 100_000; // floor oracle read; FWA's own oracle uses far less
 
     /// @notice The active keeper policy's proposed pay for verified work, from a bounded-gas
     ///         staticcall. A revert, out-of-gas or short answer is zero; only the first word of
@@ -395,11 +400,25 @@ library VaultLib {
         // A failing or malformed oracle means no cap (nothing new lists); it must not block
         // unlisting, wind-down or redemptions. FWA's owner can repoint the oracle to any contract,
         // so the read is a raw staticcall: a revert or short return data both mean "no cap".
-        (bool ok, bytes memory ret) =
-            f.floorOracle().staticcall(abi.encodeCall(IFloorOracle.getFloorRange, (packs)));
-        if (!ok || ret.length < 128) return (k1e18, 0, s);
-        (uint256 bid, uint256 ask, uint48 observedAt, uint48 periodUsed) =
-            abi.decode(ret, (uint256, uint256, uint48, uint48));
+        // Bounded gas and a manual four-word read: a gas-burning oracle or one returning words that
+        // do not fit their types (which would make abi.decode revert) also means "no cap" (audit S1).
+        address o = f.floorOracle();
+        bytes memory c = abi.encodeCall(IFloorOracle.getFloorRange, (packs));
+        bool ok;
+        uint256 bid;
+        uint256 ask;
+        uint256 observedAt;
+        uint256 periodUsed;
+        assembly ("memory-safe") {
+            let m := mload(0x40) // scratch past the free pointer; not kept
+            ok := staticcall(ORACLE_GAS, o, add(c, 32), mload(c), m, 128)
+            if lt(returndatasize(), 128) { ok := 0 }
+            bid := mload(m)
+            ask := mload(add(m, 32))
+            observedAt := mload(add(m, 64))
+            periodUsed := mload(add(m, 96))
+        }
+        if (!ok || observedAt > type(uint48).max || periodUsed > type(uint48).max) return (k1e18, 0, s);
         if (bid == 0 || bid >= ask || observedAt == 0 || observedAt > block.timestamp) return (k1e18, 0, s);
         if (block.timestamp - observedAt > f.maxOracleAge()) return (k1e18, 0, s);
         if (periodUsed < f.minOracleChallengePeriod()) return (k1e18, 0, s);

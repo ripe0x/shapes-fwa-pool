@@ -73,7 +73,7 @@ def read_tokens(vault, active_ids):
 
 def read_state(vault, slowdown, burn=False):
     p = [num(x) for x in call(vault, f"getParams()({PARAMS_T})").strip("()").split(", ")]
-    (min_edge, _buf, dist_bps, premium, share, _alloc, _mask, ceiling, tip, wfee, _rc, _rr, _ec, _er, max_pos, res,
+    (min_edge, _buf, dist_bps, premium, share, _alloc, mask, ceiling, tip, wfee, _rc, _rr, _ec, _er, max_pos, res,
      _tvl) = p
     rbud, ebud = lines(call(vault, "budget()(uint256,uint256)"))
     k, backing, _ok = lines(call(vault, "edge(uint256)(uint256,uint256,bool)", 3))
@@ -93,7 +93,8 @@ def read_state(vault, slowdown, burn=False):
     balance = num(cast("balance", vault))
     pending = num(call(vault, "pendingDepositTotal()(uint256)"))
     reserves = pending + num(call(vault, "redemptionReserve()(uint256)")) + \
-        num(call(vault, "distributionReserve()(uint256)")) + num(call(vault, "claimableTotal()(uint256)"))
+        num(call(vault, "distributionReserve()(uint256)")) + num(call(vault, "claimableTotal()(uint256)")) + \
+        num(call(vault, "processingPool()(uint256)"))  # request charges: reserved like _free() (audit E4)
     locked = num(call(vault, "lockedShares()(uint256)"))
     owed = 0
     if locked:
@@ -105,6 +106,15 @@ def read_state(vault, slowdown, burn=False):
     seq_now = num(call(FWA, "lastIssuedSequence()(uint64)"))
     seq_then = num(call(FWA, "lastIssuedSequence()(uint64)", block=max(head - 7 * 7200, 1)))
     tokens = read_tokens(vault, [l.id for l in listings if l.status == policy.ACTIVE])
+    # A distribution-only checkpoint is due when simulating it succeeds (the vault reverts a
+    # checkpoint that would neither settle flows nor distribute; audit E2, E3).
+    due = False
+    if dist_bps and not pending and not locked:
+        try:
+            cast("call", vault, "checkpoint(uint256)(uint256)", "0")
+            due = True
+        except subprocess.CalledProcessError:
+            pass
     return policy.State(
         # The keeper bids basefee + maxTip (run_pass), so that is its price.
         now=now, gas_price=num(cast("base-fee")) + tip, base_fee=num(cast("base-fee")), gas_ceiling=ceiling,
@@ -116,7 +126,7 @@ def read_state(vault, slowdown, burn=False):
         listings=listings, idle_packs=len(ids_of(call(vault, "idlePacks()(uint256[])"))),
         loose_shapes=num(call(vault, "looseShapeCount()(uint256)")),
         free=max(0, balance - reserves), idle_eth=num(call(vault, "idleEth()(uint256)")), owed_estimate=owed,
-        pending_deposits=pending, locked_shares=locked,
+        pending_deposits=pending, locked_shares=locked, distribution_due=due, pack_units_mask=mask,
         fee_credit=num(call(FWA, "feeCredit(address)(uint256)", vault)),
         open_positions=len(listings), max_positions=max_pos,
         winding_down=call(vault, "windingDown()(bool)") == "true",
@@ -146,13 +156,19 @@ def to_cast(step, min_pay=0):
 HEALTH = dict(last_pass=0, block=0, status=[], pending=None, stats={}, errors=[], pass_errors=0)
 
 
-def compensation(vault, args, sender):
+def fee_args(base_fee, tip):
+    """The fee fields the keeper signs with (tx.submit: max fee 2 x basefee + tip), so a simulation
+    sees the same tx.gasprice as inclusion; a policy may price on it (audit E1)."""
+    return ["--gas-price", str(2 * base_fee + tip), "--priority-gas-price", str(tip)]
+
+
+def compensation(vault, args, sender, fees=()):
     """What the vault promises for this exact call now: every paid function returns its payment,
     so simulating it from the keeper's address reads the contract's own quote (0 for burnTokens)."""
     if args[0].startswith("burnTokens"):
         return 0
     sig = args[0].replace(")", ")(uint256)", 1) if args[0].endswith(")") else args[0]
-    return num(cast("call", vault, sig, *args[1:], "--from", sender))
+    return num(cast("call", vault, sig, *args[1:], "--from", sender, *fees))
 
 
 # Billed gas / eth_estimateGas per call, from canary-rehearsal receipts (docs/GAS.md). The estimate
@@ -191,7 +207,7 @@ def run_pass(a, tm):
             est, _why, _exp = tm.preflight(p["to"], p["args"])
             if est is None or prio is None or p["label"] == "burnTokens":
                 return est
-            pay = compensation(a.vault, p["args"], tm.sender)
+            pay = compensation(a.vault, p["args"], tm.sender, fee_args(state.base_fee, prio))
             if pay + a.max_loss_wei < execution_cost(est, state.base_fee + prio, a.fail_rate_bps,
                                                      billed_ratio(tm, p["label"])):
                 return None
@@ -233,7 +249,8 @@ def run_pass(a, tm):
                 tm.error(f"preflight of {step[0]} reverted: {why}")
             continue
         bid = state.base_fee + state.max_tip
-        pay = compensation(a.vault, args, tm.sender)
+        fees = fee_args(state.base_fee, state.max_tip)
+        pay = compensation(a.vault, args, tm.sender, fees)
         cost_ = execution_cost(est, bid, a.fail_rate_bps, billed_ratio(tm, step[0]))
         need = cost_ * (10_000 + a.min_return_bps) // 10_000
         if pay + a.max_loss_wei < need and step[0] != "burnTokens":  # burns are the operator's opt-in cost
@@ -248,6 +265,14 @@ def run_pass(a, tm):
         # the simulated quote (basefee falls at most 12.5% a block). A larger drop means less work
         # was left to do; the whole call reverts instead of paying less.
         args = to_cast(step, pay * 8 // 10 if step[0] != "burnTokens" and a.max_loss_wei == 0 else 0)
+        # Re-check the exact signed call, minPay included, at the signed fees: a call that would
+        # revert is not sent. A state change between this check and inclusion can still revert it.
+        est2, why2, _ = tm.preflight(a.vault, args, fees)
+        if est2 is None:
+            skip.add(step[0])
+            tm.state["stats"]["skipped_expected"] += 1
+            print(f"skip {step[0]}: the signed call would revert ({why2})")
+            continue
         tm.submit(step[0], a.vault, args, est, state.base_fee, state.max_tip, pay)
         sent += 1
         if tm.wait(wanted, a.pending_timeout):

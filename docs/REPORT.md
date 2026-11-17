@@ -388,3 +388,12 @@ signature.
 Guardian and admin merged into `owner`; `lowerCaps` removed (`setParams` covers it). 80 tests pass,
 reconciler exact, canary rehearsal closes to the wei. PackVault 22,364 bytes. Not yet independently
 reviewed: covered by the release audit prompt (`docs/AUDIT-PROMPT.md`).
+
+## 17. Launch audit A and repairs (D60, 2026-11-17)
+
+External audit step A at `ba8d26e` recommended stopping before mainnet. Every code finding is
+repaired and proven by the auditor's own witnesses rewritten as regressions
+(`audit/release-ba8d26e-repairs/REPAIRS.md`). Still open and blocking release: E7 (forward return
+model omits FWA staging, so the return gate is unvalidated), E8 (owner-compromise bound and the
+raisable TVL cap need an owner decision), E9 (outcome signature). Launch steps B to E (uninformed
+second audit, comparison, real-transaction rehearsal, canary plan) have not run.

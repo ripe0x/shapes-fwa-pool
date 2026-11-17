@@ -743,3 +743,24 @@ anything at once. Constructor takes one address; the canary values file has `own
 **Given up:** a separate stop-only key (for example a hot emergency key beside a cold admin key).
 **Evidence:** 80 fork, audit and scenario tests; canary rehearsal (owner swaps the policy and starts
 wind-down) closes to the wei; reconciler exact. PackVault 22,364 bytes.
+
+## D60. Repairs from launch audit A (2026-11-17)
+
+**Source:** external launch audit step A at `ba8d26e` (`audit/release-ba8d26e/REPORT.md`).
+**Chose:** fix every code finding with the smallest change that closes it (table in
+`audit/release-ba8d26e-repairs/REPAIRS.md`). Two contract rules are new:
+- A checkpoint that neither settles holder flows nor distributes reverts whole (`Nothing`), so it
+  never consumes the interval's one slot (E3).
+- A checkpoint refuses to price (`SyncFirst`) while an allocation past FWA's settlement window is
+  unsynced (E6). Rejected alternative: marking such a listing at its reclaimable backing. FWA's
+  verified `keepNFT`/`acceptDepositorBid` stay open "the whole time the listing is allocated", so
+  the purchaser can still choose the lower outcome after the window; only `sync` makes it certain.
+Liveness check (repair review F1): `SyncFirst` makes redemption checkpoints depend on resolving
+the allocation. FWA's verified `depositorReclaimBacking`/`depositorReclaimNFT` cannot be blocked
+by the purchaser: NFT delivery is non-strict (`_deliverNFT` records a stuck-NFT claim on failure),
+ETH leaves by force-send, and only FWA's own immutable notifier can revert the settlement; either
+way the listing leaves `Allocated`, so a stuck pack no longer blocks pricing.
+Pack sizes above 30 units are out of bounds (E11). The oracle read cannot revert or burn the
+call's gas (S1).
+**Open, owner's call:** E7 (return gate unvalidated until the forward model handles FWA staging),
+E8 (owner-compromise bound and raisable TVL cap), E9 (outcome signature).

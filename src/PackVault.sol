@@ -191,6 +191,7 @@ contract PackVault is ReentrancyGuard {
     error AllocatedExposure();
     error Amount();
     error Nothing();
+    error SyncFirst();
     error Liquidity();
     error UnlistNotAllowed();
     error UnknownNft();
@@ -595,7 +596,10 @@ contract PackVault is ReentrancyGuard {
 
         // Value every open position from FWA state, read-only: resolving is sync's job, so the
         // loop costs the same per position whatever FWA did to them.
-        (uint256 navPositions, uint256 allocatedValue) = VaultLib.valueOpen(f, packs, positions, _open);
+        (uint256 navPositions, uint256 allocatedValue, bool expired) = VaultLib.valueOpen(f, packs, positions, _open);
+        // An allocation past its window is resolved by sync (anyone, paid) before pricing, so new
+        // deposits never price against the lower bound of a value the vault can already realize.
+        if (expired) revert SyncFirst();
         _harvest();
         uint256 inventory = _looseShapes.length * UNIT + VaultLib.valueIdle(packs, _idlePacks);
         uint256 nav = _free() + navPositions + inventory;
@@ -668,8 +672,8 @@ contract PackVault is ReentrancyGuard {
             return _pay(OP_CHECKPOINT, gasQ, 1, essential, minPay, pool);
         }
         if (distributed != 0) return _pay(OP_CHECKPOINT, gasQ, 1, false, minPay, type(uint256).max);
-        if (minPay != 0) revert Payment();
-        return 0;
+        // No flows and nothing distributed: revert, so the interval's one slot stays free (audit E3).
+        revert Nothing();
     }
 
     /// @notice Redeem up to `maxCount` idle packs (then loose Shapes) to ETH at their exact

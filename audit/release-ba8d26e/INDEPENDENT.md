@@ -1,0 +1,31 @@
+# Independent challenge of ba8d26e
+
+**Target:** `ba8d26e6107506155acbf25b564e198a2d4291e1` at `/Users/dd/CascadeProjects/pv-audit`. This was an informed, timeboxed source and cached-fork challenge, not a blind or complete audit. I read the named production files, `OWNER-REQUIREMENTS.md`, and `asset-flow.json` before existing tests. I sealed the checkpoint candidate before reading `ForkBase.sol` or `ForkSelection.t.sol`. The host filesystem and previous work remained visible.
+
+## Confirmed liveness observation: an empty checkpoint consumes the slot
+
+`PackVault.checkpoint` permits a call with no pending deposit or redemption whenever `distributionBps != 0` (line 590). It sets `lastCheckpointInterval` (line 593) before finding whether any distribution is due (lines 633-643). An arbitrary caller can therefore consume the sole checkpoint slot in a 12-hour interval for **zero keeper pay and zero distribution**. A holder who submits a redemption immediately afterward pays the exact request charge, locks shares, and gets `AlreadyCheckpointed` on an attempted checkpoint in the same blackout. The earliest ordinary settlement is the next blackout, up to 12 hours later. This does **not** establish indefinite starvation: the pending redemption makes the next checkpoint real work, and the attacker cannot preempt it with another empty one.
+
+This delays a holder but does not itself move or steal principal. It matters if the owner intends each blackout to remain usable until its end. The stated requirement is at least one usable exit window a day; a one-interval delay does not by itself disprove that outcome. The keeper does not intentionally send empty checkpoints (`keeper/policy.py`), but the public contract accepts them.
+
+**Executed witness:** `test/audit/IndependentChallenge.t.sol`, `test_emptyDistributionCheckpointDelaysRedemption`. Fork block `26,424,971`, real FWA and Shapes contracts, real FWA blackout and zero unsettled queue asserted. A state-changing attacker contract asserts `block.basefee == 0.15 gwei` and `tx.gasprice == 0.2 gwei` inside its call before reaching the vault. Alice's 1 ETH initial deposit became shares at the preceding checkpoint. The later empty call paid the attacker 0 wei and left `distributionReserve` unchanged. Alice's exact redemption charge was **1,624,349,546,495,007 wei**: 56,000,000,000,000 wei for the next checkpoint plus 1,568,349,546,495,007 wei unwind charge. The test sends exactly that amount and asserts the 56,000,000,000,000 wei processing charge is held. It then observes `AlreadyCheckpointed` with her shares still locked.
+
+Command: `forge test --match-path test/audit/IndependentChallenge.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv`. Exit **0**, 1 passed, 0 failed, witness gas 1,097,524. Foundry tried and failed to re-clone already-present submodules but compilation and the cached fork test succeeded. A direct `cast base-fee --rpc-url https://mainnet.gateway.tenderly.co` exited **1** because DNS lookup failed in this sandbox. The witness does not establish the current live basefee, transaction ordering, or gas cost of a broadcast attack.
+
+## Economic and requirement challenge
+
+The source flow is: deposit ETH is escrowed with a checkpoint charge; checkpoint prices shares, retains a deployment charge in NAV and pays the checkpoint caller from the processing pool; free ETH buys Shapes and FWA backing; FWA fee income returns through `harvest`; keeper quotes draw from free ETH and refilling budgets; redemption locks shares, funds a checkpoint request and an unwind charge, then fills from free ETH and inventory and becomes claimable. This review did not reconcile every bucket against all regimes, so it supplies no whole-system scorecard.
+
+**Open question:** the owner's formal gate uses trailing 30-day *successful selections* (`OWNER-REQUIREMENTS.md`, item 10 and B2 O1). The live keeper's optional slowdown control instead reads a 7-day difference in `FWA.lastIssuedSequence()` and divides by seven (`keeper/keeper.py`, lines 103-105, 124). Historical analysis in `sim/backtest_audit.py` distinguishes requests from selections and says refunded requests distributed no fees. If `lastIssuedSequence` counts requests, the live keeper can keep building during request volume that yields no fees, while the forward simulation's slowdown uses successful selections. The slowdown threshold defaults to zero, so this matters only if it is configured positive. I could not verify the deployed FWA counter's exact semantics or current values because live RPC DNS failed; this remains a question, not a confirmed finding.
+
+**Attempt closed narrowly:** a second fork test tried to inflate `harvest` pay by repeating an active listing ID 100 times against real accrued and credited FWA fees. It received 0 wei, the same as an honest credited-fee harvest, so that particular input did not demonstrate keeper extraction. The exploratory test was removed; it did not rule out other amounts or states.
+
+## Limitations
+
+I did not verify deployed source-to-bytecode correspondence, a current fork block, real signed transactions, all money regimes, or the full keeper recovery path. I did not run a broad suite, simulation, or a complete security audit. The fork witness uses real external contracts but a pinned historical state and Foundry's transaction model. No product code was changed or broadcast made.
+
+## Things that don't make sense
+
+- A no-op distribution checkpoint can consume a scarce exit window even though the keeper itself avoids making that call. Decide whether a holder should be able to use the remainder of the same blackout after such a no-op.
+- The live keeper's slowdown signal appears to count issued requests over seven days, while the owner's economic gate and simulation use successful selections over 30 days. Confirm the deployed counter semantics and whether this intentional difference can fund uneconomic builds.
+- `asset-flow.json` labels signed outcomes `DRAFT`, while `OWNER-REQUIREMENTS.md` B2 says proposed outcomes await sign-off. Confirm which outcomes the owner has actually approved before treating the signature as acceptance.
