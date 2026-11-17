@@ -214,21 +214,18 @@ def main():
     keeper()
     state("after kick, sync, relist")
 
-    # 6b. Keeper payment policy swap (D57): deploy a policy with a different formula (3 work fees per
-    #     unit, no gas), queue it, wait out the admin delay, anyone activates. Assets, shares and
-    #     positions carry over; the unchanged keeper reads the new pay by simulating each call.
+    # 6b. Keeper payment policy swap (D57, D58): deploy a policy with a different formula (3 work
+    #     fees per unit, no gas); the admin sets it at once. Assets, shares and positions carry
+    #     over; the unchanged keeper reads the new pay by simulating each call.
     fee = VALUES["workFeeWei"]
     v1 = call(VAULT, "keeperPolicy()(address)")
     out = sh("forge", "create", "--broadcast", "--unlocked", "--from", DEPLOYER, "--rpc-url", RPC,
              "test/fork/ForkKeeperPolicy.t.sol:KeeperPolicyFlat")
     v2 = next(l.split()[-1] for l in out.splitlines() if l.startswith("Deployed to:"))
     impersonate(VALUES["admin"])
-    send(VALUES["admin"], VAULT, "proposePolicy(address)", v2)
-    send(KICKER, VAULT, "activatePolicy()", expect=False)  # before the delay
-    pre = state("policy queued")
-    cast("rpc", "evm_increaseTime", str(VALUES["paramDelay"]))
-    cast("rpc", "evm_mine")
-    send(KICKER, VAULT, "activatePolicy()")
+    send(KICKER, VAULT, "setPolicy(address)", v2, expect=False)  # admin only
+    pre = state("before policy swap")
+    send(VALUES["admin"], VAULT, "setPolicy(address)", v2)
     post = state("policy V2 active")
     if call(VAULT, "keeperPolicy()(address)").lower() != v2.lower():
         sys.exit("policy swap did not take effect")

@@ -119,7 +119,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         vm.fee(BASE_FEE);
         vm.txGasPrice(GAS_PRICE);
         vm.deal(address(this), seed + 1 ether);
-        vault = new PackVault{value: seed}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p, new KeeperPolicyV1());
+        vault = new PackVault{value: seed}(FWA, SHAPES, PACKS, guardian, admin, p, new KeeperPolicyV1());
         preexisting = address(vault).balance - seed; // mainnet dust at the deploy address
         depositedCum = address(vault).balance; // seed and dust are capitalization inflow
     }
@@ -907,7 +907,7 @@ contract VaultFlowSelectionTest is VaultFlowBase {
 
         VaultLib.Params memory p = _canary();
         vm.deal(address(this), 5 ether);
-        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, guardian, admin, 1 days, p, new KeeperPolicyV1());
+        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, guardian, admin, p, new KeeperPolicyV1());
         depositedCum = address(vault).balance;
         uint256 need = 20 * 3;
         uint256 mints = (need + 9) / 10; // 20 packs x 3 units -> 6 mints of 0.1 ETH

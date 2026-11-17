@@ -93,11 +93,7 @@ contract ForkKeeperPolicyTest is ForkBase {
 
     function _swap(address policy) internal {
         vm.prank(admin);
-        vault.proposePolicy(policy);
-        vm.warp(block.timestamp + vault.paramDelay());
-        vm.roll(block.number + vault.paramDelay() / 12);
-        vm.prank(bob); // anyone activates once the delay has passed
-        vault.activatePolicy();
+        vault.setPolicy(policy); // at once (D58)
         assertEq(address(vault.keeperPolicy()), policy);
     }
 
@@ -117,11 +113,6 @@ contract ForkKeeperPolicyTest is ForkBase {
 
         KeeperPolicyFlat v2 = new KeeperPolicyFlat();
         address v1 = address(vault.keeperPolicy());
-        vm.prank(admin);
-        vault.proposePolicy(address(v2));
-        assertEq(vault.pendingPolicy(), address(v2));
-        vm.expectRevert(PackVault.TooEarly.selector);
-        vault.activatePolicy();
 
         uint256 bal = address(vault).balance;
         uint256 shares = vault.totalShares();
@@ -133,16 +124,14 @@ contract ForkKeeperPolicyTest is ForkBase {
         uint256 rc = vault.requestCharge();
         uint256 dc = vault.deployCharge();
 
-        vm.warp(block.timestamp + vault.paramDelay());
-        vm.roll(block.number + vault.paramDelay() / 12);
+        vm.prank(bob);
+        vm.expectRevert(PackVault.NotAdmin.selector);
+        vault.setPolicy(address(v2));
         vm.expectEmit(true, true, false, false, address(vault));
         emit PackVault.PolicyChanged(v1, address(v2));
-        vm.prank(bob);
-        vault.activatePolicy();
+        vm.prank(admin);
+        vault.setPolicy(address(v2));
         assertEq(address(vault.keeperPolicy()), address(v2));
-        assertEq(vault.pendingPolicy(), address(0));
-        vm.expectRevert(PackVault.TooEarly.selector);
-        vault.activatePolicy(); // nothing queued
 
         assertEq(address(vault).balance, bal, "balance");
         assertEq(vault.totalShares(), shares, "supply");
@@ -173,18 +162,18 @@ contract ForkKeeperPolicyTest is ForkBase {
         address nv = address(new PolicyNoVersion());
         vm.startPrank(admin);
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        vault.proposePolicy(eoa);
+        vault.setPolicy(eoa);
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        vault.proposePolicy(v0);
+        vault.setPolicy(v0);
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        vault.proposePolicy(nv);
+        vault.setPolicy(nv);
         vm.stopPrank();
         address ok = address(new KeeperPolicyFlat());
         vm.prank(keeper);
         vm.expectRevert(PackVault.NotAdmin.selector);
-        vault.proposePolicy(ok);
+        vault.setPolicy(ok);
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        new PackVault(FWA, SHAPES, PACKS, guardian, admin, 2 days, defaultParams(), KeeperPolicyV1(eoa));
+        new PackVault(FWA, SHAPES, PACKS, guardian, admin, defaultParams(), KeeperPolicyV1(eoa));
     }
 
     /// A policy asking for everything is paid the envelope (quoted gas x ceiling-capped price with
@@ -224,30 +213,16 @@ contract ForkKeeperPolicyTest is ForkBase {
         }
     }
 
-    /// The guardian cancels a queued policy; lowering caps also cancels it.
-    function test_guardianCancelsPendingPolicy() public {
-        address p = address(new KeeperPolicyFlat());
-        vm.prank(admin);
-        vault.proposePolicy(p);
+    /// Guardian stops are stop-only; review L1: lowering the ceiling clamps maxTip with it.
+    function test_guardianStopsAndTipClamp() public {
         vm.prank(keeper);
         vm.expectRevert(PackVault.NotGuardian.selector);
-        vault.guard(false, false, true);
+        vault.guard(true, false);
         vm.prank(guardian);
-        vault.guard(false, false, true);
-        assertEq(vault.pendingPolicy(), address(0));
-        vm.warp(block.timestamp + vault.paramDelay());
-        vm.expectRevert(PackVault.TooEarly.selector);
-        vault.activatePolicy();
-
-        vm.prank(admin);
-        vault.proposePolicy(p);
-        lowerTo(100 ether, 150, 5 gwei, 0.00002 ether);
-        assertEq(vault.pendingPolicy(), address(0), "lowerCaps cancels the queued policy");
+        vault.guard(true, false);
+        assertTrue(vault.depositsPaused());
         lowerTo(100 ether, 150, 0.01 gwei, 0.00002 ether); // below the 0.05 gwei tip
-        assertEq(vault.getParams().maxTip, 0.01 gwei, "review L1: maxTip clamped to the lowered ceiling");
-        vm.warp(block.timestamp + vault.paramDelay());
-        vm.expectRevert(PackVault.TooEarly.selector);
-        vault.activatePolicy();
+        assertEq(vault.getParams().maxTip, 0.01 gwei, "maxTip clamped to the lowered ceiling");
     }
 
     /// Even under the greedy policy, the guardian stops all pay at once (budget caps 0), and the
@@ -277,7 +252,7 @@ contract ForkKeeperPolicyTest is ForkBase {
         p.tvlCap = 1_000 ether;
         vm.fee(50 gwei);
         vm.txGasPrice(50 gwei);
-        PackVault v = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p, new KeeperPolicyV1());
+        PackVault v = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, guardian, admin, p, new KeeperPolicyV1());
         uint256 gross = Charges.grossFor(v, 40 ether);
         vm.deal(alice, gross);
         vm.prank(alice);

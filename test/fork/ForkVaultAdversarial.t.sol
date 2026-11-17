@@ -65,25 +65,19 @@ contract ForkVaultAdversarialTest is ForkBase {
         p.workFee = uint64(vault.MAX_WORK_FEE() + 1);
         vm.prank(admin);
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        vault.proposeParams(p);
+        vault.setParams(p);
         p.workFee = uint64(vault.MAX_WORK_FEE());
         vm.prank(admin);
-        vault.proposeParams(p);
+        vault.setParams(p);
+        assertEq(vault.getParams().workFee, vault.MAX_WORK_FEE(), "applied at once (D58)");
         // The guardian lowers the fee at once (never raises it); with the ceiling at 0 no pay remains.
         VaultLib.Params memory q = vault.getParams();
         vm.prank(guardian);
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        vault.lowerCaps(q.tvlCap, q.maxPositions, q.gasCeiling, 0.00003 ether, q.routineCap, q.essentialCap); // a raise
+        vault.lowerCaps(q.tvlCap, q.maxPositions, q.gasCeiling, q.workFee + 1, q.routineCap, q.essentialCap); // a raise
         lowerTo(100 ether, 150, 0, 0);
         assertEq(vault.getParams().workFee, 0);
         assertEq(vault.getParams().gasCeiling, 0);
-        // The admin's queued proposal (made above) was cancelled by the stop: it cannot restore the
-        // old fee or ceiling when its delay passes.
-        assertEq(vault.pendingParamsEta(), 0);
-        vm.warp(block.timestamp + 3 days);
-        vm.expectRevert(PackVault.TooEarly.selector);
-        vault.applyParams();
-        assertEq(vault.getParams().workFee, 0);
     }
 
     /// D51/D56: above the gas ceiling a build is accepted and paid its quote at the ceiling price;
@@ -184,7 +178,7 @@ contract ForkVaultAdversarialTest is ForkBase {
     function test_distributionPaysGainsOnce() public {
         VaultLib.Params memory p = defaultParams();
         p.distributionBps = 2_000;
-        vault = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p, new KeeperPolicyV1());
+        vault = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, guardian, admin, p, new KeeperPolicyV1());
         assertGe(address(vault).balance, 0.01 ether); // deploy addresses can hold mainnet dust
         {
             uint256 gross_ = Charges.grossFor(vault, 4 ether);
@@ -223,7 +217,7 @@ contract ForkVaultAdversarialTest is ForkBase {
     function test_checkpointAfterAllHoldersExitAndGain() public {
         VaultLib.Params memory p = defaultParams();
         p.distributionBps = 2_000;
-        vault = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p, new KeeperPolicyV1());
+        vault = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, guardian, admin, p, new KeeperPolicyV1());
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
             vm.prank(alice);
@@ -264,7 +258,7 @@ contract ForkVaultAdversarialTest is ForkBase {
         p.maxPositions = uint96(n);
         p.reserve = 0;
         vm.deal(address(this), 100 ether);
-        vault = new PackVault{value: 25 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p, new KeeperPolicyV1());
+        vault = new PackVault{value: 25 ether}(FWA, SHAPES, PACKS, guardian, admin, p, new KeeperPolicyV1());
         for (uint256 i; i < n; i += 10) {
             vault.restock(10, 3, 0);
             vault.list(10, 0);
@@ -292,7 +286,7 @@ contract ForkVaultAdversarialTest is ForkBase {
         p.maxPositions = uint96(n);
         p.reserve = 0;
         vm.deal(address(this), 100 ether);
-        vault = new PackVault{value: 25 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p, new KeeperPolicyV1());
+        vault = new PackVault{value: 25 ether}(FWA, SHAPES, PACKS, guardian, admin, p, new KeeperPolicyV1());
         uint256 seed = address(vault).balance;
         uint256 b0 = address(this).balance;
         for (uint256 i; i < n; i += 10) {
@@ -326,7 +320,7 @@ contract ForkVaultAdversarialTest is ForkBase {
         VaultLib.Params memory p = defaultParams();
         p.reserve = 0;
         vm.deal(address(this), 100 ether);
-        vault = new PackVault{value: 10 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p, new KeeperPolicyV1());
+        vault = new PackVault{value: 10 ether}(FWA, SHAPES, PACKS, guardian, admin, p, new KeeperPolicyV1());
         uint256 g = gasleft();
         vault.restock{gas: TX_GAS_CAP}(10, 3, 0);
         emit log_named_uint("restock 10 packs", g - gasleft());

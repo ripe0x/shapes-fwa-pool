@@ -38,7 +38,7 @@ python3 ~/.agents/guidance/asset-flow-kit/asset_gate.py .   # PASS needs the own
   hold mainnet dust; read balances, do not assume them.
 - Keeper pay is a fixed quote per operation (D56); never measured gas. The keeper pads gas 25% so
   a call cannot run out. `cast send` exits 0 on a reverted transaction; check receipt status.
-- The keeper payment policy is a separate contract (`src/KeeperPolicy.sol`, D57); the vault caps
+- The keeper payment policy is a separate contract (`src/KeeperPolicy.sol`, D57), set by the admin at once (D58); the vault caps
   its offer. Test policies live in `test/fork/ForkKeeperPolicy.t.sol`.
 - Rehearsal actors are fresh addresses checked clean on the fork. Never anvil's dev accounts: they
   are real mainnet addresses and #2 carries an EIP-7702 delegation that diverts ETH it receives.

@@ -14,7 +14,7 @@ contract AuditRoleAndKeeperTest is ForkBase {
     uint256 constant TX_CAP = 16_777_216;
 
     /// A compromised admin sets every keeper-pay lever to its bytecode maximum (premium 10%, ceiling
-    /// 50 gwei, maxTip 50 gwei, work fee 0.00005 ETH, budgets at their maxima), waits out the delay,
+    /// 50 gwei, maxTip 50 gwei, work fee 0.00005 ETH, budgets at their maxima), applied at once (D58),
     /// then manufactures checkpoint work with a dust deposit and runs the checkpoint itself
     /// (originally written by the 3e600e5 auditor against measured-gas pay; rewritten for D56).
     /// The checkpoint is funded by the request charge the admin's own deposit paid, so the admin
@@ -35,9 +35,7 @@ contract AuditRoleAndKeeperTest is ForkBase {
         p.maxTip = 50 gwei;
         p.workFee = uint64(vault.MAX_WORK_FEE());
         vm.prank(admin);
-        vault.proposeParams(p);
-        vm.warp(block.timestamp + vault.paramDelay());
-        vault.applyParams();
+        vault.setParams(p);
 
         vm.deal(admin, 1 ether);
         vm.fee(0.15 gwei);

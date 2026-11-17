@@ -39,7 +39,7 @@ anvil's public dev keys carry on mainnet) passes the vault's pay on.
 1. Re-check receipts counted in the last 64 blocks (reorgs) and settle the in-flight transaction.
 2. Read the vault, FWA and rewards state; `policy.plan` returns the calls worth making, in order.
 3. For the first call: preflight (`eth_estimateGas` from the keeper's address). A vault error that
-   means the state moved on (Nothing, TooEarly, NotCheckpointWindow, AlreadyCheckpointed,
+   means the state moved on (Nothing, NotCheckpointWindow, AlreadyCheckpointed,
    Paused, WindingDown, AllocatedExposure) is a quiet skip; any other revert is an error.
 4. Expected pay is read by simulating the exact call (`cast call` returns the pay the active
    policy and the vault's caps give), so a policy swap needs no keeper change. Execution cost is
@@ -58,7 +58,7 @@ someone.
 | Code | Kind | Meaning | What to do |
 |---|---|---|---|
 | OK | ok | operating normally | none |
-| GAS_ABOVE_CEILING | wait | bid above the vault's gas ceiling; only liability work is planned | none; to process redemptions now, run with `--max-loss-wei`; if gas stays high, the admin raises the ceiling (2-day delay) and the reserve with it |
+| GAS_ABOVE_CEILING | wait | bid above the vault's gas ceiling; only liability work is planned | none; to process redemptions now, run with `--max-loss-wei`; if gas stays high, the admin raises the ceiling and the reserve with it (immediate, D58) |
 | WAITING_SETTLEMENT | wait | a purchaser is inside FWA's settlement window | none |
 | WAITING_CHECKPOINT_WINDOW | wait | deposits or redemptions wait for FWA's blackout with its queue drained | none; anyone may call FWA `processAcquisitions` to drain the queue |
 | QUOTE_UNAVAILABLE | wait | FWA admission is off or its floor quote is invalid: nothing new lists | none; existing positions keep earning and can be unlisted |
@@ -69,7 +69,7 @@ someone.
 | EDGE_GATE_FAILED | action | FWA's live fees leave less than the minimum edge; the keeper unlists positions | guardian considers `startWindDown()` |
 | RECOVERY_REQUIRED | action | FWA holds a pack owed to the vault (failed delivery) | the keeper retries through `sync`; if it persists, see D23 |
 | LISTING_PAUSED | action | the guardian paused listing | guardian or admin decision |
-| RESERVE_BELOW_NEED | action | the reserve is below one checkpoint plus one listing batch at the ceiling | admin raises `reserve` (2-day delay) |
+| RESERVE_BELOW_NEED | action | the reserve is below one checkpoint plus one listing batch at the ceiling | admin raises `reserve` (immediate, D58) |
 | WINDING_DOWN | info | wind-down in progress | keep the keeper running until no positions remain |
 
 A malfunction shows as `/health` 503: no pass for 3 loop intervals, an RPC failure, a preflight

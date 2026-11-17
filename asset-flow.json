@@ -87,7 +87,7 @@
   },
   {
    "id": "O6",
-   "text": "DRAFT. Can it stall and what restarts it (gas): above the 0.5 gwei ceiling no call is refused; every call is paid at the ceiling price, not the spike (at 2 gwei a build and a checkpoint are paid as at 0.5 gwei), so the keeper waits and holders or anyone may act at their own extra cost. A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid. Work resumes when gas falls or the admin raises the ceiling (2-day delay).",
+   "text": "DRAFT. Can it stall and what restarts it (gas): above the 0.5 gwei ceiling no call is refused; every call is paid at the ceiling price, not the spike (at 2 gwei a build and a checkpoint are paid as at 0.5 gwei), so the keeper waits and holders or anyone may act at their own extra cost. A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid. Work resumes when gas falls or the admin raises the ceiling (immediate, D58).",
    "metric": "facts.checkpoint_pay_wei",
    "max": 200000000000000,
    "regimes": [

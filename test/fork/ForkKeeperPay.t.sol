@@ -155,9 +155,7 @@ contract ForkKeeperPayTest is ForkBase {
         p.gasCeiling = 50 gwei;
         p.maxTip = 0.05 gwei;
         vm.prank(admin);
-        vault.proposeParams(p);
-        vm.warp(block.timestamp + vault.paramDelay());
-        vault.applyParams();
+        vault.setParams(p);
 
         address a = makeAddr("pack-vault-test-attacker");
         vm.deal(a, 10 ether);
@@ -272,33 +270,29 @@ contract ForkKeeperPayTest is ForkBase {
         vm.warp(block.timestamp + 30 days);
         (r,) = vault.budget();
         assertEq(r, 0.002 ether);
-        // Raise the cap through the delay: the level stays where it was (0.002), not 0.3.
+        // Raise the cap: the level stays where it was (0.002), not 0.3.
         VaultLib.Params memory up = vault.getParams();
         up.routineCap = 0.3 ether;
         vm.prank(admin);
-        vault.proposeParams(up);
-        vm.warp(block.timestamp + vault.paramDelay());
-        vault.applyParams();
+        vault.setParams(up);
         (r,) = vault.budget();
         assertEq(r, 0.002 ether, "applying a raise refills nothing");
         // Above the bytecode maxima: refused.
         up.routineCap = 0.3 ether + 1;
         vm.prank(admin);
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        vault.proposeParams(up);
+        vault.setParams(up);
         up.routineRate = 0.01 ether + 1;
         up.routineCap = 0.3 ether;
         vm.prank(admin);
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        vault.proposeParams(up);
-        // A pending raise is cancelled by a guardian lowering.
-        up.routineRate = 0.01 ether;
-        vm.prank(admin);
-        vault.proposeParams(up);
+        vault.setParams(up);
+        // A guardian lowering clamps the level at once.
         q = vault.getParams();
         vm.prank(guardian);
         vault.lowerCaps(q.tvlCap, q.maxPositions, q.gasCeiling, q.workFee, 0.001 ether, q.essentialCap);
-        assertEq(vault.pendingParamsEta(), 0);
+        (r,) = vault.budget();
+        assertEq(r, 0.001 ether, "lowered cap clamps the level");
     }
 
     /// 8 (essential): routine work cannot use the essential budget: with routine empty, unwinding

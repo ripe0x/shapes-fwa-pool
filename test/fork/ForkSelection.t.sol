@@ -113,7 +113,7 @@ abstract contract SelectionBase is Test {
         p.essentialRate = 0.005 ether;
         vm.deal(address(this), 10 ether);
         vault = new PackVault{value: 3 ether}(
-            FWA, SHAPES, PACKS, makeAddr("sel-guardian"), makeAddr("sel-admin"), 2 days, p, new KeeperPolicyV1()
+            FWA, SHAPES, PACKS, makeAddr("sel-guardian"), makeAddr("sel-admin"), p, new KeeperPolicyV1()
         );
         deployBalance = address(vault).balance;
         uint256 b0 = address(this).balance;

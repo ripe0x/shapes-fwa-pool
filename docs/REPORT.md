@@ -338,7 +338,7 @@ Deposits and redemptions now pay request charges for the work they cause (D56).
 the Python model to the wei. `keeper/test_policy.py` passes. The canary rehearsal deploys with the
 production script, runs the unchanged keeper, swaps V1 for a different-formula V2 mid-run (balance,
 shares, NAV, positions and tokens unchanged across the swap), and closes the ledger and the keeper's
-own accounting to the wei. PackVault 23,888 bytes (688 under EIP-170).
+own accounting to the wei. PackVault 23,888 bytes then; 22,809 after D58.
 
 **Keeper pay vs keeper cost per operation** (µETH; pay / cost (net); basefee shown, keeper bids
 basefee + 0.05 gwei; cost from measured billed gas, `sim/out/gas-quotes.json`):
@@ -373,3 +373,12 @@ Total 1.1% to 1.9% for a 1 to 2 ETH holder; 5.9% to 13.3% for a 0.01 ETH minimum
 - About 0.5% of each charge that lifts NAV accrues to the seed's dead shares (by design).
 - The asset-flow outcomes O2 and O6 were reworded for the new rule; the gate needs the owner's new
   signature (`asset_gate.py` reports the approval hash mismatch; every metric is within its bound).
+
+## 15. Admin changes take effect at once (D58, 2026-11-17)
+
+Owner decision: no delay on parameter or keeper-policy changes. `setParams` and `setPolicy` replace
+the propose/apply flow; bounds are unchanged. Holders lose the warning window before a change. Worst
+case from a compromised admin key acting as keeper: about 0.055 ETH on the first day of a 2 ETH
+canary, then 0.015 ETH a day (budget refill at the bytecode maxima). 80 tests pass, the reconciler is
+exact and the canary rehearsal closes to the wei. The asset-flow gate still needs the owner's
+signature.

@@ -5,7 +5,7 @@ pragma solidity 0.8.30;
 ///         bounded-gas staticcall, after the work, with facts the vault established itself; the
 ///         vault then pays at most its own envelope, free ETH and budget. A policy holds nothing,
 ///         moves nothing and cannot decide whether work happened. Replace it by deploying a new
-///         contract and activating its address through the vault's admin delay (D57).
+///         contract and setting its address with the vault's admin `setPolicy` (D57, D58).
 interface IKeeperPolicy {
     /// @notice Nonzero; the vault checks it before accepting a policy address.
     function policyVersion() external view returns (uint256);

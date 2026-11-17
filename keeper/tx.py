@@ -24,7 +24,7 @@ import time
 
 KEEPER_PAID = "0x496b3bf0725d338a836ecf0b614e039f3736dacfd57aa32af1bf55ea601ceaf5"  # KeeperPaid(address,uint256)
 EXPECTED = {  # selector -> name: the vault refused because the work is done, early or not allowed now
-    "0xf9820cc1": "Nothing", "0x085de625": "TooEarly", "0xdc024d48": "NotCheckpointWindow",
+    "0xf9820cc1": "Nothing", "0xdc024d48": "NotCheckpointWindow",
     "0xcdda955f": "AlreadyCheckpointed", "0x9e87fac8": "Paused",
     "0x233d9570": "WindingDown", "0x46e807b5": "AllocatedExposure",
 }

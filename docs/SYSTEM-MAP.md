@@ -17,7 +17,7 @@ non-transferable internal shares priced at checkpoints.
 | FWA main pool (holds vault backing) | custody of listed packs, backing escrow, flat fee shares | 10% of backing on a bid, 1% settlement fee on keep/silent |
 | FWA rewards module | FWA token rewards to depositors | nothing (tokens are burned) |
 | Shapes / ShapePacks | ETH-backed prize tokens | 0.001 ETH mint fee per 0.1 ETH minted |
-| Admin / guardian (may be one key, D44) | nothing | nothing, except what any keeper earns for verified work, inside the budgets (D54 F1, D56) |
+| Admin / guardian (may be one key, D44) | nothing | nothing, except what any keeper earns for verified work, inside the budgets (D54 F1, D56); admin changes apply at once (D58) |
 
 ## Buckets (A asset, L liability, R accounting representation of the same ETH)
 

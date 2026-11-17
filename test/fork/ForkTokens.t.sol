@@ -52,7 +52,7 @@ contract ForkTokensTest is Test {
         p.essentialCap = 0.1 ether;
         p.essentialRate = 0.005 ether;
         vm.deal(address(this), 5 ether);
-        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, makeAddr("tok-guardian"), admin, 1 days, p, new KeeperPolicyV1());
+        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, makeAddr("tok-guardian"), admin, p, new KeeperPolicyV1());
         vault.restock(20, 3, 0);
         vault.list(20, 0);
 

@@ -231,7 +231,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         uint256 bal = address(vault).balance;
         uint256 gBal = guardian.balance;
         vm.prank(guardian);
-        vault.guard(true, true, true);
+        vault.guard(true, true);
         lowerTo(1 ether, 10, 1 gwei, 0);
         vm.prank(guardian);
         vault.startWindDown();
@@ -243,28 +243,24 @@ contract ForkVaultLifecycleTest is ForkBase {
         assertEq(guardian.balance, gBal);
         vm.prank(guardian);
         vm.expectRevert(PackVault.NotAdmin.selector);
-        vault.proposeParams(defaultParams());
+        vault.setParams(defaultParams());
     }
 
-    function test_paramsDelayAndBounds() public {
+    function test_paramsBoundsAppliedAtOnce() public {
         VaultLib.Params memory p = defaultParams();
         p.distributionBps = 6_000;
         vm.prank(admin);
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        vault.proposeParams(p);
+        vault.setParams(p);
         p.distributionBps = 1_000;
         // Review S1: the reimbursed tip can never exceed the gas ceiling itself.
         p.maxTip = p.gasCeiling + 1;
         vm.prank(admin);
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        vault.proposeParams(p);
+        vault.setParams(p);
         p.maxTip = 0.05 gwei;
         vm.prank(admin);
-        vault.proposeParams(p);
-        vm.expectRevert(PackVault.TooEarly.selector);
-        vault.applyParams();
-        vm.warp(block.timestamp + 2 days);
-        vault.applyParams();
+        vault.setParams(p);
         assertEq(vault.getParams().distributionBps, 1_000);
     }
 

@@ -710,3 +710,25 @@ shares, NAV, positions, pool and charges, then pays V2's own quote to the wei; i
 rejected; greedy policy capped at the envelope; reverting, gas-burning and short-return policies pay
 0 while work runs and `minPay > 0` reverts; guardian cancels and disables). Canary rehearsal swaps V1
 to a 3-fee-per-unit V2 mid-run with the unchanged keeper; ledger and keeper accounting close to the wei.
+
+## D58. No delay on admin changes (owner, 2026-11-17)
+
+**Owner:** "remove all delays on changes." Supersedes the parameter delay (`paramDelay`, D-records
+from the original design onward) and D57's propose/activate flow for the keeper policy.
+**Chose:** `setParams(p)` and `setPolicy(policy)`, admin only, take effect in the same
+transaction; bounds (`checkBounds`, `checkPolicy`) are unchanged. `proposeParams`, `applyParams`,
+`proposePolicy`, `activatePolicy`, the pending state, `TooEarly` and the constructor's `paramDelay`
+are removed; `guard` keeps only its two pause flags. A parameter change still accrues the budgets at
+the old rates and only clamps after, so raising a cap never refills it.
+**Effect for holders:** they no longer get warning time to exit before a change. The guardian can
+still lower caps or stop pay at once, but the admin can raise them back at once. A compromised admin
+acting as keeper can take, at most, the budgets' current balance (canary 0.04 ETH) plus their refill
+at the bytecode maximum rates (0.015 ETH a day): about 0.055 ETH on the first day of a 2 ETH canary,
+then 0.015 a day, until holders exit or the guardian winds down. The guardian's `lowerCaps` and
+policy stop no longer hold against the admin, who can undo them in the next transaction; only the
+pause flags and wind-down are durable, and wind-down does not freeze `setParams`. Mitigations not
+taken (owner's call): lower the bytecode budget maxima; a guardian freeze on admin setters; keep a
+delay only on raises. Independent diff review: no code defect.
+**Evidence:** 80 fork, audit and scenario tests; `test_swapToDifferentFormulaPreservesAccounting`
+(instant swap, non-admin refused, state unchanged); `test_paramsBoundsAppliedAtOnce`; canary
+rehearsal swaps the policy instantly with the ledger closing to the wei. PackVault 22,809 bytes.

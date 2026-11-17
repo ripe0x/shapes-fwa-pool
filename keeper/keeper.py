@@ -284,14 +284,10 @@ def serve_health(port, stale_after):
 
 
 def policy_info(vault):
-    """Active keeper payment policy and any queued replacement (D57). Pay itself is read by
-    simulating each call, so a swap needs no keeper change; this is for operators."""
+    """Active keeper payment policy (D57). Pay itself is read by simulating each call, so a swap
+    needs no keeper change; this is for operators."""
     active = call(vault, "keeperPolicy()(address)")
-    out = f"policy {active} v{num(call(active, 'policyVersion()(uint256)'))}"
-    pending = call(vault, "pendingPolicy()(address)")
-    if int(pending, 16):
-        out += f", pending {pending} from {num(call(vault, 'pendingPolicyEta()(uint256)'))}"
-    return out
+    return f"policy {active} v{num(call(active, 'policyVersion()(uint256)'))}"
 
 
 def print_status(a):

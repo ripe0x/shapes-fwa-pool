@@ -42,9 +42,9 @@ import {
 ///      Trust: FWA, its rewards module, Shapes, ShapePacks and the FWA token are immutable
 ///      addresses fixed here. FWA's owner can change fees, the floor quote and admission; every
 ///      such change is read live, never cached. The guardian can only stop things and lower caps.
-///      The admin can move parameters inside bytecode bounds after `PARAM_DELAY`. Neither role can
-///      take assets directly; as a keeper, a compromised admin earns at most the routine premium
-///      and work fees, inside the spending budgets' bytecode maxima.
+///      The admin sets parameters and the keeper policy at once, inside bytecode bounds (D58).
+///      Neither role can take assets directly; a compromised admin can raise keeper pay to the
+///      bytecode maxima and keep for itself, bounded by the budgets' balance and refill rates.
 contract PackVault is ReentrancyGuard {
     using SafeTransferLib for address;
 
@@ -88,7 +88,6 @@ contract PackVault is ReentrancyGuard {
     IFWAToken public immutable token;
     address public immutable guardian;
     address public immutable admin;
-    uint256 public immutable paramDelay;
 
     // ------------------------------------------------------------------ parameters
 
@@ -96,13 +95,9 @@ contract PackVault is ReentrancyGuard {
 
 
     VaultLib.Params internal params;
-    VaultLib.Params internal pendingParams;
-    uint256 public pendingParamsEta;
 
-    // Keeper payment policy (D57): proposes pay for verified work; replaced through the delay.
+    // Keeper payment policy (D57): proposes pay for verified work; replaced by the admin at once (D58).
     IKeeperPolicy public keeperPolicy;
-    address public pendingPolicy;
-    uint256 public pendingPolicyEta;
 
     bool public depositsPaused;
     bool public listingPaused;
@@ -182,9 +177,7 @@ contract PackVault is ReentrancyGuard {
     event Restocked(uint256 packs, uint256 units);
     event TokensBurned(uint256 amount);
     event KeeperPaid(address indexed keeper, uint256 amount);
-    event ParamsProposed(uint256 eta);
-    event ParamsApplied();
-    event PolicyProposed(address indexed policy, uint256 eta);
+    event ParamsSet();
     event PolicyChanged(address indexed oldPolicy, address indexed newPolicy);
     event Claimed(address indexed holder, uint256 amount);
     event WindDownStarted();
@@ -192,7 +185,6 @@ contract PackVault is ReentrancyGuard {
     error NotGuardian();
     error NotAdmin();
     error OutOfBounds();
-    error TooEarly();
     error Paused();
     error WindingDown();
     error EdgeGate();
@@ -214,11 +206,9 @@ contract PackVault is ReentrancyGuard {
         IShapePacks packs_,
         address guardian_,
         address admin_,
-        uint256 paramDelay_,
         VaultLib.Params memory initial,
         IKeeperPolicy policy_
     ) payable {
-        if (paramDelay_ < 1 days || paramDelay_ > 30 days) revert OutOfBounds();
         fwa = fwa_;
         shapes = shapes_;
         packs = packs_;
@@ -226,7 +216,6 @@ contract PackVault is ReentrancyGuard {
         token = IFWAToken(fwa_.token());
         guardian = guardian_;
         admin = admin_;
-        paramDelay = paramDelay_;
         params = initial;
         VaultLib.checkBounds(params);
         VaultLib.checkPolicy(address(policy_));
@@ -799,59 +788,36 @@ contract PackVault is ReentrancyGuard {
 
     // ------------------------------------------------------------------ roles
 
-    function proposeParams(VaultLib.Params calldata p) external {
+    /// @notice Admin sets parameters at once, within the bytecode bounds (D58: no delay).
+    function setParams(VaultLib.Params calldata p) external {
         if (msg.sender != admin) revert NotAdmin();
-        pendingParams = p;
-        VaultLib.checkBounds(pendingParams);
-        pendingParamsEta = block.timestamp + paramDelay;
-        emit ParamsProposed(pendingParamsEta);
-    }
-
-    function applyParams() external {
-        if (pendingParamsEta == 0 || block.timestamp < pendingParamsEta) revert TooEarly();
         // Budgets accrue at the old rates up to now; the new caps then only clamp, never refill.
         _syncBudget();
-        params = pendingParams;
+        params = p;
+        VaultLib.checkBounds(params);
         _syncBudget();
-        delete pendingParams;
-        pendingParamsEta = 0;
-        emit ParamsApplied();
+        emit ParamsSet();
     }
 
-    /// @notice Admin proposes a new keeper policy; anyone activates it after the delay. The
-    ///         guardian cancels it (`guard`, `lowerCaps`); it never moves the budgets or limits.
-    function proposePolicy(address policy) external {
+    /// @notice Admin replaces the keeper payment policy at once (D57, D58). The vault still caps
+    ///         every offer at its envelope, free ETH and budget.
+    function setPolicy(address policy) external {
         if (msg.sender != admin) revert NotAdmin();
         VaultLib.checkPolicy(policy);
-        pendingPolicy = policy;
-        pendingPolicyEta = block.timestamp + paramDelay;
-        emit PolicyProposed(policy, pendingPolicyEta);
-    }
-
-    function activatePolicy() external {
-        if (pendingPolicyEta == 0 || block.timestamp < pendingPolicyEta) revert TooEarly();
-        emit PolicyChanged(address(keeperPolicy), pendingPolicy);
-        keeperPolicy = IKeeperPolicy(pendingPolicy);
-        delete pendingPolicy;
-        pendingPolicyEta = 0;
+        emit PolicyChanged(address(keeperPolicy), policy);
+        keeperPolicy = IKeeperPolicy(policy);
     }
 
     /// @notice Guardian stops: each flag can only be raised, and wind-down is one-way.
-    function guard(bool pauseDeposits, bool pauseListing, bool cancelProposal) external {
+    function guard(bool pauseDeposits, bool pauseListing) external {
         if (msg.sender != guardian) revert NotGuardian();
         if (pauseDeposits) depositsPaused = true;
         if (pauseListing) listingPaused = true;
-        if (cancelProposal) {
-            delete pendingParams;
-            pendingParamsEta = 0;
-            delete pendingPolicy;
-            pendingPolicyEta = 0;
-        }
     }
 
-    /// @notice Guardian may lower caps and keeper pay limits immediately (and cancels any queued
-    ///         proposal); raising goes through the admin delay. Ceiling 0 and work fee 0, or both
-    ///         budget caps 0, stop all keeper pay at once.
+    /// @notice Guardian may lower caps and keeper pay limits immediately; the admin may raise them
+    ///         again at once (D58). Ceiling 0 and work fee 0, or both budget caps 0, stop all
+    ///         keeper pay.
     function lowerCaps(
         uint128 tvlCap,
         uint96 maxPositions,
@@ -864,11 +830,6 @@ contract PackVault is ReentrancyGuard {
         _syncBudget();
         VaultLib.lower(params, tvlCap, maxPositions, gasCeiling, workFee, routineCap, essentialCap);
         _syncBudget(); // clamp spent levels to the lowered caps
-        // Proposals queued before the stop would undo it when applied: cancel them.
-        delete pendingParams;
-        pendingParamsEta = 0;
-        delete pendingPolicy;
-        pendingPolicyEta = 0;
     }
 
     function startWindDown() external {
