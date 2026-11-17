@@ -620,3 +620,13 @@ the payment ahead of pricing would change the checkpoint's accounting for no mat
 recent activity). O2 was an ETH total at the test's 0.2 gwei, built one pack per call; it is now
 keeper gas per position with the keeper's batches of 10: 1.60M measured, bound 1.75M (at most
 0.00096 ETH per position at the 0.5 gwei ceiling).
+
+## D54. Release-candidate audit at 3e600e5: open owner decision on F1 (2026-11-17)
+
+Independent audit report and source hash in `audit/rc-3e600e5/`. No critical or high finding.
+**F1 (low, new):** keeper pay lets a compromised admin pay itself. At the bytecode maxima (50%
+premium, 50 gwei ceiling) self-keeping a dust-deposit checkpoint nets +0.0028 ETH each, about
+0.0056 ETH a day, after a visible 2-day delay that holders can exit through. At canary values it is
+about 1e-5 ETH per checkpoint, the ordinary keeper margin. The natspec and D44 claim "neither role
+has any path that moves assets to itself" is wrong as stated. **Open:** tighten
+MAX_KEEPER_PREMIUM_BPS (contract change, re-review of the change) or reword the claim only.
