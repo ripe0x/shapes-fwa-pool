@@ -156,19 +156,24 @@ def main():
     state("priced")
 
     # 2. Inventory and listing: the keeper alone, until nothing more fits. The fork carries a
-    #    real request whose word never arrives here, so FWA stages these listings.
+    #    real request whose word never arrives here; while FWA's queue is busy the keeper builds
+    #    nothing and lists nothing (a listing would stage; audit E7).
     warp_to(60)
-    keeper()
-    built = state("deployed capital")
-    staged0 = sum(1 for i in ids() if num(cast("call", FWA, "listings(uint256)(address,address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint64,uint8)", i).split("\n")[-1]) == 5)
-    print(f"  FWA staged {staged0} of {built['open']} listings (its queue was busy)")
+    out_busy = keeper()
     if num(call(FWA, "unsettledAcquisitionCount()(uint256)")):
+        if ids():
+            sys.exit("keeper listed while FWA's queue was busy")
         # FWA's own processor expires a stale request after its word deadline (anyone may call).
         for _ in range(8):
             cast("rpc", "anvil_mine", hex(1000))
         send(KICKER, FWA, "processAcquisitions(uint256)", 50)
+        warp_to(60)
+    keeper()
+    built = state("deployed capital")
+    staged0 = sum(1 for i in ids() if num(cast("call", FWA, "listings(uint256)(address,address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint64,uint8)", i).split("\n")[-1]) == 5)
+    print(f"  FWA staged {staged0} of {built['open']} listings")
     if staged0:
-        keeper()  # the keeper activates the vault's staged listings, paid per listing activated
+        keeper()  # the keeper activates any staged listings, paid per listing activated
     staged1 = sum(1 for i in ids() if num(cast("call", FWA, "listings(uint256)(address,address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint64,uint8)", i).split("\n")[-1]) == 5)
     print(f"  staged after the keeper's activation: {staged1}")
 
@@ -298,7 +303,7 @@ def main():
         token_burned=burned, token_burn_keeper_cost=token_burn_cost,
         end_balance=end["balance"], end_lastNav=end["lastNav"], ledger_in=ins, ledger_out=outs,
         ledger_gap=ins - outs, keeper_tx=json.load(open(KEEPER_STATE))["stats"],
-        keeper_out=dict(tokens_idle=out_idle, tokens_burn=out_burn, spike_wait=out_spike_wait,
+        keeper_out=dict(queue_busy=out_busy, tokens_idle=out_idle, tokens_burn=out_burn, spike_wait=out_spike_wait,
                         spike_work=out_spike_work), log=log)
     (ROOT / "sim/out/canary-rehearsal.json").write_text(json.dumps(report, indent=1, default=str))
     print(json.dumps({k: v for k, v in report.items() if k not in ("log", "keeper_out", "values")}, indent=1))

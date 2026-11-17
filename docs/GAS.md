@@ -3,7 +3,8 @@
 ## Pay rule (contract, D56/D57)
 
 ```
-price    = min(basefee + maxTip, gasCeiling)                     canary: maxTip 0.05 gwei, ceiling 0.5 gwei
+price    = min(basefee + maxTip, ceiling)       ceiling = gasCeiling (routine, canary 0.5 gwei) or
+           essentialCeiling (redemption and wind-down, canary 2 gwei); maxTip 0.05 gwei
 quoted   = base + perUnit x units (VaultLib.Q_*)                  fixed per operation, never gasleft()
 envelope = quoted x price x (1 + payMarkupBps, routine only)      canary markup 0, bytecode max 10%
            + workFee x units                                      canary 0.00002 ETH, max 0.00005
@@ -20,7 +21,7 @@ Quoted gas (VaultLib, measured as billed gas on fork receipts, `sim/out/gas-quot
 
 | Operation | Base | Per unit | Measured billed |
 |---|---|---|---|
-| checkpoint | 180,000 | 32,000 per position | 221,860 (0 positions), 975,403 (23) |
+| checkpoint | 225,000 | 33,000 per position | 221,860 (0 positions), 975,403 (23); quoted at measured cost (D61) |
 | restock | 280,000 | 200,000 per pack + 2,200,000 per mint | 2,635,830 (1 pack, 1 mint), 9,121,461 (10 packs, 3 mints) |
 | list | 255,000 | 530,000 | 858,779 (1), 5,790,861 (10) |
 | sync | 75,000 | 75,000 | 158,661 (1), 300,695 (3 kicked); bid outcome ~181k |

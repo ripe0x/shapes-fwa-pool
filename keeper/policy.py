@@ -21,7 +21,7 @@ ACTIVE, ALLOCATED, WITHDRAWN, SETTLED, STAGED = 1, 2, 3, 4, 5
 
 # The vault's quoted-gas schedule, line for line (PackVault Q_* constants, D56). Pay is a quote
 # fixed by the operation and its completed work, never the caller's gas.
-Q = dict(checkpoint=180_000, checkpoint_pos=32_000, restock=280_000, pack=200_000, mint=2_200_000,
+Q = dict(checkpoint=225_000, checkpoint_pos=33_000, restock=280_000, pack=200_000, mint=2_200_000,
          list=255_000, listed=530_000, sync=75_000, synced=75_000, activate=50_000, activated=450_000,
          unlist=240_000, unlisted=170_000, liquidate=75_000, liq_pack=150_000, liq_shape=65_000,
          harvest=80_000, harvested=15_000)
@@ -230,7 +230,10 @@ def plan(s):
         s.notes.append(f"tokens {total / 1e18:.4f} unburned (run with --burn-tokens; operator pays the gas)")
 
     # 6. Deploy: relist idle packs, then build new ones only when one cycle repays the build.
-    if spike or s.winding_down or broken or s.listing_paused or redeeming or not s.backing:
+    #    Wait for FWA's queue to drain: a listing made while it is busy is staged, earns nothing
+    #    until then either way, and then costs an activation call (audit E7).
+    if spike or s.winding_down or broken or s.listing_paused or redeeming or not s.backing \
+            or not s.queue_drained:
         return out
     net = cycle_net(s)
     if not net:

@@ -51,7 +51,7 @@
   },
   {
    "id": "O2",
-   "text": "DRAFT. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint, 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; budgets cap all pay at 0.041 ETH a day; the owner can stop pay at once.",
+   "text": "DRAFT. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling; 2 gwei for redemption and wind-down work) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint (quoted at measured gas, D61), 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; budgets cap all pay at 0.041 ETH a day; the owner can stop pay at once.",
    "metric": "facts.keeper_gas_per_position",
    "max": 1750000,
    "regimes": [
@@ -87,7 +87,7 @@
   },
   {
    "id": "O6",
-   "text": "DRAFT. Can it stall and what restarts it (gas): above the 0.5 gwei ceiling no call is refused; every call is paid at the ceiling price, not the spike (at 2 gwei a build and a checkpoint are paid as at 0.5 gwei), so the keeper waits and holders or anyone may act at their own extra cost. A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid. Work resumes when gas falls or the admin raises the ceiling (immediate, D58).",
+   "text": "DRAFT. Can it stall and what restarts it (gas): no call is refused for gas price. Routine work is paid up to the 0.5 gwei ceiling and redemption and wind-down work up to 2 gwei (D61), from the essential budget; above those the keeper waits and holders or anyone may act at their own extra cost (a deposit-pricing checkpoint at 2 gwei is paid as at 0.5 gwei). A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid. Work resumes when gas falls or the owner raises a ceiling (immediate, D58).",
    "metric": "facts.checkpoint_pay_wei",
    "max": 200000000000000,
    "regimes": [
@@ -123,7 +123,7 @@
   },
   {
    "id": "O10",
-   "text": "DRAFT. A relist staged while FWA's queue is busy earns nothing until activated; with the queue drained the vault activates it through FWA's own permissionless activation, so a relist never sits staged forever (D36).",
+   "text": "DRAFT. A listing made while FWA's queue is busy is staged and earns nothing until activated. The keeper lists only when the queue is drained (D61, audit E7), so its own listings never stage; one staged by any caller is activated through FWA's permissionless activation in batches of 20 once the queue drains (D36, audit E5).",
    "metric": "facts.relist_active_after_activate",
    "min": 1,
    "regimes": [

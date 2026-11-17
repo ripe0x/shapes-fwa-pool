@@ -105,6 +105,9 @@ def main():
               open_positions=1, work_fee=20_000_000_000_000)
     got = fns(plan(s))
     assert "liquidate" in got and got.index("liquidate") < got.index("checkpoint"), got
+    # Audit E7: no listing or building while FWA's queue is busy (it would stage and cost activation).
+    assert not {"list", "restock"} & set(fns(plan(state(queue_drained=False, **build))))
+    assert "list" in fns(plan(state(idle_packs=2, listings=act, open_positions=10, idle_eth=E, free=E)))
     print("keeper/test_policy.py: pass")
 
 

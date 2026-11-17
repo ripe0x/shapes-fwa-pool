@@ -27,7 +27,8 @@ ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent / "keeper"))
 import policy  # noqa: E402
-from vault import ACTIVE, ALLOCATED, SETTLED, WITHDRAWN, Vault  # noqa: E402
+import bisect  # noqa: E402
+from vault import ACTIVE, ALLOCATED, SETTLED, STAGED, WITHDRAWN, Vault  # noqa: E402
 
 DB = ROOT / "data/fwa.sqlite"
 OUT = ROOT / "out"
@@ -74,6 +75,48 @@ def history():
     h = {k: np.array(v) for k, v in zip(("ts", "fee", "w", "n", "cut", "crown"), zip(*rows))}
     np.savez(cache, **h)
     return h
+
+
+def staging_delays(days_back=30, poll=600):
+    """Seconds a relist waits staged (FWA queue busy) before it can be activated, measured at
+    every historical relist moment in the last `days_back` days: a bid outcome's resolution plus
+    one keeper poll. 0 when FWA's queue was empty then (audit E7)."""
+    cache = OUT / f"staging_delays_{days_back}.npy"
+    if cache.exists():
+        return np.load(cache)
+    db = sqlite3.connect(DB)
+    times, counts, drains, relists, n = [], [], [], [], 0
+    q = ("SELECT ts, event FROM logs WHERE event IN ('AcquisitionRequested','AcquisitionProcessed',"
+         "'DepositorBidAccepted','DepositorBidAcceptedAsTokens') ORDER BY block, log_index")
+    for ts, ev in db.execute(q):
+        if ev == "AcquisitionRequested":
+            n += 1
+        elif ev == "AcquisitionProcessed":
+            n -= 1
+            if n == 0:
+                drains.append(ts)
+        else:
+            relists.append(ts + poll)
+            continue
+        times.append(ts)
+        counts.append(n)
+    end = times[-1]
+    out = []
+    for t in relists:
+        if t < end - days_back * DAY or t > end:
+            continue
+        i = bisect.bisect_right(times, t) - 1
+        if i < 0 or counts[i] == 0:
+            out.append(0)
+            continue
+        k = bisect.bisect_left(drains, t)
+        out.append(drains[k] - t if k < len(drains) else end - t)
+    arr = np.array(out, dtype=float)
+    np.save(cache, arr)
+    return arr
+
+
+STAGING = None  # set in main(): relist waits from the last 30 days of history
 
 
 def pool_snapshot():
@@ -190,7 +233,14 @@ def run(sc, n_target, seed, days=365):
     accrued = selected = 0
     missed_alloc = 0  # model check: accrued / (selected x B) must approach k
     open_days = []
+    stage_until = {}  # listing -> first day it earns: the keeper lists only after FWA's queue drains
+    waits = sc.get("staging", STAGING)
     for d in range(days):
+        for i, d1 in list(stage_until.items()):
+            if d >= d1:
+                del stage_until[i]
+                if i in v.positions and v.positions[i].status == STAGED:
+                    v.positions[i].status = ACTIVE
         gas = int((g_of(d) if callable(g_of) else g_of) * GWEI)
         for (day, key, val) in sc.get("changes", []):
             if day == d:
@@ -343,7 +393,15 @@ def run(sc, n_target, seed, days=365):
                 elif fn == "list":
                     m = 0
                     while m < act_[1] and v.idle_packs and v.idle() >= backing:
-                        v.list(next_id, backing)
+                        # Listed at a uniform moment of day d, after the queue's historical wait;
+                        # the model's convention is that a listing earns from the next whole day.
+                        wait = waits[rng.integers(len(waits))] / DAY if len(waits) else 0.0
+                        first = d + int(np.ceil(rng.random() + wait))
+                        if first > d + 1:
+                            v.list(next_id, backing, STAGED)  # earns nothing yet (no activation call)
+                            stage_until[next_id] = first
+                        else:
+                            v.list(next_id, backing)
                         next_id += 1
                         m += 1
                     if m:
@@ -437,9 +495,10 @@ def ci(s):
 
 
 def main():
-    global POOL
+    global POOL, STAGING
     OUT.mkdir(exist_ok=True)
     POOL = pool_snapshot()
+    STAGING = staging_delays(30)
     vol, first = successful_daily()
     last30, last14, last7 = vol[-30:], vol[-14:], vol[-7:]
     spike = int(np.argmax(last30))
@@ -454,7 +513,11 @@ def main():
           f"per day: last 7 d {last7.mean():.0f}, last 14 d {last14.mean():.0f}, last 30 d {last30.mean():.0f} "
           f"({last30_ex.mean():.0f} without the {last30.max():.0f} of Oct 31), 30-day median {np.median(last30):.0f}.",
           "Vault: 3-unit packs (P = 0.03 ETH) at the 0.0363 cap; k = 1.0385; keeper pay V1 (quoted gas + work fee, no premium); maxTip 0.05 gwei; "
-          f"gas ceiling {CEILING} gwei; FWA tokens at zero; purchasers take the bid unless stated (keeps pay the vault more).\n"]
+          f"gas ceiling {CEILING} gwei; FWA tokens at zero; purchasers take the bid unless stated (keeps pay the vault more).\n",
+          f"FWA staging (audit E7): the keeper lists only when FWA's queue is drained, so a relist never stages; each "
+          f"listing first waits the queue's historical drain time, sampled from {len(STAGING)} relist moments in the last "
+          f"30 days ({100 * np.mean(STAGING > 0):.1f}% found the queue busy; waits up to {STAGING.max() / 3600:.1f} h). "
+          f"The forward simulation assumes this; the closed form does not.\n"]
 
     # 1. The formal gate, as approved: trailing 30-day volume, tokens at zero.
     md += ["## 1. Formal economic gate (owner's definition)\n",

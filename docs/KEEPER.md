@@ -48,7 +48,8 @@ anvil's public dev keys carry on mainnet) passes the vault's pay on.
    replacement re-quotes before re-bidding. Pay is simulated, and the final call (minPay included)
    re-estimated, with the fee fields the keeper signs, so a policy that prices on `tx.gasprice`
    is seen as it will act (audit E1). Activation goes in batches of 20; a distribution-only
-   checkpoint is planned when simulating it succeeds. `--status` and `/health` show the active policy and
+   checkpoint is planned when simulating it succeeds. Building and listing wait until FWA's queue
+   is drained, so the keeper's own listings never stage (audit E7). `--status` and `/health` show the active policy and
    any queued replacement.
 5. Save the pending entry, broadcast at basefee + maxTip (max fee 2 x basefee + maxTip), wait for
    the receipt, count it, re-read the chain, repeat.
