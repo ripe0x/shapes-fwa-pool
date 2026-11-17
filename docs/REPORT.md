@@ -201,7 +201,7 @@ Answered 2026-11-16 (sections 8, 9): canary approved; no gas stop rule; tokens b
 public; gate at the 0.5 gwei ceiling. Open:
 1. **Guardian and admin addresses** (one address may hold both, D44).
 2. **Sign `asset-flow.json`** (10 DRAFT outcomes, all OK in 16 regimes; hash
-   `1fda6b45c1dc3ef783b21ec41c89d4e6a28a3de371ca7ff8fc857eac334f51e9`; signing commands in
+   `f23d05389860157fa782341e3a3cff2065e92d3d4f61a3dd28f4176ee0fcc3b0`; signing commands in
    `~/.agents/guidance/asset-flow-kit/README.md`). Until signed the gate reports INCOMPLETE.
 3. ~~Keeper loss allowance~~: answered: the keeper stops above the ceiling (`--max-loss-wei 0`, the
    default); holders or anyone may still call any step, reimbursed at the ceiling price (D51).
@@ -279,12 +279,12 @@ information, a zero-demand holder cost bound) is done in section 11.
 ## 11. Outcomes tightened (D52)
 
 All 10 DRAFT outcomes hold in all 16 regimes; gate INCOMPLETE only for the signature. Outcome
-hash to sign: `1fda6b45c1dc3ef783b21ec41c89d4e6a28a3de371ca7ff8fc857eac334f51e9`.
+hash to sign: `f23d05389860157fa782341e3a3cff2065e92d3d4f61a3dd28f4176ee0fcc3b0`.
 
 | # | Outcome | Measured |
 |---|---|---|
 | O1 | bid: backing leaves, vault keeps the pack | 0.0363 ETH |
-| O2 | keeper pay for a full canary build | 0.0128 ETH (bound 0.015) |
+| O2 | keeper gas per position built and listed (keeper batches) | 1.60M gas (bound 1.75M; at most 0.00096 ETH at the ceiling) |
 | O3 | wind-down claim = holder's value share | 0 wei gap |
 | O4 | left after wind-down | 0.0105 ETH (seed slice) |
 | O5 | liabilities never spendable | 0 wei overlap; asserted after every keeper call |

@@ -93,9 +93,9 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         flowReport("init", a, f);
     }
 
-    /// @dev Maximum load: deposit to the 2 ETH cap and list as many packs as the capital allows
-    ///      (about 28, the canary's stated capacity). Backing, pack value and mint fees are all
-    ///      deployed at once. GAP: a real high-volume settlement burst needs several real VRF
+    /// @dev Maximum load: deposit to the 2 ETH cap and build and list as many packs as the capital
+    ///      allows, in batches of up to 10 as keeper/policy.py does (largest batch the capital check
+    ///      accepts). O2 reads keeper pay per position as gas: pay / (0.2 gwei x 1.10). GAP: a real high-volume settlement burst needs several real VRF
     ///      selections in one fork; only two historical fixtures exist, so this shows the maximum
     ///      standing load instead (see report).
     function test_flow_max_load() public {
@@ -107,12 +107,16 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         _kCheckpoint(keeper);
         _toOpen();
         uint256 listed;
-        for (uint256 i; i < 30 && vault.idleEth() > 0.07 ether; ++i) {
-            _kRestock(keeper, 1, 3);
-            listed += _kList(keeper, 1);
+        uint256 pay0 = keeperPaidCum;
+        for (uint256 c = 10; c != 0;) {
+            if (_kTryRestock(keeper, c, 3)) listed += _kList(keeper, c);
+            else --c;
         }
+        // Reimbursed price here: min(0.2 gwei bid, basefee 0.15 + maxTip 0.05, ceiling 0.5) x 1.10.
+        uint256 gasPerPosition = (keeperPaidCum - pay0) / 0.22 gwei / listed;
         Fact[] memory f = _facts("open_listings", vault.openListings().length);
         f[1] = Fact("packs_listed", listed);
+        f[2] = Fact("keeper_gas_per_position", gasPerPosition);
         flowReport("max_load", a, f);
     }
 
@@ -652,6 +656,24 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         mintFeesCum += mints * SHAPES.mintFee();
         mintedValueCum += mints * 0.1 ether;
         _guard();
+    }
+
+    /// @dev _kRestock that returns false instead of reverting when the vault refuses the batch.
+    function _kTryRestock(address who, uint256 count, uint256 units) internal returns (bool) {
+        uint256 b = who.balance;
+        uint256 loose = vault.looseShapeCount();
+        vm.prank(who);
+        try vault.restock(count, units) {}
+        catch {
+            return false;
+        }
+        keeperPaidCum += who.balance - b;
+        uint256 need = count * units;
+        uint256 mints = need > loose ? (need - loose + 9) / 10 : 0;
+        mintFeesCum += mints * SHAPES.mintFee();
+        mintedValueCum += mints * 0.1 ether;
+        _guard();
+        return true;
     }
 
     function _kList(address who, uint256 n) internal returns (uint256 listed) {

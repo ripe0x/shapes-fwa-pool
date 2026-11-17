@@ -613,3 +613,10 @@ is replaced by the zero-demand holder cost, at most 1.5% of deposits (measured 0
 that pay (about 0.00005 ETH per checkpoint at 0.2 gwei) falls on the shares that stay, not on
 those leaving or entering. Kept: it is one call's gas, bounded by the ceiling price, and moving
 the payment ahead of pricing would change the checkpoint's accounting for no material gain.
+
+## D53. Canary size 2 ETH confirmed; O2 measured in gas per position (owner, 2026-11-16)
+
+**Owner:** "approved" (2 ETH deposit cap, about 29 positions, roughly 1 to 1.5 selections a day at
+recent activity). O2 was an ETH total at the test's 0.2 gwei, built one pack per call; it is now
+keeper gas per position with the keeper's batches of 10: 1.60M measured, bound 1.75M (at most
+0.00096 ETH per position at the 0.5 gwei ceiling).

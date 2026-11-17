@@ -51,9 +51,9 @@
   },
   {
    "id": "O2",
-   "text": "DRAFT. What a keeper earns and the cheapest way to game it: only reimbursed gas plus the 10% premium, capped per position moved (D35), so padding a call earns nothing; building and listing a full 2 ETH canary pays keepers at most 0.015 ETH (measured 0.0128 ETH).",
-   "metric": "destinations.paid to keepers (gas + premium)",
-   "max_wei": "15000000000000000",
+   "text": "DRAFT. What building costs holders: keeper pay is the builder's gas plus 10%, at most 1.75M gas per position built and listed in keeper-sized batches (measured 1.60M across the 29 positions the 2 ETH canary holds). At the 0.5 gwei ceiling that is at most 0.00096 ETH per position, about 0.028 ETH for the canary (1.4%). Padding or splitting calls earns nothing extra beyond the 30k-gas overhead (D35, D41).",
+   "metric": "facts.keeper_gas_per_position",
+   "max": 1750000,
    "regimes": [
     "max_load"
    ]
