@@ -19,7 +19,7 @@ proposed outcomes in `OWNER-REQUIREMENTS.md` section B2; economics in `sim/out/f
   successful acquisitions and real settlement, keeper timing, cash and staging, the same 30 days
   give +169% annualized, matching the closed form (+166%) at the true volume (D38, D39).
 - **Returns at current activity:** 100 positions, last 14 days' activity (71 a day), 0.15 gwei:
-  mean +20.3% a year, 20% chance of a losing year (95% interval 16 to 24%), with quoted keeper
+  mean +18.7% a year, 22% chance of a losing year (95% interval 19 to 27%), with quoted keeper
   pay and request charges (D56).
 - **Keeper pay is a fixed quote paid through a replaceable policy contract (D56, D57).** Caller
   gas and tip change nothing; budgets cap all pay at 0.041 ETH a day at canary values. Two High
@@ -397,3 +397,12 @@ repaired and proven by the auditor's own witnesses rewritten as regressions
 model omits FWA staging, so the return gate is unvalidated), E8 (owner-compromise bound and the
 raisable TVL cap need an owner decision), E9 (outcome signature). Launch steps B to E (uninformed
 second audit, comparison, real-transaction rehearsal, canary plan) have not run.
+
+## 18. Return gate with FWA staging (audit E7, 2026-11-17)
+
+The keeper now lists only when FWA's queue is drained, and the forward model makes each listing
+wait the queue's historical drain time (10,588 relist moments in the last 30 days: 46.4% found it
+busy, waits up to 4.7 h). Gate at trailing-30-day volume, 100 positions, 400 runs:
+**0.5 gwei ceiling +76.6% mean (p5 -13.0%), was +78.5%; 0.15 gwei +107.5% (p5 +8.0%).** The gate
+(10%) passes. At last-14-day activity: +18.7% mean, 22% chance of a losing year (was +20.3%, 20%);
+at the 0.5 gwei ceiling +12.0%, 31%. With 1.0 gwei from day 30: +2.4%, 41%. Closed form unchanged.
