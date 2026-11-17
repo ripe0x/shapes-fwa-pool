@@ -85,7 +85,8 @@ contract ForkVaultLifecycleTest is ForkBase {
         payBeforeLast;
         // About 20.7M gas reimbursed at 0.2 gwei plus 10%: restock 10 (9.2M), list 10 (5.7M),
         // unlist, liquidate and three checkpoints.
-        assertLt(allPay, 0.005 ether);
+        // Gas pay, plus the work fee: 10 listed + 10 unlisted + liquidated items + 2 pricing checkpoints.
+        assertLt(allPay, 0.005 ether + 40 * vault.getParams().workFee);
     }
 
     function test_kickReturnsFullBackingAndPack() public {
@@ -129,7 +130,8 @@ contract ForkVaultLifecycleTest is ForkBase {
         uint256 pay = keeper.balance - before;
         // Price here is min(0.2 gwei, 0.15 + 0.05 tip) = 0.2 gwei, plus the 10% premium.
         // (+2k gas: the cap is taken just before the reimbursement code itself runs.)
-        uint256 cap = (vault.GAS_PER_MOVED() + vault.KEEPER_OVERHEAD_GAS() + 2_000) * 0.2 gwei * 11_000 / 10_000;
+        uint256 cap = (vault.GAS_PER_MOVED() + vault.KEEPER_OVERHEAD_GAS() + 2_000) * 0.2 gwei * 11_000 / 10_000
+            + vault.getParams().workFee; // one unit: one position moved
         assertGt(used, vault.GAS_PER_MOVED(), "the padding really cost gas");
         assertLe(pay, cap, "paid for one moved position, not the padding");
         assertEq(vault.idlePacks().length, 1);
@@ -213,10 +215,10 @@ contract ForkVaultLifecycleTest is ForkBase {
         uint256 gBal = guardian.balance;
         vm.startPrank(guardian);
         vault.guard(true, true, true);
-        vault.lowerCaps(1 ether, 10, 1 gwei);
+        vault.lowerCaps(1 ether, 10, 1 gwei, 0);
         vault.startWindDown();
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        vault.lowerCaps(2 ether, 10, 1 gwei);
+        vault.lowerCaps(2 ether, 10, 1 gwei, 0);
         vm.stopPrank();
         assertEq(address(vault).balance, bal);
         assertEq(guardian.balance, gBal);

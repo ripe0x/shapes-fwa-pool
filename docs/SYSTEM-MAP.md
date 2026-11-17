@@ -12,7 +12,7 @@ non-transferable internal shares priced at checkpoints.
 | Actor | Brings | Takes |
 | --- | --- | --- |
 | Depositors (holders) | ETH deposits | shares; redemptions and distributions on claim |
-| Keepers (anyone) | gas for restock/list/sync/harvest/checkpoint/unlist/liquidate/activate/burn | reimbursed gas + 10% premium, capped per position moved; nothing for padding or dust |
+| Keepers (anyone) | gas for restock/list/sync/harvest/checkpoint/unlist/liquidate/activate/burn | reimbursed gas + 10% premium, capped per position moved, plus a flat work fee per unit of work done (D55); nothing for padding or dust |
 | Purchasers (FWA buyers) | an FWA acquisition that selects a listing | the pack (keep/silent) or the bid (0.9 x backing) |
 | FWA main pool (holds vault backing) | custody of listed packs, backing escrow, flat fee shares | 10% of backing on a bid, 1% settlement fee on keep/silent |
 | FWA rewards module | FWA token rewards to depositors | nothing (tokens are burned) |
@@ -50,7 +50,7 @@ bucket: it leaves `_free` after a call does necessary work or realizes more than
 | 5 | FWA fees -> vault ETH | `harvest` (credited fees) and `checkpoint` (`_harvest`) | no |
 | 6a | On a bid: backing -> 0.9 purchaser + 0.1 FWA; pack -> vault | purchaser `acceptDepositorBid`, then `sync` | no (backing gone; vault keeps the pack) |
 | 6b | On keep/silent: backing x 0.99 -> vault; pack -> purchaser; 1% -> FWA | purchaser `keepNFT`, or `sync` past the window | no |
-| 7 | Vault -> keeper: reimbursed gas + premium | any paid keeper call | the fee share inside a listing returns when harvested; gas does not |
+| 7 | Vault -> keeper: reimbursed gas + premium + work fee per unit | any paid keeper call | the fee share inside a listing returns when harvested; gas does not |
 | 8 | Vault -> holder: redemption + distribution | `checkpoint` fills pro rata, `claim` pays | deposit again |
 | 9 | FWA rewards -> vault -> burned | `burnTokens` (permissionless, unpaid) | no (supply falls by the claimed amount) |
 

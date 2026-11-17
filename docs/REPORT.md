@@ -301,3 +301,14 @@ allowed signers. `asset_gate.py .` returns **PASS** (16 regimes, 10 outcomes). R
 canary deploy: an independent review recorded under `audit/` for the current source hash (the
 deploy step runs the gate with `--require-review`), the guardian/admin address, and the owner's
 deploy authorization.
+
+## 13. Flat work fee for permissionless keepers (D55, 2026-11-17)
+
+Owner decision: keep paying keepers gas plus 10%, and add a flat fee per unit of work so outside
+keepers have a reason to run the vault. Canary fee 0.00002 ETH per unit (maximum 0.0001); units
+are positions listed, resolved, activated or unlisted, items liquidated, and pricing checkpoints;
+splitting work earns no extra fee. The guardian can lower the fee at once, and a guardian stop now
+cancels any queued admin proposal. Cost: about 0.1% of deposits over a zero-acquisition canary
+lifecycle; about 3% of the edge per bid cycle. Review record: `audit/rc-workfee/`. The changed O2
+wording needs the owner's signature again (hash `f5100bae992f2ab5fb41c772707570d1dc5d7a0c0cdcd773317bc125927740bd`).
+F1 (premium maximum 50%) is still open.

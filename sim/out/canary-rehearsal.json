@@ -16,6 +16,7 @@
   "packUnitsMask": 8,
   "gasCeilingWei": 500000000,
   "maxTipWei": 50000000,
+  "workFeeWei": 20000000000000,
   "maxPositions": 30,
   "reserveWei": 5000000000000000,
   "tvlCapWei": 2000000000000000000,
@@ -23,41 +24,41 @@
  },
  "positions_built": 29,
  "positions_listed": 29,
- "capital_idle_after_build": 31937957277299834,
+ "capital_idle_after_build": 31337228676497936,
  "deposited": 1990000000000000000,
- "claimed": 1969935512321720101,
- "holder_result": -20064487678279899,
- "keeper_pay": 11192260318299349,
- "keeper_net": 353126945505067,
- "keeper_gas_spent": 10839133372794282,
+ "claimed": 1967943173832206297,
+ "holder_result": -22056826167793703,
+ "keeper_pay": 13217435869008314,
+ "keeper_net": 2247799878343641,
+ "keeper_gas_spent": 10969635990664673,
  "mints": 9,
  "mint_fees": 9000000000000000,
  "staged_before_activation": 0,
  "staged_after_activation": 0,
  "token_burned": 5039168559195973351,
- "token_burn_keeper_cost": 34699307760971,
- "end_balance": 9872227359980550,
- "end_lastNav": 9893179803557076,
+ "token_burn_keeper_cost": 34709049084548,
+ "end_balance": 9839390298785389,
+ "end_lastNav": 9880340230532181,
  "ledger_in": 2000000000000000000,
  "ledger_out": 2000000000000000000,
  "ledger_gap": 0,
  "keeper_tx": {
-  "sent": 18,
-  "mined": 18,
+  "sent": 19,
+  "mined": 19,
   "reverted": 0,
   "replaced": 0,
   "dropped": 0,
   "reorged": 0,
   "skipped_expected": 0,
   "skipped_loss": 2,
-  "spent_wei": 10839133372794282,
-  "paid_wei": 11192260318299349
+  "spent_wei": 10969635990664673,
+  "paid_wei": 13217435869008314
  },
  "keeper_out": {
-  "tokens_idle": "gas 0.088 gwei, 29 open, 0 idle packs, idle 0.0269 ETH, cycle net 1.319 mETH, 7d volume 96/day\nstatus TOKENS_UNBURNED [info] 5.0392 FWA tokens; anyone may call burnTokens\nnote: tokens 5.0392 unburned (run with --burn-tokens; operator pays the gas)\nnote: tokens 5.0392 unburned (run with --burn-tokens; operator pays the gas)\nnothing to do",
-  "tokens_burn": "gas 0.088 gwei, 29 open, 0 idle packs, idle 0.0269 ETH, cycle net 1.319 mETH, 7d volume 96/day\nstatus OK [ok] operating normally\nsent burnTokens nonce 7 hash 0xb5d9a103d215d44cab236618dbdd447be5d410a5e3afca7b52acb4ef9b080a9a\nmined burnTokens gas 415963 (est 443664) cost 34699307760971 pay 0 net -34699307760971 wei\ndone: 1 sent, 0 failed",
-  "spike_wait": "gas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.829 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9598 ETH owed to redeemers beyond free ETH\nskip liquidate: pay ~129715850000000 wei < cost ~247639350000000 wei beyond --max-loss-wei 0\ngas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.829 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9598 ETH owed to redeemers beyond free ETH\nskip unlist: pay ~1984588650000000 wei < cost ~3788760150000000 wei beyond --max-loss-wei 0\ngas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.829 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9598 ETH owed to redeemers beyond free ETH\nnothing to do",
-  "spike_work": "gas 0.925 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.829 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 0.925 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9300 ETH owed to redeemers beyond free ETH\nsent unlist nonce 11 hash 0x8b6034465fe2559880a290740a7e7354c0768cec5efa7d1fe2770f80bf8a1b03\nmined unlist gas 2891554 (est 3608343) cost 2360464222835842 pay 1982042150000000 net -378422072835842 wei\nsent liquidate nonce 12 hash 0x62a814a02206e1338ccbc1dc393b77a6e8993d3191c193b2fc40ab9108e94b13\nmined liquidate gas 2088512 (est 2604541) cost 1524137996966400 pay 1427375950000000 net -96762046966400 wei\ndone: 2 sent, 0 failed"
+  "tokens_idle": "gas 0.088 gwei, 29 open, 0 idle packs, idle 0.0263 ETH, cycle net 1.279 mETH, 7d volume 96/day\nstatus TOKENS_UNBURNED [info] 5.0392 FWA tokens; anyone may call burnTokens\nnote: tokens 5.0392 unburned (run with --burn-tokens; operator pays the gas)\nnote: tokens 5.0392 unburned (run with --burn-tokens; operator pays the gas)\nnothing to do",
+  "tokens_burn": "gas 0.088 gwei, 29 open, 0 idle packs, idle 0.0263 ETH, cycle net 1.279 mETH, 7d volume 96/day\nstatus OK [ok] operating normally\nsent burnTokens nonce 7 hash 0x680059f6978c195bf853a165c4099014c3e9ef3791df81bb114d39e61969255b\nmined burnTokens gas 415988 (est 443689) cost 34709049084548 pay 0 net -34709049084548 wei\ndone: 1 sent, 0 failed",
+  "spike_wait": "gas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.789 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9605 ETH owed to redeemers beyond free ETH\nskip liquidate: pay ~134492600000000 wei < cost ~256758600000000 wei beyond --max-loss-wei 0\ngas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.789 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9605 ETH owed to redeemers beyond free ETH\nskip unlist: pay ~1989390700000000 wei < cost ~3797927700000000 wei beyond --max-loss-wei 0\ngas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.789 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9605 ETH owed to redeemers beyond free ETH\nnothing to do",
+  "spike_work": "gas 0.925 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.789 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 0.925 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9307 ETH owed to redeemers beyond free ETH\nsent unlist nonce 11 hash 0xeba5bc169a3292e3bf296e5c13252961eef63a1f5de3bbafbab8b9023a062857\nmined unlist gas 2891899 (est 3617074) cost 2360749116088200 pay 2282092750000000 net -78656366088200 wei\nsent liquidate nonce 12 hash 0xc76806fdd85ff52a347340bfb0ef9e2ac74c02f61a245a6191fb684f667702c5\nmined liquidate gas 2088820 (est 2613226) cost 1524367155414820 pay 1687412800000000 net 163045644585180 wei\nsent liquidate nonce 13 hash 0x9e9c063e4889ca3939af2f9a3c94cf3b8d061a0e428790a89dd22adc89840db2\nmined liquidate gas 239371 (est 301414) cost 155763227348883 pay 175916200000000 net 20152972651117 wei\ndone: 3 sent, 0 failed"
  },
  "log": [
   {
@@ -74,75 +75,75 @@
   },
   {
    "tag": "priced",
-   "balance": 31937957277299834,
+   "balance": 31337228676497936,
    "lastNav": 2000000000000000000,
    "totalShares": 200000000000000000,
    "open": 29,
    "idle": 0,
    "loose": 3,
    "tokens": 0,
-   "keeper": 10000938946435145180,
-   "holder": 8009981974885333884
+   "keeper": 10001538859115476845,
+   "holder": 8009981957522778399
   },
   {
    "tag": "deployed capital",
-   "balance": 31937957277299834,
+   "balance": 31337228676497936,
    "lastNav": 2000000000000000000,
    "totalShares": 200000000000000000,
    "open": 29,
    "idle": 0,
    "loose": 3,
    "tokens": 0,
-   "keeper": 10000938946435145180,
-   "holder": 8009981974885333884
+   "keeper": 10001538859115476845,
+   "holder": 8009981957522778399
   },
   {
    "tag": "after token burn",
-   "balance": 31937957277299834,
+   "balance": 31337228676497936,
    "lastNav": 2000000000000000000,
    "totalShares": 200000000000000000,
    "open": 29,
    "idle": 0,
    "loose": 3,
    "tokens": 0,
-   "keeper": 10000904247127384209,
-   "holder": 8009981974885333884
+   "keeper": 10001504150066392297,
+   "holder": 8009981957522778399
   },
   {
    "tag": "after kick, sync, relist",
-   "balance": 35167423139529546,
+   "balance": 34526677763073915,
    "lastNav": 2000000000000000000,
    "totalShares": 200000000000000000,
    "open": 29,
    "idle": 0,
    "loose": 3,
    "tokens": 0,
-   "keeper": 10000911305916002117,
-   "holder": 8009981974885333884
+   "keeper": 10001551167028440400,
+   "holder": 8009981957522778399
   },
   {
    "tag": "partial withdrawal",
-   "balance": 10184726171738597,
-   "lastNav": 995469288921738596,
+   "balance": 39447346418819643,
+   "lastNav": 994747304018819642,
    "totalShares": 100500000000000000,
    "open": 14,
-   "idle": 2,
+   "idle": 1,
    "loose": 0,
    "tokens": 0,
-   "keeper": 10000131698746199875,
-   "holder": 8995522062037144613
+   "keeper": 10001433860779588497,
+   "holder": 8994807240691210057
   },
   {
    "tag": "wound down",
-   "balance": 9872227359980550,
-   "lastNav": 9893179803557076,
+   "balance": 9839390298785389,
+   "lastNav": 9880340230532181,
    "totalShares": 1000000000000000,
    "open": 0,
    "idle": 0,
    "loose": 0,
    "tokens": 0,
-   "keeper": 10000353126945505067,
-   "holder": 9979874241194138843
+   "keeper": 10002247799878343641,
+   "holder": 9977881880941280877
   }
  ]
 }

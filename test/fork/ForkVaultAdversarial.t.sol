@@ -53,6 +53,80 @@ contract ReentrantHolder {
 }
 
 contract ForkVaultAdversarialTest is ForkBase {
+    uint256 constant PER_GAS = 0.22 gwei; // min(0.2 bid, 0.15 basefee + 0.05 maxTip, 5 ceiling) x 1.10
+
+    /// D55: the work fee is paid per unit of work, not per call. Listing three packs in one call and
+    /// in three calls earns the same fee (3 units); only the per-call gas overhead differs. Each
+    /// pay is exactly gas x 0.22 gwei plus units x workFee, and a checkpoint that priced flows is
+    /// one unit.
+    function test_workFeePerUnitNotPerCall() public {
+        uint256 fee = vault.getParams().workFee;
+        assertEq(fee, 0.00002 ether);
+        vm.prank(alice);
+        vault.deposit{value: 1 ether}();
+        toBlackout();
+        uint256 cp = keeper.balance;
+        checkpoint();
+        cp = keeper.balance - cp;
+        assertEq((cp - fee) % PER_GAS, 0, "checkpoint with flows: gas + 1 unit");
+        toOpen();
+        vm.prank(keeper);
+        vault.restock(3, 3);
+        uint256 snap = vm.snapshotState();
+
+        uint256 b = keeper.balance;
+        vm.prank(keeper);
+        vault.list(3);
+        uint256 one = keeper.balance - b;
+        assertEq((one - 3 * fee) % PER_GAS, 0, "one call: gas + 3 units");
+        assertGt(one - 3 * fee, 0);
+
+        vm.revertToState(snap);
+        uint256 split;
+        for (uint256 i; i < 3; ++i) {
+            b = keeper.balance;
+            vm.prank(keeper);
+            vault.list(1);
+            uint256 pay = keeper.balance - b;
+            assertEq((pay - fee) % PER_GAS, 0, "split call: gas + 1 unit");
+            split += pay;
+        }
+        // Same 3 units of fee either way. Splitting is paid more only as gas: separate calls write
+        // FWA's storage cold, so the keeper also spends that gas; the difference carries no fee.
+        assertGt(split, one);
+        assertEq((split - one) % PER_GAS, 0, "the split premium is gas reimbursement only, no extra fee");
+        // Nothing to list: the call reverts, so no fee.
+        vm.prank(keeper);
+        vm.expectRevert(PackVault.Nothing.selector);
+        vault.list(1);
+    }
+
+    function test_workFeeBounded() public {
+        PackVault.Params memory p = defaultParams();
+        p.workFee = uint64(vault.MAX_WORK_FEE() + 1);
+        vm.prank(admin);
+        vm.expectRevert(PackVault.OutOfBounds.selector);
+        vault.proposeParams(p);
+        p.workFee = uint64(vault.MAX_WORK_FEE());
+        vm.prank(admin);
+        vault.proposeParams(p);
+        // The guardian lowers the fee at once (never raises it); with the ceiling at 0 no pay remains.
+        vm.startPrank(guardian);
+        vm.expectRevert(PackVault.OutOfBounds.selector);
+        vault.lowerCaps(100 ether, 150, 5 gwei, 0.00003 ether);
+        vault.lowerCaps(100 ether, 150, 0, 0);
+        vm.stopPrank();
+        assertEq(vault.getParams().workFee, 0);
+        assertEq(vault.getParams().gasCeiling, 0);
+        // The admin's queued proposal (made above) was cancelled by the stop: it cannot restore the
+        // old fee or ceiling when its delay passes.
+        assertEq(vault.pendingParamsEta(), 0);
+        vm.warp(block.timestamp + 3 days);
+        vm.expectRevert(PackVault.TooEarly.selector);
+        vault.applyParams();
+        assertEq(vault.getParams().workFee, 0);
+    }
+
     /// D51: above the gas ceiling a build is accepted and reimbursed at the ceiling price only; the
     ///      caller pays the rest. The guardian lowers the ceiling to the canary's 0.5 gwei (at 5 gwei
     ///      a build fails its own payback gate). Exact pay: (gas measured + 30k) x 0.5 gwei x 1.10.
@@ -63,7 +137,7 @@ contract ForkVaultAdversarialTest is ForkBase {
         checkpoint();
         toOpen();
         vm.prank(guardian);
-        vault.lowerCaps(100 ether, 150, 0.5 gwei);
+        vault.lowerCaps(100 ether, 150, 0.5 gwei, 0.00002 ether);
         vm.fee(1.9 gwei);
         vm.txGasPrice(2 gwei); // four times the ceiling; basefee + maxTip is above it too
         uint256 idle0 = vault.idlePacks().length;
@@ -425,7 +499,7 @@ contract ForkVaultAdversarialTest is ForkBase {
 
     function test_depositAboveTvlCapReverts() public {
         vm.prank(guardian);
-        vault.lowerCaps(1 ether, 150, 5 gwei);
+        vault.lowerCaps(1 ether, 150, 5 gwei, 0.00002 ether);
         vm.prank(alice);
         vm.expectRevert(PackVault.Amount.selector);
         vault.deposit{value: 1.5 ether}();

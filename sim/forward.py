@@ -38,6 +38,7 @@ SUR, CUT, S_FEE, BID_RATE = 0.05, 0.01, 0.01, 0.90
 ASK, PREMIUM = 0.033, 0.10
 MINT_FEE = 10**15
 DAY = 86_400
+WORK_FEE = 2 * 10**13  # wei per unit of work, canary value (D55)
 CEILING = 0.5  # gwei: canary gasCeiling; above it the keeper waits (D45, D51)
 
 
@@ -254,7 +255,7 @@ def run(sc, n_target, seed, days=365):
                 checkpoint_done_this_interval=False, listings=listings, idle_packs=len(v.idle_packs),
                 loose_shapes=v.loose_shapes, free=v.free(), idle_eth=v.idle(), owed_estimate=v.owed_estimate(),
                 pending_deposits=v.pending_total, locked_shares=v.locked_shares, fee_credit=credit,
-                open_positions=len(v.positions), max_positions=300, recent_volume=recent,
+                open_positions=len(v.positions), max_positions=300, recent_volume=recent, work_fee=WORK_FEE,
                 slowdown_volume=sc.get("slowdown", 0.0))
             planned = policy.plan(st)
             if step == 1:
@@ -269,7 +270,7 @@ def run(sc, n_target, seed, days=365):
                         p = v.positions[i]
                         if p.status in (SETTLED, WITHDRAWN) and p.pack_owned:
                             v.sync_owned(i)
-                    v.pay_keeper(c(policy.GAS["sync_base"] + policy.GAS["sync_per"] * len(act_[1])))
+                    v.pay_keeper(c(policy.GAS["sync_base"] + policy.GAS["sync_per"] * len(act_[1])) + len(act_[1]) * WORK_FEE)
                 elif fn == "harvest":
                     amt = credit + sum(v.positions[i].pending_fees for i in act_[1])
                     for i in act_[1]:
@@ -286,7 +287,7 @@ def run(sc, n_target, seed, days=365):
                         p = v.positions[i]
                         credit += p.pending_fees
                         v.unlist(i)
-                    v.pay_keeper(c(policy.GAS["unlist_per"] * len(act_[1])))
+                    v.pay_keeper(c(policy.GAS["unlist_per"] * len(act_[1])) + len(act_[1]) * WORK_FEE)
                 elif fn == "liquidate":
                     m = 0
                     while m < act_[1] and (v.idle_packs or v.loose_shapes) and \
@@ -294,7 +295,7 @@ def run(sc, n_target, seed, days=365):
                         v.liquidate_one()
                         m += 1
                     if m:
-                        v.pay_keeper(c(policy.GAS["liquidate_per"] * m))
+                        v.pay_keeper(c(policy.GAS["liquidate_per"] * m) + m * WORK_FEE)
                 elif fn == "checkpoint":
                     nav_pos = v.nav_positions()[0]
                     try:
@@ -306,7 +307,7 @@ def run(sc, n_target, seed, days=365):
                     checkpoints += 1
                     g = c(policy.GAS["checkpoint_base"] + policy.GAS["checkpoint_per"] * len(v.positions))
                     if paid:
-                        v.pay_keeper(g)
+                        v.pay_keeper(g + WORK_FEE)
                     if nav0_per_share is None:
                         nav0_per_share = v.last_nav * E // v.total_shares
                     del nav_pos
@@ -321,7 +322,7 @@ def run(sc, n_target, seed, days=365):
                         next_id += 1
                         m += 1
                     if m:
-                        v.pay_keeper(c(policy.GAS["list_per"] * m))
+                        v.pay_keeper(c(policy.GAS["list_per"] * m) + m * WORK_FEE)
         # Holder flows by scenario.
         for (day, frac) in sc.get("redeem", []):
             if day == d:

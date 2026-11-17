@@ -15,6 +15,7 @@
  "packUnitsMask": 8,
  "gasCeilingWei": 500000000,
  "maxTipWei": 50000000,
+ "workFeeWei": 20000000000000,
  "maxPositions": 30,
  "reserveWei": 5000000000000000,
  "tvlCapWei": 2000000000000000000,

@@ -5,6 +5,9 @@
 ```
 price = min(tx.gasprice, basefee + maxTip, gasCeiling)          canary: maxTip 0.05 gwei, ceiling 0.5 gwei
 pay   = min(measured gas + 30,000, opGasCap) x price x 1.10    from vault ETH (free ETH, never liabilities)
+      + workFee x units                                         canary 0.00002 ETH, max 0.0001 (D55)
+units = positions listed, resolved (sync), activated or unlisted; items liquidated; 1 per checkpoint that
+        priced flows or distributed. restock, harvest and burnTokens earn none.
 ```
 
 Bounds on what a caller can extract:

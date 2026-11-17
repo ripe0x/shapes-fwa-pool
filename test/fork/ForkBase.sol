@@ -71,6 +71,7 @@ abstract contract ForkBase is Test {
         p.distributionBps = 0;
         p.keeperPremiumBps = 1_000;
         p.maxTip = 0.05 gwei;
+        p.workFee = 0.00002 ether;
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 200;
         p.packUnitsMask = uint64(1) << 3;

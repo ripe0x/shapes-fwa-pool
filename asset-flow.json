@@ -51,7 +51,7 @@
   },
   {
    "id": "O2",
-   "text": "DRAFT. What building costs holders: keeper pay is the builder's gas plus 10%, at most 1.75M gas per position built and listed in keeper-sized batches (measured 1.60M across the 29 positions the 2 ETH canary holds). At the 0.5 gwei ceiling that is at most 0.00096 ETH per position, about 0.028 ETH for the canary (1.4%). Padding or splitting calls earns nothing extra beyond the 30k-gas overhead (D35, D41).",
+   "text": "DRAFT. What building costs holders: keeper pay is the builder's gas plus 10%, at most 1.75M gas per position built and listed in keeper-sized batches (measured 1.60M across the 29 positions the 2 ETH canary holds), plus the flat work fee of 0.00002 ETH per unit of work (D55): 1 unit when a position lists, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint, 1 per position unlisted or item liquidated at exit. At the 0.5 gwei ceiling a build costs at most 0.00098 ETH per position, about 0.029 ETH for the canary (1.4%). Splitting calls earns no extra fee; the guardian can lower the fee to zero at once.",
    "metric": "facts.keeper_gas_per_position",
    "max": 1750000,
    "regimes": [

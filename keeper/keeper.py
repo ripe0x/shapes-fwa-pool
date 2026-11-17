@@ -32,7 +32,7 @@ import tx as txm  # noqa: E402
 RPC = "https://mainnet.gateway.tenderly.co"
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 SHAPES = "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0"
-PARAMS_T = "(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint96,uint128,uint128,uint128)"
+PARAMS_T = "(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint96,uint128,uint128,uint128)"
 LISTING_T = "(address,address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint64,uint8)"
 
 
@@ -73,7 +73,7 @@ def read_tokens(vault, active_ids):
 
 def read_state(vault, slowdown, burn=False):
     p = [num(x) for x in call(vault, f"getParams()({PARAMS_T})").strip("()").split(", ")]
-    (min_edge, _buf, dist_bps, premium, share, _alloc, _mask, ceiling, tip, max_pos, res, _tvl, opcap) = p
+    (min_edge, _buf, dist_bps, premium, share, _alloc, _mask, ceiling, tip, wfee, max_pos, res, _tvl, opcap) = p
     k, backing, _ok = lines(call(vault, "edge(uint256)(uint256,uint256,bool)", 3))
     now = num(cast("block", "latest", "--field", "timestamp"))
     window = num(call(FWA, "settlementWindow()(uint256)"))
@@ -120,7 +120,7 @@ def read_state(vault, slowdown, burn=False):
         winding_down=call(vault, "windingDown()(bool)") == "true",
         listing_paused=call(vault, "listingPaused()(bool)") == "true", distribution_bps=dist_bps,
         recent_volume=(seq_now - seq_then) / 7, slowdown_volume=slowdown, burn_tokens=burn,
-        reserve=res, op_gas_cap=opcap,
+        reserve=res, op_gas_cap=opcap, work_fee=wfee,
         **tokens,
     )
 
@@ -141,11 +141,16 @@ def to_cast(step):
 HEALTH = dict(last_pass=0, block=0, status=[], pending=None, stats={}, errors=[], pass_errors=0)
 
 
-def expected_pay(state, fn, est):
-    """Reimbursement the vault would pay for `est` gas at this keeper's bid (0 for unpaid calls)."""
+def expected_pay(state, step, est):
+    """Reimbursement the vault would pay for `est` gas at this keeper's bid (0 for unpaid calls),
+    plus the work fee for units the call will certainly do. Units it may do (sync, unlist,
+    activate, liquidate) are not counted: an underestimate only makes the loss check stricter."""
+    fn = step[0]
     if fn == "burnTokens":
         return 0
-    return min(est, state.op_gas_cap) * policy.price(state) * (policy.BPS + state.premium_bps) // policy.BPS
+    units = step[1] if fn == "list" else 1 if fn == "checkpoint" else 0
+    return min(est, state.op_gas_cap) * policy.price(state) * (policy.BPS + state.premium_bps) // policy.BPS \
+        + units * state.work_fee
 
 
 def run_pass(a, tm):
@@ -197,7 +202,7 @@ def run_pass(a, tm):
                 tm.error(f"preflight of {step[0]} reverted: {why}")
             continue
         bid = state.base_fee + state.max_tip
-        pay, cost_ = expected_pay(state, step[0], est), est * bid
+        pay, cost_ = expected_pay(state, step, est), est * bid
         if pay + a.max_loss_wei < cost_ and step[0] != "burnTokens":  # burns are the operator's opt-in cost
             skip.add(step[0])
             tm.state["stats"]["skipped_loss"] += 1

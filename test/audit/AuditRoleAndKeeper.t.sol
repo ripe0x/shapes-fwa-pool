@@ -92,7 +92,7 @@ contract AuditRoleAndKeeperTest is ForkBase {
 
         // Guardian zeroes the ceiling. Paid keeper work now reimburses 0.
         vm.prank(guardian);
-        vault.lowerCaps(100 ether, 150, 0);
+        vault.lowerCaps(100 ether, 150, 0, 0);
 
         uint256 shares = vault.shareBalance(alice);
         vm.prank(alice);
@@ -103,7 +103,8 @@ contract AuditRoleAndKeeperTest is ForkBase {
         uint256 kBefore = keeper.balance;
         vm.prank(keeper);
         vault.checkpoint();
-        assertEq(keeper.balance, kBefore, "zero ceiling => keeper reimbursed nothing");
+        // D55: the guardian zeroed both the ceiling and the work fee, so no keeper pay at all.
+        assertEq(keeper.balance, kBefore, "zero ceiling and zero work fee => keeper reimbursed nothing");
 
         toOpen();
         uint256 before = alice.balance;

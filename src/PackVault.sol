@@ -62,6 +62,7 @@ contract PackVault is ReentrancyGuard {
     uint256 public constant MAX_GAS_CEILING = 50 gwei;
     uint256 public constant MAX_DISTRIBUTION_BPS = 5_000;
     uint256 public constant MAX_KEEPER_PREMIUM_BPS = 5_000;
+    uint256 public constant MAX_WORK_FEE = 0.0001 ether; // per unit of work (D55)
     uint256 public constant MAX_KEEPER_SHARE_BPS = 5_000;
     uint256 public constant MAX_ALLOCATED_BOUND_BPS = 1_000;
     uint256 public constant MIN_PACK_UNITS = 3; // ShapePacks minimum pack value 0.03 ETH
@@ -102,6 +103,8 @@ contract PackVault is ReentrancyGuard {
         uint64 packUnitsMask; // bit u set: packs of u x 0.01 ETH may be built and listed
         uint64 gasCeiling; // wei per gas
         uint64 maxTip; // reimbursed price is at most basefee + this
+        uint64 workFee; // flat wei per unit of work done: position listed, resolved, activated,
+        //                 unlisted, item liquidated, or a checkpoint that priced flows
         uint96 maxPositions;
         uint128 reserve; // ETH kept idle
         uint128 tvlCap; // deposits refused above this NAV
@@ -325,7 +328,7 @@ contract PackVault is ReentrancyGuard {
             _idlePacks.push(packs.createPack(ids, noMint));
         }
         emit Restocked(count, units);
-        _reimburse(g0, type(uint256).max);
+        _reimburse(g0, type(uint256).max, 0); // the work fee is paid when the pack lists
     }
 
     /// @notice List up to `maxCount` idle packs at the live gated backing.
@@ -349,7 +352,7 @@ contract PackVault is ReentrancyGuard {
             ++listed;
         }
         if (listed == 0) revert Nothing();
-        _reimburse(g0, type(uint256).max);
+        _reimburse(g0, type(uint256).max, listed);
     }
 
     /// @notice Resolve positions FWA has moved on: reclaim allocated ones the purchaser left past
@@ -363,7 +366,7 @@ contract PackVault is ReentrancyGuard {
             if (_sync(listingIds[i])) ++resolved;
         }
         if (resolved == 0) revert Nothing();
-        _reimburse(M.min(g0, gasleft() + resolved * GAS_PER_MOVED), type(uint256).max);
+        _reimburse(M.min(g0, gasleft() + resolved * GAS_PER_MOVED), type(uint256).max, resolved);
     }
 
     function _sync(uint256 listingId) internal returns (bool) {
@@ -437,7 +440,7 @@ contract PackVault is ReentrancyGuard {
             if (status == LISTING_ACTIVE) ++moved;
         }
         if (moved == 0) revert Nothing();
-        _reimburse(M.min(g0, gasleft() + moved * GAS_PER_MOVED), type(uint256).max);
+        _reimburse(M.min(g0, gasleft() + moved * GAS_PER_MOVED), type(uint256).max, moved);
     }
 
     /// @notice Withdraw active listings: allowed in wind-down, when FWA's live fees leave no edge
@@ -468,7 +471,7 @@ contract PackVault is ReentrancyGuard {
             if (!windingDown && ok && realized >= shortfall) break;
         }
         if (realized == 0) revert Nothing();
-        _reimburse(M.min(g0, gasleft() + moved * GAS_PER_MOVED), type(uint256).max);
+        _reimburse(M.min(g0, gasleft() + moved * GAS_PER_MOVED), type(uint256).max, moved);
     }
 
     /// @notice Pull FWA fees into the vault: pending fees of `activeIds` (they keep earning) and
@@ -481,7 +484,7 @@ contract PackVault is ReentrancyGuard {
         _harvest();
         uint256 amount = address(this).balance - before;
         if (amount == 0) revert Nothing();
-        _reimburse(g0, amount);
+        _reimburse(g0, amount, 0);
     }
 
     function _harvest() internal {
@@ -718,7 +721,8 @@ contract PackVault is ReentrancyGuard {
         lastNav = nav;
         emit Checkpoint(epoch, nav, totalShares, filled, paid, distributed);
         ++epoch;
-        _reimburse(g0, work || distributed != 0 ? type(uint256).max : 0);
+        bool paid_ = work || distributed != 0;
+        _reimburse(g0, paid_ ? type(uint256).max : 0, paid_ ? 1 : 0);
     }
 
     /// @notice Redeem up to `maxCount` idle packs (then loose Shapes) to ETH at their exact
@@ -745,7 +749,7 @@ contract PackVault is ReentrancyGuard {
         }
         if (n + m == 0) revert Nothing();
         emit Liquidated(n, m, address(this).balance - before);
-        _reimburse(g0, type(uint256).max);
+        _reimburse(g0, type(uint256).max, n + m);
     }
 
     /// @dev ETH locked shares will need at the last checkpoint's price, rounded up.
@@ -786,8 +790,12 @@ contract PackVault is ReentrancyGuard {
     ///      `realized` is the value an optional call produced: it pays only when the pay is at
     ///      most `keeperShareBps` of that value, so dust harvests and sales earn nothing.
     ///      type(uint256).max marks necessary work (always paid); zero marks no work.
-    function _reimburse(uint256 g0, uint256 realized) internal {
-        uint256 amount = _gasCost(M.min(g0 - gasleft() + KEEPER_OVERHEAD_GAS, params.opGasCap));
+    /// @dev Pay = measured gas at the capped price plus the premium, plus `workFee` per unit of work
+    ///      the call did. Units come from state changes the call made, so splitting a job across
+    ///      calls earns no more fee; a call that did nothing reverts before it is paid.
+    function _reimburse(uint256 g0, uint256 realized, uint256 units) internal {
+        uint256 amount = _gasCost(M.min(g0 - gasleft() + KEEPER_OVERHEAD_GAS, params.opGasCap))
+            + units * params.workFee;
         if (realized != type(uint256).max && amount * BPS > realized * params.keeperShareBps) return;
         amount = M.min(amount, _free());
         if (amount == 0) return;
@@ -830,14 +838,21 @@ contract PackVault is ReentrancyGuard {
         }
     }
 
-    /// @notice Guardian may lower caps immediately; raising goes through the admin delay.
-    function lowerCaps(uint128 tvlCap, uint96 maxPositions, uint64 gasCeiling) external {
+    /// @notice Guardian may lower caps immediately (and cancels any queued proposal); raising goes
+    ///         through the admin delay.
+    function lowerCaps(uint128 tvlCap, uint96 maxPositions, uint64 gasCeiling, uint64 workFee) external {
         if (msg.sender != guardian) revert NotGuardian();
         Params storage p = params;
-        if (tvlCap > p.tvlCap || maxPositions > p.maxPositions || gasCeiling > p.gasCeiling) revert OutOfBounds();
+        if (
+            tvlCap > p.tvlCap || maxPositions > p.maxPositions || gasCeiling > p.gasCeiling || workFee > p.workFee
+        ) revert OutOfBounds();
         p.tvlCap = tvlCap;
         p.maxPositions = maxPositions;
         p.gasCeiling = gasCeiling;
+        p.workFee = workFee; // with gasCeiling 0 this stops all keeper pay at once
+        // A proposal queued before the stop would restore the old values when applied: cancel it.
+        delete pendingParams;
+        pendingParamsEta = 0;
     }
 
     function startWindDown() external {
@@ -852,7 +867,7 @@ contract PackVault is ReentrancyGuard {
     function _checkBounds(Params memory p) internal pure {
         if (
             p.minEdgeBps > MAX_MIN_EDGE_BPS || p.bufferBps > MAX_BUFFER_BPS || p.distributionBps > MAX_DISTRIBUTION_BPS
-                || p.keeperPremiumBps > MAX_KEEPER_PREMIUM_BPS || p.keeperShareBps > MAX_KEEPER_SHARE_BPS
+                || p.keeperPremiumBps > MAX_KEEPER_PREMIUM_BPS || p.workFee > MAX_WORK_FEE || p.keeperShareBps > MAX_KEEPER_SHARE_BPS
                 || p.allocatedBoundBps > MAX_ALLOCATED_BOUND_BPS
                 || p.gasCeiling > MAX_GAS_CEILING || p.maxTip > p.gasCeiling || p.maxPositions > MAX_POSITIONS || p.opGasCap > 16_777_216
                 || p.packUnitsMask >> (MAX_PACK_UNITS + 1) != 0 || p.packUnitsMask & ((1 << MIN_PACK_UNITS) - 1) != 0

@@ -41,7 +41,8 @@ anvil's public dev keys carry on mainnet) passes the vault's pay on.
 3. For the first call: preflight (`eth_estimateGas` from the keeper's address). A vault error that
    means the state moved on (Nothing, TooEarly, NotCheckpointWindow, AlreadyCheckpointed,
    Paused, WindingDown, AllocatedExposure) is a quiet skip; any other revert is an error.
-4. Expected pay = min(estimate, opGasCap) x min(bid, basefee + maxTip, ceiling) x 1.10. Send when
+4. Expected pay = min(estimate, opGasCap) x min(bid, basefee + maxTip, ceiling) x 1.10, plus the
+   work fee for units the call will certainly do (list: n; checkpoint: 1). Send when
    pay + `--max-loss-wei` covers estimate x bid (always below the ceiling).
 5. Save the pending entry, broadcast at basefee + maxTip (max fee 2 x basefee + maxTip), wait for
    the receipt, count it, re-read the chain, repeat.

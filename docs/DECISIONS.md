@@ -630,3 +630,29 @@ premium, 50 gwei ceiling) self-keeping a dust-deposit checkpoint nets +0.0028 ET
 about 1e-5 ETH per checkpoint, the ordinary keeper margin. The natspec and D44 claim "neither role
 has any path that moves assets to itself" is wrong as stated. **Open:** tighten
 MAX_KEEPER_PREMIUM_BPS (contract change, re-review of the change) or reword the claim only.
+
+## D55. Flat work fee per unit of work, for permissionless keepers (owner, 2026-11-17)
+
+**Owner:** "the vault is permissionless too. or should be" ... "do this" (add a per-unit flat fee).
+**Why:** gas plus 10% lets anyone run the vault without loss, but at today's gas the absolute
+margin is too small for strangers to bother (a checkpoint earned about 0.000003 ETH). The pool
+balancer pays 0.0001 ETH per call; per call would let a vault keeper earn more by splitting work.
+**Chose:** `workFee` (Params, admin through the delay, bytecode maximum `MAX_WORK_FEE` 0.0001 ETH,
+canary 0.00002 ETH) paid per unit of work on top of the gas reimbursement: positions listed,
+resolved by sync, activated or unlisted; items liquidated; 1 for a checkpoint that priced flows or
+distributed. restock, harvest and burnTokens earn none. Pay stays capped by `_free()`. The guardian
+can lower the fee at once through `lowerCaps` (with the ceiling at 0, no keeper pay remains).
+Policy and simulation include the fee (bid-cycle cost +2 units, build +1, reserve need +11).
+**Evidence:** `test_workFeePerUnitNotPerCall` (every pay is gas x 0.22 gwei + units x fee exactly;
+3 packs in 1 call or 3 calls earn the same 3 units), `test_workFeeBounded` (admin bound; guardian
+lowers, never raises), auditor's `test/audit/AuditWorkFeeManufacture.t.sol`. Canary rehearsal:
+keeper net over the lifecycle +0.00225 ETH (was +0.00035); holder result -0.0221 ETH on 1.99
+(was -0.0201) with no acquisitions. Simulation, 100 positions, last 14 days: +21.0%, P(loss) 17%.
+**Accepted (review LOW-2):** a 0.01 ETH deposit can create one paid checkpoint per 12 h interval:
+at most 2 units a day, 0.0146 ETH a year at the canary fee (0.073 at the maximum); a net loss to
+the caller above about 0.4 gwei at the canary fee.
+**Not changed (review NIT-1):** the keeper counts only units it is sure of (list n, checkpoint 1),
+so its loss check is stricter than the contract's pay.
+**Repair from the second review (same day):** `lowerCaps` also cancels any queued admin proposal,
+which would otherwise restore the old caps, ceiling or fee when applied after a guardian stop
+(pre-existing for the caps and ceiling). Covered in `test_workFeeBounded`.

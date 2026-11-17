@@ -10,7 +10,7 @@ Keeper operations: `docs/KEEPER.md`. Gas: `docs/GAS.md`. Assets: `docs/SYSTEM-MA
 # Fork tests: mainnet fork on Tenderly's public gateway only. It throttles, so pass the retries.
 forge test --match-path test/fork/<File>.t.sol --rpc-url https://mainnet.gateway.tenderly.co \
   --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100
-forge build --sizes            # PackVault 22,171 bytes, 2,405 under EIP-170 (VaultLib split out)
+forge build --sizes            # PackVault 22,774 bytes, 1,802 under EIP-170 (VaultLib split out)
 
 python3 sim/snapshot.py        # Phase 0.1 live reads at one block
 python3 sim/ingest.py          # FWA, rewards and oracle logs into sim/data/fwa.sqlite (resumable)

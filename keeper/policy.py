@@ -84,6 +84,7 @@ class State:
     recent_volume: float = 0.0
     slowdown_volume: float = 0.0
     reserve: int = 0  # the vault's `reserve` parameter
+    work_fee: int = 0  # flat wei per unit of work (D55)
     op_gas_cap: int = 15_000_000
 
 
@@ -99,7 +100,7 @@ def cycle_net(s):
     if s.k <= 10**18 or s.backing == 0:
         return 0
     gross = s.backing * (s.k - 10**18) // 10**18
-    c = CYCLE_GAS * price(s) * (BPS + s.premium_bps) // BPS
+    c = CYCLE_GAS * price(s) * (BPS + s.premium_bps) // BPS + 2 * s.work_fee  # sync + relist units
     return gross - c if gross > c else 0
 
 
@@ -189,7 +190,7 @@ def plan(s):
             idle -= n * s.backing
             room -= n
     elif s.recent_volume >= s.slowdown_volume:
-        build = cost(s, RESTOCK_GAS_PER_PACK - GAS["overhead"]) + s.mint_fee * 3 // 10
+        build = cost(s, RESTOCK_GAS_PER_PACK - GAS["overhead"]) + s.mint_fee * 3 // 10 + s.work_fee
         n = 0  # largest batch the vault's capital check accepts: whole 0.1 mints plus backing
         for c in range(min(room, MAX_BATCH["restock"]), 0, -1):
             need = 3 * c
@@ -209,7 +210,7 @@ def reserve_need(s):
     and syncs pay from the backing they return, so they need none."""
     gas = (GAS["checkpoint_base"] + GAS["checkpoint_per"] * s.max_positions + GAS["overhead"]
            + GAS["list_per"] * MAX_BATCH["list"] + GAS["overhead"])
-    return gas * s.gas_ceiling * (BPS + s.premium_bps) // BPS
+    return gas * s.gas_ceiling * (BPS + s.premium_bps) // BPS + (1 + MAX_BATCH["list"]) * s.work_fee
 
 
 def status(s, planned=None):

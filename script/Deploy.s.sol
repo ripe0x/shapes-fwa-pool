@@ -21,6 +21,7 @@ contract Deploy is Script {
         p.packUnitsMask = uint64(vm.parseJsonUint(v, ".packUnitsMask"));
         p.gasCeiling = uint64(vm.parseJsonUint(v, ".gasCeilingWei"));
         p.maxTip = uint64(vm.parseJsonUint(v, ".maxTipWei"));
+        p.workFee = uint64(vm.parseJsonUint(v, ".workFeeWei"));
         p.maxPositions = uint96(vm.parseJsonUint(v, ".maxPositions"));
         p.reserve = uint128(vm.parseJsonUint(v, ".reserveWei"));
         p.tvlCap = uint128(vm.parseJsonUint(v, ".tvlCapWei"));

@@ -36,7 +36,9 @@ import {
 ///         reserve 0.005 ETH, TVL cap 2 ETH, 30 positions, 10% keeper premium, 25% keeper share.
 ///         Stated variations are named in each regime that needs one (distributions on; the real
 ///         VRF fixtures carry SelectionBase's own deploy, noted in the selection regimes).
-contract VaultFlowTest is SelectionBase, FlowBreakdown {
+/// @dev Split into two test contracts sharing this base: one contract holding every regime
+///      exceeded solc's via-IR assembly limit ("Tag too large for reserved space").
+abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
     uint256 constant PINNED = 26_424_971; // queue empty, outside blackout, pack quote ~31h old
     uint256 constant UNIT = 0.01 ether;
     uint256 constant INTERVAL = 12 hours;
@@ -77,503 +79,6 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
 
     receive() external payable {}
 
-    // ------------------------------------------------------------------ pinned-block regimes
-
-    /// @dev Initial capitalization: deploy at the canary seed, then the first deposit priced into
-    ///      shares. Shows the seed and the first holder's capital resting as free vault ETH.
-    function test_flow_init() public {
-        _forkPinned();
-        _deploy(0.01 ether, _canary());
-        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
-        _deposit(alice, 1 ether);
-        _toBlackout();
-        _kCheckpoint(keeper);
-        Fact[] memory f = _facts("open_listings", 0);
-        f[1] = Fact("holder_shares_minted", vault.shareBalance(alice));
-        flowReport("init", a, f);
-    }
-
-    /// @dev Maximum load: deposit to the 2 ETH cap and build and list as many packs as the capital
-    ///      allows, in batches of up to 10 as keeper/policy.py does (largest batch the capital check
-    ///      accepts). O2 reads keeper pay per position as gas: pay / (0.2 gwei x 1.10). GAP: a real high-volume settlement burst needs several real VRF
-    ///      selections in one fork; only two historical fixtures exist, so this shows the maximum
-    ///      standing load instead (see report).
-    function test_flow_max_load() public {
-        _forkPinned();
-        _deploy(0.01 ether, _canary());
-        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
-        _deposit(alice, 1.98 ether);
-        _toBlackout();
-        _kCheckpoint(keeper);
-        _toOpen();
-        uint256 listed;
-        uint256 pay0 = keeperPaidCum;
-        for (uint256 c = 10; c != 0;) {
-            if (_kTryRestock(keeper, c, 3)) listed += _kList(keeper, c);
-            else --c;
-        }
-        // Reimbursed price here: min(0.2 gwei bid, basefee 0.15 + maxTip 0.05, ceiling 0.5) x 1.10.
-        uint256 gasPerPosition = (keeperPaidCum - pay0) / 0.22 gwei / listed;
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("packs_listed", listed);
-        f[2] = Fact("keeper_gas_per_position", gasPerPosition);
-        flowReport("max_load", a, f);
-    }
-
-    /// @dev Low volume / prolonged inactivity, short window. Identical inputs to inactive_long;
-    ///      grouped for drift. No real acquisition happens at the pinned block, so listings sit
-    ///      and ETH destinations do not move with time.
-    function test_flow_inactive_short() public {
-        _inactive("inactive_short", 2);
-    }
-
-    function test_flow_inactive_long() public {
-        _inactive("inactive_long", 20);
-    }
-
-    function _inactive(string memory regime, uint256 intervals) internal {
-        _forkPinned();
-        _deploy(0.01 ether, _canary());
-        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
-        _deposit(alice, 1 ether);
-        _toBlackout();
-        _kCheckpoint(keeper);
-        _toOpen();
-        _kRestock(keeper, 5, 3);
-        _kList(keeper, 5);
-        for (uint256 i; i < intervals; ++i) {
-            vm.warp(block.timestamp + INTERVAL);
-            vm.roll(block.number + INTERVAL / 12);
-        }
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("idle_intervals", intervals);
-        flowReport(regime, a, f);
-    }
-
-    /// @dev Gas spike after deployment: a position is listed at low gas (setup), then the price is
-    ///      lifted above the 0.5 gwei ceiling. Every call is still accepted (D51): a build and a
-    ///      checkpoint run, each reimbursed at the 0.5 gwei ceiling price, not the spike.
-    function test_flow_gas_spike() public {
-        _forkPinned();
-        _deploy(0.01 ether, _canary());
-        // Setup at low gas, before the measured window.
-        vm.fee(BASE_FEE);
-        vm.txGasPrice(GAS_PRICE);
-        _deposit(alice, 1 ether);
-        _toBlackout();
-        _kCheckpoint(keeper);
-        _toOpen();
-        _kRestock(keeper, 3, 3);
-        _kList(keeper, 3);
-        // The spike: 2 gwei, four times the ceiling.
-        Snap memory a = flowBegin(2 gwei, 1.95 gwei, PINNED);
-        uint256 kb0 = keeper.balance;
-        _kRestock(keeper, 1, 3); // accepted above the ceiling (D51); paid at the ceiling price
-        uint256 buildPay = keeper.balance - kb0;
-        assertEq(buildPay % 0.55 gwei, 0, "build reimbursed at 0.5 gwei x 1.10");
-        _deposit(bob, 0.5 ether);
-        _toBlackout();
-        uint256 kb = keeper.balance;
-        _kCheckpoint(keeper); // prices bob's deposit; keeper pay capped at the ceiling
-        uint256 pay = keeper.balance - kb;
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("gas_price_gwei_x100", 200);
-        f[2] = Fact("checkpoint_pay_wei", pay);
-        f[3] = Fact("build_pay_wei", buildPay);
-        flowReport("gas_spike", a, f);
-    }
-
-    /// @dev Oracle owner lowers the pack ask below the posted backing, so FWA's owner can kick the
-    ///      listing and the full backing returns to the vault. Then the floor oracle is repointed to
-    ///      a contract with no such function: edge() yields no cap and nothing new lists, but
-    ///      unlisting/redemption still work (D34). Positions are synced before the snapshot.
-    function test_flow_oracle_change() public {
-        _forkPinned();
-        _deploy(0.01 ether, _canary());
-        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
-        _deposit(alice, 1 ether);
-        _toBlackout();
-        _kCheckpoint(keeper);
-        _toOpen();
-        _kRestock(keeper, 3, 3);
-        uint256[] memory ids = _idsOf(_kList(keeper, 3));
-        _setPackAsk(0.03 ether); // cap 0.033 < 0.0363 posted: FWA may kick
-        _toBlackout();
-        uint256 vb = address(vault).balance;
-        IFwaAdmin(address(FWA)).kickListing(ids[0]);
-        backingReturnedCum += address(vault).balance - vb; // full backing B returns on a kick
-        _kSync(keeper, ids);
-        // Repoint the oracle so no cap can be read; edge fails, nothing new lists.
-        vm.prank(IOwnable(address(FWA)).owner());
-        IFwaAdmin(address(FWA)).setAddr(64, address(PACKS));
-        (, uint256 backing, bool ok) = vault.edge(3);
-        uint256 packsBack = vault.idlePacks().length;
-        assertGe(packsBack, 1, "kicked pack recovered to inventory");
-        // With the oracle broken, alice redeems everything: the vault unlists the rest, liquidates
-        // and pays her (D34).
-        _toOpen();
-        uint256 aShares = vault.shareBalance(alice);
-        vm.prank(alice);
-        vault.requestRedeem(aShares);
-        _kUnlist(keeper, vault.openListings());
-        _kLiquidate(keeper, 40);
-        _toBlackout();
-        _kCheckpoint(keeper);
-        uint256 c0 = claimsCum;
-        _claim(alice);
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("edge_ok_after_repoint", ok ? 1 : 0);
-        f[2] = Fact("cap_after_repoint_wei", backing);
-        f[3] = Fact("packs_back_in_inventory", packsBack);
-        f[4] = Fact("redemption_paid_after_repoint_wei", claimsCum - c0);
-        flowReport("oracle_change", a, f);
-    }
-
-    /// @dev Failed or delayed keeper execution: keepers never harvest and an idle checkpoint is
-    ///      refused, so fees sit uncollected at FWA and no interval slot is wasted. ETH stays safe
-    ///      and recoverable; the backing counter still matches real FWA holdings (held == implied).
-    function test_flow_keeper_delay() public {
-        _forkPinned();
-        _deploy(0.01 ether, _canary());
-        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
-        _deposit(alice, 1 ether);
-        _toBlackout();
-        _kCheckpoint(keeper);
-        _toOpen();
-        _kRestock(keeper, 4, 3);
-        _kList(keeper, 4);
-        // No keeper acts for a long time. A no-flow checkpoint is refused (LOW-1 repair).
-        vm.warp(block.timestamp + INTERVAL);
-        _toBlackout();
-        vm.prank(keeper);
-        vm.expectRevert(PackVault.Nothing.selector);
-        vault.checkpoint();
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("idle_checkpoint_refused", 1);
-        f[2] = Fact("fees_uncollected_wei", _feesHeld());
-        flowReport("keeper_delay", a, f);
-    }
-
-    /// @dev Partial and simultaneous withdrawals: two holders redeem; the first checkpoint fills
-    ///      pro rata from free ETH, the backing is unwound, the next checkpoint fills the rest.
-    function test_flow_withdrawals() public {
-        _forkPinned();
-        _deploy(0.01 ether, _canary());
-        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
-        _deposit(alice, 1 ether);
-        _deposit(bob, 1 ether);
-        _toBlackout();
-        _kCheckpoint(keeper);
-        _toOpen();
-        _kRestock(keeper, 10, 3);
-        uint256[] memory ids = _idsOf(_kList(keeper, 10));
-        uint256 aShares = vault.shareBalance(alice);
-        uint256 bShares = vault.shareBalance(bob);
-        vm.prank(alice);
-        vault.requestRedeem(aShares);
-        vm.prank(bob);
-        vault.requestRedeem(bShares / 2);
-        _toBlackout();
-        _kCheckpoint(keeper); // partial fill from free ETH
-        uint256 lockedAfterFirst = vault.lockedShares();
-        _kUnlist(keeper, ids);
-        _kLiquidate(keeper, 40);
-        _toOpen();
-        _toBlackout();
-        _kCheckpoint(keeper); // fills the rest
-        _claim(alice);
-        _claim(bob);
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("locked_shares_after_first_checkpoint", lockedAfterFirst);
-        f[2] = Fact("locked_shares_at_end", vault.lockedShares());
-        flowReport("withdrawals", a, f);
-    }
-
-    /// @dev Settled-but-unclaimed ETH is a liability, never deployable (D32). Alice is filled in
-    ///      full, her entitlement settles to claimable on an unrelated touch, and keepers can still
-    ///      only deploy bob's capital and the seed.
-    function test_flow_settled_unclaimed() public {
-        _forkPinned();
-        _deploy(0.01 ether, _canary());
-        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
-        _deposit(alice, 1 ether);
-        _deposit(bob, 1 ether);
-        _toBlackout();
-        _kCheckpoint(keeper);
-        _toOpen();
-        uint256 aShares = vault.shareBalance(alice);
-        vm.prank(alice);
-        vault.requestRedeem(aShares);
-        _toBlackout();
-        _kCheckpoint(keeper); // fills alice in full from free ETH
-        _toOpen();
-        _deposit(alice, 0.01 ether); // touch: her entitlement settles to claimableEth
-        uint256 liabilities = vault.pendingDepositTotal() + vault.redemptionReserve()
-            + vault.distributionReserve() + vault.claimableTotal();
-        _kRestock(keeper, 10, 3);
-        _kList(keeper, 10);
-        // Checked before the claim, while the entitlement is still a liability: idle ETH excludes
-        // it, and the vault balance never falls below its liabilities.
-        uint256 spendable = vault.idleEth();
-        assertGt(vault.claimableTotal(), 0, "alice's entitlement settled to claimable (state reached)");
-        // The gap is the margin by which spendable ETH stays under the unowed balance: never negative.
-        uint256 unowed = address(vault).balance - liabilities;
-        _claim(alice);
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("spendable_over_unowed_wei", spendable > unowed ? spendable - unowed : 0);
-        f[2] = Fact("liabilities_wei", liabilities);
-        f[3] = Fact("guard_checks", guardChecks);
-        flowReport("settled_unclaimed", a, f);
-    }
-
-    /// @dev Distributions on (stated variation: distributionBps 2000; the canary ships 0). A 1 ETH
-    ///      forced gain above the high-water mark is distributed to live shares and claimed.
-    function test_flow_distributions() public {
-        _forkPinned();
-        PackVault.Params memory p = _canary();
-        p.distributionBps = 2_000;
-        _deploy(0.01 ether, p);
-        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
-        _deposit(alice, 1 ether);
-        _toBlackout();
-        _kCheckpoint(keeper);
-        _toOpen();
-        new ForceSender{value: 1 ether}(payable(address(vault)));
-        forcedCum += 1 ether;
-        _toBlackout();
-        _kCheckpoint(keeper); // distributes 20% of the gain above the high-water mark
-        uint256 distributed = vault.distributionReserve();
-        _claim(alice);
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("distributed_wei", distributed);
-        f[2] = Fact("distribution_bps", 2_000);
-        flowReport("distributions", a, f);
-    }
-
-    /// @dev Complete wind-down and final claims: all positions unlisted, inventory liquidated, both
-    ///      holders redeem in full. Only the dead-share seed slice remains in the vault.
-    function test_flow_wind_down() public {
-        _forkPinned();
-        _deploy(0.01 ether, _canary());
-        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
-        _deposit(alice, 1 ether);
-        _deposit(bob, 0.5 ether);
-        _toBlackout();
-        _kCheckpoint(keeper);
-        _toOpen();
-        _kRestock(keeper, 8, 3);
-        uint256[] memory ids = _idsOf(_kList(keeper, 8));
-        vm.prank(guardian);
-        vault.startWindDown();
-        _kUnlist(keeper, ids);
-        uint256 aShares = vault.shareBalance(alice);
-        uint256 bShares = vault.shareBalance(bob);
-        vm.prank(alice);
-        vault.requestRedeem(aShares);
-        vm.prank(bob);
-        vault.requestRedeem(bShares);
-        _kLiquidate(keeper, 40);
-        _toBlackout();
-        // Independent expectation: with every position unlisted and liquidated, the vault's whole
-        // value is its ETH. The checkpoint prices redemptions first and pays its keeper after, so
-        // each holder is owed (balance before that pay) x their shares / all shares, the seed's
-        // dead shares included; the pay falls on the shares that stay (here the seed slice).
-        uint256 total = vault.totalShares();
-        uint256 kb = keeper.balance;
-        _kCheckpoint(keeper);
-        uint256 nav = address(vault).balance + (keeper.balance - kb);
-        uint256 expA = nav * aShares / total;
-        uint256 expB = nav * bShares / total;
-        uint256 c0 = claimsCum;
-        _claim(alice);
-        uint256 gotA = claimsCum - c0;
-        _claim(bob);
-        uint256 gotB = claimsCum - c0 - gotA;
-        uint256 gap = (gotA > expA ? gotA - expA : expA - gotA) + (gotB > expB ? gotB - expB : expB - gotB);
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("locked_shares_at_end", vault.lockedShares());
-        f[2] = Fact("vault_eth_at_end_wei", address(vault).balance);
-        f[3] = Fact("holder_claim_gap_wei", gap);
-        f[4] = Fact("holder_loss_bps", (1.5 ether - (gotA + gotB)) * 10_000 / 1.5 ether);
-        flowReport("wind_down", a, f);
-    }
-
-    // ------------------------------------------------------------------ selection-fork regimes
-    // The real VRF fixtures (SelectionBase) carry their own deploy: 3 ETH seed, gasCeiling 50 gwei,
-    // opGasCap 3M, 30 listings. Resolution and harvest run at a canary-realistic 0.45/0.4 gwei.
-
-    /// @dev Bid outcome: the purchaser takes the bid; the vault keeps the pack and loses the
-    ///      backing. The pack returns to inventory on sync, the fee share is harvested.
-    function test_flow_acquire_bid() public {
-        Candidate memory c = late();
-        _select(c);
-        _afterSelect();
-        Snap memory a = flowBegin(0.45 gwei, 0.4 gwei, c.requestBlock);
-        _deposit(alice, 0.2 ether); // in-window holder inflow so inflow_base is positive
-        (,, uint128 backing) = vault.positions(selected);
-        uint256 pb = c.purchaser.balance;
-        vm.prank(c.purchaser);
-        IFwaSettle(address(FWA)).acceptDepositorBid(selected);
-        assertEq(c.purchaser.balance - pb, backing * 9_000 / 10_000, "purchaser got 90% of backing");
-        bidBackingOutCum += backing; // 0.9 to purchaser, 0.1 to FWA: the whole backing leaves
-        _kSync(address(this), _one(selected)); // pack returns to inventory
-        _kHarvest(address(this), vault.openListings());
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("outcome_bid", 1);
-        f[2] = Fact("packs_back_in_inventory", vault.idlePacks().length);
-        flowReport("acquire_bid", a, f);
-    }
-
-    /// @dev Keep outcome: the purchaser keeps the pack; the vault gets the backing back less FWA's
-    ///      settlement fee, and the pack value leaves to the purchaser.
-    function test_flow_acquire_keep() public {
-        Candidate memory c = late();
-        _select(c);
-        _afterSelect();
-        Snap memory a = flowBegin(0.45 gwei, 0.4 gwei, c.requestBlock);
-        _deposit(alice, 0.2 ether);
-        (, uint64 units, uint128 backing) = vault.positions(selected);
-        uint256 vb = address(vault).balance;
-        vm.prank(c.purchaser);
-        IFwaSettle(address(FWA)).keepNFT(selected);
-        uint256 reclaimed = address(vault).balance - vb;
-        assertEq(reclaimed, uint256(backing) * 9_900 / 10_000, "backing back less the 1% settlement fee");
-        backingReturnedCum += reclaimed;
-        settlementCutCum += backing - reclaimed;
-        packToPurchaserCum += uint256(units) * UNIT;
-        _kSync(address(this), _one(selected));
-        _kHarvest(address(this), vault.openListings());
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("outcome_keep", 1);
-        f[2] = Fact("packs_held", vault.idlePacks().length);
-        flowReport("acquire_keep", a, f);
-    }
-
-    /// @dev Silent purchaser: past the settlement window the vault reclaims the better outcome
-    ///      (backing, since B(1-s) > P), inside sync. The pack goes to the purchaser.
-    function test_flow_acquire_silent() public {
-        Candidate memory c = late();
-        _select(c);
-        _afterSelect();
-        Snap memory a = flowBegin(0.45 gwei, 0.4 gwei, c.requestBlock);
-        _deposit(alice, 0.2 ether);
-        vm.warp(block.timestamp + FWA.settlementWindow());
-        (, uint64 units, uint128 backing) = vault.positions(selected);
-        uint256 vb = address(vault).balance;
-        uint256 kb = address(this).balance;
-        vm.prank(address(this));
-        vault.sync(_one(selected));
-        uint256 pay = address(this).balance - kb;
-        keeperPaidCum += pay;
-        uint256 reclaimed = (address(vault).balance - vb) + pay;
-        assertEq(reclaimed, uint256(backing) * 9_900 / 10_000, "vault reclaimed backing on silence");
-        backingReturnedCum += reclaimed;
-        settlementCutCum += backing - reclaimed;
-        packToPurchaserCum += uint256(units) * UNIT;
-        _kHarvest(address(this), vault.openListings());
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("outcome_silent", 1);
-        flowReport("acquire_silent", a, f);
-    }
-
-    /// @dev Staged listing and delayed activation (as ForkReconcile): after a bid, the pack is
-    ///      relisted while FWA's queue is still busy, so FWA stages it (no fees). With the queue
-    ///      drained the vault activates it through FWA's own permissionless activation, paid.
-    function test_flow_staged_activation() public {
-        Candidate memory c = late();
-        _select(c);
-        _afterSelect();
-        Snap memory a = flowBegin(0.45 gwei, 0.4 gwei, c.requestBlock);
-        _deposit(alice, 0.2 ether);
-        (,, uint128 backing) = vault.positions(selected);
-        vm.prank(c.purchaser);
-        IFwaSettle(address(FWA)).acceptDepositorBid(selected);
-        bidBackingOutCum += backing;
-        _kSync(address(this), _one(selected));
-        _kHarvest(address(this), vault.openListings());
-        uint256 relisted = _kList(address(this), 1); // relists into a busy queue
-        uint256[] memory open = vault.openListings();
-        uint256 relistId = open[open.length - 1];
-        (,,,,,,,,,, uint8 st) = FWA.listings(relistId);
-        bool staged = st == LISTING_STAGED;
-        _drainQueue();
-        if (staged) _kActivate(address(this), _one(relistId));
-        (,,,,,,,,,, st) = FWA.listings(relistId);
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("relisted_staged", staged ? 1 : 0);
-        f[2] = Fact("relist_active_after_activate", st == LISTING_ACTIVE ? 1 : 0);
-        f[3] = Fact("relisted_count", relisted);
-        flowReport("staged_activation", a, f);
-    }
-
-    // ------------------------------------------------------------------ token-fork regime
-
-    /// @dev FWA token lifecycle (D43): a real buyback routes tokens to live vault listings; anyone's
-    ///      unpaid call claims and burns every token the vault holds. Supply falls by exactly the
-    ///      claimed amount; no ETH moves for the burn. Tokens are reported in token units as a flow
-    ///      and facts, never as an ETH bucket (worth zero to holders).
-    function test_flow_tokens() public {
-        string memory fx = vm.readFile("test/fixtures/buyback.json");
-        vm.createSelectFork("mainnet", vm.parseJsonBytes32(fx, ".tx"));
-        assertEq(FWA.unsettledAcquisitionCount(), 0);
-        preexisting = 0;
-        vm.fee(0.1 gwei);
-        vm.txGasPrice(0.15 gwei);
-        IFWAToken token = IFWAToken(FWA.token());
-        IFWARewards rewards = IFWARewards(FWA.rewards());
-
-        PackVault.Params memory p = _canary();
-        vm.deal(address(this), 5 ether);
-        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, guardian, admin, 1 days, p);
-        depositedCum = address(vault).balance;
-        uint256 need = 20 * 3;
-        uint256 mints = (need + 9) / 10; // 20 packs x 3 units -> 6 mints of 0.1 ETH
-        mintFeesCum = mints * SHAPES.mintFee();
-        mintedValueCum = mints * 0.1 ether;
-        uint256 bthis = address(this).balance;
-        vault.restock(20, 3);
-        vault.list(20);
-        keeperPaidCum = address(this).balance - bthis; // restock + list reimburse this contract
-        backingPostedCum = 20 * B;
-        // Replay the real buyback as its original self-call (EIP-7702 delegated sender).
-        address from = vm.parseJsonAddress(fx, ".from");
-        bytes memory input = vm.parseJsonBytes(fx, ".input");
-        vm.txGasPrice(vm.parseJsonUint(fx, ".gasPrice"));
-        vm.prank(from, from);
-        (bool ok,) = vm.parseJsonAddress(fx, ".to").call(input);
-        assertTrue(ok, "real buyback replays");
-        vm.txGasPrice(0.15 gwei);
-
-        Snap memory a = flowBegin(0.15 gwei, 0.1 gwei, BUYBACK_block());
-        vm.deal(alice, 1 ether);
-        _deposit(alice, 0.1 ether); // in-window holder inflow so inflow_base is positive
-        uint256[] memory ids = vault.openListings();
-        uint256 pending = _pendingTokens(rewards, ids);
-        tokensClaimedCum = pending;
-        uint256 supply = token.totalSupply();
-        address anyone = makeAddr("pack-vault-test-anyone");
-        vm.prank(anyone);
-        vault.burnTokens(ids);
-        tokensBurnedCum = supply - token.totalSupply();
-        assertEq(tokensBurnedCum, pending, "burned exactly what was claimed");
-        assertEq(anyone.balance, 0, "unpaid: no ETH to the caller");
-        Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("tokens_claimed_units", tokensClaimedCum);
-        f[2] = Fact("tokens_burned_units", tokensBurnedCum);
-        f[3] = Fact("burn_paid_any_eth", 0);
-        flowReport("tokens", a, f);
-    }
-
-    function BUYBACK_block() internal pure returns (uint256) {
-        return 26_423_454;
-    }
-
-    function _pendingTokens(IFWARewards rewards, uint256[] memory ids) internal view returns (uint256 sum) {
-        for (uint256 i; i < ids.length; ++i) {
-            sum += rewards.pendingDepositorTokens(ids[i]);
-        }
-    }
-
     // ------------------------------------------------------------------ helpers
 
     function _forkPinned() internal {
@@ -597,6 +102,7 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
         p.packUnitsMask = uint64(8); // bit 3 set: 3-unit packs
         p.gasCeiling = 0.5 gwei;
         p.maxTip = 0.05 gwei;
+        p.workFee = 0.00002 ether;
         p.maxPositions = 30;
         p.reserve = 0.005 ether;
         p.tvlCap = 2 ether;
@@ -904,4 +410,510 @@ contract VaultFlowTest is SelectionBase, FlowBreakdown {
     function flowTolerance() internal pure override returns (uint256) {
         return 0;
     }
+}
+
+contract VaultFlowPinnedTest is VaultFlowBase {
+    // ------------------------------------------------------------------ pinned-block regimes
+
+    /// @dev Initial capitalization: deploy at the canary seed, then the first deposit priced into
+    ///      shares. Shows the seed and the first holder's capital resting as free vault ETH.
+    function test_flow_init() public {
+        _forkPinned();
+        _deploy(0.01 ether, _canary());
+        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
+        _deposit(alice, 1 ether);
+        _toBlackout();
+        _kCheckpoint(keeper);
+        Fact[] memory f = _facts("open_listings", 0);
+        f[1] = Fact("holder_shares_minted", vault.shareBalance(alice));
+        flowReport("init", a, f);
+    }
+
+    /// @dev Maximum load: deposit to the 2 ETH cap and build and list as many packs as the capital
+    ///      allows, in batches of up to 10 as keeper/policy.py does (largest batch the capital check
+    ///      accepts). O2 reads keeper pay per position as gas: pay / (0.2 gwei x 1.10). GAP: a real high-volume settlement burst needs several real VRF
+    ///      selections in one fork; only two historical fixtures exist, so this shows the maximum
+    ///      standing load instead (see report).
+    function test_flow_max_load() public {
+        _forkPinned();
+        _deploy(0.01 ether, _canary());
+        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
+        _deposit(alice, 1.98 ether);
+        _toBlackout();
+        _kCheckpoint(keeper);
+        _toOpen();
+        uint256 listed;
+        uint256 pay0 = keeperPaidCum;
+        for (uint256 c = 10; c != 0;) {
+            if (_kTryRestock(keeper, c, 3)) listed += _kList(keeper, c);
+            else --c;
+        }
+        // Reimbursed price here: min(0.2 gwei bid, basefee 0.15 + maxTip 0.05, ceiling 0.5) x 1.10.
+        // Work fee: one unit per pack listed (restock pays none). The rest is gas at 0.22 gwei.
+        uint256 feePaid = listed * vault.getParams().workFee;
+        uint256 gasPerPosition = (keeperPaidCum - pay0 - feePaid) / 0.22 gwei / listed;
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("packs_listed", listed);
+        f[2] = Fact("keeper_gas_per_position", gasPerPosition);
+        f[3] = Fact("work_fee_per_position_wei", feePaid / listed);
+        flowReport("max_load", a, f);
+    }
+
+    /// @dev Low volume / prolonged inactivity, short window. Identical inputs to inactive_long;
+    ///      grouped for drift. No real acquisition happens at the pinned block, so listings sit
+    ///      and ETH destinations do not move with time.
+    function test_flow_inactive_short() public {
+        _inactive("inactive_short", 2);
+    }
+
+    function test_flow_inactive_long() public {
+        _inactive("inactive_long", 20);
+    }
+
+    function _inactive(string memory regime, uint256 intervals) internal {
+        _forkPinned();
+        _deploy(0.01 ether, _canary());
+        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
+        _deposit(alice, 1 ether);
+        _toBlackout();
+        _kCheckpoint(keeper);
+        _toOpen();
+        _kRestock(keeper, 5, 3);
+        _kList(keeper, 5);
+        for (uint256 i; i < intervals; ++i) {
+            vm.warp(block.timestamp + INTERVAL);
+            vm.roll(block.number + INTERVAL / 12);
+        }
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("idle_intervals", intervals);
+        flowReport(regime, a, f);
+    }
+
+    /// @dev Gas spike after deployment: a position is listed at low gas (setup), then the price is
+    ///      lifted above the 0.5 gwei ceiling. Every call is still accepted (D51): a build and a
+    ///      checkpoint run, each reimbursed at the 0.5 gwei ceiling price, not the spike.
+    function test_flow_gas_spike() public {
+        _forkPinned();
+        _deploy(0.01 ether, _canary());
+        // Setup at low gas, before the measured window.
+        vm.fee(BASE_FEE);
+        vm.txGasPrice(GAS_PRICE);
+        _deposit(alice, 1 ether);
+        _toBlackout();
+        _kCheckpoint(keeper);
+        _toOpen();
+        _kRestock(keeper, 3, 3);
+        _kList(keeper, 3);
+        // The spike: 2 gwei, four times the ceiling.
+        Snap memory a = flowBegin(2 gwei, 1.95 gwei, PINNED);
+        uint256 kb0 = keeper.balance;
+        _kRestock(keeper, 1, 3); // accepted above the ceiling (D51); paid at the ceiling price
+        uint256 buildPay = keeper.balance - kb0;
+        assertEq(buildPay % 0.55 gwei, 0, "build reimbursed at 0.5 gwei x 1.10");
+        _deposit(bob, 0.5 ether);
+        _toBlackout();
+        uint256 kb = keeper.balance;
+        _kCheckpoint(keeper); // prices bob's deposit; keeper pay capped at the ceiling
+        uint256 pay = keeper.balance - kb;
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("gas_price_gwei_x100", 200);
+        f[2] = Fact("checkpoint_pay_wei", pay);
+        f[3] = Fact("build_pay_wei", buildPay);
+        flowReport("gas_spike", a, f);
+    }
+
+    /// @dev Oracle owner lowers the pack ask below the posted backing, so FWA's owner can kick the
+    ///      listing and the full backing returns to the vault. Then the floor oracle is repointed to
+    ///      a contract with no such function: edge() yields no cap and nothing new lists, but
+    ///      unlisting/redemption still work (D34). Positions are synced before the snapshot.
+    function test_flow_oracle_change() public {
+        _forkPinned();
+        _deploy(0.01 ether, _canary());
+        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
+        _deposit(alice, 1 ether);
+        _toBlackout();
+        _kCheckpoint(keeper);
+        _toOpen();
+        _kRestock(keeper, 3, 3);
+        uint256[] memory ids = _idsOf(_kList(keeper, 3));
+        _setPackAsk(0.03 ether); // cap 0.033 < 0.0363 posted: FWA may kick
+        _toBlackout();
+        uint256 vb = address(vault).balance;
+        IFwaAdmin(address(FWA)).kickListing(ids[0]);
+        backingReturnedCum += address(vault).balance - vb; // full backing B returns on a kick
+        _kSync(keeper, ids);
+        // Repoint the oracle so no cap can be read; edge fails, nothing new lists.
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setAddr(64, address(PACKS));
+        (, uint256 backing, bool ok) = vault.edge(3);
+        uint256 packsBack = vault.idlePacks().length;
+        assertGe(packsBack, 1, "kicked pack recovered to inventory");
+        // With the oracle broken, alice redeems everything: the vault unlists the rest, liquidates
+        // and pays her (D34).
+        _toOpen();
+        uint256 aShares = vault.shareBalance(alice);
+        vm.prank(alice);
+        vault.requestRedeem(aShares);
+        _kUnlist(keeper, vault.openListings());
+        _kLiquidate(keeper, 40);
+        _toBlackout();
+        _kCheckpoint(keeper);
+        uint256 c0 = claimsCum;
+        _claim(alice);
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("edge_ok_after_repoint", ok ? 1 : 0);
+        f[2] = Fact("cap_after_repoint_wei", backing);
+        f[3] = Fact("packs_back_in_inventory", packsBack);
+        f[4] = Fact("redemption_paid_after_repoint_wei", claimsCum - c0);
+        flowReport("oracle_change", a, f);
+    }
+
+    /// @dev Failed or delayed keeper execution: keepers never harvest and an idle checkpoint is
+    ///      refused, so fees sit uncollected at FWA and no interval slot is wasted. ETH stays safe
+    ///      and recoverable; the backing counter still matches real FWA holdings (held == implied).
+    function test_flow_keeper_delay() public {
+        _forkPinned();
+        _deploy(0.01 ether, _canary());
+        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
+        _deposit(alice, 1 ether);
+        _toBlackout();
+        _kCheckpoint(keeper);
+        _toOpen();
+        _kRestock(keeper, 4, 3);
+        _kList(keeper, 4);
+        // No keeper acts for a long time. A no-flow checkpoint is refused (LOW-1 repair).
+        vm.warp(block.timestamp + INTERVAL);
+        _toBlackout();
+        vm.prank(keeper);
+        vm.expectRevert(PackVault.Nothing.selector);
+        vault.checkpoint();
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("idle_checkpoint_refused", 1);
+        f[2] = Fact("fees_uncollected_wei", _feesHeld());
+        flowReport("keeper_delay", a, f);
+    }
+
+    /// @dev Partial and simultaneous withdrawals: two holders redeem; the first checkpoint fills
+    ///      pro rata from free ETH, the backing is unwound, the next checkpoint fills the rest.
+    function test_flow_withdrawals() public {
+        _forkPinned();
+        _deploy(0.01 ether, _canary());
+        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
+        _deposit(alice, 1 ether);
+        _deposit(bob, 1 ether);
+        _toBlackout();
+        _kCheckpoint(keeper);
+        _toOpen();
+        _kRestock(keeper, 10, 3);
+        uint256[] memory ids = _idsOf(_kList(keeper, 10));
+        uint256 aShares = vault.shareBalance(alice);
+        uint256 bShares = vault.shareBalance(bob);
+        vm.prank(alice);
+        vault.requestRedeem(aShares);
+        vm.prank(bob);
+        vault.requestRedeem(bShares / 2);
+        _toBlackout();
+        _kCheckpoint(keeper); // partial fill from free ETH
+        uint256 lockedAfterFirst = vault.lockedShares();
+        _kUnlist(keeper, ids);
+        _kLiquidate(keeper, 40);
+        _toOpen();
+        _toBlackout();
+        _kCheckpoint(keeper); // fills the rest
+        _claim(alice);
+        _claim(bob);
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("locked_shares_after_first_checkpoint", lockedAfterFirst);
+        f[2] = Fact("locked_shares_at_end", vault.lockedShares());
+        flowReport("withdrawals", a, f);
+    }
+
+    /// @dev Settled-but-unclaimed ETH is a liability, never deployable (D32). Alice is filled in
+    ///      full, her entitlement settles to claimable on an unrelated touch, and keepers can still
+    ///      only deploy bob's capital and the seed.
+    function test_flow_settled_unclaimed() public {
+        _forkPinned();
+        _deploy(0.01 ether, _canary());
+        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
+        _deposit(alice, 1 ether);
+        _deposit(bob, 1 ether);
+        _toBlackout();
+        _kCheckpoint(keeper);
+        _toOpen();
+        uint256 aShares = vault.shareBalance(alice);
+        vm.prank(alice);
+        vault.requestRedeem(aShares);
+        _toBlackout();
+        _kCheckpoint(keeper); // fills alice in full from free ETH
+        _toOpen();
+        _deposit(alice, 0.01 ether); // touch: her entitlement settles to claimableEth
+        uint256 liabilities = vault.pendingDepositTotal() + vault.redemptionReserve()
+            + vault.distributionReserve() + vault.claimableTotal();
+        _kRestock(keeper, 10, 3);
+        _kList(keeper, 10);
+        // Checked before the claim, while the entitlement is still a liability: idle ETH excludes
+        // it, and the vault balance never falls below its liabilities.
+        uint256 spendable = vault.idleEth();
+        assertGt(vault.claimableTotal(), 0, "alice's entitlement settled to claimable (state reached)");
+        // The gap is the margin by which spendable ETH stays under the unowed balance: never negative.
+        uint256 unowed = address(vault).balance - liabilities;
+        _claim(alice);
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("spendable_over_unowed_wei", spendable > unowed ? spendable - unowed : 0);
+        f[2] = Fact("liabilities_wei", liabilities);
+        f[3] = Fact("guard_checks", guardChecks);
+        flowReport("settled_unclaimed", a, f);
+    }
+
+    /// @dev Distributions on (stated variation: distributionBps 2000; the canary ships 0). A 1 ETH
+    ///      forced gain above the high-water mark is distributed to live shares and claimed.
+    function test_flow_distributions() public {
+        _forkPinned();
+        PackVault.Params memory p = _canary();
+        p.distributionBps = 2_000;
+        _deploy(0.01 ether, p);
+        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
+        _deposit(alice, 1 ether);
+        _toBlackout();
+        _kCheckpoint(keeper);
+        _toOpen();
+        new ForceSender{value: 1 ether}(payable(address(vault)));
+        forcedCum += 1 ether;
+        _toBlackout();
+        _kCheckpoint(keeper); // distributes 20% of the gain above the high-water mark
+        uint256 distributed = vault.distributionReserve();
+        _claim(alice);
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("distributed_wei", distributed);
+        f[2] = Fact("distribution_bps", 2_000);
+        flowReport("distributions", a, f);
+    }
+
+    /// @dev Complete wind-down and final claims: all positions unlisted, inventory liquidated, both
+    ///      holders redeem in full. Only the dead-share seed slice remains in the vault.
+    function test_flow_wind_down() public {
+        _forkPinned();
+        _deploy(0.01 ether, _canary());
+        Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
+        _deposit(alice, 1 ether);
+        _deposit(bob, 0.5 ether);
+        _toBlackout();
+        _kCheckpoint(keeper);
+        _toOpen();
+        _kRestock(keeper, 8, 3);
+        uint256[] memory ids = _idsOf(_kList(keeper, 8));
+        vm.prank(guardian);
+        vault.startWindDown();
+        _kUnlist(keeper, ids);
+        uint256 aShares = vault.shareBalance(alice);
+        uint256 bShares = vault.shareBalance(bob);
+        vm.prank(alice);
+        vault.requestRedeem(aShares);
+        vm.prank(bob);
+        vault.requestRedeem(bShares);
+        _kLiquidate(keeper, 40);
+        _toBlackout();
+        // Independent expectation: with every position unlisted and liquidated, the vault's whole
+        // value is its ETH. The checkpoint prices redemptions first and pays its keeper after, so
+        // each holder is owed (balance before that pay) x their shares / all shares, the seed's
+        // dead shares included; the pay falls on the shares that stay (here the seed slice).
+        uint256 total = vault.totalShares();
+        uint256 kb = keeper.balance;
+        _kCheckpoint(keeper);
+        uint256 nav = address(vault).balance + (keeper.balance - kb);
+        uint256 expA = nav * aShares / total;
+        uint256 expB = nav * bShares / total;
+        uint256 c0 = claimsCum;
+        _claim(alice);
+        uint256 gotA = claimsCum - c0;
+        _claim(bob);
+        uint256 gotB = claimsCum - c0 - gotA;
+        uint256 gap = (gotA > expA ? gotA - expA : expA - gotA) + (gotB > expB ? gotB - expB : expB - gotB);
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("locked_shares_at_end", vault.lockedShares());
+        f[2] = Fact("vault_eth_at_end_wei", address(vault).balance);
+        f[3] = Fact("holder_claim_gap_wei", gap);
+        f[4] = Fact("holder_loss_bps", (1.5 ether - (gotA + gotB)) * 10_000 / 1.5 ether);
+        flowReport("wind_down", a, f);
+    }
+
+}
+
+contract VaultFlowSelectionTest is VaultFlowBase {
+    // ------------------------------------------------------------------ selection-fork regimes
+    // The real VRF fixtures (SelectionBase) carry their own deploy: 3 ETH seed, gasCeiling 50 gwei,
+    // opGasCap 3M, 30 listings. Resolution and harvest run at a canary-realistic 0.45/0.4 gwei.
+
+    /// @dev Bid outcome: the purchaser takes the bid; the vault keeps the pack and loses the
+    ///      backing. The pack returns to inventory on sync, the fee share is harvested.
+    function test_flow_acquire_bid() public {
+        Candidate memory c = late();
+        _select(c);
+        _afterSelect();
+        Snap memory a = flowBegin(0.45 gwei, 0.4 gwei, c.requestBlock);
+        _deposit(alice, 0.2 ether); // in-window holder inflow so inflow_base is positive
+        (,, uint128 backing) = vault.positions(selected);
+        uint256 pb = c.purchaser.balance;
+        vm.prank(c.purchaser);
+        IFwaSettle(address(FWA)).acceptDepositorBid(selected);
+        assertEq(c.purchaser.balance - pb, backing * 9_000 / 10_000, "purchaser got 90% of backing");
+        bidBackingOutCum += backing; // 0.9 to purchaser, 0.1 to FWA: the whole backing leaves
+        _kSync(address(this), _one(selected)); // pack returns to inventory
+        _kHarvest(address(this), vault.openListings());
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("outcome_bid", 1);
+        f[2] = Fact("packs_back_in_inventory", vault.idlePacks().length);
+        flowReport("acquire_bid", a, f);
+    }
+
+    /// @dev Keep outcome: the purchaser keeps the pack; the vault gets the backing back less FWA's
+    ///      settlement fee, and the pack value leaves to the purchaser.
+    function test_flow_acquire_keep() public {
+        Candidate memory c = late();
+        _select(c);
+        _afterSelect();
+        Snap memory a = flowBegin(0.45 gwei, 0.4 gwei, c.requestBlock);
+        _deposit(alice, 0.2 ether);
+        (, uint64 units, uint128 backing) = vault.positions(selected);
+        uint256 vb = address(vault).balance;
+        vm.prank(c.purchaser);
+        IFwaSettle(address(FWA)).keepNFT(selected);
+        uint256 reclaimed = address(vault).balance - vb;
+        assertEq(reclaimed, uint256(backing) * 9_900 / 10_000, "backing back less the 1% settlement fee");
+        backingReturnedCum += reclaimed;
+        settlementCutCum += backing - reclaimed;
+        packToPurchaserCum += uint256(units) * UNIT;
+        _kSync(address(this), _one(selected));
+        _kHarvest(address(this), vault.openListings());
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("outcome_keep", 1);
+        f[2] = Fact("packs_held", vault.idlePacks().length);
+        flowReport("acquire_keep", a, f);
+    }
+
+    /// @dev Silent purchaser: past the settlement window the vault reclaims the better outcome
+    ///      (backing, since B(1-s) > P), inside sync. The pack goes to the purchaser.
+    function test_flow_acquire_silent() public {
+        Candidate memory c = late();
+        _select(c);
+        _afterSelect();
+        Snap memory a = flowBegin(0.45 gwei, 0.4 gwei, c.requestBlock);
+        _deposit(alice, 0.2 ether);
+        vm.warp(block.timestamp + FWA.settlementWindow());
+        (, uint64 units, uint128 backing) = vault.positions(selected);
+        uint256 vb = address(vault).balance;
+        uint256 kb = address(this).balance;
+        vm.prank(address(this));
+        vault.sync(_one(selected));
+        uint256 pay = address(this).balance - kb;
+        keeperPaidCum += pay;
+        uint256 reclaimed = (address(vault).balance - vb) + pay;
+        assertEq(reclaimed, uint256(backing) * 9_900 / 10_000, "vault reclaimed backing on silence");
+        backingReturnedCum += reclaimed;
+        settlementCutCum += backing - reclaimed;
+        packToPurchaserCum += uint256(units) * UNIT;
+        _kHarvest(address(this), vault.openListings());
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("outcome_silent", 1);
+        flowReport("acquire_silent", a, f);
+    }
+
+    /// @dev Staged listing and delayed activation (as ForkReconcile): after a bid, the pack is
+    ///      relisted while FWA's queue is still busy, so FWA stages it (no fees). With the queue
+    ///      drained the vault activates it through FWA's own permissionless activation, paid.
+    function test_flow_staged_activation() public {
+        Candidate memory c = late();
+        _select(c);
+        _afterSelect();
+        Snap memory a = flowBegin(0.45 gwei, 0.4 gwei, c.requestBlock);
+        _deposit(alice, 0.2 ether);
+        (,, uint128 backing) = vault.positions(selected);
+        vm.prank(c.purchaser);
+        IFwaSettle(address(FWA)).acceptDepositorBid(selected);
+        bidBackingOutCum += backing;
+        _kSync(address(this), _one(selected));
+        _kHarvest(address(this), vault.openListings());
+        uint256 relisted = _kList(address(this), 1); // relists into a busy queue
+        uint256[] memory open = vault.openListings();
+        uint256 relistId = open[open.length - 1];
+        (,,,,,,,,,, uint8 st) = FWA.listings(relistId);
+        bool staged = st == LISTING_STAGED;
+        _drainQueue();
+        if (staged) _kActivate(address(this), _one(relistId));
+        (,,,,,,,,,, st) = FWA.listings(relistId);
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("relisted_staged", staged ? 1 : 0);
+        f[2] = Fact("relist_active_after_activate", st == LISTING_ACTIVE ? 1 : 0);
+        f[3] = Fact("relisted_count", relisted);
+        flowReport("staged_activation", a, f);
+    }
+
+    // ------------------------------------------------------------------ token-fork regime
+
+    /// @dev FWA token lifecycle (D43): a real buyback routes tokens to live vault listings; anyone's
+    ///      unpaid call claims and burns every token the vault holds. Supply falls by exactly the
+    ///      claimed amount; no ETH moves for the burn. Tokens are reported in token units as a flow
+    ///      and facts, never as an ETH bucket (worth zero to holders).
+    function test_flow_tokens() public {
+        string memory fx = vm.readFile("test/fixtures/buyback.json");
+        vm.createSelectFork("mainnet", vm.parseJsonBytes32(fx, ".tx"));
+        assertEq(FWA.unsettledAcquisitionCount(), 0);
+        preexisting = 0;
+        vm.fee(0.1 gwei);
+        vm.txGasPrice(0.15 gwei);
+        IFWAToken token = IFWAToken(FWA.token());
+        IFWARewards rewards = IFWARewards(FWA.rewards());
+
+        PackVault.Params memory p = _canary();
+        vm.deal(address(this), 5 ether);
+        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, guardian, admin, 1 days, p);
+        depositedCum = address(vault).balance;
+        uint256 need = 20 * 3;
+        uint256 mints = (need + 9) / 10; // 20 packs x 3 units -> 6 mints of 0.1 ETH
+        mintFeesCum = mints * SHAPES.mintFee();
+        mintedValueCum = mints * 0.1 ether;
+        uint256 bthis = address(this).balance;
+        vault.restock(20, 3);
+        vault.list(20);
+        keeperPaidCum = address(this).balance - bthis; // restock + list reimburse this contract
+        backingPostedCum = 20 * B;
+        // Replay the real buyback as its original self-call (EIP-7702 delegated sender).
+        address from = vm.parseJsonAddress(fx, ".from");
+        bytes memory input = vm.parseJsonBytes(fx, ".input");
+        vm.txGasPrice(vm.parseJsonUint(fx, ".gasPrice"));
+        vm.prank(from, from);
+        (bool ok,) = vm.parseJsonAddress(fx, ".to").call(input);
+        assertTrue(ok, "real buyback replays");
+        vm.txGasPrice(0.15 gwei);
+
+        Snap memory a = flowBegin(0.15 gwei, 0.1 gwei, BUYBACK_block());
+        vm.deal(alice, 1 ether);
+        _deposit(alice, 0.1 ether); // in-window holder inflow so inflow_base is positive
+        uint256[] memory ids = vault.openListings();
+        uint256 pending = _pendingTokens(rewards, ids);
+        tokensClaimedCum = pending;
+        uint256 supply = token.totalSupply();
+        address anyone = makeAddr("pack-vault-test-anyone");
+        vm.prank(anyone);
+        vault.burnTokens(ids);
+        tokensBurnedCum = supply - token.totalSupply();
+        assertEq(tokensBurnedCum, pending, "burned exactly what was claimed");
+        assertEq(anyone.balance, 0, "unpaid: no ETH to the caller");
+        Fact[] memory f = _facts("open_listings", vault.openListings().length);
+        f[1] = Fact("tokens_claimed_units", tokensClaimedCum);
+        f[2] = Fact("tokens_burned_units", tokensBurnedCum);
+        f[3] = Fact("burn_paid_any_eth", 0);
+        flowReport("tokens", a, f);
+    }
+
+    function BUYBACK_block() internal pure returns (uint256) {
+        return 26_423_454;
+    }
+
+    function _pendingTokens(IFWARewards rewards, uint256[] memory ids) internal view returns (uint256 sum) {
+        for (uint256 i; i < ids.length; ++i) {
+            sum += rewards.pendingDepositorTokens(ids[i]);
+        }
+    }
+
 }
