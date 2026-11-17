@@ -3,12 +3,19 @@ pragma solidity 0.8.30;
 
 import {ForkBase, IFwaAdmin, IOwnable} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {VaultLib} from "../../src/VaultLib.sol";
+import {Charges} from "../utils/Charges.sol";
 import {LISTING_ACTIVE, LISTING_WITHDRAWN} from "../../src/interfaces/External.sol";
 
 contract ForkVaultLifecycleTest is ForkBase {
+    receive() external payable {} // this contract calls paid work directly
+
     function _depositAndPrice(address who, uint256 amount) internal {
-        vm.prank(who);
-        vault.deposit{value: amount}();
+        {
+            uint256 gross_ = Charges.grossFor(vault, amount);
+            vm.prank(who);
+            vault.deposit{value: gross_}();
+        }
         toBlackout();
         checkpoint();
         toOpen();
@@ -16,8 +23,8 @@ contract ForkVaultLifecycleTest is ForkBase {
 
     function _listN(uint256 n) internal returns (uint256[] memory ids) {
         vm.startPrank(keeper);
-        vault.restock(n, 3);
-        vault.list(n);
+        vault.restock(n, 3, 0);
+        vault.list(n, 0);
         vm.stopPrank();
         ids = vault.openListings();
     }
@@ -31,12 +38,19 @@ contract ForkVaultLifecycleTest is ForkBase {
     }
 
     function test_depositListRedeem_roundTrip() public {
-        _depositAndPrice(alice, 2 ether);
+        uint256 ck = vault.requestCharge();
+        vm.prank(alice);
+        vault.deposit{value: ck + 2 ether}();
+        (,, uint96 charge) = vault.pendingDeposits(alice);
+        toBlackout();
+        checkpoint();
+        toOpen();
         uint256 shares = vault.totalShares() - vault.DEAD_SHARES();
         uint256 seed = 0.01 ether + preexisting;
         uint256 supply = vault.totalShares();
-        // First depositor at seed price: 2 ETH buys 2 / seed times the dead shares.
-        assertEq(shares, 2 ether * vault.DEAD_SHARES() / seed);
+        // First depositor at seed price: 2 ETH less its deployment charge buys (2 - charge) / seed
+        // times the dead shares; the charge itself joins NAV.
+        assertEq(shares, (2 ether - charge) * vault.DEAD_SHARES() / seed);
 
         uint256 balBefore = address(vault).balance;
         uint256 kBefore = keeper.balance;
@@ -53,16 +67,17 @@ contract ForkVaultLifecycleTest is ForkBase {
         }
 
         // Alice exits everything. First checkpoint fills from free ETH, the rest waits.
+        uint256 rc = Charges.redeemCharge(vault, shares);
         vm.prank(alice);
-        vault.requestRedeem(shares);
+        vault.requestRedeem{value: rc}(shares);
         toBlackout();
         checkpoint();
         assertGt(vault.lockedShares(), 0, "partial fill leaves shares locked");
 
         // The shortfall unlocks unlisting and liquidation, then the next checkpoint fills the rest.
         vm.startPrank(keeper);
-        vault.unlist(ids);
-        vault.liquidate(40);
+        vault.unlist(ids, 0);
+        vault.liquidate(40, 0);
         vm.stopPrank();
         assertEq(vault.openListings().length, 0);
         toOpen();
@@ -74,14 +89,16 @@ contract ForkVaultLifecycleTest is ForkBase {
         uint256 before = alice.balance;
         vm.prank(alice);
         vault.claim();
-        // Every wei: alice's claim + mint fees + all keeper pay + what is left = seed + deposit.
+        // Every wei: alice's claim + mint fees + all keeper pay + what is left = seed + deposit +
+        // the two request charges she paid.
         uint256 got = alice.balance - before;
         uint256 allPay = keeper.balance - 1 ether;
-        assertEq(got + 0.003 ether + allPay + address(vault).balance, seed + 2 ether);
-        // Alice bears her share of the mint fees and of the keeper pay after her pricing (the
-        // order of fills makes the exact split path-dependent, so bound it on both sides).
-        assertLe(got, (seed + 2 ether - 0.003 ether) * shares / supply);
-        assertGe(got, (seed + 2 ether - 0.003 ether - allPay) * shares / supply);
+        uint256 inflow = seed + 2 ether + ck + rc;
+        assertEq(got + 0.003 ether + allPay + address(vault).balance, inflow);
+        // Alice bears her share of the mint fees and of the keeper pay (the order of fills makes
+        // the exact split path-dependent, so bound it on both sides).
+        assertLe(got, (inflow - 0.003 ether) * shares / supply);
+        assertGe(got, (inflow - 0.003 ether - allPay) * (shares) / supply - charge);
         payBeforeLast;
         // About 20.7M gas reimbursed at 0.2 gwei plus 10%: restock 10 (9.2M), list 10 (5.7M),
         // unlist, liquidate and three checkpoints.
@@ -100,7 +117,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         assertEq(address(vault).balance - before, B, "kick returns full backing");
         (,,,,,,,,,, uint8 status) = FWA.listings(ids[0]);
         assertEq(status, LISTING_WITHDRAWN);
-        vault.sync(ids);
+        vault.sync(ids, 0);
         assertEq(vault.openListings().length, 1);
         assertEq(vault.idlePacks().length, 1);
         // New cap 0.033 still clears the keep gate B (k - s) >= P: 0.033 x 1.0285 > 0.03.
@@ -109,8 +126,9 @@ contract ForkVaultLifecycleTest is ForkBase {
         assertEq(backing, 0.033 ether);
     }
 
-    /// Repair: sync and unlist skip ids they cannot act on, so a keeper padding a call with junk
-    /// ids was paid the premium on the padding. Pay is now capped per position actually moved.
+    /// D56: pay is the quote for completed work. Padding a sync with 399 ids the vault never held
+    /// costs the caller gas and earns nothing: the pay equals the quote for one resolved position,
+    /// (75k base + 75k per resolved) x 0.2 gwei + one work fee (V1: no markup), to the wei.
     function test_paddedSyncPaysOnlyForWorkDone() public {
         _depositAndPrice(alice, 1 ether);
         uint256[] memory ids = _listN(2);
@@ -125,15 +143,11 @@ contract ForkVaultLifecycleTest is ForkBase {
         uint256 before = keeper.balance;
         uint256 g = gasleft();
         vm.prank(keeper);
-        vault.sync(padded);
+        uint256 pay = vault.sync(padded, 0);
         uint256 used = g - gasleft();
-        uint256 pay = keeper.balance - before;
-        // Price here is min(0.2 gwei, 0.15 + 0.05 tip) = 0.2 gwei, plus the 10% premium.
-        // (+2k gas: the cap is taken just before the reimbursement code itself runs.)
-        uint256 cap = (vault.GAS_PER_MOVED() + vault.KEEPER_OVERHEAD_GAS() + 2_000) * 0.2 gwei * 11_000 / 10_000
-            + vault.getParams().workFee; // one unit: one position moved
-        assertGt(used, vault.GAS_PER_MOVED(), "the padding really cost gas");
-        assertLe(pay, cap, "paid for one moved position, not the padding");
+        assertEq(keeper.balance - before, pay);
+        assertGt(used, 1_000_000, "the padding really cost gas");
+        assertEq(pay, 150_000 * 0.2 gwei + vault.getParams().workFee, "quote for one resolved position");
         assertEq(vault.idlePacks().length, 1);
     }
 
@@ -142,7 +156,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         uint256[] memory ids = _listN(2);
         vm.prank(keeper);
         vm.expectRevert(PackVault.UnlistNotAllowed.selector);
-        vault.unlist(ids);
+        vault.unlist(ids, 0);
 
         // FWA's owner puts the crown share back to 5%: k = 0.9875, the edge is gone.
         vm.prank(IOwnable(address(FWA)).owner());
@@ -153,10 +167,10 @@ contract ForkVaultLifecycleTest is ForkBase {
         vm.startPrank(keeper);
         // No edge: no capital goes into new packs or listings.
         vm.expectRevert(PackVault.EdgeGate.selector);
-        vault.restock(1, 3);
+        vault.restock(1, 3, 0);
         uint256 before = address(vault).balance;
         uint256 kBefore = keeper.balance;
-        vault.unlist(ids);
+        vault.unlist(ids, 0);
         vm.stopPrank();
         assertEq(address(vault).balance - before + (keeper.balance - kBefore), 2 * B, "backing back, less gas pay");
     }
@@ -171,7 +185,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         assertFalse(ok);
         vm.prank(keeper);
         vm.expectRevert(PackVault.UnlistNotAllowed.selector);
-        vault.unlist(ids);
+        vault.unlist(ids, 0);
     }
 
     /// Repair: unlisting read the oracle through edge(), so an oracle FWA's owner repoints to a
@@ -190,13 +204,16 @@ contract ForkVaultLifecycleTest is ForkBase {
         vault.startWindDown();
         uint256 before = address(vault).balance;
         vm.prank(keeper);
-        vault.unlist(ids);
+        vault.unlist(ids, 0);
         assertGe(address(vault).balance + (keeper.balance - 1 ether), before + 3 * B, "backing back");
         vm.prank(keeper);
-        vault.liquidate(40);
+        vault.liquidate(40, 0);
         uint256 shares = vault.shareBalance(alice);
-        vm.prank(alice);
-        vault.requestRedeem(shares);
+        {
+            uint256 rc_ = Charges.redeemCharge(vault, shares);
+            vm.prank(alice);
+            vault.requestRedeem{value: rc_}(shares);
+        }
         toBlackout();
         checkpoint();
         assertEq(vault.lockedShares(), 0, "redemption completes without the oracle");
@@ -213,13 +230,15 @@ contract ForkVaultLifecycleTest is ForkBase {
         _listN(2);
         uint256 bal = address(vault).balance;
         uint256 gBal = guardian.balance;
-        vm.startPrank(guardian);
+        vm.prank(guardian);
         vault.guard(true, true, true);
-        vault.lowerCaps(1 ether, 10, 1 gwei, 0);
+        lowerTo(1 ether, 10, 1 gwei, 0);
+        vm.prank(guardian);
         vault.startWindDown();
+        VaultLib.Params memory q = vault.getParams();
+        vm.prank(guardian);
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        vault.lowerCaps(2 ether, 10, 1 gwei, 0);
-        vm.stopPrank();
+        vault.lowerCaps(2 ether, q.maxPositions, q.gasCeiling, q.workFee, q.routineCap, q.essentialCap); // a raise
         assertEq(address(vault).balance, bal);
         assertEq(guardian.balance, gBal);
         vm.prank(guardian);
@@ -228,7 +247,7 @@ contract ForkVaultLifecycleTest is ForkBase {
     }
 
     function test_paramsDelayAndBounds() public {
-        PackVault.Params memory p = defaultParams();
+        VaultLib.Params memory p = defaultParams();
         p.distributionBps = 6_000;
         vm.prank(admin);
         vm.expectRevert(PackVault.OutOfBounds.selector);
@@ -250,8 +269,11 @@ contract ForkVaultLifecycleTest is ForkBase {
     }
 
     function test_cancelDepositBeforePricing() public {
-        vm.prank(alice);
-        vault.deposit{value: 1 ether}();
+        {
+            uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            vm.prank(alice);
+            vault.deposit{value: gross_}();
+        }
         uint256 before = alice.balance;
         vm.prank(alice);
         vault.cancelDeposit();
@@ -265,10 +287,16 @@ contract ForkVaultLifecycleTest is ForkBase {
         _listN(20);
         uint256 aShares = vault.shareBalance(alice);
         uint256 bShares = vault.shareBalance(bob);
-        vm.prank(alice);
-        vault.requestRedeem(aShares);
-        vm.prank(bob);
-        vault.requestRedeem(bShares / 2);
+        {
+            uint256 rc_ = Charges.redeemCharge(vault, aShares);
+            vm.prank(alice);
+            vault.requestRedeem{value: rc_}(aShares);
+        }
+        {
+            uint256 rc_ = Charges.redeemCharge(vault, bShares / 2);
+            vm.prank(bob);
+            vault.requestRedeem{value: rc_}(bShares / 2);
+        }
         toBlackout();
         checkpoint();
         vm.prank(alice);
@@ -283,40 +311,58 @@ contract ForkVaultLifecycleTest is ForkBase {
     }
 
     function test_windDownCompletesWithNoAcquisitions() public {
-        _depositAndPrice(alice, 1 ether);
-        _depositAndPrice(bob, 0.5 ether);
+        uint256 seed = 0.01 ether + preexisting;
+        uint256 inflow = seed; // every wei that entered: seed, deposits with charges, redeem charges
+        uint256 g = Charges.grossFor(vault, 1 ether);
+        inflow += g;
+        vm.prank(alice);
+        vault.deposit{value: g}();
+        toBlackout();
+        checkpoint();
+        toOpen();
+        g = Charges.grossFor(vault, 0.5 ether);
+        inflow += g;
+        vm.prank(bob);
+        vault.deposit{value: g}();
+        toBlackout();
+        checkpoint();
+        toOpen();
         uint256[] memory ids = _listN(8);
         vm.prank(guardian);
         vault.startWindDown();
         vm.prank(keeper);
-        vault.unlist(ids);
+        vault.unlist(ids, 0);
         uint256 aShares = vault.shareBalance(alice);
         uint256 bShares = vault.shareBalance(bob);
+        uint256 rc = Charges.redeemCharge(vault, aShares);
+        inflow += rc;
         vm.prank(alice);
-        vault.requestRedeem(aShares);
+        vault.requestRedeem{value: rc}(aShares);
+        rc = Charges.redeemCharge(vault, bShares);
+        inflow += rc;
         vm.prank(bob);
-        vault.requestRedeem(bShares);
+        vault.requestRedeem{value: rc}(bShares);
         vm.prank(keeper);
-        vault.liquidate(40); // wind-down: every idle pack and loose Shape back to ETH
+        vault.liquidate(40, 0); // wind-down: every idle pack and loose Shape back to ETH
         assertEq(vault.idlePacks().length, 0);
         assertEq(vault.looseShapeCount(), 0);
         toBlackout();
+        uint256 pool = vault.processingPool();
         uint256 kBefore = keeper.balance;
         checkpoint();
         uint256 checkpointPay = keeper.balance - kBefore;
+        assertLe(checkpointPay, pool, "the checkpoint is paid out of the request charges");
         assertEq(vault.lockedShares(), 0);
+        uint256 claimed = alice.balance + bob.balance;
         vm.prank(alice);
         vault.claim();
         vm.prank(bob);
         vault.claim();
-        // Every wei is accounted for: what is left is exactly the dead shares' NAV, and seed plus
-        // deposits equal holders' claims + mint fees + all keeper pay + what is left.
-        uint256 seed = 0.01 ether + preexisting;
-        uint256 claimed = (alice.balance + bob.balance) - (100 ether - 1.5 ether);
+        claimed = alice.balance + bob.balance - claimed;
         uint256 keeperPay = keeper.balance - 1 ether;
-        // The checkpoint's own gas pay leaves after it prices, so it comes out of the remainder.
-        assertApproxEqAbs(address(vault).balance + checkpointPay, vault.lastNav(), 3, "only the dead shares' NAV remains");
-        assertEq(claimed + 0.003 ether + keeperPay + address(vault).balance, seed + 1.5 ether);
-        assertLt(address(vault).balance, seed, "the dead shares bore their slice of fees and gas");
+        // What is left is exactly the dead shares' NAV plus the pool remainder (it joins the
+        // vault's ETH after pricing), and every wei that entered is accounted for.
+        assertApproxEqAbs(address(vault).balance, vault.lastNav() + (pool - checkpointPay), 3, "only the dead shares' NAV remains");
+        assertEq(claimed + 0.003 ether + keeperPay + address(vault).balance, inflow);
     }
 }

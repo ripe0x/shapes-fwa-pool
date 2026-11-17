@@ -59,8 +59,10 @@ class Vault:
     epoch: int = 0
     high_water_mark: int = 0
     last_nav: int = 0
-    pending: dict = field(default_factory=dict)  # holder -> [amount, epoch]
+    pending: dict = field(default_factory=dict)  # holder -> [amount, epoch, deployment charge]
     pending_total: int = 0
+    pending_charge_total: int = 0
+    processing_pool: int = 0  # request charges held for the next checkpoint (D56)
     epoch_nav: dict = field(default_factory=dict)
     epoch_supply: dict = field(default_factory=dict)
     epoch_dist: dict = field(default_factory=dict)
@@ -93,7 +95,8 @@ class Vault:
 
     # ------------------------------------------------------------ cash buckets
     def free(self):
-        owed = self.pending_total + self.redemption_reserve + self.distribution_reserve + self.claimable_total
+        owed = (self.pending_total + self.redemption_reserve + self.distribution_reserve + self.claimable_total
+                + self.processing_pool)
         return self.balance - owed if self.balance > owed else 0
 
     def owed_estimate(self):
@@ -178,22 +181,31 @@ class Vault:
             self.balance += UNIT
 
     # ------------------------------------------------------------ holders
-    def deposit(self, h, amount):
+    def deposit(self, h, amount, ck=0, charge=0):
+        """`amount` escrowed (deployment `charge` included), `ck` to the processing pool."""
         self._settle_holder(h)
-        d = self.pending.setdefault(h, [0, 0])
+        d = self.pending.setdefault(h, [0, 0, 0])
         d[0] += amount
         d[1] = self.epoch
+        d[2] += charge
         self.pending_total += amount
-        self.balance += amount
+        self.pending_charge_total += charge
+        self.processing_pool += ck
+        self.balance += amount + ck
 
     def cancel(self, h):
         self._settle_holder(h)
-        amount = self.pending.pop(h, [0, 0])[0]
+        d = self.pending.pop(h, [0, 0, 0])
+        amount = d[0]
         self.pending_total -= amount
+        self.pending_charge_total -= d[2]
         self.balance -= amount
         return amount
 
-    def request_redeem(self, h, amount):
+    def request_redeem(self, h, amount, ck=0, unwind=0):
+        """Charges paid in ETH: `ck` to the processing pool, `unwind` to the vault."""
+        self.processing_pool += ck
+        self.balance += ck + unwind
         self._settle_holder(h)
         self._settle_dist(h)
         self.shares[h] = self.shares.get(h, 0) - amount
@@ -215,14 +227,14 @@ class Vault:
         s = self.shares.get(h, 0)
         d = self.pending.get(h)
         if d and d[0] and d[1] < self.epoch:
-            s += d[0] * self.epoch_supply[d[1]] // self.epoch_nav[d[1]]
+            s += (d[0] - d[2]) * self.epoch_supply[d[1]] // self.epoch_nav[d[1]]
         return s
 
     def _settle_holder(self, h):
         d = self.pending.get(h)
         if d and d[0] and d[1] < self.epoch:
             self._settle_dist(h)
-            minted = d[0] * self.epoch_supply[d[1]] // self.epoch_nav[d[1]]
+            minted = (d[0] - d[2]) * self.epoch_supply[d[1]] // self.epoch_nav[d[1]]
             self.shares[h] = self.shares.get(h, 0) + minted
             self.dist_debt[h] = self.dist_debt.get(h, 0) + minted * self.epoch_dist[d[1]] // E
             del self.pending[h]
@@ -320,11 +332,17 @@ class Vault:
         self.epoch_supply[self.epoch] = supply
         self.epoch_dist[self.epoch] = self.dist_per_share
         if self.pending_total:
-            self.total_shares += self.pending_total * supply // nav
+            self.total_shares += (self.pending_total - self.pending_charge_total) * supply // nav
             nav += self.pending_total
             self.pending_total = 0
+            self.pending_charge_total = 0
+            per_share = nav * E // self.total_shares
+            if per_share > self.high_water_mark:
+                self.high_water_mark = per_share
         self.last_nav = nav
         self.epoch += 1
+        if work:
+            self.processing_pool = 0  # keeper pay comes out of it (pay_keeper); the rest is free ETH
         return work or distributed != 0
 
     # ------------------------------------------------------------ reporting

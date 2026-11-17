@@ -41,9 +41,12 @@ anvil's public dev keys carry on mainnet) passes the vault's pay on.
 3. For the first call: preflight (`eth_estimateGas` from the keeper's address). A vault error that
    means the state moved on (Nothing, TooEarly, NotCheckpointWindow, AlreadyCheckpointed,
    Paused, WindingDown, AllocatedExposure) is a quiet skip; any other revert is an error.
-4. Expected pay = min(estimate, opGasCap) x min(bid, basefee + maxTip, ceiling) x 1.10, plus the
-   work fee for units the call will certainly do (list: n; checkpoint: 1). Send when
-   pay + `--max-loss-wei` covers estimate x bid (always below the ceiling).
+4. Expected pay is read by simulating the exact call (`cast call` returns the pay the active
+   policy and the vault's caps give), so a policy swap needs no keeper change. Execution cost is
+   the estimate x the billed/estimate ratio calibrated from the keeper's own receipts, at the bid.
+   Send when pay + `--max-loss-wei` covers that cost; `minPay` is 80% of the simulated pay, and a
+   replacement re-quotes before re-bidding. `--status` and `/health` show the active policy and
+   any queued replacement.
 5. Save the pending entry, broadcast at basefee + maxTip (max fee 2 x basefee + maxTip), wait for
    the receipt, count it, re-read the chain, repeat.
 

@@ -67,8 +67,9 @@ def main():
 
     compare("selected")
     compare("bid")  # purchaser takes the bid: no vault ETH moves
-    v.deposit("alice", 10**18)
-    v.deposit("bob", 5 * 10**17)
+    ch = by["charges"]
+    v.deposit("alice", 10**18, ch["ckA"], ch["chargeA"])
+    v.deposit("bob", 5 * 10**17, ch["ckB"], ch["chargeB"])
     compare("deposits")
     v.resolve_bid(selected)
     compare("sync")
@@ -80,7 +81,8 @@ def main():
     compare("list")
     v.checkpoint()
     compare("checkpoint1")
-    v.request_redeem("alice", v.share_balance("alice"))
+    rc = by["redeemCharge"]
+    v.request_redeem("alice", v.share_balance("alice"), rc["ck"], rc["total"] - rc["ck"])
     compare("redeem")
     v.checkpoint()
     compare("checkpoint2")
@@ -93,7 +95,7 @@ def main():
     # The ledger: every wei in equals every wei out plus what the vault still holds.
     held = (v.balance + sum(p.backing + p.units * 10**16 for p in v.positions.values())
             + sum(v.idle_packs) * 10**16 + v.loose_shapes * 10**16)
-    ins = s["deployBalance"] + 15 * 10**17 + v.fees_received
+    ins = s["deployBalance"] + 15 * 10**17 + ch["ckA"] + ch["ckB"] + rc["total"] + v.fees_received
     outs = v.keeper_paid + v.mint_fees + got + v.backing_lost
     check("ledger", "held + out == in", held + outs, ins)
     steps = [r["step"] for r in rows]

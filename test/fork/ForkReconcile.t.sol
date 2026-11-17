@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {Charges} from "../utils/Charges.sol";
 import {LISTING_ACTIVE, LISTING_STAGED} from "../../src/interfaces/External.sol";
 
 /// @notice One full cycle on real contracts with a real VRF selection, written step by step to
@@ -92,28 +93,40 @@ contract ForkReconcileTest is SelectionBase {
         IFwaSettle(address(FWA)).acceptDepositorBid(selected);
         _snap("bid");
 
-        vm.deal(alice, 1 ether);
-        vm.deal(bob, 0.5 ether);
+        // Holders fund their deposits and the request charges (D56) on top.
+        uint256 ckA = vault.requestCharge();
+        vm.deal(alice, 1 ether + ckA);
         vm.prank(alice);
-        vault.deposit{value: 1 ether}();
+        vault.deposit{value: 1 ether + ckA}();
+        uint256 ckB = vault.requestCharge();
+        vm.deal(bob, 0.5 ether + ckB);
         vm.prank(bob);
-        vault.deposit{value: 0.5 ether}();
+        vault.deposit{value: 0.5 ether + ckB}();
+        (,, uint96 chA) = vault.pendingDeposits(alice);
+        (,, uint96 chB) = vault.pendingDeposits(bob);
+        vm.writeLine(
+            OUT,
+            string.concat(
+                '{"step":"charges","ckA":', vm.toString(ckA), ',"chargeA":', vm.toString(uint256(chA)),
+                ',"ckB":', vm.toString(ckB), ',"chargeB":', vm.toString(uint256(chB)), "}"
+            )
+        );
         _snap("deposits");
 
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
         uint256 g = gasleft();
-        vault.sync(one);
+        vault.sync(one, 0);
         uint256 gSync = g - gasleft();
         _snap("sync");
 
         g = gasleft();
-        vault.harvest(vault.openListings());
+        vault.harvest(vault.openListings(), 0);
         uint256 gHarvest = g - gasleft();
         _snap("harvest");
 
         g = gasleft();
-        vault.list(1);
+        vault.list(1, 0);
         uint256 gList = g - gasleft();
         uint256[] memory open = vault.openListings();
         (,, uint128 relistBacking) = vault.positions(open[open.length - 1]);
@@ -122,7 +135,7 @@ contract ForkReconcileTest is SelectionBase {
 
         _toBlackout();
         g = gasleft();
-        vault.checkpoint();
+        vault.checkpoint(0);
         uint256 gCheckpoint = g - gasleft();
         _snap("checkpoint1");
         vm.writeLine(
@@ -134,14 +147,18 @@ contract ForkReconcileTest is SelectionBase {
         );
 
         uint256 aShares = vault.shareBalance(alice);
+        uint256 ckR = vault.requestCharge();
+        uint256 rc = Charges.redeemCharge(vault, aShares);
+        vm.deal(alice, rc);
         vm.prank(alice);
-        vault.requestRedeem(aShares);
+        vault.requestRedeem{value: rc}(aShares);
+        vm.writeLine(OUT, string.concat('{"step":"redeemCharge","ck":', vm.toString(ckR), ',"total":', vm.toString(rc), "}"));
         _snap("redeem");
 
         vm.warp(block.timestamp + 12 hours);
         vm.roll(block.number + 3600);
         assertEq(FWA.unsettledAcquisitionCount(), 0);
-        vault.checkpoint();
+        vault.checkpoint(0);
         _snap("checkpoint2");
 
         vm.prank(alice);
@@ -156,12 +173,15 @@ contract ForkReconcileTest is SelectionBase {
         assertEq(st, LISTING_STAGED, "staged while the queue was busy");
         uint256[] memory one2 = new uint256[](1);
         one2[0] = relist;
-        vault.activate(one2, 50);
+        uint256 gA = gasleft();
+        vault.activate(one2, 50, 0);
+        gA = gA - gasleft();
+        vm.writeLine(OUT, string.concat('{"step":"gasActivate","activate1":', vm.toString(gA), "}"));
         (,,,,,,,,,, st) = FWA.listings(relist);
         assertEq(st, LISTING_ACTIVE, "activated");
         _snap("activate");
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.activate(one2, 50); // nothing left to activate: no pay for a repeat
+        vault.activate(one2, 50, 0); // nothing left to activate: no pay for a repeat
         // Every position is live; nothing strands.
         for (uint256 i; i < open.length; ++i) {
             (,,,,,,,,,, uint8 status) = FWA.listings(open[i]);

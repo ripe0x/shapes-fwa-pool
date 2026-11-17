@@ -9,7 +9,7 @@
  "minEdgeBps": 100,
  "bufferBps": 0,
  "distributionBps": 0,
- "keeperPremiumBps": 1000,
+ "payMarkupBps": 0,
  "keeperShareBps": 2500,
  "allocatedBoundBps": 1000,
  "packUnitsMask": 8,
@@ -19,5 +19,8 @@
  "maxPositions": 30,
  "reserveWei": 5000000000000000,
  "tvlCapWei": 2000000000000000000,
- "opGasCap": 15000000
+ "routineCapWei": 30000000000000000,
+ "routineRatePerDayWei": 800000000000000,
+ "essentialCapWei": 10000000000000000,
+ "essentialRatePerDayWei": 200000000000000
 }

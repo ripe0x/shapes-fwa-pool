@@ -188,7 +188,8 @@ class TxManager:
 
     def resolve(self, still_wanted):
         """Advance the in-flight transaction. Returns True while one remains in flight.
-        `still_wanted(p)` preflights the same call again (None if the work is gone)."""
+        `still_wanted(p, prio, max_fee)` preflights the same call again and re-checks profit at the
+        replacement's fees (None if the work is gone or no longer worth it)."""
         p = self.state["pending"]
         if not p:
             return False
@@ -230,7 +231,7 @@ class TxManager:
         if self.max_fee is not None and max_fee > self.max_fee:
             self.log(f"waiting: replacing {p['label']} would bid above the {self.max_fee} wei cap")
             return True
-        if still_wanted(p) is None:
+        if still_wanted(p, prio, max_fee) is None:
             # Never confirmed broadcast and no longer needed: forget it. If the lost broadcast did
             # land, it sits at this nonce doing work that is gone (it reverts); the next submit
             # takes the following nonce. No work runs twice.

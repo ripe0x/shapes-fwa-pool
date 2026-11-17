@@ -19,11 +19,14 @@ proposed outcomes in `OWNER-REQUIREMENTS.md` section B2; economics in `sim/out/f
   successful acquisitions and real settlement, keeper timing, cash and staging, the same 30 days
   give +169% annualized, matching the closed form (+166%) at the true volume (D38, D39).
 - **Returns at current activity:** 100 positions, last 14 days' activity (71 a day), 0.15 gwei:
-  mean +21% a year, 18% chance of a losing year (95% interval 14 to 22%).
-- **Gas is the binding risk.** The gas ceiling is now 0.5 gwei and the gate passes there (+121%
-  closed form, +76% simulated; D42). Above it the keeper waits instead of spending: with 1.0
-  gwei from day 30 the year is +2.9% (36% chance of loss), against +2% (46%) at the old 1.5
-  ceiling.
+  mean +20.3% a year, 20% chance of a losing year (95% interval 16 to 24%), with quoted keeper
+  pay and request charges (D56).
+- **Keeper pay is a fixed quote paid through a replaceable policy contract (D56, D57).** Caller
+  gas and tip change nothing; budgets cap all pay at 0.041 ETH a day at canary values. Two High
+  defects found in this work are fixed (section 14).
+- **Gas is the binding risk.** The gas ceiling is now 0.5 gwei and the gate passes there (+132%
+  closed form, +78.5% simulated; D42). Above it the keeper waits instead of spending: with 1.0
+  gwei from day 30 the year is +3.1% (34% chance of loss).
 - **Recommendation: proceed with the approved private canary** (28 positions fit, not 30), with
   your own keeper running `--burn-tokens`. No critical or high defect is open;
   every lifecycle step except acquisitions selecting vault listings ran through the production
@@ -124,8 +127,8 @@ hurts: at 0.5 gwei all year keeper gas is 13% of deposits and the year is +9%.
 
 | Gas | Net per bid cycle | Closed form | Forward simulation (cold start) | 10%? |
 |---|---|---|---|---|
-| 0.15 gwei (spot at pinned block) | +1.264 mETH | +160% | +123% (p5 +23%) | yes |
-| 0.5 gwei (gas ceiling, D42) | +0.956 mETH | +121% | +76% (p5 -8%) | yes |
+| 0.15 gwei (spot at pinned block) | +1.232 mETH | +156% | +104.7% (p5 +2.6%) | yes |
+| 0.5 gwei (gas ceiling, D42) | +1.046 mETH | +132% | +78.5% (p5 -8.6%) | yes |
 
 The gate passes at the ceiling. The 30-day figure is several times the return at the current run
 rate (+9% to +21% at last-14-day activity) and should not be shown to holders as expected.
@@ -312,3 +315,61 @@ cancels any queued admin proposal. Cost: about 0.1% of deposits over a zero-acqu
 lifecycle; about 3% of the edge per bid cycle. Review record: `audit/rc-workfee/`. The changed O2
 wording needs the owner's signature again (hash `f5100bae992f2ab5fb41c772707570d1dc5d7a0c0cdcd773317bc125927740bd`).
 F1 (premium maximum 50%) is still open.
+
+## 14. Quoted keeper pay and a replaceable payment policy (D56, D57, 2026-11-17)
+
+**What changed.** Keeper pay no longer reads measured gas or the caller's gas price. Each
+operation has a quoted gas figure; the vault's envelope is that quote at
+`min(basefee + 0.05 gwei, 0.5 gwei)` plus 0.00002 ETH per unit of work (no premium at canary).
+A separate policy contract proposes the payment; the vault pays the smallest of the offer, the
+envelope, the funding cap, free ETH and a refilling budget. The policy is swapped through the
+admin delay, anyone activates it, and the guardian cancels a queued one or stops all pay at once.
+Deposits and redemptions now pay request charges for the work they cause (D56).
+
+**Found and fixed during this work**
+| # | Severity | Defect | Fix | Evidence |
+|---|---|---|---|---|
+| P1 | High (liveness) | Yul evaluated `and(staticcall, gt(returndatasize, 31))` right to left: the size check read the previous call's data, so every policy offer read 0 and keepers were paid nothing | bind the call result first | ForkKeeperPolicy (V1 pays its quote to the wei) |
+| P2 | High | Security review H1: the deployment charge was stored as uint64; a charge above 18.4 ETH (one 40 ETH deposit at a 50 gwei ceiling) truncated, minting shares the checkpoint never added to the supply, and cancel could underflow `pendingChargeTotal`, blocking checkpoints | `PendingDeposit` is `uint96 amount, uint64 epoch, uint96 charge` (one slot; uint96 exceeds all ETH) | `test_largeDepositChargeNotTruncated` (20.5 ETH charge stored whole; holder shares = supply minted) |
+| P3 | Low | Security review L1: `lowerCaps` could leave `maxTip` above a lowered ceiling, inflating the deployment charge | `lower` clamps `maxTip` to the new ceiling | `test_guardianCancelsPendingPolicy` |
+| P4 | Evidence | Rehearsal ledger counted the quoted redemption charge, not the charge kept after the refund of any excess | count the vault's balance change | canary rehearsal ledger gap 0 |
+
+**Evidence (this revision).** 80 Solidity tests pass (fork, audit, scenario). The reconciler matches
+the Python model to the wei. `keeper/test_policy.py` passes. The canary rehearsal deploys with the
+production script, runs the unchanged keeper, swaps V1 for a different-formula V2 mid-run (balance,
+shares, NAV, positions and tokens unchanged across the swap), and closes the ledger and the keeper's
+own accounting to the wei. PackVault 23,888 bytes (688 under EIP-170).
+
+**Keeper pay vs keeper cost per operation** (µETH; pay / cost (net); basefee shown, keeper bids
+basefee + 0.05 gwei; cost from measured billed gas, `sim/out/gas-quotes.json`):
+
+| Operation | 0.15 gwei | 0.5 gwei | 1.0 gwei | 1.5 gwei | 5 gwei |
+|---|---|---|---|---|---|
+| checkpoint, 23 positions | 203 / 195 (+8) | 478 / 536 (-58) | 478 / 1,024 (-546) | 478 / 1,512 (-1,034) | 478 / 4,926 (-4,448) |
+| restock 10 (3 mints) | 1,976 / 1,824 (+152) | 4,640 / 5,017 (-377) | 4,640 / 9,578 (-4,938) | 4,640 / 14,138 (-9,498) | 4,640 / 46,063 (-41,423) |
+| list 1 | 177 / 172 (+5) | 412 / 472 (-60) | 412 / 902 (-489) | 412 / 1,331 (-919) | 412 / 4,337 (-3,924) |
+| list 10 | 1,311 / 1,158 (+153) | 2,978 / 3,185 (-207) | 2,978 / 6,080 (-3,103) | 2,978 / 8,976 (-5,998) | 2,978 / 29,244 (-26,266) |
+| sync 3 (kicked) | 120 / 60 (+60) | 210 / 165 (+45) | 210 / 316 (-106) | 210 / 466 (-256) | 210 / 1,519 (-1,309) |
+| unlist 8 | 480 / 333 (+147) | 960 / 917 (+43) | 960 / 1,751 (-791) | 960 / 2,584 (-1,624) | 960 / 8,419 (-7,459) |
+| liquidate 1 | 65 / 50 (+15) | 133 / 138 (-5) | 133 / 263 (-130) | 133 / 388 (-255) | 133 / 1,263 (-1,131) |
+
+Every operation pays below the ceiling (break-even near 0.45 gwei basefee). Above it, pay stops at
+the ceiling price: the keeper waits for routine work, and liability work runs only when a caller
+accepts the loss (D45, D51).
+
+**Worst-case keeper spend** (budgets bound all pay, checkpoints included): canary 0.041 ETH in any
+24 h, 0.405 ETH a year; at the bytecode maxima 0.415 ETH in 24 h, 5.875 ETH a year.
+
+**Holder round trip** (economic review): deployment charge 0.92% of a deposit at 0.15 gwei, 1.54% at
+the ceiling; unwind 0.16% to 0.30%; two fixed checkpoint charges of 0.00024 to 0.00057 ETH each.
+Total 1.1% to 1.9% for a 1 to 2 ETH holder; 5.9% to 13.3% for a 0.01 ETH minimum deposit.
+
+**Not changed, for the owner to know**
+- A checkpoint pays less than its gas at the ceiling (23 positions: -58 µETH). Above the ceiling a
+  redemption checkpoint needs a caller willing to lose that, or the holder (unpaid, permissionless).
+- A cancelled deposit forfeits its checkpoint charge (it already paid for a checkpoint slot).
+- Several deposits in one interval each pay a full checkpoint charge for one shared checkpoint; the
+  surplus goes to NAV, not to a keeper.
+- About 0.5% of each charge that lifts NAV accrues to the seed's dead shares (by design).
+- The asset-flow outcomes O2 and O6 were reworded for the new rule; the gate needs the owner's new
+  signature (`asset_gate.py` reports the approval hash mismatch; every metric is within its bound).

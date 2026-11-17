@@ -66,8 +66,8 @@ block 26,424,971 unless stated; P = 0.03 ETH pack, B = 0.0363 ETH backing, k = 1
 | O2 | Edge per bid cycle | B (k - 1) = 1.396 mETH before gas; cycle gas 0.8M: net 1.264 mETH at 0.15 gwei, 0.516 at 1.0, 0.076 at 1.5; break-even 1.59 gwei | fork gas (ForkReconcile), D20 |
 | O3 | Purchaser on a bid outcome | receives 0.9 B = 0.03267 ETH; the vault keeps the pack | ForkSelection bid test (absolute) |
 | O4 | Vault on a keep or silent outcome | B (1 - s) = 0.035937 ETH back; pack goes to purchaser | ForkSelection keep and silent tests |
-| O5 | Keeper pay | (gas + 30k) x min(tx price, basefee + 0.05 gwei, 0.5 gwei gas ceiling) x 1.10, from vault ETH; at most 300k gas per position moved for sync, unlist and activate; harvest paid only if pay <= 25% of ETH realized; no-op checkpoints refused. Rehearsal: keeper +18% over gas spent | ForkVaultAdversarial, ForkSelection, canary rehearsal |
-| O6 | New packs | built only when one bid cycle repays the build (1.05M gas + 0.0003 ETH): below ~0.54 gwei | D20, test_restockGated |
+| O5 | Keeper pay | quoted gas per operation x min(basefee + 0.05 gwei, 0.5 gwei gas ceiling) + 0.00002 ETH per unit of work, no premium (D56); offered by a replaceable policy contract, capped by the vault (D57); from free ETH within refilling budgets; harvest paid only if pay <= 25% of ETH realized; no-op calls pay nothing. Rehearsal: every V1 call below the ceiling profits (+12% to +148%) | ForkVaultAdversarial, ForkSelection, canary rehearsal |
+| O6 | New packs | built only when one bid cycle repays the build (1.39M quoted gas + 0.0003 ETH + 1 work fee): quoted price below ~0.52 gwei | D20, test_restockGated |
 | O7 | User pays | mint fee 0.001 ETH per 0.1 ETH of Shapes; keeper gas; no vault fee | lifecycle round trip (absolute, every wei) |
 | O8 | End state | wind-down returns every holder's NAV share; only the seed's dead-share slice remains | lifecycle wind-down test, keeper rehearsal |
 | O9 | Size | at most 300 positions (about 20 ETH); worst-case checkpoint 10.17M gas; the 2 ETH canary holds 28 positions | checkpoint gas tests, canary rehearsal |

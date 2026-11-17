@@ -32,7 +32,7 @@ import tx as txm  # noqa: E402
 RPC = "https://mainnet.gateway.tenderly.co"
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 SHAPES = "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0"
-PARAMS_T = "(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint96,uint128,uint128,uint128)"
+PARAMS_T = "(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint96,uint128,uint128)"
 LISTING_T = "(address,address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint64,uint8)"
 
 
@@ -73,7 +73,9 @@ def read_tokens(vault, active_ids):
 
 def read_state(vault, slowdown, burn=False):
     p = [num(x) for x in call(vault, f"getParams()({PARAMS_T})").strip("()").split(", ")]
-    (min_edge, _buf, dist_bps, premium, share, _alloc, _mask, ceiling, tip, wfee, max_pos, res, _tvl, opcap) = p
+    (min_edge, _buf, dist_bps, premium, share, _alloc, _mask, ceiling, tip, wfee, _rc, _rr, _ec, _er, max_pos, res,
+     _tvl) = p
+    rbud, ebud = lines(call(vault, "budget()(uint256,uint256)"))
     k, backing, _ok = lines(call(vault, "edge(uint256)(uint256,uint256,bool)", 3))
     now = num(cast("block", "latest", "--field", "timestamp"))
     window = num(call(FWA, "settlementWindow()(uint256)"))
@@ -106,7 +108,7 @@ def read_state(vault, slowdown, burn=False):
     return policy.State(
         # The keeper bids basefee + maxTip (run_pass), so that is its price.
         now=now, gas_price=num(cast("base-fee")) + tip, base_fee=num(cast("base-fee")), gas_ceiling=ceiling,
-        max_tip=tip, premium_bps=premium, share_bps=share, k=num(k), backing=num(backing), min_edge_bps=min_edge,
+        max_tip=tip, markup_bps=premium, share_bps=share, k=num(k), backing=num(backing), min_edge_bps=min_edge,
         mint_fee=num(call(SHAPES, "mintFee()(uint256)")), settlement_window=window,
         blackout=call(FWA, "isPurchaseBlackout()(bool)") == "true",
         queue_drained=num(call(FWA, "unsettledAcquisitionCount()(uint256)")) == 0,
@@ -120,37 +122,57 @@ def read_state(vault, slowdown, burn=False):
         winding_down=call(vault, "windingDown()(bool)") == "true",
         listing_paused=call(vault, "listingPaused()(bool)") == "true", distribution_bps=dist_bps,
         recent_volume=(seq_now - seq_then) / 7, slowdown_volume=slowdown, burn_tokens=burn,
-        reserve=res, op_gas_cap=opcap, work_fee=wfee,
+        reserve=res, work_fee=wfee, routine_budget=num(rbud), essential_budget=num(ebud),
         **tokens,
     )
 
 
-def to_cast(step):
+def to_cast(step, min_pay=0):
+    """Signature and arguments of a planned call. Every paid call takes `minPay` last (D56)."""
     fn, *args = step
-    if fn in ("sync", "harvest", "unlist", "burnTokens"):
-        return [f"{fn}(uint256[])", "[" + ",".join(map(str, args[0])) + "]"]
+    if fn == "burnTokens":
+        return ["burnTokens(uint256[])", "[" + ",".join(map(str, args[0])) + "]"]
+    if fn in ("sync", "harvest", "unlist"):
+        return [f"{fn}(uint256[],uint256)", "[" + ",".join(map(str, args[0])) + "]", min_pay]
     if fn == "activate":
-        return ["activate(uint256[],uint256)", "[" + ",".join(map(str, args[0])) + "]", args[1]]
+        return ["activate(uint256[],uint256,uint256)", "[" + ",".join(map(str, args[0])) + "]", args[1], min_pay]
     if fn in ("list", "liquidate"):
-        return [f"{fn}(uint256)", args[0]]
+        return [f"{fn}(uint256,uint256)", args[0], min_pay]
     if fn == "restock":
-        return ["restock(uint256,uint256)", args[0], args[1]]
-    return [f"{fn}()"]
+        return ["restock(uint256,uint256,uint256)", args[0], args[1], min_pay]
+    return [f"{fn}(uint256)", min_pay]
 
 
 HEALTH = dict(last_pass=0, block=0, status=[], pending=None, stats={}, errors=[], pass_errors=0)
 
 
-def expected_pay(state, step, est):
-    """Reimbursement the vault would pay for `est` gas at this keeper's bid (0 for unpaid calls),
-    plus the work fee for units the call will certainly do. Units it may do (sync, unlist,
-    activate, liquidate) are not counted: an underestimate only makes the loss check stricter."""
-    fn = step[0]
-    if fn == "burnTokens":
+def compensation(vault, args, sender):
+    """What the vault promises for this exact call now: every paid function returns its payment,
+    so simulating it from the keeper's address reads the contract's own quote (0 for burnTokens)."""
+    if args[0].startswith("burnTokens"):
         return 0
-    units = step[1] if fn == "list" else 1 if fn == "checkpoint" else 0
-    return min(est, state.op_gas_cap) * policy.price(state) * (policy.BPS + state.premium_bps) // policy.BPS \
-        + units * state.work_fee
+    sig = args[0].replace(")", ")(uint256)", 1) if args[0].endswith(")") else args[0]
+    return num(cast("call", vault, sig, *args[1:], "--from", sender))
+
+
+# Billed gas / eth_estimateGas per call, from canary-rehearsal receipts (docs/GAS.md). The estimate
+# sets the gas limit; billed gas sets the cost. Replaced by this keeper's own receipts once it has
+# three of a kind.
+BILLED_PER_ESTIMATE = dict(restock=0.92, list=0.98, sync=0.93, unlist=0.80, liquidate=0.80, checkpoint=0.97,
+                           harvest=0.95, activate=0.95, burnTokens=0.95)
+
+
+def billed_ratio(tm, label):
+    rows = [e for e in (tm.state["counted"] if tm else []) if e["label"] == label and e.get("est")]
+    if len(rows) >= 3:
+        return min(1.0, sum(e["gas_used"] for e in rows[-20:]) / sum(e["est"] for e in rows[-20:]))
+    return BILLED_PER_ESTIMATE.get(label, 1.0)
+
+
+def execution_cost(est, bid, fail_rate_bps, ratio=1.0):
+    """What the keeper expects to spend: billed gas (the estimate calibrated by receipts) at its
+    bid, grossed up for competing transactions it expects to lose."""
+    return int(est * ratio) * bid * (10_000 + fail_rate_bps) // 10_000
 
 
 def run_pass(a, tm):
@@ -164,8 +186,15 @@ def run_pass(a, tm):
     for _ in range(a.max_steps):
         state = read_state(a.vault, a.slowdown_volume, a.burn_tokens)
 
-        def wanted(p, state=state):
+        def wanted(p, prio=None, max_fee=None, state=state):
+            """Preflight again; on a replacement also re-check profit at the bumped tip."""
             est, _why, _exp = tm.preflight(p["to"], p["args"])
+            if est is None or prio is None or p["label"] == "burnTokens":
+                return est
+            pay = compensation(a.vault, p["args"], tm.sender)
+            if pay + a.max_loss_wei < execution_cost(est, state.base_fee + prio, a.fail_rate_bps,
+                                                     billed_ratio(tm, p["label"])):
+                return None
             return est
 
         if tm and tm.wait(wanted, a.pending_timeout):
@@ -174,8 +203,9 @@ def run_pass(a, tm):
         state = read_state(a.vault, a.slowdown_volume, a.burn_tokens)
         steps = [st for st in policy.plan(state) if st[0] not in skip]
         codes = policy.status(state)  # from the full plan: skips in this pass are this keeper's choice
-        HEALTH.update(block=head, status=codes + declined)
+        HEALTH.update(block=head, status=codes + declined, policy=policy_info(a.vault))
         if sent == 0:
+            print(HEALTH["policy"])
             print(f"gas {state.gas_price / 1e9:.3f} gwei, {len(state.listings)} open, {state.idle_packs} idle packs, "
                   f"idle {state.idle_eth / 1e18:.4f} ETH, cycle net {policy.cycle_net(state) / 1e15:.3f} mETH, "
                   f"7d volume {state.recent_volume:.0f}/day")
@@ -192,6 +222,7 @@ def run_pass(a, tm):
             break
         step, args = steps[0], to_cast(steps[0])
         est, why, benign = tm.preflight(a.vault, args)
+        pay = 0
         if est is None:
             skip.add(step[0])
             if benign:
@@ -202,15 +233,21 @@ def run_pass(a, tm):
                 tm.error(f"preflight of {step[0]} reverted: {why}")
             continue
         bid = state.base_fee + state.max_tip
-        pay, cost_ = expected_pay(state, step, est), est * bid
-        if pay + a.max_loss_wei < cost_ and step[0] != "burnTokens":  # burns are the operator's opt-in cost
+        pay = compensation(a.vault, args, tm.sender)
+        cost_ = execution_cost(est, bid, a.fail_rate_bps, billed_ratio(tm, step[0]))
+        need = cost_ * (10_000 + a.min_return_bps) // 10_000
+        if pay + a.max_loss_wei < need and step[0] != "burnTokens":  # burns are the operator's opt-in cost
             skip.add(step[0])
             tm.state["stats"]["skipped_loss"] += 1
             # Liability work this keeper declined: holders wait on it, so monitoring must see it.
             declined.append(("LIABILITY_WORK_SKIPPED", "action",
                              f"{step[0]} needs --max-loss-wei >= {cost_ - pay} or lower gas"))
-            print(f"skip {step[0]}: pay ~{pay} wei < cost ~{cost_} wei beyond --max-loss-wei {a.max_loss_wei}")
+            print(f"skip {step[0]}: pay {pay} wei < cost ~{need} wei beyond --max-loss-wei {a.max_loss_wei}")
             continue
+        # minPay: pay and this keeper's gas both move with basefee, so the floor is relative: 80% of
+        # the simulated quote (basefee falls at most 12.5% a block). A larger drop means less work
+        # was left to do; the whole call reverts instead of paying less.
+        args = to_cast(step, pay * 8 // 10 if step[0] != "burnTokens" and a.max_loss_wei == 0 else 0)
         tm.submit(step[0], a.vault, args, est, state.base_fee, state.max_tip, pay)
         sent += 1
         if tm.wait(wanted, a.pending_timeout):
@@ -246,8 +283,20 @@ def serve_health(port, stale_after):
     threading.Thread(target=srv.serve_forever, daemon=True).start()
 
 
+def policy_info(vault):
+    """Active keeper payment policy and any queued replacement (D57). Pay itself is read by
+    simulating each call, so a swap needs no keeper change; this is for operators."""
+    active = call(vault, "keeperPolicy()(address)")
+    out = f"policy {active} v{num(call(active, 'policyVersion()(uint256)'))}"
+    pending = call(vault, "pendingPolicy()(address)")
+    if int(pending, 16):
+        out += f", pending {pending} from {num(call(vault, 'pendingPolicyEta()(uint256)'))}"
+    return out
+
+
 def print_status(a):
     state = read_state(a.vault, a.slowdown_volume, a.burn_tokens)
+    print(policy_info(a.vault))
     for code, kind, detail in policy.status(state):
         print(f"{code:28} {kind:7} {detail}")
     try:
@@ -282,6 +331,9 @@ def main():
     ap.add_argument("--max-loss-wei", type=int, default=0,
                     help="loss this keeper accepts per call (liability work above the gas ceiling)")
     ap.add_argument("--max-fee-gwei", type=float, help="never bid a max fee above this")
+    ap.add_argument("--fail-rate-bps", type=int, default=0,
+                    help="share of sent calls expected to lose to a competing keeper (adds to cost)")
+    ap.add_argument("--min-return-bps", type=int, default=0, help="required return over expected cost")
     ap.add_argument("--confirmations", type=int, default=1, help="blocks before a receipt counts (2+ on mainnet)")
     ap.add_argument("--replace-after", type=int, default=3, help="blocks pending before a same-nonce replacement")
     ap.add_argument("--max-replacements", type=int, default=5)

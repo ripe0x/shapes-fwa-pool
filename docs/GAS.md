@@ -1,63 +1,80 @@
 # Gas and keeper compensation
 
-## Pay rule (contract)
+## Pay rule (contract, D56/D57)
 
 ```
-price = min(tx.gasprice, basefee + maxTip, gasCeiling)          canary: maxTip 0.05 gwei, ceiling 0.5 gwei
-pay   = min(measured gas + 30,000, opGasCap) x price x 1.10    from vault ETH (free ETH, never liabilities)
-      + workFee x units                                         canary 0.00002 ETH, max 0.0001 (D55)
-units = positions listed, resolved (sync), activated or unlisted; items liquidated; 1 per checkpoint that
-        priced flows or distributed. restock, harvest and burnTokens earn none.
+price    = min(basefee + maxTip, gasCeiling)                     canary: maxTip 0.05 gwei, ceiling 0.5 gwei
+quoted   = base + perUnit x units (VaultLib.Q_*)                  fixed per operation, never gasleft()
+envelope = quoted x price x (1 + payMarkupBps, routine only)      canary markup 0, bytecode max 10%
+           + workFee x units                                      canary 0.00002 ETH, max 0.00005
+offer    = active policy's quote(...)                             50,000-gas staticcall; failure = 0
+pay      = min(offer, envelope, funding cap, free ETH, budget)    reverts if pay < minPay
+V1 offer = quoted x price + workFee x units                        = the envelope at canary values
 ```
+
+Units: packs built (restock), positions listed, resolved (sync), activated or unlisted, items
+liquidated, positions harvested, 1 per checkpoint that priced flows or distributed. burnTokens is
+unpaid.
+
+Quoted gas (VaultLib, measured as billed gas on fork receipts, `sim/out/gas-quotes.json`):
+
+| Operation | Base | Per unit | Measured billed |
+|---|---|---|---|
+| checkpoint | 180,000 | 32,000 per position | 221,860 (0 positions), 975,403 (23) |
+| restock | 280,000 | 200,000 per pack + 2,200,000 per mint | 2,635,830 (1 pack, 1 mint), 9,121,461 (10 packs, 3 mints) |
+| list | 255,000 | 530,000 | 858,779 (1), 5,790,861 (10) |
+| sync | 75,000 | 75,000 | 158,661 (1), 300,695 (3 kicked); bid outcome ~181k |
+| activate | 50,000 | 450,000 | ~518,000 (1) |
+| unlist | 240,000 | 170,000 | 480,141 (1), 1,667,172 (8) |
+| liquidate | 75,000 | 150,000 per pack, 65,000 per Shape | 250,185 (1) |
+| harvest | 80,000 | 15,000 | |
 
 Bounds on what a caller can extract:
-- `harvest` pays only if pay <= 25% of the fees it realized.
-- `sync`, `unlist` and `activate` pay at most 300,000 gas per position they moved.
-- A no-op call pays nothing:
-  - every paid call reverts `Nothing` without work;
-  - `checkpoint` refuses when no flows or distributions are pending.
-- No call is refused for gas price (D51). Above the ceiling every call is paid at the ceiling price and the caller pays the rest.
-- `burnTokens` pays nothing.
-- Splitting work into more calls earns at most the 30,000-gas overhead per call. Worst case is about
-  0.015 ETH a year at the ceiling (D41 LOW-3).
+- Pay is fixed by the operation and its completed units: gas limit, gas used and tip change nothing.
+- Each base is under the measured fixed cost / 1.1, so splitting a job across calls loses money.
+- A no-op call reverts `Nothing`; `checkpoint` without flows or distributions pays 0.
+- A checkpoint with flows is paid from `processingPool`, filled only by the request charges.
+- `harvest` pays only if its envelope is at most 25% of the fees it realized.
+- Routine and essential budgets cap total pay per day (canary 0.0008 / 0.0002 ETH a day refill,
+  0.03 / 0.01 ETH caps).
+- Above the ceiling every call is accepted and paid at the ceiling price (D51).
 
-## Keeper P&L per call (canary rehearsal receipts, selected; repeated batches omitted)
+## Keeper P&L per call (canary rehearsal receipts)
 
-Canary rehearsal setup:
-- anvil fork of block 26,418,539
-- `keeper/keeper.py` bidding basefee + 0.05 gwei
-- receipts from `keeper/rehearse_canary.py`, run after `ae8fc54` with the D45 to D47 changes
-- "net" = KeeperPaid - gasUsed x effectiveGasPrice
+Setup: anvil fork of block 26,418,539 with an empty-block basefee that decays from 0.15 gwei;
+`keeper/keeper.py` bidding basefee + 0.05 gwei; `keeper/rehearse_canary.py` (D57 run). Rows from
+the first liquidate on run under V2, the test policy the rehearsal swaps in (3 work fees per unit,
+no gas component), capped by the vault's envelope. "net" = KeeperPaid - gas x effective price.
 
-| Call | Bid gwei | Gas used | Estimate | Est / used | Keeper net (wei) | Net / cost |
+| Call | Price gwei | Gas | Estimate | Est / gas | Keeper net (wei) | Net / cost |
 |---|---|---|---|---|---|---|
-| checkpoint (first pricing) | 0.168 | 199,390 | 200,892 | 1.01 | +1.93e12 | +6% |
-| restock 10 packs | 0.168 | 9,147,348 | 10,014,151 | 1.09 | +2.64e14 | +21% |
-| list 10 | 0.168 | 5,791,220 | 5,921,520 | 1.02 | +9.55e13 | +12% |
-| sync (kicked listing) | 0.070 | 153,283 | 164,385 | 1.07 | +5.25e11 | +5% |
-| list 1 | 0.070 | 817,371 | 836,073 | 1.02 | +6.53e12 | +12% |
-| burnTokens (29 listings) | 0.088 | 415,963 | 443,664 | 1.07 | -3.47e13 | unpaid |
-| unlist 14 (spike) | 0.925 | 2,891,554 | 3,608,343 | 1.25 | -3.78e14 | -16% |
-| liquidate (spike) | 0.925 | 2,088,512 | 2,604,541 | 1.25 | -9.68e13 | -6% |
-| checkpoint (spike, redemption) | 1.050 | 685,990 | 707,392 | 1.03 | -2.50e14 | -39% |
-| unlist 15 (wind-down) | 0.138 | 2,628,768 | 3,279,860 | 1.25 | +1.14e14 | +37% |
-| liquidate (wind-down) | 0.138 | 2,222,010 | 2,771,414 | 1.25 | +8.87e13 | +36% |
-| checkpoint (final) | 0.103 | 184,619 | 206,021 | 1.12 | +3.18e12 | +18% |
+| checkpoint (first pricing) | 0.154 | 229,097 | 245,621 | 1.07 | +1.24e13 | +35% |
+| restock 10 | 0.141 | 9,176,506 | 10,055,643 | 1.10 | +1.58e14 | +12% |
+| list 10 | 0.133 | 5,815,375 | 5,948,288 | 1.02 | +1.65e14 | +21% |
+| burnTokens | 0.084 | 415,966 | 443,664 | 1.07 | -3.49e13 | unpaid |
+| sync (kicked) | 0.067 | 179,877 | 199,197 | 1.11 | +1.80e13 | +148% |
+| list 1 | 0.065 | 840,200 | 861,525 | 1.03 | +1.64e13 | +29% |
+| V2: liquidate (spike) | 0.925 | 211,135 | 266,098 | 1.26 | -1.53e13 | -7% |
+| V2: unlist 14 (spike) | 0.816 | 2,919,001 | 3,648,131 | 1.25 | -1.48e15 | -62% |
+| V2: checkpoint (spike, redemption) | 0.925 | 707,889 | 742,375 | 1.05 | -5.95e14 | -90% |
+| V2: unlist 15 (wind-down) | 0.118 | 2,657,521 | 3,318,422 | 1.25 | +2.76e14 | +88% |
+| V2: checkpoint (final) | 0.096 | 209,368 | 241,007 | 1.15 | +1.72e13 | +85% |
 
 Results:
-- **Whole rehearsal:** 18 transactions. Keeper paid 0.011194 ETH, spent 0.010840 ETH, **net +0.000353 ETH**. That includes the
-  spike work, a loss of 0.000779 ETH, and the token burn, 0.0000347 ETH.
-- **Below the ceiling every paid call profits.** The margin is +5% to +37%.
-- **Unlisting and liquidation earn more than their gas.** They are paid on measured gas before EIP-3529 refunds, which the
-  sender gets back.
-- **Above the ceiling the keeper's loss is (bid - ceiling x 1.1) x gas.** It is accepted only within `--max-loss-wei`.
+- Under V1 below the ceiling every paid call profits: +12% to +148% (the work fee dominates small
+  calls at sub-0.1 gwei prices).
+- The spike rows ran under V2, which pays no gas: the keeper accepted the loss only because the
+  rehearsal passes `--max-loss-wei 0.01 ETH`. The default keeper waits.
+- Every payment's receipt matched the keeper's simulation except where basefee fell between the
+  simulation and inclusion (each empty anvil block lowers it); the paid amount was then lower,
+  never higher.
 
 ## Thresholds per operation (D45)
 
 | Operation | Planned when | Gas limit for it |
 |---|---|---|
-| New packs (`restock` + `list`) | one bid cycle repays the build: 1.05M gas + 0.0003 ETH mint share | below about 0.54 gwei, and under the ceiling |
-| Relist idle packs | a bid cycle nets positive: B(k-1) = 1.396 mETH against 0.8M gas | break-even 1.59 gwei, capped by the 0.5 gwei ceiling |
+| New packs (`restock` + `list`) | one bid cycle repays the build: 1.39M quoted gas + 0.0003 ETH mint share + 1 work fee | quoted price below about 0.52 gwei, and under the ceiling |
+| Relist idle packs | a bid cycle nets positive: B(k-1) = 1.396 mETH against 0.62M quoted gas + 2 work fees | break-even 2.19 gwei, capped by the 0.5 gwei ceiling |
 | Harvest fees | pay <= 25% of fees realized; or redemption cash needed | under the ceiling; above it only for redemptions |
 | Activate staged listings | FWA's queue drained | under the ceiling |
 | Burn token rewards | operator opt-in | under the ceiling; unpaid |
@@ -66,26 +83,12 @@ Results:
 | Liquidity release (`unlist`, `liquidate`) | redeemers short of ETH; wind-down; edge gate failed | any gas (keeper's loss above the ceiling) |
 | Wind-down | guardian started it | any gas |
 
-## Measured gas per unit
-
-These are the policy constants (`keeper/policy.py`), measured on fork tests and confirmed by the receipts above.
-
-| Unit | Gas |
-|---|---|
-| restock, per 3-unit pack | 921,000 measured (1,050,000 build constant) |
-| list, per position | 499,000 to 570,000 |
-| sync | 60,000 + 100,000 per listing |
-| harvest | 90,000 + 15,000 per listing |
-| unlist, per position | 201,000 |
-| liquidate, per pack | 160,000 |
-| checkpoint | 220,000 + 32,100 per position (300 positions all kicked: 10.17M, under EIP-7825's 16.78M) |
-| bid cycle (sync + relist + harvest share + 2 x 30k overhead) | 800,000 |
-
 ## Reserve (D46)
 
 ```
-reserve need = (checkpoint at max positions + one 10-pack listing batch) x ceiling x 1.10
-             = (220k + 32.1k x 30 + 30k + 570k x 10 + 30k) x 0.5 gwei x 1.10 = 0.0038 ETH   (canary)
+reserve need = one 10-pack listing batch x ceiling x (1 + markup) + 10 work fees
+             = (255k + 530k x 10) x 0.5 gwei + 10 x 0.00002 = 0.0030 ETH   (canary)
+(checkpoints are paid from request charges; unlisting and syncs from the backing they return)
 ```
 
-The canary reserve is 0.005 ETH, down from 0.05 ETH. The 2 ETH canary now builds 29 positions instead of 28. At 300 positions the need is 0.0086 ETH.
+The canary reserve is 0.005 ETH. The need no longer grows with positions.

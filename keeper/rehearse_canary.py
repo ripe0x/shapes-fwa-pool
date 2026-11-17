@@ -104,6 +104,12 @@ def calm():
     cast("rpc", "evm_mine")
 
 
+def redeem_charge(shares):
+    """PackVault's redemption charge for `shares` now: checkpoint + unwind per position value."""
+    value = shares * num(call(VAULT, "lastNav()(uint256)")) // num(call(VAULT, "totalShares()(uint256)"))
+    return num(call(VAULT, "requestCharge()(uint256)")) + value * num(call(VAULT, "unwindCharge()(uint256)")) // (663 * 10**14)
+
+
 def state(tag):
     s = dict(tag=tag, balance=num(cast("balance", VAULT)), lastNav=num(call(VAULT, "lastNav()(uint256)")),
              totalShares=num(call(VAULT, "totalShares()(uint256)")),
@@ -140,9 +146,11 @@ def main():
     s0 = state("deployed")
 
     # 1. Deposits: the TVL cap is enforced on lastNav + escrow (lastNav is 0 before pricing).
-    send(HOLDER, VAULT, "deposit()", value=VALUES["tvlCapWei"] - VALUES["seedWei"])
-    send(HOLDER2, VAULT, "deposit()", value=2 * 10**16, expect=False)
-    deposited = VALUES["tvlCapWei"] - VALUES["seedWei"]
+    #    The request charge (D56) comes on top of the escrow.
+    ck = num(call(VAULT, "requestCharge()(uint256)"))
+    send(HOLDER, VAULT, "deposit()", value=ck + VALUES["tvlCapWei"] - VALUES["seedWei"])
+    send(HOLDER2, VAULT, "deposit()", value=ck + 2 * 10**16, expect=False)
+    deposited = ck + VALUES["tvlCapWei"] - VALUES["seedWei"]  # every wei the holder sent in
     warp_to(42360)
     keeper()
     state("priced")
@@ -206,11 +214,38 @@ def main():
     keeper()
     state("after kick, sync, relist")
 
+    # 6b. Keeper payment policy swap (D57): deploy a policy with a different formula (3 work fees per
+    #     unit, no gas), queue it, wait out the admin delay, anyone activates. Assets, shares and
+    #     positions carry over; the unchanged keeper reads the new pay by simulating each call.
+    fee = VALUES["workFeeWei"]
+    v1 = call(VAULT, "keeperPolicy()(address)")
+    out = sh("forge", "create", "--broadcast", "--unlocked", "--from", DEPLOYER, "--rpc-url", RPC,
+             "test/fork/ForkKeeperPolicy.t.sol:KeeperPolicyFlat")
+    v2 = next(l.split()[-1] for l in out.splitlines() if l.startswith("Deployed to:"))
+    impersonate(VALUES["admin"])
+    send(VALUES["admin"], VAULT, "proposePolicy(address)", v2)
+    send(KICKER, VAULT, "activatePolicy()", expect=False)  # before the delay
+    pre = state("policy queued")
+    cast("rpc", "evm_increaseTime", str(VALUES["paramDelay"]))
+    cast("rpc", "evm_mine")
+    send(KICKER, VAULT, "activatePolicy()")
+    post = state("policy V2 active")
+    if call(VAULT, "keeperPolicy()(address)").lower() != v2.lower():
+        sys.exit("policy swap did not take effect")
+    keep = ("balance", "lastNav", "totalShares", "open", "idle", "loose", "tokens")
+    if any(pre[k] != post[k] for k in keep):
+        sys.exit(f"policy swap changed vault state: {pre} -> {post}")
+    swap_at = len(json.load(open(KEEPER_STATE))["counted"])
+    swap = dict(v1=v1, v2=v2, preserved=list(keep))
+
     # 7. Partial withdrawal during a gas spike above the 0.5 gwei ceiling. Liability work only:
     #    a keeper accepting no loss waits; one accepting a bounded loss releases liquidity, is
     #    interrupted after one call and restarts from its state file, then prices the redemption.
     shares = num(call(VAULT, "shareBalance(address)(uint256)", HOLDER))
-    send(HOLDER, VAULT, "requestRedeem(uint256)", shares // 2)
+    rc = redeem_charge(shares // 2)
+    b0 = num(cast("balance", VAULT))
+    send(HOLDER, VAULT, "requestRedeem(uint256)", shares // 2, value=rc)
+    deposited += num(cast("balance", VAULT)) - b0  # charge kept; any excess (basefee moved) is refunded
     spike()
     out_spike_wait = keeper()
     if "GAS_ABOVE_CEILING" not in out_spike_wait or "sent " in out_spike_wait:
@@ -228,7 +263,10 @@ def main():
     # 8. Full withdrawal, then wind-down.
     warp_to(60)
     shares = num(call(VAULT, "shareBalance(address)(uint256)", HOLDER))
-    send(HOLDER, VAULT, "requestRedeem(uint256)", shares)
+    rc = redeem_charge(shares)
+    b0 = num(cast("balance", VAULT))
+    send(HOLDER, VAULT, "requestRedeem(uint256)", shares, value=rc)
+    deposited += num(cast("balance", VAULT)) - b0  # charge kept; any excess (basefee moved) is refunded
     impersonate(VALUES["guardian"])
     send(VALUES["guardian"], VAULT, "startWindDown()")
     keeper()
@@ -271,6 +309,25 @@ def main():
     if ins != outs:
         sys.exit(f"ledger does not close: in {ins} out {outs}")
     kt = report["keeper_tx"]
+    # Item 13: every paid call's receipt pays exactly what the keeper's simulation of that call
+    # quoted, unless basefee moved between simulation and inclusion (the gas-spike steps).
+    counted = json.load(open(KEEPER_STATE))["counted"]
+    exact = [e for e in counted if e["label"] != "burnTokens" and e["pay"] == e["expected_pay"]]
+    moved = [(e["label"], e["expected_pay"], e["pay"]) for e in counted if e["label"] != "burnTokens" and e["pay"] != e["expected_pay"]]
+    report["quote_matches_payment"] = dict(exact=len(exact), differed=moved)
+    # After the swap a payment is V2's offer (3 work fees per unit, no gas) unless the vault capped
+    # it: at low basefee its envelope per unit (quoted gas + 1 fee) is below 3 fees. Checkpoints are
+    # also capped by the request-charge pool. Exactness of each payment is item 13 above.
+    after_swap = [(e["label"], e["pay"]) for e in counted[swap_at:] if e["label"] != "burnTokens"]
+    v2_exact = [(l, p) for l, p in after_swap if l != "checkpoint" and p % (3 * fee) == 0]
+    capped = [(l, p) for l, p in after_swap if (l, p) not in v2_exact]
+    swap.update(paid_after=after_swap, v2_formula=v2_exact, capped_by_vault=capped)
+    report["policy_swap"] = swap
+    print(f"after the V2 swap: V2 formula {v2_exact}; capped by the vault {capped}")
+    if not v2_exact:
+        sys.exit("no payment followed V2's formula")
+    print(f"quoted pay equals paid in {len(exact)} receipts; differed (basefee moved): {moved}")
+    (ROOT / "sim/out/canary-rehearsal.json").write_text(json.dumps(report, indent=1, default=str))
     if kt["paid_wei"] != pay or kt["spent_wei"] != report["keeper_gas_spent"]:
         sys.exit(f"keeper accounting differs from chain: tracked paid {kt['paid_wei']} spent {kt['spent_wei']}, "
                  f"chain paid {pay} spent {report['keeper_gas_spent']}")

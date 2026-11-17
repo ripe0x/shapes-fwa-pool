@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import {ForkBase} from "../fork/ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {Charges} from "../utils/Charges.sol";
 
 /// @notice Release-candidate audit of the D55 workFee (uncommitted change). Attacks the two fee
 ///         manufacture vectors not already covered by the repo's workFee tests:
@@ -14,8 +15,11 @@ contract AuditWorkFeeManufactureTest is ForkBase {
     /// each time. An attacker cannot manufacture more than one checkpoint fee per interval.
     function test_checkpointFeeIsOnePerIntervalAndNeedsAFlow() public {
         uint256 fee = vault.getParams().workFee;
-        vm.prank(alice);
-        vault.deposit{value: 1 ether}();
+        {
+            uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            vm.prank(alice);
+            vault.deposit{value: gross_}();
+        }
 
         toBlackout();
         uint256 b = keeper.balance;
@@ -26,7 +30,7 @@ contract AuditWorkFeeManufactureTest is ForkBase {
         // Same interval: a second checkpoint is refused outright (no second fee this interval).
         vm.prank(keeper);
         vm.expectRevert(PackVault.AlreadyCheckpointed.selector);
-        vault.checkpoint();
+        vault.checkpoint(0);
 
         // Next interval with NO holder flow: refused (distributionBps is 0). So the fee cannot be
         // farmed by just calling checkpoint every interval; a real deposit/redeem is required.
@@ -34,18 +38,21 @@ contract AuditWorkFeeManufactureTest is ForkBase {
         toBlackout();
         vm.prank(keeper);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.checkpoint();
+        vault.checkpoint(0);
 
         // The cheapest manufacture: the attacker escrows the 0.01 ETH minimum deposit (their own
         // money, recoverable as shares) to force one paid checkpoint. Measure the drain.
         toOpen();
         vm.deal(bob, 1 ether);
-        vm.prank(bob);
-        vault.deposit{value: 0.01 ether}(); // MIN_DEPOSIT
+        {
+            uint256 gross_ = Charges.grossFor(vault, 0.01 ether);
+            vm.prank(bob);
+            vault.deposit{value: gross_}();
+        } // MIN_DEPOSIT
         toBlackout();
         uint256 kb = keeper.balance;
         vm.prank(keeper);
-        vault.checkpoint();
+        vault.checkpoint(0);
         uint256 pay2 = keeper.balance - kb;
         emit log_named_uint("manufactured checkpoint pay (wei)", pay2);
         emit log_named_uint("work-fee portion drained to keeper (wei)", fee);
@@ -57,8 +64,11 @@ contract AuditWorkFeeManufactureTest is ForkBase {
     /// list -> unlist -> list fee loop is not reachable: the only way to earn an unlist unit is a
     /// state the attacker cannot cheaply manufacture (wind-down, dead edge, or a real redemption).
     function test_listUnlistLoopIsGated() public {
-        vm.prank(alice);
-        vault.deposit{value: 1 ether}();
+        {
+            uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            vm.prank(alice);
+            vault.deposit{value: gross_}();
+        }
         toBlackout();
         checkpoint();
         toOpen();
@@ -66,12 +76,12 @@ contract AuditWorkFeeManufactureTest is ForkBase {
         uint256 fee = vault.getParams().workFee;
         uint256 b = keeper.balance;
         vm.prank(keeper);
-        vault.restock(1, 3); // 0 units, by design
+        vault.restock(1, 3, 0); // 0 units, by design
         uint256 restockPay = keeper.balance - b;
 
         b = keeper.balance;
         vm.prank(keeper);
-        vault.list(1); // 1 unit
+        vault.list(1, 0); // 1 unit
         uint256 listPay = keeper.balance - b;
         assertGt(listPay, fee, "list pays the per-position work fee");
         emit log_named_uint("restock pay (0 units expected)", restockPay);
@@ -83,6 +93,6 @@ contract AuditWorkFeeManufactureTest is ForkBase {
         // Healthy edge, not winding down, no redemption request: unlist must revert. No fee loop.
         vm.prank(keeper);
         vm.expectRevert(PackVault.UnlistNotAllowed.selector);
-        vault.unlist(ids);
+        vault.unlist(ids, 0);
     }
 }

@@ -49,7 +49,7 @@ contract VaultHandler is Test {
         if (bal == 0) return;
         uint256 amount = bal * bound(frac, 1, 100) / 100;
         vm.prank(a);
-        try vault.requestRedeem(amount) {} catch {}
+        try vault.requestRedeem{value: 0.01 ether}(amount) {} catch {}
         ++calls;
     }
 
@@ -65,7 +65,7 @@ contract VaultHandler is Test {
         if (t >= start) start += INTERVAL;
         vm.warp(start + 60);
         vm.prank(keeper);
-        try vault.checkpoint() {} catch {}
+        try vault.checkpoint(0) {} catch {}
         // Leave the blackout so listing-side actions see an open interval next.
         vm.warp(start - BLACKOUT + INTERVAL + 60);
         ++calls;
@@ -76,12 +76,12 @@ contract VaultHandler is Test {
         uint256 loose = vault.looseShapeCount();
         uint256 before = address(vault).balance;
         vm.startPrank(keeper);
-        try vault.restock(n, 3) {
+        try vault.restock(n, 3, 0) {
             uint256 mints = loose >= 3 * n ? 0 : (3 * n - loose + 9) / 10;
             mintFeesPaid += mints * 0.001 ether;
             before;
         } catch {}
-        try vault.list(n) {} catch {}
+        try vault.list(n, 0) {} catch {}
         vm.stopPrank();
         ++calls;
     }
@@ -90,13 +90,13 @@ contract VaultHandler is Test {
         uint256[] memory ids = vault.openListings();
         if (ids.length == 0) return;
         vm.prank(keeper);
-        try vault.unlist(ids) {} catch {}
+        try vault.unlist(ids, 0) {} catch {}
         ++calls;
     }
 
     function liquidate(uint256 n) external {
         vm.prank(keeper);
-        try vault.liquidate(bound(n, 1, 10)) {} catch {}
+        try vault.liquidate(bound(n, 1, 10), 0) {} catch {}
         ++calls;
     }
 

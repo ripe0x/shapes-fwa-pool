@@ -656,3 +656,57 @@ so its loss check is stricter than the contract's pay.
 **Repair from the second review (same day):** `lowerCaps` also cancels any queued admin proposal,
 which would otherwise restore the old caps, ceiling or fee when applied after a guardian stop
 (pre-existing for the caps and ceiling). Covered in `test_workFeeBounded`.
+
+## D56. Quoted keeper pay, request charges and refilling budgets (owner brief, 2026-11-17)
+
+**Owner:** "Implement keeper reimbursement redesign" (brief 1), then "why would we do a % and a flat
+fee?!" (no percentage on top of the flat fee). Supersedes D55's premium-plus-fee rule, D51's
+"reimbursed at min(tx price, ...)" wording, the 30,000-gas overhead and the per-position gas caps
+(V7), and closes D54's F1 by construction.
+**Chose:**
+- Pay never reads `gasleft()` or `tx.gasprice`. Each operation has a quoted gas figure: a base plus
+  a per-unit amount (`VaultLib.Q_*`), measured as billed gas on fork receipts
+  (`keeper/measure_gas.py`, `sim/out/gas-quotes.json`). Each base is at or under the measured fixed
+  cost divided by 1.1, so splitting a job never earns a second base worth its transaction.
+- The vault's envelope: `quotedGas x min(basefee + maxTip, gasCeiling)`, times `1 + payMarkupBps` on
+  routine work (bytecode maximum 10%, canary 0), plus `workFee x units`. Gates and charges use it.
+- Request charges pay for the work a request causes, so a dust deposit or redemption cannot
+  manufacture paid work: a checkpoint charge (quote of one checkpoint plus one unit) into
+  `processingPool`, which funds the checkpoint's pay and releases the rest to holders; a deployment
+  charge escrowed with each deposit (no shares, joins NAV at pricing, refunded on cancel, floored at
+  the builder's maximum margin); an unwind charge on redemptions. The high-water mark is raised after
+  deposits so charges are never distributed.
+- Budgets: routine and essential buckets refill linearly to immutable bytecode maxima. Essential work
+  (unlist, liquidate, checkpoints with redemptions, syncs during redemptions or wind-down) carries no
+  markup and draws only on the essential bucket, so routine work cannot starve redemptions.
+- `minPay` on every paid call: the call reverts if pay would be lower; with 0 the work runs for
+  whatever is paid, so maintenance is never blocked by pay.
+**Evidence:** `test/fork/ForkKeeperPay.t.sol` (11 tests: pay ignores caller gas and tip, splitting
+loses, repeats pay nothing, dust deposit and tiny redemption, manufactured cycle at the maxima loses,
+budgets bound spend, routine cannot drain essential, pay never uses liabilities, minPay atomic).
+
+## D57. Replaceable keeper payment policy (owner brief, 2026-11-17)
+
+**Owner:** "Implement a replaceable keeper payment policy". No proxy, plugin framework, registry or
+governance token.
+**Chose:** PackVault stays immutable and enforces everything (asset custody, work validation, the
+envelope, budgets, liabilities, paying). A separate `IKeeperPolicy` contract only proposes a payment
+from facts the vault established (operation, completed units, quoted gas, essential flag, ceiling,
+tip, fee). The vault calls it with a 50,000-gas `staticcall` after the work and pays
+`min(offer, envelope, funding cap, free ETH, budget)`. A revert, gas exhaustion or short return
+offers 0: the work stands, the call pays 0, and `minPay` decides whether the caller accepts that.
+The admin proposes a policy (must have code and a nonzero `policyVersion()`); anyone activates it
+after `paramDelay`; `PolicyChanged(old, new)` is emitted. The guardian cancels a queued policy
+(`guard(.., .., true)` or `lowerCaps`) and can stop all pay at once (budget caps 0, or ceiling and
+fee 0). A policy cannot loosen a gate or a charge: those use the envelope.
+**V1** (`KeeperPolicyV1`): `quotedGas x min(basefee + maxTip, gasCeiling) + units x workFee`. No
+premium. Canary: ceiling 0.5 gwei, maxTip 0.05 gwei, fee 0.00002 ETH, markup 0, so the envelope
+equals V1's pay.
+**Found while testing:** Yul evaluates `and(staticcall(..), gt(returndatasize(), 31))` right to left,
+so the size check read the previous call's return data; every offer read 0. Fixed by binding the
+call result first. Pay was never above the envelope; the bug paid too little.
+**Evidence:** `test/fork/ForkKeeperPolicy.t.sol` (swap to a different formula preserves balance,
+shares, NAV, positions, pool and charges, then pays V2's own quote to the wei; invalid policies
+rejected; greedy policy capped at the envelope; reverting, gas-burning and short-return policies pay
+0 while work runs and `minPay > 0` reverts; guardian cancels and disables). Canary rehearsal swaps V1
+to a 3-fee-per-unit V2 mid-run with the unchanged keeper; ledger and keeper accounting close to the wei.

@@ -36,8 +36,10 @@ python3 ~/.agents/guidance/asset-flow-kit/asset_gate.py .   # PASS needs the own
 - Test actors use `makeAddr("pack-vault-test-...")` and setUp asserts they hold no code or ETH:
   short labels map to real mainnet addresses, some with EIP-7702 sweepers. Deploy addresses can
   hold mainnet dust; read balances, do not assume them.
-- Keeper transactions pad gas 25%: keeper pay depends on `gasleft()`. `cast send` exits 0 on a
-  reverted transaction; check receipt status.
+- Keeper pay is a fixed quote per operation (D56); never measured gas. The keeper pads gas 25% so
+  a call cannot run out. `cast send` exits 0 on a reverted transaction; check receipt status.
+- The keeper payment policy is a separate contract (`src/KeeperPolicy.sol`, D57); the vault caps
+  its offer. Test policies live in `test/fork/ForkKeeperPolicy.t.sol`.
 - Rehearsal actors are fresh addresses checked clean on the fork. Never anvil's dev accounts: they
   are real mainnet addresses and #2 carries an EIP-7702 delegation that diverts ETH it receives.
 - Keeper decisions live in `keeper/policy.py` only; the simulation imports it. Vault accounting in

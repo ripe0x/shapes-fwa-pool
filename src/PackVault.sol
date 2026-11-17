@@ -5,6 +5,7 @@ import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {FixedPointMathLib as M} from "solady/utils/FixedPointMathLib.sol";
 import {VaultLib} from "./VaultLib.sol";
+import {IKeeperPolicy} from "./KeeperPolicy.sol";
 import {
     IShapes,
     IShapePacks,
@@ -30,16 +31,20 @@ import {
 ///      B (1 - s) back, loses the pack worth P: net B (k - s) - P). `edgeOk` recomputes k and the cap
 ///      from live FWA reads, so the vault stops listing by itself when FWA's owner moves a number.
 ///
-///      Keepers are reimbursed gas from vault ETH (a holder expense, NAV-visible), never from a
-///      fee skim: the edge per selection is only about 3.85% of backing, so any fixed share of
-///      fees large enough to pay keepers exceeds it. A call is paid only when it did necessary
-///      work or realized more than its cost.
+///      Keepers are paid from vault ETH (a holder expense, NAV-visible), never from a fee skim.
+///      Pay is a quote fixed by the operation and the work it verifiably completed (D56): quoted
+///      gas x min(basefee + maxTip, gasCeiling), plus a premium on routine strategy work only,
+///      plus `workFee` per unit of work. A caller's gas use, calldata, gas limit or tip never
+///      changes it. Checkpoints are funded by charges on the deposit and redemption requests that
+///      need them, so holders do not pay for work someone else manufactures. All pay draws on two
+///      refilling budgets (routine, essential) bounded in bytecode.
 ///
 ///      Trust: FWA, its rewards module, Shapes, ShapePacks and the FWA token are immutable
 ///      addresses fixed here. FWA's owner can change fees, the floor quote and admission; every
 ///      such change is read live, never cached. The guardian can only stop things and lower caps.
-///      The admin can move parameters inside bytecode bounds after `PARAM_DELAY`. Neither role has
-///      any path that moves assets to itself.
+///      The admin can move parameters inside bytecode bounds after `PARAM_DELAY`. Neither role can
+///      take assets directly; as a keeper, a compromised admin earns at most the routine premium
+///      and work fees, inside the spending budgets' bytecode maxima.
 contract PackVault is ReentrancyGuard {
     using SafeTransferLib for address;
 
@@ -56,29 +61,23 @@ contract PackVault is ReentrancyGuard {
     /// @notice Hard bounds fixed in bytecode. Governance moves parameters only inside them.
     /// Bounds the checkpoint loop: open plus idle positions never exceed it, and the worst-case
     /// checkpoint must fit EIP-7825's 16,777,216 gas transaction cap with margin.
-    uint256 public constant MAX_POSITIONS = 300;
-    uint256 public constant MAX_MIN_EDGE_BPS = 1_000;
-    uint256 public constant MAX_BUFFER_BPS = 2_000;
-    uint256 public constant MAX_GAS_CEILING = 50 gwei;
-    uint256 public constant MAX_DISTRIBUTION_BPS = 5_000;
-    uint256 public constant MAX_KEEPER_PREMIUM_BPS = 5_000;
-    uint256 public constant MAX_WORK_FEE = 0.0001 ether; // per unit of work (D55)
-    uint256 public constant MAX_KEEPER_SHARE_BPS = 5_000;
-    uint256 public constant MAX_ALLOCATED_BOUND_BPS = 1_000;
-    uint256 public constant MIN_PACK_UNITS = 3; // ShapePacks minimum pack value 0.03 ETH
-    uint256 public constant MAX_PACK_UNITS = 63; // highest bit of the uint64 mask
-    uint256 public constant MIN_DEPOSIT = 0.01 ether;
-    uint256 public constant MIN_DISTRIBUTION = 0.01 ether;
-    uint256 public constant KEEPER_OVERHEAD_GAS = 30_000;
+    uint256 public constant MAX_POSITIONS = VaultLib.MAX_POSITIONS;
+    /// Operation ids passed to the keeper policy.
+    uint256 internal constant OP_RESTOCK = 1;
+    uint256 internal constant OP_LIST = 2;
+    uint256 internal constant OP_SYNC = 3;
+    uint256 internal constant OP_ACTIVATE = 4;
+    uint256 internal constant OP_UNLIST = 5;
+    uint256 internal constant OP_LIQUIDATE = 6;
+    uint256 internal constant OP_HARVEST = 7;
+    uint256 internal constant OP_CHECKPOINT = 8;
+    uint256 public constant MAX_WORK_FEE = VaultLib.MAX_WORK_FEE; // per unit of work (D55, D56)
+    /// Spending budgets: capacity and refill per day, maxima in bytecode (D56).
+    uint256 internal constant MIN_PACK_UNITS = 3; // ShapePacks minimum pack value 0.03 ETH
+    uint256 internal constant MIN_DEPOSIT = 0.01 ether;
+    uint256 internal constant MIN_DISTRIBUTION = 0.01 ether;
     uint256 public constant DEAD_SHARES = 1e15;
-    /// Gas a bid-outcome cycle costs the vault: relist plus its share of sync and harvest.
-    uint256 public constant CYCLE_GAS = 800_000;
-    /// Gas to build one 3-unit pack: a third of a 0.1 mint and ten-way split, plus createPack.
-    uint256 public constant RESTOCK_GAS_PER_PACK = 1_050_000;
-    uint256 public constant MAX_LIQUIDATIONS = 40; // packs redeemed per call, about 8M gas
-    /// Most gas `sync` and `unlist` reimburse per position they actually moved, so padding a call
-    /// with ids it skips cannot earn the premium (measured: sync ~160k, unlist ~200k per id).
-    uint256 public constant GAS_PER_MOVED = 300_000;
+    uint256 internal constant MAX_LIQUIDATIONS = 40; // packs redeemed per call, about 8M gas
 
     // ------------------------------------------------------------------ immutables
 
@@ -93,27 +92,17 @@ contract PackVault is ReentrancyGuard {
 
     // ------------------------------------------------------------------ parameters
 
-    struct Params {
-        uint16 minEdgeBps; // require k >= 1 + minEdge
-        uint16 bufferBps; // list at cap x (1 - buffer), so a small ask cut does not trigger kicks
-        uint16 distributionBps; // share of new gains above the high-water mark paid out
-        uint16 keeperPremiumBps; // paid on top of reimbursed gas
-        uint16 keeperShareBps; // optional calls are paid only if pay <= this share of value realized
-        uint16 allocatedBoundBps; // checkpoint skips when Allocated value exceeds this share of NAV
-        uint64 packUnitsMask; // bit u set: packs of u x 0.01 ETH may be built and listed
-        uint64 gasCeiling; // wei per gas
-        uint64 maxTip; // reimbursed price is at most basefee + this
-        uint64 workFee; // flat wei per unit of work done: position listed, resolved, activated,
-        //                 unlisted, item liquidated, or a checkpoint that priced flows
-        uint96 maxPositions;
-        uint128 reserve; // ETH kept idle
-        uint128 tvlCap; // deposits refused above this NAV
-        uint128 opGasCap; // reimbursed gas per call
-    }
+    // Governed parameters (VaultLib.Params); library code reads them by storage pointer.
 
-    Params internal params;
-    Params internal pendingParams;
+
+    VaultLib.Params internal params;
+    VaultLib.Params internal pendingParams;
     uint256 public pendingParamsEta;
+
+    // Keeper payment policy (D57): proposes pay for verified work; replaced through the delay.
+    IKeeperPolicy public keeperPolicy;
+    address public pendingPolicy;
+    uint256 public pendingPolicyEta;
 
     bool public depositsPaused;
     bool public listingPaused;
@@ -121,13 +110,7 @@ contract PackVault is ReentrancyGuard {
 
     // ------------------------------------------------------------------ positions and inventory
 
-    struct Position {
-        uint64 packId;
-        uint64 units; // pack value in 0.01 ETH
-        uint128 backing;
-    }
-
-    mapping(uint256 listingId => Position) public positions;
+    mapping(uint256 listingId => VaultLib.Position) public positions;
     uint256[] internal _open; // non-terminal FWA listing ids
     mapping(uint256 listingId => uint256 indexPlusOne) internal _openIndex;
     uint256[] internal _idlePacks;
@@ -144,15 +127,18 @@ contract PackVault is ReentrancyGuard {
     uint256 public lastNav;
 
     struct PendingDeposit {
-        uint128 amount;
+        // uint96 holds 7.9e10 ETH, more than exists, so neither field can truncate.
+        uint96 amount; // escrowed, deployment charge included
         uint64 epoch; // priced at the checkpoint that ends this epoch
+        uint96 charge; // deployment charge: escrowed with the deposit, earns no shares
     }
 
     mapping(address => PendingDeposit) public pendingDeposits;
     uint256 public pendingDepositTotal; // ETH escrowed, excluded from NAV
-    mapping(uint256 epoch => uint256) public epochNav; // post-flow NAV used to price deposits
-    mapping(uint256 epoch => uint256) public epochSupply;
-    mapping(uint256 epoch => uint256) public epochDistPerShare; // accumulator when deposits were priced
+    uint256 internal pendingChargeTotal; // deployment charges inside pendingDepositTotal
+    mapping(uint256 epoch => uint256) internal epochNav; // post-flow NAV used to price deposits
+    mapping(uint256 epoch => uint256) internal epochSupply;
+    mapping(uint256 epoch => uint256) internal epochDistPerShare; // accumulator when deposits were priced
 
     // Pro-rata redemption index. Each checkpoint fills fraction f of all locked shares at the
     // checkpoint price; g tracks the surviving fraction, q the ETH paid per original share.
@@ -165,19 +151,22 @@ contract PackVault is ReentrancyGuard {
 
     mapping(address => Redemption) public redemptions;
     uint256 public lockedShares;
-    uint256 public redeemEra;
-    uint256 public redeemG = SCALE;
-    uint256 public redeemQ;
-    mapping(uint256 era => uint256) public eraFinalQ;
+    uint256 internal redeemEra;
+    uint256 internal redeemG = SCALE;
+    uint256 internal redeemQ;
+    mapping(uint256 era => uint256) internal eraFinalQ;
     uint256 public redemptionReserve; // ETH owed to redeemers, excluded from NAV
     mapping(address => uint256) public claimableEth;
     uint256 public claimableTotal; // settled to holders, not yet paid: a liability like the reserves
 
     // Distributions: per-share accumulator over all live shares.
     uint256 public distPerShare; // wei x 1e18 per share
-    mapping(address => uint256) public distDebt;
+    mapping(address => uint256) internal distDebt;
     uint256 public distributionReserve;
 
+    // Keeper pay: request charges held for the next checkpoint, and the two spending budgets.
+    uint256 public processingPool; // excluded from NAV until the checkpoint it funds
+    VaultLib.Budget internal _budget;
 
     // ------------------------------------------------------------------ events and errors
 
@@ -195,6 +184,8 @@ contract PackVault is ReentrancyGuard {
     event KeeperPaid(address indexed keeper, uint256 amount);
     event ParamsProposed(uint256 eta);
     event ParamsApplied();
+    event PolicyProposed(address indexed policy, uint256 eta);
+    event PolicyChanged(address indexed oldPolicy, address indexed newPolicy);
     event Claimed(address indexed holder, uint256 amount);
     event WindDownStarted();
 
@@ -213,6 +204,7 @@ contract PackVault is ReentrancyGuard {
     error Liquidity();
     error UnlistNotAllowed();
     error UnknownNft();
+    error Payment();
 
     // ------------------------------------------------------------------ construction
 
@@ -223,7 +215,8 @@ contract PackVault is ReentrancyGuard {
         address guardian_,
         address admin_,
         uint256 paramDelay_,
-        Params memory initial
+        VaultLib.Params memory initial,
+        IKeeperPolicy policy_
     ) payable {
         if (paramDelay_ < 1 days || paramDelay_ > 30 days) revert OutOfBounds();
         fwa = fwa_;
@@ -234,8 +227,11 @@ contract PackVault is ReentrancyGuard {
         guardian = guardian_;
         admin = admin_;
         paramDelay = paramDelay_;
-        _checkBounds(initial);
         params = initial;
+        VaultLib.checkBounds(params);
+        VaultLib.checkPolicy(address(policy_));
+        keeperPolicy = policy_;
+        _budget = VaultLib.Budget(uint128(initial.routineCap), uint128(initial.essentialCap), block.timestamp);
         shapes_.setApprovalForAll(address(packs_), true);
         packs_.setApprovalForAll(address(fwa_), true);
         // First issuance: the deployer's seed buys dead shares so the share price cannot be
@@ -258,33 +254,21 @@ contract PackVault is ReentrancyGuard {
 
     /// @notice Live economics from FWA. `backing` is what a new listing would post; zero when the
     ///         gate fails for a pack of `units` x 0.01 ETH.
-    function edge(uint256 units) public view returns (uint256 k1e18, uint256 backing, bool ok) {
-        Params memory p = params;
-        uint256 cap;
-        uint256 s;
-        (k1e18, cap, s) = VaultLib.economics(fwa, address(packs));
-        backing = cap * (BPS - p.bufferBps) / BPS;
-        // Keep outcome must not lose: B (k - s) >= P. Bid outcome is B (k - 1) > 0 given k >= 1 +
-        // edge; spending callers also require it to clear gas (`_cycleNet`).
-        ok = cap != 0 && k1e18 >= 1e18 + uint256(p.minEdgeBps) * 1e14 && k1e18 > s * 1e14
-            && backing * (k1e18 - s * 1e14) >= units * UNIT * 1e18;
-        if (!ok) backing = 0;
+    function edge(uint256 units) public view returns (uint256, uint256, bool) {
+        return VaultLib.edge(params, fwa, address(packs), units);
     }
 
-    /// @dev Expected net of one bid-outcome cycle after its gas, zero when not positive.
+    /// @dev Expected net of one bid-outcome cycle after the full keeper pay it causes (resolve,
+    ///      relist and the harvest share, each at its quote with premium and work fee), zero when
+    ///      not positive.
     function _cycleNet(uint256 k1e18, uint256 backing) internal view returns (uint256) {
-        if (k1e18 <= 1e18) return 0;
-        uint256 gross = backing * (k1e18 - 1e18) / 1e18;
-        uint256 gas = _gasCost(CYCLE_GAS);
-        return gross > gas ? gross - gas : 0;
+        return VaultLib.cycleNet(params, k1e18, backing);
     }
 
-    /// @dev Wei the vault pays a keeper for `gasUnits`: price capped at basefee + tip and the
-    ///      ceiling, plus the premium.
-    function _gasCost(uint256 gasUnits) internal view returns (uint256) {
-        Params memory p = params;
-        uint256 price = M.min(M.min(tx.gasprice, block.basefee + p.maxTip), p.gasCeiling);
-        return gasUnits * price * (BPS + p.keeperPremiumBps) / BPS;
+    /// @dev Keeper pay for `gasQ` quoted gas and `units` of work: priced at basefee + maxTip,
+    ///      capped at the ceiling, never at the caller's own gas price; premium on routine work.
+    function _quote(uint256 gasQ, uint256 units, bool essential) internal view returns (uint256) {
+        return VaultLib.quote(params, gasQ, units, essential);
     }
 
     // ------------------------------------------------------------------ inventory
@@ -292,17 +276,18 @@ contract PackVault is ReentrancyGuard {
     /// @notice Build `count` packs of `units` x 0.01 ETH: mint 0.1 ETH Shapes, split each into ten
     ///         0.01 Shapes (one mint fee per ten units), then pack them. Only when every new pack
     ///         can be listed right away and its build cost is repaid by one bid cycle.
-    function restock(uint256 count, uint256 units) external nonReentrant {
-        uint256 g0 = gasleft();
+    function restock(uint256 count, uint256 units, uint256 minPay) external nonReentrant returns (uint256) {
         _requireOperating();
+        _precheck(minPay, false);
         if (listingPaused) revert Paused();
         if (count == 0 || (params.packUnitsMask >> units) & 1 == 0) revert Amount();
         if (_open.length + _idlePacks.length + count > params.maxPositions) revert Amount();
         (uint256 k, uint256 backing, bool ok) = edge(units);
         uint256 fee = shapes.mintFee();
-        if (!ok || _gasCost(RESTOCK_GAS_PER_PACK) + fee * units / SHAPES_PER_MINT > _cycleNet(k, backing)) {
-            revert EdgeGate();
-        }
+        // A pack is worth building only if one bid cycle repays its build share, its mint fee share
+        // and its first listing, all at the pay they cause.
+        uint256 build = VaultLib.quote(params, VaultLib.Q_PACK + VaultLib.Q_MINT * units / SHAPES_PER_MINT + VaultLib.Q_LISTED, 2, false);
+        if (!ok || build + fee * units / SHAPES_PER_MINT > _cycleNet(k, backing)) revert EdgeGate();
         uint256 need = count * units;
         uint256 have = _looseShapes.length;
         uint256 mints = need > have ? (need - have + SHAPES_PER_MINT - 1) / SHAPES_PER_MINT : 0;
@@ -328,13 +313,13 @@ contract PackVault is ReentrancyGuard {
             _idlePacks.push(packs.createPack(ids, noMint));
         }
         emit Restocked(count, units);
-        _reimburse(g0, type(uint256).max, 0); // the work fee is paid when the pack lists
+        return _pay(OP_RESTOCK, VaultLib.Q_RESTOCK + count * VaultLib.Q_PACK + mints * VaultLib.Q_MINT, count, false, minPay, type(uint256).max);
     }
 
     /// @notice List up to `maxCount` idle packs at the live gated backing.
-    function list(uint256 maxCount) external nonReentrant {
-        uint256 g0 = gasleft();
+    function list(uint256 maxCount, uint256 minPay) external nonReentrant returns (uint256) {
         _requireOperating();
+        _precheck(minPay, false);
         if (listingPaused) revert Paused();
         uint256 listed;
         while (listed < maxCount && _idlePacks.length != 0 && _open.length < params.maxPositions) {
@@ -345,85 +330,51 @@ contract PackVault is ReentrancyGuard {
             if (_idle() < backing) break;
             _idlePacks.pop();
             uint256 listingId = fwa.listNFT{value: backing}(address(packs), packId);
-            positions[listingId] = Position(uint64(packId), uint64(units), uint128(backing));
+            positions[listingId] = VaultLib.Position(uint64(packId), uint64(units), uint128(backing));
             _open.push(listingId);
             _openIndex[listingId] = _open.length;
             emit Listed(listingId, packId, backing);
             ++listed;
         }
         if (listed == 0) revert Nothing();
-        _reimburse(g0, type(uint256).max, listed);
+        return _pay(OP_LIST, VaultLib.Q_LIST + listed * VaultLib.Q_LISTED, listed, false, minPay, type(uint256).max);
     }
 
     /// @notice Resolve positions FWA has moved on: reclaim allocated ones the purchaser left past
     ///         the settlement window, fold settled and withdrawn ones back into inventory.
     ///         A pack FWA failed to deliver stays an open position until it arrives; calling sync
     ///         again retries the pull. Paid only when something resolved.
-    function sync(uint256[] calldata listingIds) external nonReentrant {
-        uint256 g0 = gasleft();
+    function sync(uint256[] calldata listingIds, uint256 minPay) external nonReentrant returns (uint256) {
         uint256 resolved;
         for (uint256 i; i < listingIds.length; ++i) {
             if (_sync(listingIds[i])) ++resolved;
         }
         if (resolved == 0) revert Nothing();
-        _reimburse(M.min(g0, gasleft() + resolved * GAS_PER_MOVED), type(uint256).max, resolved);
+        bool essential = windingDown || lockedShares != 0;
+        return _pay(OP_SYNC, VaultLib.Q_SYNC + resolved * VaultLib.Q_SYNCED, resolved, essential, minPay, type(uint256).max);
     }
 
     function _sync(uint256 listingId) internal returns (bool) {
-        Position memory pos = positions[listingId];
-        if (_openIndex[listingId] == 0) return false;
-        IFWAV2 f = fwa;
-        (,,,,,,,,, uint64 allocatedAt, uint8 status) = f.listings(listingId);
-        if (status == LISTING_ALLOCATED) {
-            if (block.timestamp < allocatedAt + f.settlementWindow()) return false;
-            // Purchaser went silent: pick the better outcome for the vault.
-            uint256 back = pos.backing * (BPS - f.ownerSettlementFeeBps()) / BPS;
-            if (back >= pos.units * UNIT) f.depositorReclaimBacking(listingId);
-            else f.depositorReclaimNFT(listingId);
-            (,,,,,,,,,, status) = f.listings(listingId);
-        }
-        if (status != LISTING_SETTLED && status != LISTING_WITHDRAWN) return false;
-        // FWA delivers NFTs best-effort; a failed delivery is a pull claim held for the vault.
-        // The outcome comes from FWA's own record, never from inference: a pack is the vault's
-        // if the vault holds it or FWA owes it. Anything else went to the purchaser.
-        if (f.stuckNFTRecipient(listingId) == address(this)) {
-            // Reverts while the collection still fails; the claim survives for the next try.
-            (bool ok,) = address(f).call(abi.encodeCall(IFWAV2.recoverStuckNFT, (listingId)));
-            if (!ok || !_owns(pos.packId)) {
-                emit PackOwed(listingId);
-                return false;
-            }
-        }
-        bool packBack = _owns(pos.packId);
-        if (packBack) _idlePacks.push(pos.packId);
-        _removeOpen(listingId);
-        emit Resolved(listingId, status, packBack);
-        return true;
+        return VaultLib.sync(positions, _open, _openIndex, _idlePacks, fwa, packs, listingId);
     }
 
+
     function _owns(uint256 packId) internal view returns (bool) {
-        try packs.ownerOf(packId) returns (address o) {
-            return o == address(this);
-        } catch {
-            return false;
-        }
+        return VaultLib.owns(packs, packId);
     }
 
     function _removeOpen(uint256 listingId) internal {
-        uint256 idx = _openIndex[listingId] - 1;
-        uint256 last = _open[_open.length - 1];
-        _open[idx] = last;
-        _openIndex[last] = idx + 1;
-        _open.pop();
-        delete _openIndex[listingId];
-        delete positions[listingId];
+        VaultLib.removeOpen(positions, _open, _openIndex, listingId);
     }
 
     /// @notice Activate vault listings FWA staged because its acquisition queue was busy when they
     ///         were listed: a staged listing earns no fees or token rewards. Runs FWA's own
     ///         permissionless FIFO activation; paid only per vault listing it actually activated.
-    function activate(uint256[] calldata listingIds, uint256 maxCount) external nonReentrant {
-        uint256 g0 = gasleft();
+    function activate(uint256[] calldata listingIds, uint256 maxCount, uint256 minPay)
+        external
+        nonReentrant
+        returns (uint256)
+    {
         bool[] memory staged = new bool[](listingIds.length);
         for (uint256 i; i < listingIds.length; ++i) {
             // Strictly increasing ids: a repeated id cannot count twice toward the pay cap.
@@ -440,18 +391,20 @@ contract PackVault is ReentrancyGuard {
             if (status == LISTING_ACTIVE) ++moved;
         }
         if (moved == 0) revert Nothing();
-        _reimburse(M.min(g0, gasleft() + moved * GAS_PER_MOVED), type(uint256).max, moved);
+        return _pay(OP_ACTIVATE, VaultLib.Q_ACTIVATE + moved * VaultLib.Q_ACTIVATED, moved, false, minPay, type(uint256).max);
     }
 
     /// @notice Withdraw active listings: allowed in wind-down, when FWA's live fees leave no edge
     ///         (k below 1 + minEdge), or to cover locked redemptions free ETH and inventory cannot.
     ///         A stale quote or a gas spike stops new listings but never unwinds earning ones.
-    function unlist(uint256[] calldata listingIds) external nonReentrant {
-        uint256 g0 = gasleft();
+    function unlist(uint256[] calldata listingIds, uint256 minPay) external nonReentrant returns (uint256) {
         (uint256 k,,) = edge(MIN_PACK_UNITS);
         bool ok = k >= 1e18 + uint256(params.minEdgeBps) * 1e14;
         uint256 shortfall = _redemptionShortfall();
         if (!windingDown && ok && shortfall == 0) revert UnlistNotAllowed();
+        // Essential when it frees ETH for redeemers or winds down; routine when only the edge failed.
+        bool essential = windingDown || shortfall != 0;
+        _precheck(minPay, essential);
         uint256 realized;
         uint256 moved;
         for (uint256 i; i < listingIds.length; ++i) {
@@ -461,7 +414,7 @@ contract PackVault is ReentrancyGuard {
             if (fwa.topListingId() == id && block.timestamp < fwa.topListingSince() + CROWN_EXIT_WINDOW) continue;
             (,,,,,,,,,, uint8 status) = fwa.listings(id);
             if (status != LISTING_ACTIVE) continue;
-            Position memory pos = positions[id];
+            VaultLib.Position memory pos = positions[id];
             fwa.withdrawListing(id); // reverts while FWA's queue is not drained
             _idlePacks.push(pos.packId);
             _removeOpen(id);
@@ -471,20 +424,26 @@ contract PackVault is ReentrancyGuard {
             if (!windingDown && ok && realized >= shortfall) break;
         }
         if (realized == 0) revert Nothing();
-        _reimburse(M.min(g0, gasleft() + moved * GAS_PER_MOVED), type(uint256).max, moved);
+        return _pay(OP_UNLIST, VaultLib.Q_UNLIST + moved * VaultLib.Q_UNLISTED, moved, essential, minPay, type(uint256).max);
     }
 
     /// @notice Pull FWA fees into the vault: pending fees of `activeIds` (they keep earning) and
     ///         credited fees of resolved listings. Paid only if the pay is a small share of it.
-    function harvest(uint256[] calldata activeIds) external nonReentrant {
-        uint256 g0 = gasleft();
+    ///         Gas is quoted only for the vault's own listings that had fees to claim.
+    function harvest(uint256[] calldata activeIds, uint256 minPay) external nonReentrant returns (uint256) {
         uint256 before = address(this).balance;
+        uint256 n;
+        for (uint256 i; i < activeIds.length; ++i) {
+            if (_openIndex[activeIds[i]] != 0 && fwa.pendingFees(activeIds[i]) != 0) ++n;
+        }
         // One listing that moved on since the caller looked must not block the rest.
         if (activeIds.length != 0) try fwa.claimListingFees(activeIds) {} catch {}
         _harvest();
         uint256 amount = address(this).balance - before;
         if (amount == 0) revert Nothing();
-        _reimburse(g0, amount, 0);
+        // Optional work: paid only when the quote is at most keeperShareBps of the fees collected.
+        uint256 g = VaultLib.Q_HARVEST + n * VaultLib.Q_HARVESTED;
+        return _pay(OP_HARVEST, g, 0, false, minPay, _quote(g, 0, false) * BPS > amount * params.keeperShareBps ? 0 : type(uint256).max);
     }
 
     function _harvest() internal {
@@ -510,35 +469,56 @@ contract PackVault is ReentrancyGuard {
 
     // ------------------------------------------------------------------ holders
 
-    /// @notice Escrow ETH to buy shares at the next checkpoint. Cancellable until then.
+    /// @notice Escrow ETH to buy shares at the next checkpoint. Cancellable until then. The
+    ///         request charge (`requestCharge()`) is kept from `msg.value` to fund that checkpoint.
     function deposit() external payable nonReentrant {
         if (depositsPaused) revert Paused();
         if (windingDown) revert WindingDown();
-        if (msg.value < MIN_DEPOSIT) revert Amount();
-        if (lastNav + pendingDepositTotal + msg.value > params.tvlCap) revert Amount();
+        // Charges: the checkpoint (to the pool, kept on cancel) and building and listing positions
+        // with this ETH (escrowed with the deposit and refunded on cancel; at pricing it joins the
+        // vault's value, which pays for that work, and earns the depositor no shares).
+        uint256 ck = requestCharge();
+        if (msg.value < MIN_DEPOSIT + ck) revert Amount();
+        uint256 amount = msg.value - ck;
+        uint256 deploy = deployCharge();
+        uint256 charge = amount * deploy / (VaultLib.POSITION_VALUE + deploy);
+        if (lastNav + pendingDepositTotal + amount > params.tvlCap) revert Amount();
         _settleHolder(msg.sender);
+        processingPool += ck;
         PendingDeposit storage d = pendingDeposits[msg.sender];
-        d.amount += uint128(msg.value);
+        d.amount += uint96(amount);
+        d.charge += uint96(charge);
         d.epoch = uint64(epoch);
-        pendingDepositTotal += msg.value;
-        emit Deposited(msg.sender, msg.value, epoch);
+        pendingDepositTotal += amount;
+        pendingChargeTotal += charge;
+        emit Deposited(msg.sender, amount, epoch);
     }
 
     function cancelDeposit() external nonReentrant {
         _settleHolder(msg.sender);
-        uint256 amount = pendingDeposits[msg.sender].amount;
+        PendingDeposit memory d = pendingDeposits[msg.sender];
+        uint256 amount = d.amount;
         if (amount == 0) revert Nothing();
         delete pendingDeposits[msg.sender];
         pendingDepositTotal -= amount;
+        pendingChargeTotal -= d.charge;
         msg.sender.forceSafeTransferETH(amount);
         emit DepositCancelled(msg.sender, amount);
     }
 
     /// @notice Lock shares for redemption. Filled pro rata at checkpoints as ETH frees up; the
-    ///         unfilled part stays exposed to the vault until filled.
-    function requestRedeem(uint256 amount) external nonReentrant {
+    ///         unfilled part stays exposed to the vault until filled. Send at least
+    ///         `requestCharge()`: it funds the checkpoint; any excess is returned.
+    function requestRedeem(uint256 amount) external payable nonReentrant {
         _settleHolder(msg.sender);
         if (amount == 0 || amount > sharesOf[msg.sender]) revert Amount();
+        // Charges: the checkpoint (to the pool) and unwinding positions worth the shares' value
+        // (to the vault, which pays for that work).
+        uint256 ck = requestCharge();
+        uint256 charge = ck + M.mulDiv(M.mulDiv(amount, lastNav, totalShares), unwindCharge(), VaultLib.POSITION_VALUE);
+        if (msg.value < charge) revert Amount();
+        processingPool += ck;
+        if (msg.value > charge) msg.sender.forceSafeTransferETH(msg.value - charge);
         _settleDist(msg.sender);
         sharesOf[msg.sender] -= amount;
         distDebt[msg.sender] = sharesOf[msg.sender] * distPerShare / 1e18;
@@ -565,7 +545,7 @@ contract PackVault is ReentrancyGuard {
         PendingDeposit memory d = pendingDeposits[h];
         if (d.amount != 0 && d.epoch < epoch) {
             _settleDist(h);
-            uint256 minted = uint256(d.amount) * epochSupply[d.epoch] / epochNav[d.epoch];
+            uint256 minted = uint256(d.amount - d.charge) * epochSupply[d.epoch] / epochNav[d.epoch];
             sharesOf[h] += minted;
             // New shares earn every distribution after their pricing, even if converted later.
             distDebt[h] += minted * epochDistPerShare[d.epoch] / 1e18;
@@ -612,8 +592,9 @@ contract PackVault is ReentrancyGuard {
     /// @notice Price the vault and settle flows. Only during FWA's purchase blackout with its
     ///         acquisition queue drained: no listing can be selected until the blackout ends, so
     ///         every Active position is worth exactly what a withdrawal would return.
-    function checkpoint() external nonReentrant {
-        uint256 g0 = gasleft();
+    ///         Paid at cost plus one work unit, from the request charges of the flows it settles
+    ///         (`processingPool`); with no flows, from the routine budget for a distribution.
+    function checkpoint(uint256 minPay) external nonReentrant returns (uint256) {
         IFWAV2 f = fwa;
         if (!f.isPurchaseBlackout() || f.unsettledAcquisitionCount() != 0) revert NotCheckpointWindow();
         uint256 interval = block.timestamp / INTERVAL;
@@ -622,38 +603,16 @@ contract PackVault is ReentrancyGuard {
         // use up the interval's one slot and delay flows that arrive later in the blackout.
         bool work = pendingDepositTotal != 0 || lockedShares != 0;
         if (!work && params.distributionBps == 0) revert Nothing();
+        bool essential = lockedShares != 0 || windingDown;
+        _precheck(minPay, essential);
         lastCheckpointInterval = interval;
+        uint256 gasQ = VaultLib.Q_CHECKPOINT + _open.length * VaultLib.Q_CHECKPOINT_POS;
 
         // Value every open position from FWA state, read-only: resolving is sync's job, so the
         // loop costs the same per position whatever FWA did to them.
-        uint256 navPositions;
-        uint256 allocatedValue;
-        uint256 s = f.ownerSettlementFeeBps();
-        for (uint256 i; i < _open.length; ++i) {
-            uint256 id = _open[i];
-            Position memory pos = positions[id];
-            (,,,,,,,,,, uint8 status) = f.listings(id);
-            uint256 value = pos.units * UNIT;
-            if (status == LISTING_ACTIVE) {
-                navPositions += value + pos.backing + f.pendingFees(id);
-            } else if (status == LISTING_STAGED) {
-                navPositions += value + pos.backing;
-            } else if (status == LISTING_ALLOCATED) {
-                // Both outcomes pay at least the lesser of the pack and the net backing.
-                uint256 floorValue = M.min(value, pos.backing * (BPS - s) / BPS);
-                navPositions += floorValue;
-                allocatedValue += floorValue;
-            } else if (_owns(pos.packId) || f.stuckNFTRecipient(id) == address(this)) {
-                // Settled or withdrawn, not yet synced: every ETH leg already reached the
-                // balance or fee credit; the pack is held or owed to the vault.
-                navPositions += value;
-            }
-        }
+        (uint256 navPositions, uint256 allocatedValue) = VaultLib.valueOpen(f, packs, positions, _open);
         _harvest();
-        uint256 inventory = _looseShapes.length * UNIT;
-        for (uint256 i; i < _idlePacks.length; ++i) {
-            inventory += packs.valueOf(_idlePacks[i]);
-        }
+        uint256 inventory = _looseShapes.length * UNIT + VaultLib.valueIdle(packs, _idlePacks);
         uint256 nav = _free() + navPositions + inventory;
         if (allocatedValue * BPS > nav * params.allocatedBoundBps) revert AllocatedExposure();
 
@@ -663,17 +622,9 @@ contract PackVault is ReentrancyGuard {
         uint256 filled;
         uint256 paid;
         if (lockedShares != 0) {
-            // Owed rounds up and a partial fill leaves 2 wei of headroom, so the rounded-up
-            // reserve below never exceeds the ETH actually freed.
-            uint256 owed = M.mulDivUp(lockedShares, nav, supply);
-            uint256 liquid = _free() + pendingDepositTotal;
-            uint256 frac = owed <= liquid ? SCALE : M.mulDiv(liquid > 2 ? liquid - 2 : 0, SCALE, owed);
-            filled = M.mulDiv(lockedShares, frac, SCALE);
-            // ETH per locked share this checkpoint, x SCALE. Holders claim floor(shares x unit);
-            // the reserve rounds the same unit up over the (never understated) locked total, so
-            // it always covers the sum of claims.
-            uint256 unit = M.mulDiv(frac, nav, supply);
-            paid = M.mulDivUp(lockedShares, unit, SCALE);
+            uint256 frac;
+            uint256 unit;
+            (frac, filled, unit, paid) = VaultLib.fill(lockedShares, nav, supply, _free() + pendingDepositTotal);
             redeemQ += M.mulDiv(redeemG, unit, SCALE);
             if (frac == SCALE) {
                 eraFinalQ[redeemEra] = redeemQ;
@@ -714,22 +665,33 @@ contract PackVault is ReentrancyGuard {
         epochSupply[epoch] = supply;
         epochDistPerShare[epoch] = distPerShare;
         if (pendingDepositTotal != 0) {
-            totalShares += pendingDepositTotal * supply / nav;
+            totalShares += (pendingDepositTotal - pendingChargeTotal) * supply / nav;
             nav += pendingDepositTotal;
             pendingDepositTotal = 0;
+            pendingChargeTotal = 0;
+            // Deployment charges lift NAV per share; that is not a gain to distribute.
+            perShare = nav * 1e18 / totalShares;
+            if (perShare > highWaterMark) highWaterMark = perShare;
         }
         lastNav = nav;
         emit Checkpoint(epoch, nav, totalShares, filled, paid, distributed);
         ++epoch;
-        bool paid_ = work || distributed != 0;
-        _reimburse(g0, paid_ ? type(uint256).max : 0, paid_ ? 1 : 0);
+        if (work) {
+            // Pay comes out of the request charges; what is left over joins the vault's ETH.
+            uint256 pool = processingPool;
+            processingPool = 0;
+            return _pay(OP_CHECKPOINT, gasQ, 1, essential, minPay, pool);
+        }
+        if (distributed != 0) return _pay(OP_CHECKPOINT, gasQ, 1, false, minPay, type(uint256).max);
+        if (minPay != 0) revert Payment();
+        return 0;
     }
 
     /// @notice Redeem up to `maxCount` idle packs (then loose Shapes) to ETH at their exact
     ///         backing, while locked redemptions exceed free ETH, or freely in wind-down.
-    function liquidate(uint256 maxCount) external nonReentrant {
-        uint256 g0 = gasleft();
+    function liquidate(uint256 maxCount, uint256 minPay) external nonReentrant returns (uint256) {
         if (!windingDown && _owedEstimate() <= _free() + pendingDepositTotal) revert Nothing();
+        _precheck(minPay, true);
         maxCount = M.min(maxCount, MAX_LIQUIDATIONS);
         uint256 before = address(this).balance;
         uint256 n;
@@ -749,7 +711,7 @@ contract PackVault is ReentrancyGuard {
         }
         if (n + m == 0) revert Nothing();
         emit Liquidated(n, m, address(this).balance - before);
-        _reimburse(g0, type(uint256).max, n + m);
+        return _pay(OP_LIQUIDATE, VaultLib.Q_LIQUIDATE + n * VaultLib.Q_LIQ_PACK + m * VaultLib.Q_LIQ_SHAPE, n + m, true, minPay, type(uint256).max);
     }
 
     /// @dev ETH locked shares will need at the last checkpoint's price, rounded up.
@@ -760,18 +722,16 @@ contract PackVault is ReentrancyGuard {
 
     function _redemptionShortfall() internal view returns (uint256) {
         uint256 owed = _owedEstimate();
-        uint256 inventory = _free() + _looseShapes.length * UNIT;
-        for (uint256 i; i < _idlePacks.length; ++i) {
-            inventory += packs.valueOf(_idlePacks[i]);
-        }
+        uint256 inventory = _free() + _looseShapes.length * UNIT + VaultLib.valueIdle(packs, _idlePacks);
         return owed > inventory ? owed - inventory : 0;
     }
 
     /// @dev The vault's own ETH: balance less escrowed deposits and every amount owed to holders,
     ///      whether still in a shared reserve or already settled to a holder's claimable balance.
-    ///      Forced ETH lands here, so it is attributed by balance, never by callback.
+    ///      Request charges held for the next checkpoint are excluded too. Forced ETH lands here,
+    ///      so it is attributed by balance, never by callback.
     function _free() internal view returns (uint256) {
-        uint256 owed = pendingDepositTotal + redemptionReserve + distributionReserve + claimableTotal;
+        uint256 owed = pendingDepositTotal + redemptionReserve + distributionReserve + claimableTotal + processingPool;
         uint256 bal = address(this).balance;
         return bal > owed ? bal - owed : 0;
     }
@@ -786,45 +746,94 @@ contract PackVault is ReentrancyGuard {
 
     // ------------------------------------------------------------------ keeper pay
 
-    /// @dev Reimburse the caller's gas plus premium from vault ETH, at most `opGasCap` gas.
-    ///      `realized` is the value an optional call produced: it pays only when the pay is at
-    ///      most `keeperShareBps` of that value, so dust harvests and sales earn nothing.
-    ///      type(uint256).max marks necessary work (always paid); zero marks no work.
-    /// @dev Pay = measured gas at the capped price plus the premium, plus `workFee` per unit of work
-    ///      the call did. Units come from state changes the call made, so splitting a job across
-    ///      calls earns no more fee; a call that did nothing reverts before it is paid.
-    function _reimburse(uint256 g0, uint256 realized, uint256 units) internal {
-        uint256 amount = _gasCost(M.min(g0 - gasleft() + KEEPER_OVERHEAD_GAS, params.opGasCap))
-            + units * params.workFee;
-        if (realized != type(uint256).max && amount * BPS > realized * params.keeperShareBps) return;
-        amount = M.min(amount, _free());
-        if (amount == 0) return;
-        msg.sender.forceSafeTransferETH(amount);
-        emit KeeperPaid(msg.sender, amount);
+    /// @notice What a deposit or redemption request is charged: one checkpoint at its quote now
+    ///         (at cost plus one work unit). It funds the checkpoint that settles the request.
+    function requestCharge() public view returns (uint256) {
+        return VaultLib.requestCharge(params, _open.length);
     }
 
-    /// @dev No gas-price gate: above `gasCeiling` a call is still accepted, and `_reimburse` pays
-    ///      its gas at the ceiling price; the caller covers the rest (D51).
+    /// @notice Deployment charge per VaultLib.POSITION_VALUE deposited: building and listing one position at
+    ///         its quote now plus its Shapes mint fee share, and never less than the keeper margin
+    ///         that building it can pay out at any gas price.
+    function deployCharge() public view returns (uint256) {
+        return VaultLib.deployCharge(params, shapes.mintFee());
+    }
+
+    /// @notice Unwind charge per VaultLib.POSITION_VALUE redeemed: unlisting and liquidating one position.
+    function unwindCharge() public view returns (uint256) {
+        return VaultLib.unwindCharge(params);
+    }
+
+    /// @dev Pay the caller for completed work. The vault states the facts (operation, units,
+    ///      quoted gas); the active policy proposes the pay in a bounded-gas staticcall whose
+    ///      failure or malformed answer counts as zero. The vault pays the least of that offer,
+    ///      its own envelope (`_quote`, the most this work may ever cost), `cap` (a funding source
+    ///      such as request charges), free ETH and the budget. Below `minPay` the whole call
+    ///      reverts; with `minPay` 0 the work is done for whatever is paid (VaultLib.pay).
+    function _pay(uint256 op, uint256 gasQ, uint256 units, bool essential, uint256 minPay, uint256 cap)
+        internal
+        returns (uint256)
+    {
+        return VaultLib.pay(params, _budget, address(keeperPolicy), op, gasQ, units, essential, minPay, cap, _free());
+    }
+
+    /// @dev Revert before the work when `minPay` already exceeds what could be paid.
+    function _precheck(uint256 minPay, bool essential) internal view {
+        if (minPay != 0) VaultLib.precheck(params, _budget, minPay, essential, _free());
+    }
+
+    /// @dev Budget levels now: each refills at its rate since the last update, never above its cap.
+    function _budgetNow() internal view returns (uint256, uint256) {
+        return VaultLib.budgetNow(params, _budget);
+    }
+
+    function _syncBudget() internal {
+        VaultLib.syncBudget(params, _budget);
+    }
+
+    /// @dev No gas-price gate: above `gasCeiling` a call is still accepted and its quote is priced
+    ///      at the ceiling; the caller covers the rest (D51).
     function _requireOperating() internal view {
         if (windingDown) revert WindingDown();
     }
 
     // ------------------------------------------------------------------ roles
 
-    function proposeParams(Params calldata p) external {
+    function proposeParams(VaultLib.Params calldata p) external {
         if (msg.sender != admin) revert NotAdmin();
-        _checkBounds(p);
         pendingParams = p;
+        VaultLib.checkBounds(pendingParams);
         pendingParamsEta = block.timestamp + paramDelay;
         emit ParamsProposed(pendingParamsEta);
     }
 
     function applyParams() external {
         if (pendingParamsEta == 0 || block.timestamp < pendingParamsEta) revert TooEarly();
+        // Budgets accrue at the old rates up to now; the new caps then only clamp, never refill.
+        _syncBudget();
         params = pendingParams;
+        _syncBudget();
         delete pendingParams;
         pendingParamsEta = 0;
         emit ParamsApplied();
+    }
+
+    /// @notice Admin proposes a new keeper policy; anyone activates it after the delay. The
+    ///         guardian cancels it (`guard`, `lowerCaps`); it never moves the budgets or limits.
+    function proposePolicy(address policy) external {
+        if (msg.sender != admin) revert NotAdmin();
+        VaultLib.checkPolicy(policy);
+        pendingPolicy = policy;
+        pendingPolicyEta = block.timestamp + paramDelay;
+        emit PolicyProposed(policy, pendingPolicyEta);
+    }
+
+    function activatePolicy() external {
+        if (pendingPolicyEta == 0 || block.timestamp < pendingPolicyEta) revert TooEarly();
+        emit PolicyChanged(address(keeperPolicy), pendingPolicy);
+        keeperPolicy = IKeeperPolicy(pendingPolicy);
+        delete pendingPolicy;
+        pendingPolicyEta = 0;
     }
 
     /// @notice Guardian stops: each flag can only be raised, and wind-down is one-way.
@@ -835,24 +844,31 @@ contract PackVault is ReentrancyGuard {
         if (cancelProposal) {
             delete pendingParams;
             pendingParamsEta = 0;
+            delete pendingPolicy;
+            pendingPolicyEta = 0;
         }
     }
 
-    /// @notice Guardian may lower caps immediately (and cancels any queued proposal); raising goes
-    ///         through the admin delay.
-    function lowerCaps(uint128 tvlCap, uint96 maxPositions, uint64 gasCeiling, uint64 workFee) external {
+    /// @notice Guardian may lower caps and keeper pay limits immediately (and cancels any queued
+    ///         proposal); raising goes through the admin delay. Ceiling 0 and work fee 0, or both
+    ///         budget caps 0, stop all keeper pay at once.
+    function lowerCaps(
+        uint128 tvlCap,
+        uint96 maxPositions,
+        uint64 gasCeiling,
+        uint64 workFee,
+        uint64 routineCap,
+        uint64 essentialCap
+    ) external {
         if (msg.sender != guardian) revert NotGuardian();
-        Params storage p = params;
-        if (
-            tvlCap > p.tvlCap || maxPositions > p.maxPositions || gasCeiling > p.gasCeiling || workFee > p.workFee
-        ) revert OutOfBounds();
-        p.tvlCap = tvlCap;
-        p.maxPositions = maxPositions;
-        p.gasCeiling = gasCeiling;
-        p.workFee = workFee; // with gasCeiling 0 this stops all keeper pay at once
-        // A proposal queued before the stop would restore the old values when applied: cancel it.
+        _syncBudget();
+        VaultLib.lower(params, tvlCap, maxPositions, gasCeiling, workFee, routineCap, essentialCap);
+        _syncBudget(); // clamp spent levels to the lowered caps
+        // Proposals queued before the stop would undo it when applied: cancel them.
         delete pendingParams;
         pendingParamsEta = 0;
+        delete pendingPolicy;
+        pendingPolicyEta = 0;
     }
 
     function startWindDown() external {
@@ -863,25 +879,11 @@ contract PackVault is ReentrancyGuard {
         emit WindDownStarted();
     }
 
-    /// @notice Admin unpause goes through the delay like any parameter, never immediately.
-    function _checkBounds(Params memory p) internal pure {
-        if (
-            p.minEdgeBps > MAX_MIN_EDGE_BPS || p.bufferBps > MAX_BUFFER_BPS || p.distributionBps > MAX_DISTRIBUTION_BPS
-                || p.keeperPremiumBps > MAX_KEEPER_PREMIUM_BPS || p.workFee > MAX_WORK_FEE || p.keeperShareBps > MAX_KEEPER_SHARE_BPS
-                || p.allocatedBoundBps > MAX_ALLOCATED_BOUND_BPS
-                || p.gasCeiling > MAX_GAS_CEILING || p.maxTip > p.gasCeiling || p.maxPositions > MAX_POSITIONS || p.opGasCap > 16_777_216
-                || p.packUnitsMask >> (MAX_PACK_UNITS + 1) != 0 || p.packUnitsMask & ((1 << MIN_PACK_UNITS) - 1) != 0
-        ) revert OutOfBounds();
-    }
 
     // ------------------------------------------------------------------ views
 
-    function getParams() external view returns (Params memory) {
+    function getParams() external view returns (VaultLib.Params memory) {
         return params;
-    }
-
-    function getPendingParams() external view returns (Params memory) {
-        return pendingParams;
     }
 
     function openListings() external view returns (uint256[] memory) {
@@ -900,10 +902,15 @@ contract PackVault is ReentrancyGuard {
     function shareBalance(address h) external view returns (uint256 shares) {
         shares = sharesOf[h];
         PendingDeposit memory d = pendingDeposits[h];
-        if (d.amount != 0 && d.epoch < epoch) shares += uint256(d.amount) * epochSupply[d.epoch] / epochNav[d.epoch];
+        if (d.amount != 0 && d.epoch < epoch) shares += uint256(d.amount - d.charge) * epochSupply[d.epoch] / epochNav[d.epoch];
     }
 
     function idleEth() external view returns (uint256) {
         return _idle();
+    }
+
+    /// @notice Keeper budget available now: routine (strategy) and essential (redemption, wind-down).
+    function budget() external view returns (uint256 routine, uint256 essential) {
+        return _budgetNow();
     }
 }

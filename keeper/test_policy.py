@@ -13,7 +13,7 @@ E = 10**18
 
 def state(**kw):
     base = dict(now=10**6, gas_price=int(0.2 * G), base_fee=int(0.15 * G), gas_ceiling=int(0.5 * G),
-                max_tip=int(0.05 * G), premium_bps=1_000, share_bps=2_500, k=int(1.0385 * E), backing=int(0.0363 * E),
+                max_tip=int(0.05 * G), markup_bps=1_000, share_bps=2_500, k=int(1.0385 * E), backing=int(0.0363 * E),
                 min_edge_bps=100, mint_fee=10**15, settlement_window=3600, blackout=True, queue_drained=True,
                 checkpoint_done_this_interval=False, max_positions=30, reserve=5 * 10**15)
     base.update(kw)
@@ -64,10 +64,10 @@ def main():
     s = state(listings=act, free=E, pending_deposits=10**17, open_positions=10, **spike)
     assert plan(s) == []
 
-    # Reserve need at the canary: one checkpoint at 30 positions plus one 10-pack listing batch at
-    # 0.5 gwei with the 10% premium: 6,943,000 gas x 0.55 gwei.
-    assert reserve_need(state()) == 6_943_000 * int(0.5 * G) * 11_000 // 10_000
-    assert 0.0038 * E < reserve_need(state()) < 0.0039 * E
+    # Reserve need at the canary: one 10-pack listing batch at 0.5 gwei with the 10% premium:
+    # (255k + 10 x 530k) quoted gas x 0.55 gwei (checkpoints are paid from request charges).
+    assert reserve_need(state()) == 5_555_000 * int(0.5 * G) * 11_000 // 10_000
+    assert 0.0030 * E < reserve_need(state()) < 0.0031 * E
     assert "RESERVE_BELOW_NEED" in {c for c, _, _ in status(state(reserve=10**15))}
 
     # Waiting states.

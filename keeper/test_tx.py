@@ -104,7 +104,7 @@ def main():
         assert est is None and not benign, why
         # 2. Normal send: receipt reconciled against the KeeperPaid event.
         submit(tm, c, c.payer)
-        assert not tm.wait(lambda p: 1, 10)
+        assert not tm.wait(lambda p, *a: 1, 10)
         e = tm.state["counted"][-1]
         assert e["status"] == 1 and e["pay"] == PAY and e["net"] == PAY - e["cost"] and e["cost"] > 0, e
         assert tm.state["stats"]["mined"] == 1 and tm.state["stats"]["paid_wei"] == PAY
@@ -126,11 +126,11 @@ def main():
         c.mine(3)
         tm = manager(c, f"{d}/b.json", replace_after=2)  # restart from the state file
         assert tm.state["pending"]["nonce"] == nonce
-        assert tm.resolve(lambda p: 1), "still in flight"
+        assert tm.resolve(lambda p, *a: 1), "still in flight"
         p = tm.state["pending"]
         assert p["replacements"] == 1 and len(p["hashes"]) == 2 and p["nonce"] == nonce, p
         c.mine(1)
-        assert not tm.resolve(lambda p: 1)
+        assert not tm.resolve(lambda p, *a: 1)
         e = tm.state["counted"][-1]
         assert e["hash"] == p["hashes"][-1] and e["pay"] == PAY and tm.state["stats"]["replaced"] == 1
         assert int(c.cast("nonce", c.keeper)) == nonce + 1, "exactly one transaction used the nonce"
@@ -142,9 +142,9 @@ def main():
                                    prio=50_000_000, max_fee=c.base() * 3, sent_block=tm.head(), replacements=0,
                                    hashes=[], expected_pay=PAY, submitted=0)
         c.mine(2)
-        assert tm.resolve(lambda p: 1) and len(tm.state["pending"]["hashes"]) == 1
+        assert tm.resolve(lambda p, *a: 1) and len(tm.state["pending"]["hashes"]) == 1
         c.mine(1)
-        assert not tm.resolve(lambda p: 1) and int(c.cast("nonce", c.keeper)) == n0 + 1
+        assert not tm.resolve(lambda p, *a: 1) and int(c.cast("nonce", c.keeper)) == n0 + 1
 
         # 6. Lost response, broadcast happened: the nonce is used by our call; it is found and counted.
         n1 = int(c.cast("nonce", c.keeper))
@@ -154,7 +154,7 @@ def main():
                                    hashes=[], expected_pay=PAY, submitted=0)
         c.mine(1)
         before = tm.state["stats"]["mined"]
-        assert not tm.resolve(lambda p: 1)
+        assert not tm.resolve(lambda p, *a: 1)
         assert tm.state["counted"][-1]["hash"] == h.split()[-1] and tm.state["stats"]["mined"] == before + 1
 
         # 7. Nonce used by an unrelated transaction (another process with this key): dropped, not resent.
@@ -165,7 +165,7 @@ def main():
                                    hashes=[], expected_pay=PAY, submitted=0)
         c.mine(1)
         dropped = tm.state["stats"]["dropped"]
-        assert not tm.resolve(lambda p: 1) and tm.state["stats"]["dropped"] == dropped + 1
+        assert not tm.resolve(lambda p, *a: 1) and tm.state["stats"]["dropped"] == dropped + 1
         assert int(c.cast("nonce", c.keeper)) == n2 + 1
 
         # 8. Work done by someone else while ours was stuck: not replaced, waits for the nonce.
@@ -174,7 +174,23 @@ def main():
         submit(tm, c, c.payer)
         c.rpcm("anvil_setNextBlockBaseFeePerGas", hex(c.base() * 20))
         c.mine(2)
-        assert tm.resolve(lambda p: None) and tm.state["pending"]["replacements"] == 0
+        assert tm.resolve(lambda p, *a: None) and tm.state["pending"]["replacements"] == 0
+        c.rpcm("anvil_dropAllTransactions")
+        c.automine(True)
+        c.mine(1)
+
+        # 8b. Every replacement is re-priced: the callback receives the bumped tip and max fee and can
+        #     refuse; a refusal means no replacement is sent.
+        seen = []
+        c.automine(False)
+        tm.state["pending"] = None
+        submit(tm, c, c.payer)
+        c.rpcm("anvil_setNextBlockBaseFeePerGas", hex(c.base() * 20))
+        c.mine(2)
+        prio0 = tm.state["pending"]["prio"]
+        assert tm.resolve(lambda p, prio=None, mf=None: seen.append((prio, mf)) or None)
+        assert seen and seen[0][0] > prio0 and seen[0][1] > 0, seen
+        assert tm.state["pending"]["replacements"] == 0, "unprofitable replacement not sent"
         c.rpcm("anvil_dropAllTransactions")
         c.automine(True)
         c.mine(1)
@@ -182,7 +198,7 @@ def main():
         # 9. Reorg: a counted receipt that leaves the chain is uncounted and reported.
         tm.state["pending"] = None
         submit(tm, c, c.payer)
-        assert not tm.wait(lambda p: 1, 10)
+        assert not tm.wait(lambda p, *a: 1, 10)
         mined, paid = tm.state["stats"]["mined"], tm.state["stats"]["paid_wei"]
         c.rpcm("anvil_reorg", 1, [])
         tm.check_reorgs(tm.head())
@@ -196,7 +212,7 @@ def main():
         again = manager(c, f"{d}/b.json")
         assert again.state == json.load(open(f"{d}/b.json"))
         release(again)
-        print("keeper/test_tx.py: 10 scenarios pass")
+        print("keeper/test_tx.py: 11 scenarios pass")
     finally:
         c.close()
 

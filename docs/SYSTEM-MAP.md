@@ -12,12 +12,12 @@ non-transferable internal shares priced at checkpoints.
 | Actor | Brings | Takes |
 | --- | --- | --- |
 | Depositors (holders) | ETH deposits | shares; redemptions and distributions on claim |
-| Keepers (anyone) | gas for restock/list/sync/harvest/checkpoint/unlist/liquidate/activate/burn | reimbursed gas + 10% premium, capped per position moved, plus a flat work fee per unit of work done (D55); nothing for padding or dust |
+| Keepers (anyone) | gas for restock/list/sync/harvest/checkpoint/unlist/liquidate/activate/burn | quoted gas per operation at the capped price plus a flat work fee per unit of work (D56), offered by the replaceable policy and capped by the vault (D57); nothing for padding, repeats or dust |
 | Purchasers (FWA buyers) | an FWA acquisition that selects a listing | the pack (keep/silent) or the bid (0.9 x backing) |
 | FWA main pool (holds vault backing) | custody of listed packs, backing escrow, flat fee shares | 10% of backing on a bid, 1% settlement fee on keep/silent |
 | FWA rewards module | FWA token rewards to depositors | nothing (tokens are burned) |
 | Shapes / ShapePacks | ETH-backed prize tokens | 0.001 ETH mint fee per 0.1 ETH minted |
-| Admin / guardian (may be one key, D44) | nothing | nothing: no role has any path that moves assets to itself |
+| Admin / guardian (may be one key, D44) | nothing | nothing, except what any keeper earns for verified work, inside the budgets (D54 F1, D56) |
 
 ## Buckets (A asset, L liability, R accounting representation of the same ETH)
 
@@ -43,14 +43,14 @@ bucket: it leaves `_free` after a call does necessary work or realizes more than
 
 | # | Flow | Trigger | Reverses? |
 | --- | --- | --- | --- |
-| 1 | Depositor -> vault: deposit | `deposit` (escrowed), priced at the next `checkpoint` | yes: `cancelDeposit` before pricing; `requestRedeem` + `claim` after |
+| 1 | Depositor -> vault: deposit + checkpoint charge (to `processingPool`); the deployment charge stays escrowed with the deposit and earns no shares (D56) | `deposit` (escrowed), priced at the next `checkpoint` | yes: `cancelDeposit` before pricing refunds the escrow, not the checkpoint charge; `requestRedeem` (plus checkpoint and unwind charges) + `claim` after |
 | 2 | Vault -> Shapes/Packs: mint value + 0.001 fee, build pack | `restock`, only when one bid cycle repays the build | value yes (`liquidate` redeems); mint fee no |
 | 3 | Vault -> FWA: post backing, list pack | `list`, idle ETH above reserve covers one backing and the edge clears gas | yes: `unlist` (wind-down, no edge, or to fund redemptions), kick, keep/silent |
 | 4 | FWA -> each active listing: flat fee share | any FWA acquisition | no |
 | 5 | FWA fees -> vault ETH | `harvest` (credited fees) and `checkpoint` (`_harvest`) | no |
 | 6a | On a bid: backing -> 0.9 purchaser + 0.1 FWA; pack -> vault | purchaser `acceptDepositorBid`, then `sync` | no (backing gone; vault keeps the pack) |
 | 6b | On keep/silent: backing x 0.99 -> vault; pack -> purchaser; 1% -> FWA | purchaser `keepNFT`, or `sync` past the window | no |
-| 7 | Vault -> keeper: reimbursed gas + premium + work fee per unit | any paid keeper call | the fee share inside a listing returns when harvested; gas does not |
+| 7 | Vault -> keeper: quoted gas at the capped price + work fee per unit (checkpoints from the request-charge pool) | any paid keeper call | the fee share inside a listing returns when harvested; gas does not |
 | 8 | Vault -> holder: redemption + distribution | `checkpoint` fills pro rata, `claim` pays | deposit again |
 | 9 | FWA rewards -> vault -> burned | `burnTokens` (permissionless, unpaid) | no (supply falls by the claimed amount) |
 

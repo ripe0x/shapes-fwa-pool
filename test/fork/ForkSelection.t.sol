@@ -3,6 +3,8 @@ pragma solidity 0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
+import {VaultLib} from "../../src/VaultLib.sol";
 import {
     IShapes, IShapePacks, IFWAV2, LISTING_ACTIVE, LISTING_ALLOCATED
 } from "../../src/interfaces/External.sol";
@@ -95,9 +97,9 @@ abstract contract SelectionBase is Test {
         }
         assertEq(FWA.unsettledAcquisitionCount(), 0, "queue empty before the request");
 
-        PackVault.Params memory p;
+        VaultLib.Params memory p;
         p.minEdgeBps = 100;
-        p.keeperPremiumBps = 1_000;
+        p.payMarkupBps = 1_000;
         p.maxTip = 0.05 gwei;
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 200;
@@ -105,15 +107,18 @@ abstract contract SelectionBase is Test {
         p.gasCeiling = 50 gwei;
         p.maxPositions = 150;
         p.tvlCap = 100 ether;
-        p.opGasCap = 3_000_000;
+        p.routineCap = 0.3 ether; // bytecode maxima: these suites test mechanics, not budgets
+        p.routineRate = 0.01 ether;
+        p.essentialCap = 0.1 ether;
+        p.essentialRate = 0.005 ether;
         vm.deal(address(this), 10 ether);
         vault = new PackVault{value: 3 ether}(
-            FWA, SHAPES, PACKS, makeAddr("sel-guardian"), makeAddr("sel-admin"), 2 days, p
+            FWA, SHAPES, PACKS, makeAddr("sel-guardian"), makeAddr("sel-admin"), 2 days, p, new KeeperPolicyV1()
         );
         deployBalance = address(vault).balance;
         uint256 b0 = address(this).balance;
-        vault.restock(COUNT, 3);
-        vault.list(COUNT);
+        vault.restock(COUNT, 3, 0);
+        vault.list(COUNT, 0);
         selectPay = address(this).balance - b0;
         uint256[] memory ids = vault.openListings();
         selected = ids[c.index];
@@ -173,6 +178,8 @@ abstract contract SelectionBase is Test {
 }
 
 contract ForkSelectionTest is SelectionBase {
+    receive() external payable {} // this contract calls paid work directly
+
     function test_bidOutcome_packReturnsBackingSpent() public {
         Candidate memory c = late();
         _select(c);
@@ -185,14 +192,14 @@ contract ForkSelectionTest is SelectionBase {
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
         uint256 keeperBefore = address(this).balance;
-        vault.sync(one);
+        vault.sync(one, 0);
         uint256 syncPay = address(this).balance - keeperBefore;
         assertGt(syncPay, 0, "resolving a position is paid");
         assertEq(vBefore - address(vault).balance, syncPay, "sync moves no ETH but its gas pay");
         assertEq(vault.idlePacks().length, 1, "pack back in inventory");
         assertEq(vault.openListings().length, COUNT - 1);
         keeperBefore = address(this).balance;
-        vault.harvest(new uint256[](0));
+        vault.harvest(new uint256[](0), 0);
         // The whole credited share reaches the vault. Its gas would cost more than 25% of it, so
         // the harvest is unpaid: a keeper earns nothing for a dust harvest.
         assertEq(address(this).balance, keeperBefore, "dust harvest unpaid");
@@ -210,7 +217,7 @@ contract ForkSelectionTest is SelectionBase {
         assertEq(PACKS.ownerOf(packId), c.purchaser);
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
-        vault.sync(one);
+        vault.sync(one, 0);
         assertEq(vault.idlePacks().length, 0);
         assertEq(vault.openListings().length, COUNT - 1);
     }
@@ -221,11 +228,11 @@ contract ForkSelectionTest is SelectionBase {
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.sync(one); // purchaser's window still open
+        vault.sync(one, 0); // purchaser's window still open
         vm.warp(block.timestamp + FWA.settlementWindow());
         uint256 vBefore = address(vault).balance;
         uint256 kBefore = address(this).balance;
-        vault.sync(one);
+        vault.sync(one, 0);
         // B (1 - s) = 0.035937 > P = 0.03, so the vault takes the backing (D9), less gas pay.
         assertEq(address(vault).balance - vBefore + (address(this).balance - kBefore), B * 9_900 / 10_000);
         assertEq(vault.openListings().length, COUNT - 1);
@@ -238,7 +245,7 @@ contract ForkSelectionTest is SelectionBase {
         IFwaSettle(address(FWA)).acceptDepositorBid(selected);
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
-        vault.sync(one);
+        vault.sync(one, 0);
         assertEq(vault.idlePacks().length, 1);
     }
 }

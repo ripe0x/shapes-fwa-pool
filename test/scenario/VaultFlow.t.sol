@@ -5,6 +5,9 @@ import {FlowBreakdown} from "../utils/FlowBreakdown.sol";
 import {SelectionBase, IFwaSettle} from "../fork/ForkSelection.t.sol";
 import {ForceSender, IOwnable, IOracleAdmin, IFwaAdmin} from "../fork/ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
+import {VaultLib} from "../../src/VaultLib.sol";
+import {Charges} from "../utils/Charges.sol";
 import {
     IShapes,
     IShapePacks,
@@ -92,11 +95,11 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         vm.deal(bob, 50 ether);
     }
 
-    function _canary() internal pure returns (PackVault.Params memory p) {
+    function _canary() internal pure returns (VaultLib.Params memory p) {
         p.minEdgeBps = 100;
         p.bufferBps = 0;
         p.distributionBps = 0;
-        p.keeperPremiumBps = 1_000;
+        p.payMarkupBps = 0; // canary: envelope = V1 pay
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 1_000;
         p.packUnitsMask = uint64(8); // bit 3 set: 3-unit packs
@@ -106,14 +109,17 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         p.maxPositions = 30;
         p.reserve = 0.005 ether;
         p.tvlCap = 2 ether;
-        p.opGasCap = 15_000_000;
+        p.routineCap = 0.03 ether; // canary budgets (deploy/canary.example.json)
+        p.routineRate = 0.0008 ether;
+        p.essentialCap = 0.01 ether;
+        p.essentialRate = 0.0002 ether;
     }
 
-    function _deploy(uint256 seed, PackVault.Params memory p) internal {
+    function _deploy(uint256 seed, VaultLib.Params memory p) internal {
         vm.fee(BASE_FEE);
         vm.txGasPrice(GAS_PRICE);
         vm.deal(address(this), seed + 1 ether);
-        vault = new PackVault{value: seed}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p);
+        vault = new PackVault{value: seed}(FWA, SHAPES, PACKS, guardian, admin, 2 days, p, new KeeperPolicyV1());
         preexisting = address(vault).balance - seed; // mainnet dust at the deploy address
         depositedCum = address(vault).balance; // seed and dust are capitalization inflow
     }
@@ -154,7 +160,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         uint256 b = who.balance;
         uint256 loose = vault.looseShapeCount();
         vm.prank(who);
-        vault.restock(count, units);
+        vault.restock(count, units, 0);
         keeperPaidCum += who.balance - b;
         // Each mint adds 0.1 ETH of redeemable value and a 0.001 ETH fee.
         uint256 need = count * units;
@@ -169,7 +175,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         uint256 b = who.balance;
         uint256 loose = vault.looseShapeCount();
         vm.prank(who);
-        try vault.restock(count, units) {}
+        try vault.restock(count, units, 0) {}
         catch {
             return false;
         }
@@ -186,7 +192,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         uint256 open = vault.openListings().length;
         uint256 b = who.balance;
         vm.prank(who);
-        vault.list(n);
+        vault.list(n, 0);
         keeperPaidCum += who.balance - b;
         listed = vault.openListings().length - open;
         backingPostedCum += listed * B;
@@ -196,7 +202,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
     function _kSync(address who, uint256[] memory ids) internal {
         uint256 b = who.balance;
         vm.prank(who);
-        vault.sync(ids);
+        vault.sync(ids, 0);
         keeperPaidCum += who.balance - b;
         _guard();
     }
@@ -205,7 +211,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         uint256 vb = address(vault).balance;
         uint256 b = who.balance;
         vm.prank(who);
-        vault.unlist(ids);
+        vault.unlist(ids, 0);
         uint256 pay = who.balance - b;
         keeperPaidCum += pay;
         backingReturnedCum += (address(vault).balance - vb) + pay; // backing freed into the balance
@@ -216,7 +222,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         uint256 vb = address(vault).balance;
         uint256 b = who.balance;
         vm.prank(who);
-        vault.liquidate(maxCount);
+        vault.liquidate(maxCount, 0);
         uint256 pay = who.balance - b;
         keeperPaidCum += pay;
         redeemedCum += (address(vault).balance - vb) + pay; // redeemed value into the balance
@@ -227,7 +233,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         uint256 vb = address(vault).balance;
         uint256 b = who.balance;
         vm.prank(who);
-        try vault.harvest(ids) {} catch {}
+        try vault.harvest(ids, 0) {} catch {}
         uint256 pay = who.balance - b;
         keeperPaidCum += pay;
         feeHarvestedCum += (address(vault).balance + pay) - vb; // fees in, less keeper pay out
@@ -237,7 +243,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
     function _kActivate(address who, uint256[] memory ids) internal {
         uint256 b = who.balance;
         vm.prank(who);
-        vault.activate(ids, 50);
+        vault.activate(ids, 50, 0);
         keeperPaidCum += who.balance - b;
         _guard();
     }
@@ -246,7 +252,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         uint256 vb = address(vault).balance;
         uint256 b = who.balance;
         vm.prank(who);
-        vault.checkpoint();
+        vault.checkpoint(0);
         uint256 pay = who.balance - b;
         keeperPaidCum += pay;
         feeHarvestedCum += (address(vault).balance + pay) - vb; // checkpoint harvests credited fees
@@ -268,9 +274,12 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
     }
 
     function _deposit(address who, uint256 amt) internal {
-        vm.prank(who);
-        vault.deposit{value: amt}();
-        depositedCum += amt;
+        {
+            uint256 gross_ = Charges.grossFor(vault, amt);
+            vm.prank(who);
+            vault.deposit{value: gross_}();
+            depositedCum += gross_; // inflow is all ETH sent: escrow + checkpoint charge + deployment charge
+        }
     }
 
     function _claim(address who) internal {
@@ -350,15 +359,16 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
     }
 
     function flowBuckets() internal view override returns (Bucket[] memory k) {
-        k = new Bucket[](9);
+        k = new Bucket[](10);
         uint256 pending = vault.pendingDepositTotal();
         uint256 redeem = vault.redemptionReserve();
         uint256 dist = vault.distributionReserve();
         uint256 claimable = vault.claimableTotal();
         uint256 bal = address(vault).balance;
-        uint256 liabilities = pending + redeem + dist + claimable;
+        uint256 pool = vault.processingPool();
+        uint256 liabilities = pending + redeem + dist + claimable + pool;
         uint256 free = bal > liabilities ? bal - liabilities : 0;
-        PackVault.Params memory p = vault.getParams();
+        VaultLib.Params memory p = vault.getParams();
         uint256 reserveNeed = uint256(p.reserve) + _owed();
 
         (uint256 backingHeld, uint256 backingImplied, uint256 packHeld) = _fwaHoldings();
@@ -378,6 +388,8 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         k[6] = Bucket("pack value in FWA custody (listed)", packHeld, false, 0, false, 0);
         k[7] = Bucket("inventory held by vault (idle packs + loose Shapes)", inv, false, 0, false, 0);
         k[8] = Bucket("FWA fees uncollected (pending + credit)", _feesHeld(), false, 0, false, 0);
+        // Request charges held to pay the next checkpoint's keeper (D56); the remainder joins free ETH.
+        k[9] = Bucket("request charges held for the next checkpoint", pool, false, 0, true, pool);
     }
 
     /// @dev Reads FWA's own listing records, not just vault counters. held/packHeld count only
@@ -431,7 +443,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
 
     /// @dev Maximum load: deposit to the 2 ETH cap and build and list as many packs as the capital
     ///      allows, in batches of up to 10 as keeper/policy.py does (largest batch the capital check
-    ///      accepts). O2 reads keeper pay per position as gas: pay / (0.2 gwei x 1.10). GAP: a real high-volume settlement burst needs several real VRF
+    ///      accepts). O2 reads keeper pay per position as gas: pay / 0.2 gwei. GAP: a real high-volume settlement burst needs several real VRF
     ///      selections in one fork; only two historical fixtures exist, so this shows the maximum
     ///      standing load instead (see report).
     function test_flow_max_load() public {
@@ -448,10 +460,10 @@ contract VaultFlowPinnedTest is VaultFlowBase {
             if (_kTryRestock(keeper, c, 3)) listed += _kList(keeper, c);
             else --c;
         }
-        // Reimbursed price here: min(0.2 gwei bid, basefee 0.15 + maxTip 0.05, ceiling 0.5) x 1.10.
-        // Work fee: one unit per pack listed (restock pays none). The rest is gas at 0.22 gwei.
+        // Reimbursed price here: min(0.2 gwei bid, basefee 0.15 + maxTip 0.05, ceiling 0.5), no markup (V1).
+        // Work fee: one unit per pack listed (restock pays none). The rest is gas at 0.2 gwei.
         uint256 feePaid = listed * vault.getParams().workFee;
-        uint256 gasPerPosition = (keeperPaidCum - pay0 - feePaid) / 0.22 gwei / listed;
+        uint256 gasPerPosition = (keeperPaidCum - pay0 - feePaid) / 0.2 gwei / listed;
         Fact[] memory f = _facts("open_listings", vault.openListings().length);
         f[1] = Fact("packs_listed", listed);
         f[2] = Fact("keeper_gas_per_position", gasPerPosition);
@@ -490,8 +502,9 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     }
 
     /// @dev Gas spike after deployment: a position is listed at low gas (setup), then the price is
-    ///      lifted above the 0.5 gwei ceiling. Every call is still accepted (D51): a build and a
-    ///      checkpoint run, each reimbursed at the 0.5 gwei ceiling price, not the spike.
+    ///      lifted above the 0.5 gwei ceiling. No call is refused for gas price (D51): the
+    ///      checkpoint runs, paid at the ceiling price from its request charges; a build is refused
+    ///      by its own payback gate, which prices keeper pay at the ceiling (D56).
     function test_flow_gas_spike() public {
         _forkPinned();
         _deploy(0.01 ether, _canary());
@@ -506,10 +519,13 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _kList(keeper, 3);
         // The spike: 2 gwei, four times the ceiling.
         Snap memory a = flowBegin(2 gwei, 1.95 gwei, PINNED);
-        uint256 kb0 = keeper.balance;
-        _kRestock(keeper, 1, 3); // accepted above the ceiling (D51); paid at the ceiling price
-        uint256 buildPay = keeper.balance - kb0;
-        assertEq(buildPay % 0.55 gwei, 0, "build reimbursed at 0.5 gwei x 1.10");
+        // No gas-price refusal (D51). The gate prices the build at the ceiling (D56); at the canary
+        // envelope (no markup) one pack repays it, so the build runs and pay stops at 0.5 gwei.
+        uint256 paid0 = keeperPaidCum;
+        _kRestock(keeper, 1, 3);
+        uint256 buildPay = keeperPaidCum - paid0;
+        // One loose Shape left from the earlier mint: 280k base + 200k pack + one 2.2M mint, at the ceiling.
+        assertEq(buildPay, 2_680_000 * 0.5 gwei + vault.getParams().workFee, "build pay capped at the ceiling");
         _deposit(bob, 0.5 ether);
         _toBlackout();
         uint256 kb = keeper.balance;
@@ -552,8 +568,12 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         // and pays her (D34).
         _toOpen();
         uint256 aShares = vault.shareBalance(alice);
-        vm.prank(alice);
-        vault.requestRedeem(aShares);
+        {
+            uint256 rc_ = Charges.redeemCharge(vault, aShares);
+            vm.prank(alice);
+            vault.requestRedeem{value: rc_}(aShares);
+            depositedCum += rc_; // the request charge is holder ETH entering the vault
+        }
         _kUnlist(keeper, vault.openListings());
         _kLiquidate(keeper, 40);
         _toBlackout();
@@ -586,7 +606,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _toBlackout();
         vm.prank(keeper);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.checkpoint();
+        vault.checkpoint(0);
         Fact[] memory f = _facts("open_listings", vault.openListings().length);
         f[1] = Fact("idle_checkpoint_refused", 1);
         f[2] = Fact("fees_uncollected_wei", _feesHeld());
@@ -608,10 +628,18 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         uint256[] memory ids = _idsOf(_kList(keeper, 10));
         uint256 aShares = vault.shareBalance(alice);
         uint256 bShares = vault.shareBalance(bob);
-        vm.prank(alice);
-        vault.requestRedeem(aShares);
-        vm.prank(bob);
-        vault.requestRedeem(bShares / 2);
+        {
+            uint256 rc_ = Charges.redeemCharge(vault, aShares);
+            vm.prank(alice);
+            vault.requestRedeem{value: rc_}(aShares);
+            depositedCum += rc_; // the request charge is holder ETH entering the vault
+        }
+        {
+            uint256 rc_ = Charges.redeemCharge(vault, bShares / 2);
+            vm.prank(bob);
+            vault.requestRedeem{value: rc_}(bShares / 2);
+            depositedCum += rc_; // the request charge is holder ETH entering the vault
+        }
         _toBlackout();
         _kCheckpoint(keeper); // partial fill from free ETH
         uint256 lockedAfterFirst = vault.lockedShares();
@@ -641,8 +669,12 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _kCheckpoint(keeper);
         _toOpen();
         uint256 aShares = vault.shareBalance(alice);
-        vm.prank(alice);
-        vault.requestRedeem(aShares);
+        {
+            uint256 rc_ = Charges.redeemCharge(vault, aShares);
+            vm.prank(alice);
+            vault.requestRedeem{value: rc_}(aShares);
+            depositedCum += rc_; // the request charge is holder ETH entering the vault
+        }
         _toBlackout();
         _kCheckpoint(keeper); // fills alice in full from free ETH
         _toOpen();
@@ -669,7 +701,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      forced gain above the high-water mark is distributed to live shares and claimed.
     function test_flow_distributions() public {
         _forkPinned();
-        PackVault.Params memory p = _canary();
+        VaultLib.Params memory p = _canary();
         p.distributionBps = 2_000;
         _deploy(0.01 ether, p);
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
@@ -707,20 +739,29 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _kUnlist(keeper, ids);
         uint256 aShares = vault.shareBalance(alice);
         uint256 bShares = vault.shareBalance(bob);
-        vm.prank(alice);
-        vault.requestRedeem(aShares);
-        vm.prank(bob);
-        vault.requestRedeem(bShares);
+        {
+            uint256 rc_ = Charges.redeemCharge(vault, aShares);
+            vm.prank(alice);
+            vault.requestRedeem{value: rc_}(aShares);
+            depositedCum += rc_; // the request charge is holder ETH entering the vault
+        }
+        {
+            uint256 rc_ = Charges.redeemCharge(vault, bShares);
+            vm.prank(bob);
+            vault.requestRedeem{value: rc_}(bShares);
+            depositedCum += rc_; // the request charge is holder ETH entering the vault
+        }
         _kLiquidate(keeper, 40);
         _toBlackout();
         // Independent expectation: with every position unlisted and liquidated, the vault's whole
-        // value is its ETH. The checkpoint prices redemptions first and pays its keeper after, so
-        // each holder is owed (balance before that pay) x their shares / all shares, the seed's
-        // dead shares included; the pay falls on the shares that stay (here the seed slice).
+        // value is its ETH less the request-charge pool. The checkpoint prices redemptions first and
+        // pays its keeper (from the pool) after, so each holder is owed that value x their shares /
+        // all shares, the seed's dead shares included.
         uint256 total = vault.totalShares();
         uint256 kb = keeper.balance;
+        uint256 pool = vault.processingPool(); // request charges: not holder value, excluded from NAV
         _kCheckpoint(keeper);
-        uint256 nav = address(vault).balance + (keeper.balance - kb);
+        uint256 nav = address(vault).balance + (keeper.balance - kb) - pool;
         uint256 expA = nav * aShares / total;
         uint256 expB = nav * bShares / total;
         uint256 c0 = claimsCum;
@@ -742,7 +783,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
 contract VaultFlowSelectionTest is VaultFlowBase {
     // ------------------------------------------------------------------ selection-fork regimes
     // The real VRF fixtures (SelectionBase) carry their own deploy: 3 ETH seed, gasCeiling 50 gwei,
-    // opGasCap 3M, 30 listings. Resolution and harvest run at a canary-realistic 0.45/0.4 gwei.
+    // 30 listings. Resolution and harvest run at a canary-realistic 0.45/0.4 gwei.
 
     /// @dev Bid outcome: the purchaser takes the bid; the vault keeps the pack and loses the
     ///      backing. The pack returns to inventory on sync, the fee share is harvested.
@@ -804,7 +845,7 @@ contract VaultFlowSelectionTest is VaultFlowBase {
         uint256 vb = address(vault).balance;
         uint256 kb = address(this).balance;
         vm.prank(address(this));
-        vault.sync(_one(selected));
+        vault.sync(_one(selected), 0);
         uint256 pay = address(this).balance - kb;
         keeperPaidCum += pay;
         uint256 reclaimed = (address(vault).balance - vb) + pay;
@@ -864,17 +905,17 @@ contract VaultFlowSelectionTest is VaultFlowBase {
         IFWAToken token = IFWAToken(FWA.token());
         IFWARewards rewards = IFWARewards(FWA.rewards());
 
-        PackVault.Params memory p = _canary();
+        VaultLib.Params memory p = _canary();
         vm.deal(address(this), 5 ether);
-        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, guardian, admin, 1 days, p);
+        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, guardian, admin, 1 days, p, new KeeperPolicyV1());
         depositedCum = address(vault).balance;
         uint256 need = 20 * 3;
         uint256 mints = (need + 9) / 10; // 20 packs x 3 units -> 6 mints of 0.1 ETH
         mintFeesCum = mints * SHAPES.mintFee();
         mintedValueCum = mints * 0.1 ether;
         uint256 bthis = address(this).balance;
-        vault.restock(20, 3);
-        vault.list(20);
+        vault.restock(20, 3, 0);
+        vault.list(20, 0);
         keeperPaidCum = address(this).balance - bthis; // restock + list reimburse this contract
         backingPostedCum = 20 * B;
         // Replay the real buyback as its original self-call (EIP-7702 delegated sender).

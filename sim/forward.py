@@ -105,11 +105,13 @@ def k_of(crown=0.001, cut=CUT, sur=SUR):
     return (1 + sur) * (1 - cut) * (1 - crown)
 
 
-def expectation(n, volume, gwei, B=0.0363, crown=0.001, premium=0.10):
+def expectation(n, volume, gwei, B=0.0363, crown=0.001, premium=0.0):
     pool = POOL
     W = np.sum(1 / pool) + n / B
     cycles = 365 * volume * (1 / B) / W
-    gas = policy.CYCLE_GAS * gwei * 1e-9 * (1 + premium)
+    # A bid cycle's keeper pay as the vault quotes it (D56): quoted gas at basefee + 0.05 gwei tip,
+    # capped at the ceiling (V1: no premium), plus two work units (resolve and relist).
+    gas = policy.CYCLE_GAS * min(gwei + 0.05, CEILING) * 1e-9 * (1 + premium) + 2 * WORK_FEE / E
     net = B * (k_of(crown) - 1) - gas
     capital = n * (B + P / E)
     return dict(cycle_days=365 / cycles, net_meth=net * 1e3, apr=cycles * net / (B + P / E),
@@ -119,7 +121,7 @@ def expectation(n, volume, gwei, B=0.0363, crown=0.001, premium=0.10):
 # ---------------------------------------------------------------- 2. backtest
 
 
-def backtest(h, n, gwei, t0, t1, B=0.0363, runs=400, seed=1, premium=0.10):
+def backtest(h, n, gwei, t0, t1, B=0.0363, runs=400, seed=1, premium=0.0):
     """Vault of n listings at backing B inside the real history between t0 and t1 (unix s).
     Positions are relisted the same day after a bid outcome (cycle gas charged per selection)."""
     m = (h["ts"] >= t0) & (h["ts"] < t1)
@@ -131,7 +133,7 @@ def backtest(h, n, gwei, t0, t1, B=0.0363, runs=400, seed=1, premium=0.10):
     fee2 = fee * H2 / H  # the vault's listings move the harmonic backing, so the fee
     vault_fees = fee2 * (1 - cut) * (1 - crown) * n / (N + n)
     p_sel = (n / B) / (w + n / B)
-    cycle_cost = B + policy.CYCLE_GAS * gwei * 1e-9 * (1 + premium)
+    cycle_cost = B + policy.CYCLE_GAS * min(gwei + 0.05, CEILING) * 1e-9 * (1 + premium) + 2 * WORK_FEE / E
     days = (t1 - t0) / DAY
     capital = n * (B + P / E)
     exp_pnl = vault_fees.sum() - p_sel.sum() * cycle_cost
@@ -152,6 +154,14 @@ class Scenario(dict):
     elasticity; checkpoint miss rate; holder flows."""
 
 
+def charge_state(gas, open_positions):
+    """Minimal policy state for the request charges at `gas` wei basefee (canary parameters)."""
+    return policy.State(now=0, gas_price=gas, base_fee=gas, gas_ceiling=int(CEILING * GWEI), max_tip=5 * 10**7,
+                        markup_bps=0, share_bps=2_500, k=0, backing=0, min_edge_bps=100, mint_fee=MINT_FEE,
+                        settlement_window=0, blackout=False, queue_drained=True, checkpoint_done_this_interval=False,
+                        open_positions=open_positions, work_fee=WORK_FEE)
+
+
 def run(sc, n_target, seed, days=365):
     rng = np.random.default_rng(seed)
     others = POOL
@@ -161,7 +171,12 @@ def run(sc, n_target, seed, days=365):
     g_of = sc.get("gwei", 0.15)  # gwei, or a function of the day (gas changing after deployment)
     deposit = int((n_target * (0.0363 + 0.03) + 0.06 + 0.11) * E)  # positions + mint room + slack
     v = Vault(seed=10**16, balance=10**16, reserve=9 * 10**15)  # policy.reserve_need at 300 positions, 0.5 gwei (D46)
-    v.deposit("h", deposit)
+    g0 = g_of(0) if callable(g_of) else g_of
+    st0 = charge_state(int(g0 * GWEI), 0)
+    ck0 = policy.request_charge(st0)
+    d0 = policy.deploy_charge(st0)
+    v.deposit("h", deposit, ck0, deposit * d0 // (policy.POSITION_VALUE + d0))  # D56 request charges
+    paid_in = deposit + ck0  # every wei the holder sent
     nav0_per_share = None
     next_id = 0
     credit = 0  # FWA fee credit owed to the vault
@@ -250,7 +265,7 @@ def run(sc, n_target, seed, days=365):
             # The simulator settles allocations at day granularity: nothing waits on the window.
             st = policy.State(
                 now=d * DAY, gas_price=gas, base_fee=gas, gas_ceiling=int(CEILING * GWEI), max_tip=5 * 10**7,
-                premium_bps=1_000, share_bps=2_500, k=k, backing=backing, min_edge_bps=100, mint_fee=MINT_FEE,
+                markup_bps=0, share_bps=2_500, k=k, backing=backing, min_edge_bps=100, mint_fee=MINT_FEE,
                 settlement_window=10**12, blackout=(step == 1), queue_drained=blackout_ok or step == 0,
                 checkpoint_done_this_interval=False, listings=listings, idle_packs=len(v.idle_packs),
                 loose_shapes=v.loose_shapes, free=v.free(), idle_eth=v.idle(), owed_estimate=v.owed_estimate(),
@@ -264,22 +279,26 @@ def run(sc, n_target, seed, days=365):
                 step = 1
             for act_ in planned:
                 fn = act_[0]
-                c = lambda g: policy.cost(st, g)  # noqa: E731
+                q = lambda g, u=0, e=False: policy.quote(st, g, u, e)  # noqa: E731  envelope (gates)
+                pv = lambda g, u=0, e=False: policy.pay_v1(st, g, u, e)  # noqa: E731  V1 pay
+                Q = policy.Q
+                ess = v.locked_shares != 0  # redemption work: no premium, essential budget (D56)
                 if fn == "sync":
                     for i in act_[1]:
                         p = v.positions[i]
                         if p.status in (SETTLED, WITHDRAWN) and p.pack_owned:
                             v.sync_owned(i)
-                    v.pay_keeper(c(policy.GAS["sync_base"] + policy.GAS["sync_per"] * len(act_[1])) + len(act_[1]) * WORK_FEE)
+                    n_ = len(act_[1])
+                    v.pay_keeper(pv(Q["sync"] + Q["synced"] * n_, n_, ess))
                 elif fn == "harvest":
                     amt = credit + sum(v.positions[i].pending_fees for i in act_[1])
                     for i in act_[1]:
                         v.positions[i].pending_fees = 0
                     credit = 0
                     v.receive_fees(amt)
-                    g = c(policy.GAS["harvest_base"] + policy.GAS["harvest_per"] * len(act_[1]))
-                    if g * 10_000 <= amt * 2_500:
-                        v.pay_keeper(g)
+                    g = q(Q["harvest"] + Q["harvested"] * len(act_[1]))
+                    if g * 10_000 <= amt * 2_500:  # gate on the envelope, pay the policy
+                        v.pay_keeper(pv(Q["harvest"] + Q["harvested"] * len(act_[1])))
                     else:
                         keeper_unpaid += g
                 elif fn == "unlist":
@@ -287,7 +306,8 @@ def run(sc, n_target, seed, days=365):
                         p = v.positions[i]
                         credit += p.pending_fees
                         v.unlist(i)
-                    v.pay_keeper(c(policy.GAS["unlist_per"] * len(act_[1])) + len(act_[1]) * WORK_FEE)
+                    n_ = len(act_[1])
+                    v.pay_keeper(pv(Q["unlist"] + Q["unlisted"] * n_, n_, True))
                 elif fn == "liquidate":
                     m = 0
                     while m < act_[1] and (v.idle_packs or v.loose_shapes) and \
@@ -295,9 +315,11 @@ def run(sc, n_target, seed, days=365):
                         v.liquidate_one()
                         m += 1
                     if m:
-                        v.pay_keeper(c(policy.GAS["liquidate_per"] * m) + m * WORK_FEE)
+                        v.pay_keeper(pv(Q["liquidate"] + Q["liq_pack"] * m, m, True))
                 elif fn == "checkpoint":
                     nav_pos = v.nav_positions()[0]
+                    pool = v.processing_pool
+                    flows = v.pending_total != 0 or v.locked_shares != 0
                     try:
                         paid = v.checkpoint(credit)
                     except RuntimeError:  # AllocatedExposure: the contract reverts; retry next blackout
@@ -305,16 +327,16 @@ def run(sc, n_target, seed, days=365):
                         continue
                     credit = 0
                     checkpoints += 1
-                    g = c(policy.GAS["checkpoint_base"] + policy.GAS["checkpoint_per"] * len(v.positions))
+                    g = pv(Q["checkpoint"] + Q["checkpoint_pos"] * len(v.positions), 1, True)
                     if paid:
-                        v.pay_keeper(g + WORK_FEE)
+                        v.pay_keeper(min(g, pool) if flows else g)  # flows: paid from the request charges
                     if nav0_per_share is None:
                         nav0_per_share = v.last_nav * E // v.total_shares
                     del nav_pos
                 elif fn == "restock":
                     if v.idle() >= act_[1] * backing:
-                        v.restock(act_[1], 3, MINT_FEE)
-                        v.pay_keeper(c(policy.GAS["restock_per_pack"] * act_[1]))
+                        mints = v.restock(act_[1], 3, MINT_FEE)
+                        v.pay_keeper(pv(Q["restock"] + Q["pack"] * act_[1] + Q["mint"] * mints, act_[1]))
                 elif fn == "list":
                     m = 0
                     while m < act_[1] and v.idle_packs and v.idle() >= backing:
@@ -322,11 +344,16 @@ def run(sc, n_target, seed, days=365):
                         next_id += 1
                         m += 1
                     if m:
-                        v.pay_keeper(c(policy.GAS["list_per"] * m) + m * WORK_FEE)
+                        v.pay_keeper(pv(Q["list"] + Q["listed"] * m, m))
         # Holder flows by scenario.
         for (day, frac) in sc.get("redeem", []):
             if day == d:
-                v.request_redeem("h", v.share_balance("h") * frac // 1)
+                sh = v.share_balance("h") * frac // 1
+                st1 = charge_state(gas, len(v.positions))
+                ck = policy.request_charge(st1)
+                unwind = (sh * v.last_nav // v.total_shares) * policy.unwind_charge(st1) // policy.POSITION_VALUE
+                v.request_redeem("h", sh, ck, unwind)
+                paid_in += ck + unwind
     end_nav = v.nav_now() + credit
     supply = v.total_shares
     # Holder's value: shares at end NAV plus anything already redeemed or claimable.
@@ -337,7 +364,7 @@ def run(sc, n_target, seed, days=365):
     holder = v.share_balance("h") * end_nav // supply + claimed
     locked_val = v.locked_shares * end_nav // supply
     value_end = holder + locked_val
-    ret = value_end / deposit - 1
+    ret = value_end / paid_in - 1
     deployed = sum(p.backing + p.units * 10**16 for p in v.positions.values())
     return dict(ret=ret * 365 / days, keeper=v.keeper_paid / deposit, mint=v.mint_fees / deposit,
                 fees=v.fees_received / deposit, lost=v.backing_lost / deposit, util=deployed / max(1, end_nav),
@@ -423,7 +450,7 @@ def main():
           f"Pool: {len(POOL):,} listings, harmonic backing {len(POOL) / np.sum(1 / POOL):.4f} ETH. Successful acquisitions "
           f"per day: last 7 d {last7.mean():.0f}, last 14 d {last14.mean():.0f}, last 30 d {last30.mean():.0f} "
           f"({last30_ex.mean():.0f} without the {last30.max():.0f} of Oct 31), 30-day median {np.median(last30):.0f}.",
-          "Vault: 3-unit packs (P = 0.03 ETH) at the 0.0363 cap; k = 1.0385; keeper premium 10%; maxTip 0.05 gwei; "
+          "Vault: 3-unit packs (P = 0.03 ETH) at the 0.0363 cap; k = 1.0385; keeper pay V1 (quoted gas + work fee, no premium); maxTip 0.05 gwei; "
           f"gas ceiling {CEILING} gwei; FWA tokens at zero; purchasers take the bid unless stated (keeps pay the vault more).\n"]
 
     # 1. The formal gate, as approved: trailing 30-day volume, tokens at zero.
@@ -442,7 +469,7 @@ def main():
                   f"{'yes' if x['apr'] >= 0.10 else 'no'} (closed form); {'yes' if sm['mean'] >= 0.10 else 'no'} (sim) |")
         print(md[-1], flush=True)
     md.append(f"\nBid outcome at the {CEILING} gwei ceiling: {gate[CEILING][0]['net_meth']:+.3f} mETH per cycle. New packs "
-              "need gas below ~0.54 gwei (one bid cycle must repay the build); the closed form assumes positions already "
+              "need a quoted price below ~0.52 gwei (one bid cycle must repay the build); the closed form assumes positions already "
               "exist. Exit windows: 59 of the last 60 blackouts had a drained queue (Phase 0.2).\n")
 
     md += ["## 2. Expectation (closed form, per position, no variance)\n",
@@ -454,11 +481,14 @@ def main():
                 x = expectation(n, v_, g)
                 md.append(f"| {v_:.0f} | {g} | {n} | {x['cycle_days']:.1f} | {x['net_meth']:+.3f} | {pct(x['apr'])} | "
                           f"{100 * x['share']:.1f}% |")
-    md.append(f"\nBreak-even gas for a bid cycle: {(0.0363 * (k_of() - 1)) / (policy.CYCLE_GAS * 1.1) * 1e9:.2f} gwei "
-              f"(cycle gas {policy.CYCLE_GAS:,}: relist ~600k, sync ~190k, harvest share). New packs: below "
-              f"{(0.0363 * (k_of() - 1) - 0.0003) / ((policy.CYCLE_GAS + policy.RESTOCK_GAS_PER_PACK) * 1.1) * 1e9:.2f} gwei "
-              f"with the contract's 1.05M build constant ({(0.0363 * (k_of() - 1) - 0.0003) / ((policy.CYCLE_GAS + 951_000) * 1.1) * 1e9:.2f} "
-              "gwei at the measured 921k + 30k).\n")
+    gross = 0.0363 * (k_of() - 1)
+    fee = WORK_FEE / E
+    build_g = policy.Q["pack"] + policy.Q["mint"] * 3 // 10 + policy.Q["listed"]
+    md.append(f"\nBreak-even quoted price for a bid cycle (D56: quoted gas {policy.CYCLE_GAS:,} = resolve 75k + relist 530k "
+              f"+ harvest share 15k, + 2 work fees; V1 pays no markup): {(gross - 2 * fee) / policy.CYCLE_GAS * 1e9:.2f} gwei. "
+              f"New packs (build {build_g:,} quoted gas, mint fee share 0.0003 ETH and one more work fee on top): "
+              f"below {(gross - 0.0003 - 3 * fee) / (policy.CYCLE_GAS + build_g) * 1e9:.2f} gwei quoted price "
+              "(basefee + 0.05 gwei tip).\n")
 
     def g_path(base, high, start, stop=10**9):
         return lambda d: high if start <= d < stop else base

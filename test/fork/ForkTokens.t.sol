@@ -3,6 +3,8 @@ pragma solidity 0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
+import {VaultLib} from "../../src/VaultLib.sol";
 import {
     IShapes, IShapePacks, IFWAV2, IFWARewards, IFWAToken
 } from "../../src/interfaces/External.sol";
@@ -35,9 +37,9 @@ contract ForkTokensTest is Test {
         vm.txGasPrice(0.15 gwei);
         token = IFWAToken(FWA.token());
 
-        PackVault.Params memory p;
+        VaultLib.Params memory p;
         p.minEdgeBps = 100;
-        p.keeperPremiumBps = 1_000;
+        p.payMarkupBps = 1_000;
         p.maxTip = 0.05 gwei;
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 200;
@@ -45,11 +47,14 @@ contract ForkTokensTest is Test {
         p.gasCeiling = 0.5 gwei;
         p.maxPositions = 150;
         p.tvlCap = 100 ether;
-        p.opGasCap = 3_000_000;
+        p.routineCap = 0.3 ether; // bytecode maxima: these suites test mechanics, not budgets
+        p.routineRate = 0.01 ether;
+        p.essentialCap = 0.1 ether;
+        p.essentialRate = 0.005 ether;
         vm.deal(address(this), 5 ether);
-        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, makeAddr("tok-guardian"), admin, 1 days, p);
-        vault.restock(20, 3);
-        vault.list(20);
+        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, makeAddr("tok-guardian"), admin, 1 days, p, new KeeperPolicyV1());
+        vault.restock(20, 3, 0);
+        vault.list(20, 0);
 
         // The real buyback, replayed as its original self-call (EIP-7702 delegated sender).
         address from = vm.parseJsonAddress(fx, ".from");
@@ -95,7 +100,7 @@ contract ForkTokensTest is Test {
         uint256[] memory one = new uint256[](1);
         one[0] = ids[0];
         uint256 firstPending = IFWARewards(FWA.rewards()).pendingDepositorTokens(ids[0]);
-        vault.unlist(one); // its pending tokens become the vault's token credit
+        vault.unlist(one, 0); // its pending tokens become the vault's token credit
         assertEq(IFWARewards(FWA.rewards()).tokenCredit(address(vault)), firstPending, "credit on removal");
 
         // The stale list still includes ids[0]: FWA's batch claim reverts, the credit still burns.

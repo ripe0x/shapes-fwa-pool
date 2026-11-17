@@ -3,6 +3,8 @@ pragma solidity 0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
+import {VaultLib} from "../../src/VaultLib.sol";
 import {IShapes, IShapePacks, IFWAV2, IFloorOracle} from "../../src/interfaces/External.sol";
 
 /// @dev Sends ETH by self-destruct: arrives with no call, as FWA's forceSafeTransferETH can.
@@ -58,18 +60,18 @@ abstract contract ForkBase is Test {
         // Real fee environment, so every ETH flow carries its real gas price.
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
-        vault = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, defaultParams());
+        vault = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, guardian, admin, 2 days, defaultParams(), new KeeperPolicyV1());
         preexisting = address(vault).balance - 0.01 ether; // ETH already at the deploy address
         vm.deal(alice, 50 ether);
         vm.deal(bob, 50 ether);
         vm.deal(keeper, 1 ether);
     }
 
-    function defaultParams() internal pure returns (PackVault.Params memory p) {
+    function defaultParams() internal pure returns (VaultLib.Params memory p) {
         p.minEdgeBps = 100;
         p.bufferBps = 0;
         p.distributionBps = 0;
-        p.keeperPremiumBps = 1_000;
+        p.payMarkupBps = 1_000;
         p.maxTip = 0.05 gwei;
         p.workFee = 0.00002 ether;
         p.keeperShareBps = 2_500;
@@ -79,7 +81,17 @@ abstract contract ForkBase is Test {
         p.maxPositions = 150;
         p.reserve = 0.05 ether;
         p.tvlCap = 100 ether;
-        p.opGasCap = 15_000_000;
+        p.routineCap = 0.3 ether; // bytecode maxima: these suites test mechanics, not budgets
+        p.routineRate = 0.01 ether;
+        p.essentialCap = 0.1 ether;
+        p.essentialRate = 0.005 ether;
+    }
+
+    /// @dev Guardian lowers caps and pay limits (everything else unchanged).
+    function lowerTo(uint128 tvl, uint96 maxPos, uint64 ceiling, uint64 fee) internal {
+        VaultLib.Params memory q = vault.getParams();
+        vm.prank(guardian);
+        vault.lowerCaps(tvl, maxPos, ceiling, fee, q.routineCap, q.essentialCap);
     }
 
     /// @dev Warp to the next FWA purchase blackout (no new acquisitions can open).
@@ -101,7 +113,7 @@ abstract contract ForkBase is Test {
 
     function checkpoint() internal {
         vm.prank(keeper);
-        vault.checkpoint();
+        vault.checkpoint(0);
     }
 
     function setPackAsk(uint256 ask) internal {

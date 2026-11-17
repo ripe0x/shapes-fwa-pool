@@ -51,7 +51,7 @@
   },
   {
    "id": "O2",
-   "text": "DRAFT. What building costs holders: keeper pay is the builder's gas plus 10%, at most 1.75M gas per position built and listed in keeper-sized batches (measured 1.60M across the 29 positions the 2 ETH canary holds), plus the flat work fee of 0.00002 ETH per unit of work (D55): 1 unit when a position lists, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint, 1 per position unlisted or item liquidated at exit. At the 0.5 gwei ceiling a build costs at most 0.00098 ETH per position, about 0.029 ETH for the canary (1.4%). Splitting calls earns no extra fee; the guardian can lower the fee to zero at once.",
+   "text": "DRAFT. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint, 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; budgets cap all pay at 0.041 ETH a day; the guardian can stop pay at once.",
    "metric": "facts.keeper_gas_per_position",
    "max": 1750000,
    "regimes": [
@@ -87,7 +87,7 @@
   },
   {
    "id": "O6",
-   "text": "DRAFT. Can it stall and what restarts it (gas): above the 0.5 gwei ceiling no call is refused; every call is reimbursed at the ceiling price, not the spike (a checkpoint at 2 gwei pays about 0.00013 ETH, a quarter of the uncapped cost), so the keeper waits and holders or anyone may act at their own extra cost. Claims are the holder's own, unpaid. Work resumes when gas falls or the admin raises the ceiling (2-day delay).",
+   "text": "DRAFT. Can it stall and what restarts it (gas): above the 0.5 gwei ceiling no call is refused; every call is paid at the ceiling price, not the spike (at 2 gwei a build and a checkpoint are paid as at 0.5 gwei), so the keeper waits and holders or anyone may act at their own extra cost. A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid. Work resumes when gas falls or the admin raises the ceiling (2-day delay).",
    "metric": "facts.checkpoint_pay_wei",
    "max": 200000000000000,
    "regimes": [

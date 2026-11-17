@@ -1,0 +1,150 @@
+{
+ "fork_block": 26418539,
+ "basefee_wei": 150000000,
+ "rows": [
+  {
+   "label": "checkpoint, 0 positions, 1 deposit",
+   "sig": "checkpoint(uint256)",
+   "gas": 221860,
+   "positions": 0
+  },
+  {
+   "label": "restock 1 (1 mint, no loose)",
+   "sig": "restock(uint256,uint256,uint256)",
+   "gas": 2635830,
+   "packs": 1,
+   "mints": 1
+  },
+  {
+   "label": "restock 1 (0 mints, from loose)",
+   "sig": "restock(uint256,uint256,uint256)",
+   "gas": 533382,
+   "packs": 1,
+   "mints": 0
+  },
+  {
+   "label": "restock 2 (1 mint, 4 loose)",
+   "sig": "restock(uint256,uint256,uint256)",
+   "gas": 2838467,
+   "packs": 2,
+   "mints": 1
+  },
+  {
+   "label": "restock 10 (3 mints)",
+   "sig": "restock(uint256,uint256,uint256)",
+   "gas": 9121461,
+   "packs": 10,
+   "mints": 3
+  },
+  {
+   "label": "list 1",
+   "sig": "list(uint256,uint256)",
+   "gas": 858779,
+   "units": 1
+  },
+  {
+   "label": "list 2",
+   "sig": "list(uint256,uint256)",
+   "gas": 1419094,
+   "units": 2
+  },
+  {
+   "label": "list 10",
+   "sig": "list(uint256,uint256)",
+   "gas": 5790861,
+   "units": 10
+  },
+  {
+   "label": "restock 10 (3 mints)",
+   "sig": "restock(uint256,uint256,uint256)",
+   "gas": 9128993,
+   "packs": 10,
+   "mints": 3
+  },
+  {
+   "label": "list 10",
+   "sig": "list(uint256,uint256)",
+   "gas": 5670561,
+   "units": 10
+  },
+  {
+   "label": "checkpoint, 23 positions, 1 redemption",
+   "sig": "checkpoint(uint256)",
+   "gas": 975403,
+   "positions": 23
+  },
+  {
+   "label": "sync 1 (kicked)",
+   "sig": "sync(uint256[],uint256)",
+   "gas": 158661,
+   "units": 1
+  },
+  {
+   "label": "sync 2 (kicked)",
+   "sig": "sync(uint256[],uint256)",
+   "gas": 229677,
+   "units": 2
+  },
+  {
+   "label": "sync 3 (kicked)",
+   "sig": "sync(uint256[],uint256)",
+   "gas": 300695,
+   "units": 3
+  },
+  {
+   "label": "liquidate 1 pack",
+   "sig": "liquidate(uint256,uint256)",
+   "gas": 250185,
+   "units": 1
+  },
+  {
+   "label": "liquidate 2 packs",
+   "sig": "liquidate(uint256,uint256)",
+   "gas": 402161,
+   "units": 2
+  },
+  {
+   "label": "liquidate 3 packs",
+   "sig": "liquidate(uint256,uint256)",
+   "gas": 558617,
+   "units": 3
+  },
+  {
+   "label": "unlist 1",
+   "sig": "unlist(uint256[],uint256)",
+   "gas": 480141,
+   "units": 1
+  },
+  {
+   "label": "unlist 2",
+   "sig": "unlist(uint256[],uint256)",
+   "gas": 678677,
+   "units": 2
+  },
+  {
+   "label": "unlist 8",
+   "sig": "unlist(uint256[],uint256)",
+   "gas": 1667172,
+   "units": 8
+  },
+  {
+   "label": "liquidate 10 packs",
+   "sig": "liquidate(uint256,uint256)",
+   "gas": 1638129,
+   "units": 10
+  },
+  {
+   "label": "liquidate loose (8 Shapes)",
+   "sig": "liquidate(uint256,uint256)",
+   "gas": 648856,
+   "units": 8,
+   "loose": true
+  },
+  {
+   "label": "checkpoint, 6 positions, redemption fill",
+   "sig": "checkpoint(uint256)",
+   "gas": 393990,
+   "positions": 6
+  }
+ ]
+}

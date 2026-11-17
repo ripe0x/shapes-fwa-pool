@@ -19,13 +19,14 @@ BPS = 10_000
 UNIT = 10**16
 ACTIVE, ALLOCATED, WITHDRAWN, SETTLED, STAGED = 1, 2, 3, 4, 5
 
-# Measured on the fork (test/fork/ForkReconcile.t.sol, ForkVaultAdversarial.t.sol), plus the
-# vault's 30k reimbursement overhead per call.
-GAS = dict(sync_base=60_000, sync_per=100_000, harvest_base=90_000, harvest_per=15_000,
-           list_per=570_000, restock_per_pack=921_000, unlist_per=201_000, liquidate_per=160_000,
-           checkpoint_base=220_000, checkpoint_per=32_100, overhead=30_000)
-CYCLE_GAS = 800_000
-RESTOCK_GAS_PER_PACK = 1_050_000
+# The vault's quoted-gas schedule, line for line (PackVault Q_* constants, D56). Pay is a quote
+# fixed by the operation and its completed work, never the caller's gas.
+Q = dict(checkpoint=180_000, checkpoint_pos=32_000, restock=280_000, pack=200_000, mint=2_200_000,
+         list=255_000, listed=530_000, sync=75_000, synced=75_000, activate=50_000, activated=450_000,
+         unlist=240_000, unlisted=170_000, liquidate=75_000, liq_pack=150_000, liq_shape=65_000,
+         harvest=80_000, harvested=15_000)
+POSITION_VALUE = 663 * 10**14  # 0.0663 ETH: what request charges are scaled by
+CYCLE_GAS = Q["synced"] + Q["listed"] + Q["harvested"]  # a bid cycle's quoted gas (gates)
 MAX_BATCH = dict(sync=20, harvest=60, list=10, restock=10, unlist=20, liquidate=40)
 
 
@@ -46,7 +47,7 @@ class State:
     base_fee: int
     gas_ceiling: int
     max_tip: int
-    premium_bps: int
+    markup_bps: int
     share_bps: int
     k: int  # 1e18 scale, live
     backing: int  # live gated backing for a 3-unit pack, 0 when the gate fails
@@ -85,23 +86,60 @@ class State:
     slowdown_volume: float = 0.0
     reserve: int = 0  # the vault's `reserve` parameter
     work_fee: int = 0  # flat wei per unit of work (D55)
-    op_gas_cap: int = 15_000_000
+    routine_budget: int = 10**30  # keeper budgets available now (PackVault.budget())
+    essential_budget: int = 10**30
 
 
 def price(s):
-    return min(s.gas_price, s.base_fee + s.max_tip, s.gas_ceiling)
+    """The price the vault quotes at: basefee + maxTip, capped at the ceiling (never the bid)."""
+    return min(s.base_fee + s.max_tip, s.gas_ceiling)
 
 
-def cost(s, gas):
-    return (gas + GAS["overhead"]) * price(s) * (BPS + s.premium_bps) // BPS
+def quote(s, gas, units=0, essential=False):
+    """VaultLib.quote, the vault's envelope: quoted gas at the price, markup on routine work, plus
+    work fees. Gates and charges use it; pay never exceeds it."""
+    q = gas * price(s)
+    if not essential:
+        q = q * (BPS + s.markup_bps) // BPS
+    return q + units * s.work_fee
 
+
+
+def pay_v1(s, gas, units=0, essential=False):
+    """What KeeperPolicyV1 offers, capped by the envelope: quoted gas at min(basefee + maxTip,
+    ceiling) plus the work fee per unit, no markup. The live keeper reads pay by simulating the
+    call instead, so it follows whatever policy is active."""
+    return min(gas * price(s) + units * s.work_fee, quote(s, gas, units, essential))
 
 def cycle_net(s):
+    """PackVault._cycleNet: a bid cycle's edge after the keeper pay it causes."""
     if s.k <= 10**18 or s.backing == 0:
         return 0
     gross = s.backing * (s.k - 10**18) // 10**18
-    c = CYCLE_GAS * price(s) * (BPS + s.premium_bps) // BPS + 2 * s.work_fee  # sync + relist units
+    c = quote(s, CYCLE_GAS, 2)
     return gross - c if gross > c else 0
+
+
+def build_cost(s):
+    """PackVault.restock's gate: one 3-unit pack's build share, mint fee share and first listing."""
+    return quote(s, Q["pack"] + Q["mint"] * 3 // 10 + Q["listed"], 2) + s.mint_fee * 3 // 10
+
+
+def request_charge(s):
+    """PackVault.requestCharge: one checkpoint at cost plus one work unit."""
+    return quote(s, Q["checkpoint"] + Q["checkpoint_pos"] * s.open_positions, 1, True)
+
+
+def deploy_charge(s):
+    """PackVault.deployCharge, per POSITION_VALUE deposited."""
+    g = Q["pack"] + Q["mint"] * 3 // 10 + Q["listed"]
+    floor = g * (s.gas_ceiling * s.markup_bps + s.max_tip * (BPS + s.markup_bps)) // BPS + 2 * s.work_fee
+    return max(build_cost(s), floor)
+
+
+def unwind_charge(s):
+    """PackVault.unwindCharge, per POSITION_VALUE redeemed."""
+    return quote(s, Q["unlisted"] + Q["liq_pack"], 2, True)
 
 
 def plan(s):
@@ -130,7 +168,7 @@ def plan(s):
     #    redeemers need ETH and fees are the cheapest source.
     earning = sorted((l for l in active if l.pending_fees), key=lambda l: -l.pending_fees)[:MAX_BATCH["harvest"]]
     amount = s.fee_credit + sum(l.pending_fees for l in earning)
-    hcost = cost(s, GAS["harvest_base"] + GAS["harvest_per"] * len(earning))
+    hcost = quote(s, Q["harvest"] + Q["harvested"] * len(earning))
     if amount and ((hcost * BPS <= amount * s.share_bps and not spike) or shortfall):
         out.append(("harvest", [l.id for l in earning]))
         shortfall = max(0, shortfall - amount)
@@ -190,7 +228,7 @@ def plan(s):
             idle -= n * s.backing
             room -= n
     elif s.recent_volume >= s.slowdown_volume:
-        build = cost(s, RESTOCK_GAS_PER_PACK - GAS["overhead"]) + s.mint_fee * 3 // 10 + s.work_fee
+        build = build_cost(s)
         n = 0  # largest batch the vault's capital check accepts: whole 0.1 mints plus backing
         for c in range(min(room, MAX_BATCH["restock"]), 0, -1):
             need = 3 * c
@@ -205,12 +243,11 @@ def plan(s):
 
 
 def reserve_need(s):
-    """ETH the reserve should hold for necessary paid work when everything else is deployed: one
-    checkpoint at maximum positions plus one full listing batch, at the gas ceiling (D46). Unlisting
-    and syncs pay from the backing they return, so they need none."""
-    gas = (GAS["checkpoint_base"] + GAS["checkpoint_per"] * s.max_positions + GAS["overhead"]
-           + GAS["list_per"] * MAX_BATCH["list"] + GAS["overhead"])
-    return gas * s.gas_ceiling * (BPS + s.premium_bps) // BPS + (1 + MAX_BATCH["list"]) * s.work_fee
+    """ETH the reserve should hold for paid work when everything else is deployed: one full listing
+    batch at the gas ceiling (D46, D56). Checkpoints are paid from request charges; unlisting and
+    syncs from the backing they return."""
+    g = Q["list"] + Q["listed"] * MAX_BATCH["list"]
+    return g * s.gas_ceiling * (BPS + s.markup_bps) // BPS + MAX_BATCH["list"] * s.work_fee
 
 
 def status(s, planned=None):
@@ -251,9 +288,14 @@ def status(s, planned=None):
         out.append(("RECOVERY_REQUIRED", "action", f"FWA holds packs owed to the vault for listings {owed[:5]}"))
     if s.listing_paused and not s.winding_down:
         out.append(("LISTING_PAUSED", "action", "guardian paused listing"))
+    if s.routine_budget == 0:
+        out.append(("ROUTINE_BUDGET_EMPTY", "wait", "strategy work is unpaid until the routine budget refills"))
+    if s.essential_budget == 0 and (s.locked_shares or s.winding_down):
+        out.append(("ESSENTIAL_BUDGET_EMPTY", "action", "redemption and wind-down work is unpaid; holders can run it "
+                    "themselves, or the guardian/admin restores the essential budget"))
     if s.reserve < reserve_need(s) and not s.winding_down:
         out.append(("RESERVE_BELOW_NEED", "action", f"reserve {s.reserve / 1e18:.4f} ETH < {reserve_need(s) / 1e18:.4f} "
-                    "needed at the ceiling; admin raises it through the delay"))
+                    "needed for one listing batch at the ceiling; admin raises it through the delay"))
     if not out:
         out.append(("OK", "ok", "operating normally"))
     return out
