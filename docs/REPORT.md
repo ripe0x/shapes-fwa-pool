@@ -382,3 +382,9 @@ case from a compromised admin key acting as keeper: about 0.055 ETH on the first
 canary, then 0.015 ETH a day (budget refill at the bytecode maxima). 80 tests pass, the reconciler is
 exact and the canary rehearsal closes to the wei. The asset-flow gate still needs the owner's
 signature.
+
+## 16. One owner role (D59, 2026-11-17)
+
+Guardian and admin merged into `owner`; `lowerCaps` removed (`setParams` covers it). 80 tests pass,
+reconciler exact, canary rehearsal closes to the wei. PackVault 22,364 bytes. Not yet independently
+reviewed: covered by the release audit prompt (`docs/AUDIT-PROMPT.md`).

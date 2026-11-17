@@ -154,7 +154,7 @@ contract ForkKeeperPayTest is ForkBase {
         p.workFee = uint64(vault.MAX_WORK_FEE());
         p.gasCeiling = 50 gwei;
         p.maxTip = 0.05 gwei;
-        vm.prank(admin);
+        vm.prank(owner);
         vault.setParams(p);
 
         address a = makeAddr("pack-vault-test-attacker");
@@ -218,8 +218,7 @@ contract ForkKeeperPayTest is ForkBase {
         _priced(alice, 1 ether);
         _restock(2);
         VaultLib.Params memory q = vault.getParams();
-        vm.prank(guardian);
-        vault.lowerCaps(q.tvlCap, q.maxPositions, q.gasCeiling, q.workFee, 0, 0);
+        setCaps(0, 0);
         (uint256 r, uint256 e) = vault.budget();
         assertEq(r + e, 0);
         vm.prank(keeper);
@@ -245,13 +244,12 @@ contract ForkKeeperPayTest is ForkBase {
     }
 
     /// 11-12: the budgets bound total pay over time. A level never refills above its cap, a
-    /// parameter change never refills spent capacity, the admin cannot exceed the bytecode
-    /// maxima, and the guardian's lowering cancels a pending raise.
+    /// parameter change never refills spent capacity, the owner cannot exceed the bytecode
+    /// maxima, and the owner's lowering cancels a pending raise.
     function test_budgetsBoundSpendingOverTime() public {
         _priced(alice, 3 ether);
         VaultLib.Params memory q = vault.getParams();
-        vm.prank(guardian);
-        vault.lowerCaps(q.tvlCap, q.maxPositions, q.gasCeiling, q.workFee, 0.002 ether, q.essentialCap);
+        setCaps(0.002 ether, q.essentialCap);
         (uint256 r,) = vault.budget();
         assertEq(r, 0.002 ether, "lowering clamps the level to the cap");
         // Build until the routine budget runs out: total pay never exceeds it.
@@ -273,24 +271,23 @@ contract ForkKeeperPayTest is ForkBase {
         // Raise the cap: the level stays where it was (0.002), not 0.3.
         VaultLib.Params memory up = vault.getParams();
         up.routineCap = 0.3 ether;
-        vm.prank(admin);
+        vm.prank(owner);
         vault.setParams(up);
         (r,) = vault.budget();
         assertEq(r, 0.002 ether, "applying a raise refills nothing");
         // Above the bytecode maxima: refused.
         up.routineCap = 0.3 ether + 1;
-        vm.prank(admin);
+        vm.prank(owner);
         vm.expectRevert(PackVault.OutOfBounds.selector);
         vault.setParams(up);
         up.routineRate = 0.01 ether + 1;
         up.routineCap = 0.3 ether;
-        vm.prank(admin);
+        vm.prank(owner);
         vm.expectRevert(PackVault.OutOfBounds.selector);
         vault.setParams(up);
-        // A guardian lowering clamps the level at once.
+        // A owner lowering clamps the level at once.
         q = vault.getParams();
-        vm.prank(guardian);
-        vault.lowerCaps(q.tvlCap, q.maxPositions, q.gasCeiling, q.workFee, 0.001 ether, q.essentialCap);
+        setCaps(0.001 ether, q.essentialCap);
         (r,) = vault.budget();
         assertEq(r, 0.001 ether, "lowered cap clamps the level");
     }
@@ -303,8 +300,7 @@ contract ForkKeeperPayTest is ForkBase {
         vm.prank(keeper);
         vault.list(3, 0);
         VaultLib.Params memory q = vault.getParams();
-        vm.prank(guardian);
-        vault.lowerCaps(q.tvlCap, q.maxPositions, q.gasCeiling, q.workFee, 0, q.essentialCap);
+        setCaps(0, q.essentialCap);
         _restock(1); // routine: unpaid now
         uint256 shares = vault.shareBalance(alice);
         uint256 rc = Charges.redeemCharge(vault, shares);

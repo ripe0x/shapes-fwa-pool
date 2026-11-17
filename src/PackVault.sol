@@ -41,10 +41,10 @@ import {
 ///
 ///      Trust: FWA, its rewards module, Shapes, ShapePacks and the FWA token are immutable
 ///      addresses fixed here. FWA's owner can change fees, the floor quote and admission; every
-///      such change is read live, never cached. The guardian can only stop things and lower caps.
-///      The admin sets parameters and the keeper policy at once, inside bytecode bounds (D58).
-///      Neither role can take assets directly; a compromised admin can raise keeper pay to the
-///      bytecode maxima and keep for itself, bounded by the budgets' balance and refill rates.
+///      such change is read live, never cached. One owner (D59) sets parameters and the keeper
+///      policy at once, inside bytecode bounds (D58), pauses and starts wind-down. The owner
+///      cannot take assets directly; a compromised owner can raise keeper pay to the bytecode
+///      maxima and keep for itself, bounded by the budgets' balance and refill rates.
 contract PackVault is ReentrancyGuard {
     using SafeTransferLib for address;
 
@@ -86,8 +86,7 @@ contract PackVault is ReentrancyGuard {
     IShapePacks public immutable packs;
     IFWARewards public immutable rewards;
     IFWAToken public immutable token;
-    address public immutable guardian;
-    address public immutable admin;
+    address public immutable owner;
 
     // ------------------------------------------------------------------ parameters
 
@@ -96,7 +95,7 @@ contract PackVault is ReentrancyGuard {
 
     VaultLib.Params internal params;
 
-    // Keeper payment policy (D57): proposes pay for verified work; replaced by the admin at once (D58).
+    // Keeper payment policy (D57): proposes pay for verified work; replaced by the owner at once (D58).
     IKeeperPolicy public keeperPolicy;
 
     bool public depositsPaused;
@@ -182,8 +181,7 @@ contract PackVault is ReentrancyGuard {
     event Claimed(address indexed holder, uint256 amount);
     event WindDownStarted();
 
-    error NotGuardian();
-    error NotAdmin();
+    error NotOwner();
     error OutOfBounds();
     error Paused();
     error WindingDown();
@@ -204,8 +202,7 @@ contract PackVault is ReentrancyGuard {
         IFWAV2 fwa_,
         IShapes shapes_,
         IShapePacks packs_,
-        address guardian_,
-        address admin_,
+        address owner_,
         VaultLib.Params memory initial,
         IKeeperPolicy policy_
     ) payable {
@@ -214,8 +211,7 @@ contract PackVault is ReentrancyGuard {
         packs = packs_;
         rewards = IFWARewards(fwa_.rewards());
         token = IFWAToken(fwa_.token());
-        guardian = guardian_;
-        admin = admin_;
+        owner = owner_;
         params = initial;
         VaultLib.checkBounds(params);
         VaultLib.checkPolicy(address(policy_));
@@ -788,9 +784,9 @@ contract PackVault is ReentrancyGuard {
 
     // ------------------------------------------------------------------ roles
 
-    /// @notice Admin sets parameters at once, within the bytecode bounds (D58: no delay).
+    /// @notice Owner sets parameters at once, within the bytecode bounds (D58: no delay).
     function setParams(VaultLib.Params calldata p) external {
-        if (msg.sender != admin) revert NotAdmin();
+        if (msg.sender != owner) revert NotOwner();
         // Budgets accrue at the old rates up to now; the new caps then only clamp, never refill.
         _syncBudget();
         params = p;
@@ -799,41 +795,24 @@ contract PackVault is ReentrancyGuard {
         emit ParamsSet();
     }
 
-    /// @notice Admin replaces the keeper payment policy at once (D57, D58). The vault still caps
+    /// @notice Owner replaces the keeper payment policy at once (D57, D58). The vault still caps
     ///         every offer at its envelope, free ETH and budget.
     function setPolicy(address policy) external {
-        if (msg.sender != admin) revert NotAdmin();
+        if (msg.sender != owner) revert NotOwner();
         VaultLib.checkPolicy(policy);
         emit PolicyChanged(address(keeperPolicy), policy);
         keeperPolicy = IKeeperPolicy(policy);
     }
 
-    /// @notice Guardian stops: each flag can only be raised, and wind-down is one-way.
+    /// @notice Owner stops: each flag can only be raised, and wind-down is one-way.
     function guard(bool pauseDeposits, bool pauseListing) external {
-        if (msg.sender != guardian) revert NotGuardian();
+        if (msg.sender != owner) revert NotOwner();
         if (pauseDeposits) depositsPaused = true;
         if (pauseListing) listingPaused = true;
     }
 
-    /// @notice Guardian may lower caps and keeper pay limits immediately; the admin may raise them
-    ///         again at once (D58). Ceiling 0 and work fee 0, or both budget caps 0, stop all
-    ///         keeper pay.
-    function lowerCaps(
-        uint128 tvlCap,
-        uint96 maxPositions,
-        uint64 gasCeiling,
-        uint64 workFee,
-        uint64 routineCap,
-        uint64 essentialCap
-    ) external {
-        if (msg.sender != guardian) revert NotGuardian();
-        _syncBudget();
-        VaultLib.lower(params, tvlCap, maxPositions, gasCeiling, workFee, routineCap, essentialCap);
-        _syncBudget(); // clamp spent levels to the lowered caps
-    }
-
     function startWindDown() external {
-        if (msg.sender != guardian) revert NotGuardian();
+        if (msg.sender != owner) revert NotOwner();
         windingDown = true;
         depositsPaused = true;
         listingPaused = true;

@@ -81,7 +81,7 @@ Results:
 | Checkpoint | FWA blackout, queue drained, flows pending | deposits under the ceiling; redemptions at any gas |
 | Sync (recovery of settled, kicked, expired positions) | due | under the ceiling; above it only for redemptions or wind-down |
 | Liquidity release (`unlist`, `liquidate`) | redeemers short of ETH; wind-down; edge gate failed | any gas (keeper's loss above the ceiling) |
-| Wind-down | guardian started it | any gas |
+| Wind-down | owner started it | any gas |
 
 ## Reserve (D46)
 

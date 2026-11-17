@@ -66,9 +66,9 @@ someone.
 | STAGED_PENDING_ACTIVATION | wait | listings FWA staged; activated once its queue drains | none |
 | REDEMPTION_LIQUIDITY_SHORT | wait / action | ETH owed to redeemers beyond free ETH; "action" when nothing is planned to release it | if gas is above the ceiling, run with `--max-loss-wei`; if FWA's queue never drains, call FWA `processAcquisitions` |
 | TOKENS_UNBURNED | info | FWA token rewards not yet burned | optional: `--burn-tokens`, or anyone calls `burnTokens(ids)` |
-| EDGE_GATE_FAILED | action | FWA's live fees leave less than the minimum edge; the keeper unlists positions | guardian considers `startWindDown()` |
+| EDGE_GATE_FAILED | action | FWA's live fees leave less than the minimum edge; the keeper unlists positions | owner considers `startWindDown()` |
 | RECOVERY_REQUIRED | action | FWA holds a pack owed to the vault (failed delivery) | the keeper retries through `sync`; if it persists, see D23 |
-| LISTING_PAUSED | action | the guardian paused listing | guardian or admin decision |
+| LISTING_PAUSED | action | the owner paused listing | owner decision |
 | RESERVE_BELOW_NEED | action | the reserve is below one checkpoint plus one listing batch at the ceiling | admin raises `reserve` (immediate, D58) |
 | WINDING_DOWN | info | wind-down in progress | keep the keeper running until no positions remain |
 
@@ -93,7 +93,7 @@ or a transaction still pending after 5 replacements.
 
 ## Wind-down
 
-Guardian `startWindDown()` (one way). The keeper unlists every position (FWA's queue must be
+Owner `startWindDown()` (one way). The keeper unlists every position (FWA's queue must be
 drained), liquidates packs and Shapes back to ETH, and checkpoints redemptions in each blackout.
 Holders `requestRedeem`, then `claim` after the next checkpoint. Anyone can run every step.
 

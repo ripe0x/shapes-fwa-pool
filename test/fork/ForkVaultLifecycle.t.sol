@@ -200,7 +200,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         (, uint256 backing, bool ok) = vault.edge(3);
         assertFalse(ok, "no cap: nothing new lists");
         assertEq(backing, 0);
-        vm.prank(guardian);
+        vm.prank(owner);
         vault.startWindDown();
         uint256 before = address(vault).balance;
         vm.prank(keeper);
@@ -225,41 +225,37 @@ contract ForkVaultLifecycleTest is ForkBase {
         assertFalse(ok, "quote older than FWA's 7 day max age");
     }
 
-    function test_guardianCannotMoveAssets() public {
+    function test_ownerStopsCannotMoveAssets() public {
         _depositAndPrice(alice, 1 ether);
         _listN(2);
         uint256 bal = address(vault).balance;
-        uint256 gBal = guardian.balance;
-        vm.prank(guardian);
+        uint256 gBal = owner.balance;
+        vm.prank(owner);
         vault.guard(true, true);
         lowerTo(1 ether, 10, 1 gwei, 0);
-        vm.prank(guardian);
+        vm.prank(owner);
         vault.startWindDown();
-        VaultLib.Params memory q = vault.getParams();
-        vm.prank(guardian);
-        vm.expectRevert(PackVault.OutOfBounds.selector);
-        vault.lowerCaps(2 ether, q.maxPositions, q.gasCeiling, q.workFee, q.routineCap, q.essentialCap); // a raise
         assertEq(address(vault).balance, bal);
-        assertEq(guardian.balance, gBal);
-        vm.prank(guardian);
-        vm.expectRevert(PackVault.NotAdmin.selector);
+        assertEq(owner.balance, gBal);
+        vm.prank(keeper);
+        vm.expectRevert(PackVault.NotOwner.selector);
         vault.setParams(defaultParams());
     }
 
     function test_paramsBoundsAppliedAtOnce() public {
         VaultLib.Params memory p = defaultParams();
         p.distributionBps = 6_000;
-        vm.prank(admin);
+        vm.prank(owner);
         vm.expectRevert(PackVault.OutOfBounds.selector);
         vault.setParams(p);
         p.distributionBps = 1_000;
         // Review S1: the reimbursed tip can never exceed the gas ceiling itself.
         p.maxTip = p.gasCeiling + 1;
-        vm.prank(admin);
+        vm.prank(owner);
         vm.expectRevert(PackVault.OutOfBounds.selector);
         vault.setParams(p);
         p.maxTip = 0.05 gwei;
-        vm.prank(admin);
+        vm.prank(owner);
         vault.setParams(p);
         assertEq(vault.getParams().distributionBps, 1_000);
     }
@@ -324,7 +320,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         checkpoint();
         toOpen();
         uint256[] memory ids = _listN(8);
-        vm.prank(guardian);
+        vm.prank(owner);
         vault.startWindDown();
         vm.prank(keeper);
         vault.unlist(ids, 0);

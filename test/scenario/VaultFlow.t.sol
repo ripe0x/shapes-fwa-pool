@@ -54,8 +54,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
     address alice = makeAddr("pack-vault-test-alice");
     address bob = makeAddr("pack-vault-test-bob");
     address keeper = makeAddr("pack-vault-test-keeper");
-    address guardian = makeAddr("pack-vault-test-guardian");
-    address admin = makeAddr("pack-vault-test-admin");
+    address owner = makeAddr("pack-vault-test-admin"); // one role (D59)
 
     uint256 preexisting; // ETH already at the deploy address (dust), part of the seed inflow
 
@@ -86,7 +85,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
 
     function _forkPinned() internal {
         vm.createSelectFork("mainnet", PINNED);
-        address[5] memory actors = [alice, bob, keeper, guardian, admin];
+        address[4] memory actors = [alice, bob, keeper, owner];
         for (uint256 i; i < actors.length; ++i) {
             assertEq(actors[i].code.length, 0, "test actor has code on mainnet");
             assertEq(actors[i].balance, 0, "test actor has mainnet balance");
@@ -119,7 +118,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         vm.fee(BASE_FEE);
         vm.txGasPrice(GAS_PRICE);
         vm.deal(address(this), seed + 1 ether);
-        vault = new PackVault{value: seed}(FWA, SHAPES, PACKS, guardian, admin, p, new KeeperPolicyV1());
+        vault = new PackVault{value: seed}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
         preexisting = address(vault).balance - seed; // mainnet dust at the deploy address
         depositedCum = address(vault).balance; // seed and dust are capitalization inflow
     }
@@ -734,7 +733,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _toOpen();
         _kRestock(keeper, 8, 3);
         uint256[] memory ids = _idsOf(_kList(keeper, 8));
-        vm.prank(guardian);
+        vm.prank(owner);
         vault.startWindDown();
         _kUnlist(keeper, ids);
         uint256 aShares = vault.shareBalance(alice);
@@ -907,7 +906,7 @@ contract VaultFlowSelectionTest is VaultFlowBase {
 
         VaultLib.Params memory p = _canary();
         vm.deal(address(this), 5 ether);
-        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, guardian, admin, p, new KeeperPolicyV1());
+        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
         depositedCum = address(vault).balance;
         uint256 need = 20 * 3;
         uint256 mints = (need + 9) / 10; // 20 packs x 3 units -> 6 mints of 0.1 ETH

@@ -19,7 +19,7 @@ contract ForkTokensTest is Test {
     uint256 constant BUYBACK_BLOCK = 26_423_454;
 
     PackVault vault;
-    address admin = makeAddr("tok-admin");
+    address owner = makeAddr("tok-admin");
     IFWAToken token;
 
     function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
@@ -52,7 +52,7 @@ contract ForkTokensTest is Test {
         p.essentialCap = 0.1 ether;
         p.essentialRate = 0.005 ether;
         vm.deal(address(this), 5 ether);
-        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, makeAddr("tok-guardian"), admin, p, new KeeperPolicyV1());
+        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
         vault.restock(20, 3, 0);
         vault.list(20, 0);
 
@@ -95,7 +95,7 @@ contract ForkTokensTest is Test {
     function test_staleIdDoesNotBlockCredit() public {
         uint256[] memory ids = vault.openListings();
         uint256 pendingAll = _pending(ids);
-        vm.prank(makeAddr("tok-guardian"));
+        vm.prank(owner);
         vault.startWindDown();
         uint256[] memory one = new uint256[](1);
         one[0] = ids[0];

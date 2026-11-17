@@ -9,15 +9,15 @@ import {Charges} from "../utils/Charges.sol";
 /// @notice Independent release-candidate audit probes (commit 3e600e5). Attacks the real deployed
 ///         FWA/Shapes/ShapePacks on a mainnet fork. No mocks. These target the contract claim
 ///         "Neither role has any path that moves assets to itself" (PackVault natspec) and the
-///         guardian stop-only trust boundary.
+///         owner stop-only trust boundary.
 contract AuditRoleAndKeeperTest is ForkBase {
     uint256 constant TX_CAP = 16_777_216;
 
-    /// A compromised admin sets every keeper-pay lever to its bytecode maximum (premium 10%, ceiling
+    /// A compromised owner sets every keeper-pay lever to its bytecode maximum (premium 10%, ceiling
     /// 50 gwei, maxTip 50 gwei, work fee 0.00005 ETH, budgets at their maxima), applied at once (D58),
     /// then manufactures checkpoint work with a dust deposit and runs the checkpoint itself
     /// (originally written by the 3e600e5 auditor against measured-gas pay; rewritten for D56).
-    /// The checkpoint is funded by the request charge the admin's own deposit paid, so the admin
+    /// The checkpoint is funded by the request charge the owner's own deposit paid, so the owner
     /// gets back at most what it put in.
     function test_adminMaxParamsSelfKeepExtraction() public {
         {
@@ -34,23 +34,23 @@ contract AuditRoleAndKeeperTest is ForkBase {
         p.gasCeiling = 50 gwei;
         p.maxTip = 50 gwei;
         p.workFee = uint64(vault.MAX_WORK_FEE());
-        vm.prank(admin);
+        vm.prank(owner);
         vault.setParams(p);
 
-        vm.deal(admin, 1 ether);
+        vm.deal(owner, 1 ether);
         vm.fee(0.15 gwei);
         vm.txGasPrice(50 gwei);
         uint256 charge = vault.requestCharge();
         uint256 gross = Charges.grossFor(vault, 0.01 ether);
-        vm.prank(admin);
+        vm.prank(owner);
         vault.deposit{value: gross}();
         assertEq(vault.processingPool(), charge, "the checkpoint charge funds the pool");
 
         toBlackout();
-        uint256 before = admin.balance;
-        vm.prank(admin);
+        uint256 before = owner.balance;
+        vm.prank(owner);
         uint256 pay = vault.checkpoint(0);
-        assertEq(admin.balance - before, pay, "returned pay is what was paid");
+        assertEq(owner.balance - before, pay, "returned pay is what was paid");
         assertGt(pay, 0);
         emit log_named_uint("charge paid (wei)", charge);
         emit log_named_uint("checkpoint pay (wei)", pay);
@@ -59,7 +59,7 @@ contract AuditRoleAndKeeperTest is ForkBase {
         vm.txGasPrice(0.2 gwei);
     }
 
-    /// The guardian is "stop only". Prove that even the most aggressive stop it can do to keeper
+    /// The owner is "stop only". Prove that even the most aggressive stop it can do to keeper
     /// economics -- lowering the gas ceiling to zero so every paid call reimburses nothing -- does
     /// not trap holder funds: redemption pricing and claim remain callable (unpaid) by holders.
     function test_guardianZeroCeilingDoesNotTrapHolderFunds() public {
@@ -87,7 +87,7 @@ contract AuditRoleAndKeeperTest is ForkBase {
         uint256 kBefore = keeper.balance;
         vm.prank(keeper);
         vault.checkpoint(0);
-        // D55: the guardian zeroed both the ceiling and the work fee, so no keeper pay at all.
+        // D55: the owner zeroed both the ceiling and the work fee, so no keeper pay at all.
         assertEq(keeper.balance, kBefore, "zero ceiling and zero work fee => keeper reimbursed nothing");
 
         toOpen();
@@ -97,7 +97,7 @@ contract AuditRoleAndKeeperTest is ForkBase {
         uint256 got = alice.balance - before;
         emit log_named_uint("alice redemption claimed under zero ceiling (wei)", got);
         // Alice's ~1 ETH is paid in full (within rounding + her share of earlier keeper gas).
-        assertApproxEqAbs(got, 1 ether, 2e14, "holder funds not trapped by guardian zeroing the ceiling"); // dead shares keep ~1% of the deployment charge
+        assertApproxEqAbs(got, 1 ether, 2e14, "holder funds not trapped by owner zeroing the ceiling"); // dead shares keep ~1% of the deployment charge
         assertLe(got, 1 ether);
     }
 }

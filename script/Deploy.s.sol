@@ -32,15 +32,14 @@ contract Deploy is Script {
         p.essentialCap = uint64(vm.parseJsonUint(v, ".essentialCapWei"));
         p.essentialRate = uint64(vm.parseJsonUint(v, ".essentialRatePerDayWei"));
         vm.startBroadcast();
-        // The keeper payment policy is its own immutable contract; the admin replaces it with
+        // The keeper payment policy is its own immutable contract; the owner replaces it with
         // setPolicy (D57, D58).
         KeeperPolicyV1 policy = new KeeperPolicyV1();
         vault = new PackVault{value: vm.parseJsonUint(v, ".seedWei")}(
             IFWAV2(vm.parseJsonAddress(v, ".fwa")),
             IShapes(vm.parseJsonAddress(v, ".shapes")),
             IShapePacks(vm.parseJsonAddress(v, ".packs")),
-            vm.parseJsonAddress(v, ".guardian"),
-            vm.parseJsonAddress(v, ".admin"),
+            vm.parseJsonAddress(v, ".owner"),
             p,
             policy
         );

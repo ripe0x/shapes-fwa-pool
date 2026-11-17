@@ -42,8 +42,7 @@ abstract contract ForkBase is Test {
 
     PackVault vault;
     uint256 preexisting;
-    address guardian = makeAddr("pack-vault-test-guardian");
-    address admin = makeAddr("pack-vault-test-admin");
+    address owner = makeAddr("pack-vault-test-admin"); // one role (D59)
     address keeper = makeAddr("pack-vault-test-keeper");
     address alice = makeAddr("pack-vault-test-alice");
     address bob = makeAddr("pack-vault-test-bob");
@@ -52,7 +51,7 @@ abstract contract ForkBase is Test {
         vm.createSelectFork("mainnet", BLOCK);
         // Well-known labels map to real mainnet addresses, some with EIP-7702 sweepers. Every
         // test actor must be a clean wallet.
-        address[5] memory actors = [guardian, admin, keeper, alice, bob];
+        address[4] memory actors = [owner, keeper, alice, bob];
         for (uint256 i; i < actors.length; ++i) {
             assertEq(actors[i].code.length, 0, "test actor has code on mainnet");
             assertEq(actors[i].balance, 0, "test actor has mainnet balance");
@@ -60,7 +59,7 @@ abstract contract ForkBase is Test {
         // Real fee environment, so every ETH flow carries its real gas price.
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
-        vault = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, guardian, admin, defaultParams(), new KeeperPolicyV1());
+        vault = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, defaultParams(), new KeeperPolicyV1());
         preexisting = address(vault).balance - 0.01 ether; // ETH already at the deploy address
         vm.deal(alice, 50 ether);
         vm.deal(bob, 50 ether);
@@ -87,11 +86,21 @@ abstract contract ForkBase is Test {
         p.essentialRate = 0.005 ether;
     }
 
-    /// @dev Guardian lowers caps and pay limits (everything else unchanged).
+    /// @dev Owner sets caps and pay limits (everything else unchanged); the tip follows a lower ceiling.
     function lowerTo(uint128 tvl, uint96 maxPos, uint64 ceiling, uint64 fee) internal {
         VaultLib.Params memory q = vault.getParams();
-        vm.prank(guardian);
-        vault.lowerCaps(tvl, maxPos, ceiling, fee, q.routineCap, q.essentialCap);
+        (q.tvlCap, q.maxPositions, q.gasCeiling, q.workFee) = (tvl, maxPos, ceiling, fee);
+        if (q.maxTip > ceiling) q.maxTip = ceiling;
+        vm.prank(owner);
+        vault.setParams(q);
+    }
+
+    /// @dev Owner sets the routine and essential budget caps.
+    function setCaps(uint64 routine, uint64 essential) internal {
+        VaultLib.Params memory q = vault.getParams();
+        (q.routineCap, q.essentialCap) = (routine, essential);
+        vm.prank(owner);
+        vault.setParams(q);
     }
 
     /// @dev Warp to the next FWA purchase blackout (no new acquisitions can open).

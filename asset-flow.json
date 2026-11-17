@@ -51,7 +51,7 @@
   },
   {
    "id": "O2",
-   "text": "DRAFT. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint, 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; budgets cap all pay at 0.041 ETH a day; the guardian can stop pay at once.",
+   "text": "DRAFT. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint, 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; budgets cap all pay at 0.041 ETH a day; the owner can stop pay at once.",
    "metric": "facts.keeper_gas_per_position",
    "max": 1750000,
    "regimes": [

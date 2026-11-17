@@ -251,28 +251,6 @@ library VaultLib {
         ) revert OutOfBounds();
     }
 
-    /// @notice Guardian lowering: each value must not exceed the current one.
-    function lower(
-        Params storage p,
-        uint128 tvlCap,
-        uint96 maxPositions,
-        uint64 gasCeiling,
-        uint64 workFee,
-        uint64 routineCap,
-        uint64 essentialCap
-    ) external {
-        if (
-            tvlCap > p.tvlCap || maxPositions > p.maxPositions || gasCeiling > p.gasCeiling || workFee > p.workFee
-                || routineCap > p.routineCap || essentialCap > p.essentialCap
-        ) revert OutOfBounds();
-        (p.tvlCap, p.maxPositions, p.gasCeiling, p.workFee, p.routineCap, p.essentialCap) =
-            (tvlCap, maxPositions, gasCeiling, workFee, routineCap, essentialCap);
-        if (p.maxTip > gasCeiling) p.maxTip = uint64(gasCeiling); // keep checkBounds' maxTip <= ceiling
-    }
-
-    /// @notice A bid cycle's edge after the keeper pay it can cause at most (resolve, relist, harvest
-    ///         share at the envelope), zero when not positive. Gates use the envelope, never a
-    ///         policy's quote, so no policy can understate a cost to pass a gate (D57).
     function cycleNet(Params storage p, uint256 k1e18, uint256 backing) external view returns (uint256) {
         if (k1e18 <= 1e18) return 0;
         uint256 gross = backing * (k1e18 - 1e18) / 1e18;

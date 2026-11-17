@@ -732,3 +732,14 @@ delay only on raises. Independent diff review: no code defect.
 **Evidence:** 80 fork, audit and scenario tests; `test_swapToDifferentFormulaPreservesAccounting`
 (instant swap, non-admin refused, state unchanged); `test_paramsBoundsAppliedAtOnce`; canary
 rehearsal swaps the policy instantly with the ledger closing to the wei. PackVault 22,809 bytes.
+
+## D59. One owner role (owner, 2026-11-17)
+
+**Owner:** "why do we still have the guardian and admin roles? ... seems like overkill", then "do it".
+Supersedes D44 (one address may hold both roles) and the guardian half of D58.
+**Chose:** one immutable `owner` with `setParams`, `setPolicy`, `guard` (one-way pauses) and
+`startWindDown`. `lowerCaps` and `VaultLib.lower` are removed: with no delay, `setParams` lowers
+anything at once. Constructor takes one address; the canary values file has `owner`.
+**Given up:** a separate stop-only key (for example a hot emergency key beside a cold admin key).
+**Evidence:** 80 fork, audit and scenario tests; canary rehearsal (owner swaps the policy and starts
+wind-down) closes to the wei; reconciler exact. PackVault 22,364 bytes.

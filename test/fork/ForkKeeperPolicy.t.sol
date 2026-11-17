@@ -22,7 +22,7 @@ contract KeeperPolicyFlat is IKeeperPolicy {
     }
 }
 
-/// @dev Hostile policies an admin could propose. Each is a real deployed contract the vault calls.
+/// @dev Hostile policies an owner could propose. Each is a real deployed contract the vault calls.
 contract PolicyGreedy is IKeeperPolicy {
     function policyVersion() external pure returns (uint256) {
         return 1;
@@ -92,7 +92,7 @@ contract ForkKeeperPolicyTest is ForkBase {
     }
 
     function _swap(address policy) internal {
-        vm.prank(admin);
+        vm.prank(owner);
         vault.setPolicy(policy); // at once (D58)
         assertEq(address(vault.keeperPolicy()), policy);
     }
@@ -125,11 +125,11 @@ contract ForkKeeperPolicyTest is ForkBase {
         uint256 dc = vault.deployCharge();
 
         vm.prank(bob);
-        vm.expectRevert(PackVault.NotAdmin.selector);
+        vm.expectRevert(PackVault.NotOwner.selector);
         vault.setPolicy(address(v2));
         vm.expectEmit(true, true, false, false, address(vault));
         emit PackVault.PolicyChanged(v1, address(v2));
-        vm.prank(admin);
+        vm.prank(owner);
         vault.setPolicy(address(v2));
         assertEq(address(vault.keeperPolicy()), address(v2));
 
@@ -154,13 +154,13 @@ contract ForkKeeperPolicyTest is ForkBase {
         assertEq(vault.openListings().length, open.length + 3);
     }
 
-    /// The vault rejects an EOA, version 0, a contract without policyVersion, a non-admin proposer,
+    /// The vault rejects an EOA, version 0, a contract without policyVersion, a non-owner proposer,
     /// and an invalid constructor policy.
     function test_invalidPolicyRejected() public {
         address eoa = makeAddr("pack-vault-test-eoa-policy");
         address v0 = address(new PolicyVersionZero());
         address nv = address(new PolicyNoVersion());
-        vm.startPrank(admin);
+        vm.startPrank(owner);
         vm.expectRevert(PackVault.OutOfBounds.selector);
         vault.setPolicy(eoa);
         vm.expectRevert(PackVault.OutOfBounds.selector);
@@ -170,10 +170,10 @@ contract ForkKeeperPolicyTest is ForkBase {
         vm.stopPrank();
         address ok = address(new KeeperPolicyFlat());
         vm.prank(keeper);
-        vm.expectRevert(PackVault.NotAdmin.selector);
+        vm.expectRevert(PackVault.NotOwner.selector);
         vault.setPolicy(ok);
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        new PackVault(FWA, SHAPES, PACKS, guardian, admin, defaultParams(), KeeperPolicyV1(eoa));
+        new PackVault(FWA, SHAPES, PACKS, owner, defaultParams(), KeeperPolicyV1(eoa));
     }
 
     /// A policy asking for everything is paid the envelope (quoted gas x ceiling-capped price with
@@ -213,26 +213,23 @@ contract ForkKeeperPolicyTest is ForkBase {
         }
     }
 
-    /// Guardian stops are stop-only; review L1: lowering the ceiling clamps maxTip with it.
-    function test_guardianStopsAndTipClamp() public {
+    /// Only the owner pauses; pauses are one-way.
+    function test_ownerPauses() public {
         vm.prank(keeper);
-        vm.expectRevert(PackVault.NotGuardian.selector);
+        vm.expectRevert(PackVault.NotOwner.selector);
         vault.guard(true, false);
-        vm.prank(guardian);
+        vm.prank(owner);
         vault.guard(true, false);
         assertTrue(vault.depositsPaused());
-        lowerTo(100 ether, 150, 0.01 gwei, 0.00002 ether); // below the 0.05 gwei tip
-        assertEq(vault.getParams().maxTip, 0.01 gwei, "maxTip clamped to the lowered ceiling");
     }
 
-    /// Even under the greedy policy, the guardian stops all pay at once (budget caps 0), and the
+    /// Even under the greedy policy, the owner stops all pay at once (budget caps 0), and the
     /// keeper's work still runs unpaid.
-    function test_guardianDisablesPayImmediately() public {
+    function test_ownerDisablesPayImmediately() public {
         _priced();
         _swap(address(new PolicyGreedy()));
         VaultLib.Params memory q = vault.getParams();
-        vm.prank(guardian);
-        vault.lowerCaps(q.tvlCap, q.maxPositions, q.gasCeiling, q.workFee, 0, 0);
+        setCaps(0, 0);
         (uint256 r, uint256 e) = vault.budget();
         assertEq(r + e, 0, "budgets emptied");
         uint256 open = vault.openListings().length;
@@ -252,7 +249,7 @@ contract ForkKeeperPolicyTest is ForkBase {
         p.tvlCap = 1_000 ether;
         vm.fee(50 gwei);
         vm.txGasPrice(50 gwei);
-        PackVault v = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, guardian, admin, p, new KeeperPolicyV1());
+        PackVault v = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
         uint256 gross = Charges.grossFor(v, 40 ether);
         vm.deal(alice, gross);
         vm.prank(alice);

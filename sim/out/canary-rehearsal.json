@@ -3,8 +3,7 @@
   "fwa": "0x958C41181182e76F221331b2755b77D9e1426A98",
   "shapes": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
   "packs": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
-  "guardian": "0x0000000000000000000000000000000000000001",
-  "admin": "0x0000000000000000000000000000000000000002",
+  "owner": "0x0000000000000000000000000000000000000002",
   "seedWei": 10000000000000000,
   "minEdgeBps": 100,
   "bufferBps": 0,
@@ -26,23 +25,23 @@
  },
  "positions_built": 29,
  "positions_listed": 29,
- "capital_idle_after_build": 31884029754730000,
- "deposited": 1992459113277574910,
- "claimed": 1973648796927735652,
- "holder_result": -18810316349839258,
- "keeper_pay": 9725041002950000,
- "keeper_net": -1250664076929771,
- "keeper_gas_spent": 10975705079879771,
+ "capital_idle_after_build": 31887781584280000,
+ "deposited": 1992459040387473274,
+ "claimed": 1973652505158955053,
+ "holder_result": -18806535228518221,
+ "keeper_pay": 9721270875600000,
+ "keeper_net": -1244399500183850,
+ "keeper_gas_spent": 10965670375783850,
  "mints": 9,
  "mint_fees": 9000000000000000,
  "staged_before_activation": 0,
  "staged_after_activation": 0,
  "token_burned": 5039168559195973351,
- "token_burn_keeper_cost": 34839565107120,
- "end_balance": 10085275346889258,
- "end_lastNav": 10008074940849256,
- "ledger_in": 2002459113277574910,
- "ledger_out": 2002459113277574910,
+ "token_burn_keeper_cost": 34818427661200,
+ "end_balance": 10085264352918221,
+ "end_lastNav": 10008063950806219,
+ "ledger_in": 2002459040387473274,
+ "ledger_out": 2002459040387473274,
  "ledger_gap": 0,
  "keeper_tx": {
   "sent": 18,
@@ -53,14 +52,14 @@
   "reorged": 0,
   "skipped_expected": 0,
   "skipped_loss": 2,
-  "spent_wei": 10975705079879771,
-  "paid_wei": 9725041002950000
+  "spent_wei": 10965670375783850,
+  "paid_wei": 9721270875600000
  },
  "keeper_out": {
-  "tokens_idle": "policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1\ngas 0.089 gwei, 29 open, 0 idle packs, idle 0.0269 ETH, cycle net 1.301 mETH, 7d volume 96/day\nstatus TOKENS_UNBURNED [info] 5.0392 FWA tokens; anyone may call burnTokens\nnote: tokens 5.0392 unburned (run with --burn-tokens; operator pays the gas)\nnote: tokens 5.0392 unburned (run with --burn-tokens; operator pays the gas)\nnothing to do",
-  "tokens_burn": "policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1\ngas 0.089 gwei, 29 open, 0 idle packs, idle 0.0269 ETH, cycle net 1.301 mETH, 7d volume 96/day\nstatus OK [ok] operating normally\nsent burnTokens nonce 7 hash 0x114d7022eebba98b24cf49bedd2f333bd96dddc1705f02f8ce2668a32262647d\nmined burnTokens gas 415944 (est 443642) cost 34839565107120 pay 0 net -34839565107120 wei\ndone: 1 sent, 0 failed",
-  "spike_wait": "policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2\ngas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9589 ETH owed to redeemers beyond free ETH\nskip liquidate: pay 180000000000000 wei < cost ~221749500000000 wei beyond --max-loss-wei 0\npolicy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2\ngas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9589 ETH owed to redeemers beyond free ETH\nskip unlist: pay 900000000000000 wei < cost ~3064798800000000 wei beyond --max-loss-wei 0\npolicy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2\ngas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9589 ETH owed to redeemers beyond free ETH\nnothing to do",
-  "spike_work": "policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2\ngas 0.925 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 0.925 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9291 ETH owed to redeemers beyond free ETH\nsent unlist nonce 11 hash 0x3a0f163baa7411cab4ee1b4ccb1c2c98aa6bcd10ac8c4e8aa1df8ab61a6bc326\nmined unlist gas 2917113 (est 3645771) cost 2381497824365817 pay 900000000000000 net -1481497824365817 wei\nsent liquidate nonce 12 hash 0x91bc32f6dc3e95c5370f63a23df93493a9fb471569a6c42e953a205bd94724bc\nmined liquidate gas 2105489 (est 2631241) cost 1536807388592201 pay 780000000000000 net -756807388592201 wei\ndone: 2 sent, 0 failed"
+  "tokens_idle": "policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1\ngas 0.088 gwei, 29 open, 0 idle packs, idle 0.0269 ETH, cycle net 1.301 mETH, 7d volume 96/day\nstatus TOKENS_UNBURNED [info] 5.0392 FWA tokens; anyone may call burnTokens\nnote: tokens 5.0392 unburned (run with --burn-tokens; operator pays the gas)\nnote: tokens 5.0392 unburned (run with --burn-tokens; operator pays the gas)\nnothing to do",
+  "tokens_burn": "policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1\ngas 0.088 gwei, 29 open, 0 idle packs, idle 0.0269 ETH, cycle net 1.301 mETH, 7d volume 96/day\nstatus OK [ok] operating normally\nsent burnTokens nonce 7 hash 0xf87488a1f526d6259c0608ee43808ecb49aa6ea8ec2453c2d17355097b31e256\nmined burnTokens gas 415900 (est 443598) cost 34818427661200 pay 0 net -34818427661200 wei\ndone: 1 sent, 0 failed",
+  "spike_wait": "policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2\ngas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9589 ETH owed to redeemers beyond free ETH\nskip liquidate: pay 180000000000000 wei < cost ~221730600000000 wei beyond --max-loss-wei 0\npolicy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2\ngas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9589 ETH owed to redeemers beyond free ETH\nskip unlist: pay 900000000000000 wei < cost ~3064784100000000 wei beyond --max-loss-wei 0\npolicy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2\ngas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9589 ETH owed to redeemers beyond free ETH\nnothing to do",
+  "spike_work": "policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2\ngas 0.925 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day\nstatus GAS_ABOVE_CEILING [wait] bid 0.925 gwei > ceiling 0.500; liability work only\nstatus WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue\nstatus REDEMPTION_LIQUIDITY_SHORT [wait] 0.9291 ETH owed to redeemers beyond free ETH\nsent unlist nonce 11 hash 0xa1f9410902ac573783034818ad1cb1b399618b907ef5e39301827a1b44534d57\nmined unlist gas 2917099 (est 3645753) cost 2381486205313856 pay 900000000000000 net -1481486205313856 wei\nsent liquidate nonce 12 hash 0xaa7116d8ba04aebd61f2eb9daa0e84d1c02597c082de4b151d6ceb478abfb20e\nmined liquidate gas 2105472 (est 2631219) cost 1536794765445504 pay 780000000000000 net -756794765445504 wei\ndone: 2 sent, 0 failed"
  },
  "log": [
   {
@@ -77,99 +76,99 @@
   },
   {
    "tag": "priced",
-   "balance": 31884029754730000,
-   "lastNav": 2000002525993640000,
-   "totalShares": 198219937468124227,
+   "balance": 31887781584280000,
+   "lastNav": 2000002551620780000,
+   "totalShares": 198220523423735469,
    "open": 29,
    "idle": 0,
    "loose": 3,
    "tokens": 0,
-   "keeper": 10000994005927469089,
-   "holder": 8009917362632287702
+   "keeper": 10001000179573796846,
+   "holder": 8009917396482880555
   },
   {
    "tag": "deployed capital",
-   "balance": 31884029754730000,
-   "lastNav": 2000002525993640000,
-   "totalShares": 198219937468124227,
+   "balance": 31887781584280000,
+   "lastNav": 2000002551620780000,
+   "totalShares": 198220523423735469,
    "open": 29,
    "idle": 0,
    "loose": 3,
    "tokens": 0,
-   "keeper": 10000994005927469089,
-   "holder": 8009917362632287702
+   "keeper": 10001000179573796846,
+   "holder": 8009917396482880555
   },
   {
    "tag": "after token burn",
-   "balance": 31884029754730000,
-   "lastNav": 2000002525993640000,
-   "totalShares": 198219937468124227,
+   "balance": 31887781584280000,
+   "lastNav": 2000002551620780000,
+   "totalShares": 198220523423735469,
    "open": 29,
    "idle": 0,
    "loose": 3,
    "tokens": 0,
-   "keeper": 10000959166362361969,
-   "holder": 8009917362632287702
+   "keeper": 10000965361146135646,
+   "holder": 8009917396482880555
   },
   {
    "tag": "after kick, sync, relist",
-   "balance": 35082723517405000,
-   "lastNav": 2000002525993640000,
-   "totalShares": 198219937468124227,
+   "balance": 35086493444280000,
+   "lastNav": 2000002551620780000,
+   "totalShares": 198220523423735469,
    "open": 29,
    "idle": 0,
    "loose": 3,
    "tokens": 0,
-   "keeper": 10000993824079303186,
-   "holder": 8009917362632287702
+   "keeper": 10001000024690816521,
+   "holder": 8009917396482880555
   },
   {
    "tag": "before policy swap",
-   "balance": 35082723517405000,
-   "lastNav": 2000002525993640000,
-   "totalShares": 198219937468124227,
+   "balance": 35086493444280000,
+   "lastNav": 2000002551620780000,
+   "totalShares": 198220523423735469,
    "open": 29,
    "idle": 0,
    "loose": 3,
    "tokens": 0,
-   "keeper": 10000993824079303186,
-   "holder": 8009917362632287702
+   "keeper": 10001000024690816521,
+   "holder": 8009917396482880555
   },
   {
    "tag": "policy V2 active",
-   "balance": 35082723517405000,
-   "lastNav": 2000002525993640000,
-   "totalShares": 198219937468124227,
+   "balance": 35086493444280000,
+   "lastNav": 2000002551620780000,
+   "totalShares": 198220523423735469,
    "open": 29,
    "idle": 0,
    "loose": 3,
    "tokens": 0,
-   "keeper": 10000993824079303186,
-   "holder": 8009917362632287702
+   "keeper": 10001000024690816521,
+   "holder": 8009917396482880555
   },
   {
    "tag": "partial withdrawal",
-   "balance": 11886214032079665,
-   "lastNav": 996759463518311664,
-   "totalShares": 99609968734062114,
+   "balance": 11888048863388869,
+   "lastNav": 996761312466648868,
+   "totalShares": 99610261711867735,
    "open": 14,
    "idle": 2,
    "loose": 0,
    "tokens": 0,
-   "keeper": 9998147084816345168,
-   "holder": 8995667495741001001
+   "keeper": 9998153342970057161,
+   "holder": 8995669475789293776
   },
   {
    "tag": "wound down",
-   "balance": 10085275346889258,
-   "lastNav": 10008074940849256,
+   "balance": 10085264352918221,
+   "lastNav": 10008063950806219,
    "totalShares": 1000000000000000,
    "open": 0,
    "idle": 0,
    "loose": 0,
    "tokens": 0,
-   "keeper": 9998749335923070229,
-   "holder": 9981110721385185809
+   "keeper": 9998755600499816150,
+   "holder": 9981114557256570352
   }
  ],
  "quote_matches_payment": {
@@ -177,68 +176,68 @@
   "differed": [
    [
     "checkpoint",
-    50434717160000,
-    47755377560000
+    50412268100000,
+    47735734700000
    ],
    [
     "restock",
-    1569265292960000,
-    1454482182080000
+    1568296245200000,
+    1453633325120000
    ],
    [
     "list",
-    984757716380000,
-    940784169730000
+    984226702820000,
+    940223175835000
    ],
    [
     "restock",
-    1384187835680000,
-    1309593109520000
+    1383291053360000,
+    1308786636800000
    ],
    [
     "list",
-    894120464345000,
-    857990827670000
+    893615964800000,
+    857506226135000
    ],
    [
     "restock",
-    1208147683920000,
-    1148070825960000
+    1207390466760000,
+    1147390088280000
    ],
    [
     "list",
-    740432707425000,
-    713293752750000
+    740038616775000,
+    712943228850000
    ],
    [
     "sync",
-    30479682650000,
-    30107222450000
+    30475978550000,
+    30103981250000
    ],
    [
     "list",
-    72894464155000,
-    71199014875000
+    72877501875000,
+    71184158750000
    ],
    [
     "liquidate",
-    91755455125000,
-    87633634000000
+    91755442750000,
+    87633620125000
    ],
    [
     "unlist",
-    612800322880000,
-    587914533220000
+    612800225940000,
+    587914431040000
    ],
    [
     "liquidate",
-    535616072425000,
-    518882914375000
+    535615987600000,
+    518882836075000
    ],
    [
     "checkpoint",
-    38523929960000,
-    37333438760000
+    38523922940000,
+    37333432640000
    ]
   ]
  },
@@ -273,19 +272,19 @@
    ],
    [
     "liquidate",
-    87633634000000
+    87633620125000
    ],
    [
     "unlist",
-    587914533220000
+    587914431040000
    ],
    [
     "liquidate",
-    518882914375000
+    518882836075000
    ],
    [
     "checkpoint",
-    37333438760000
+    37333432640000
    ]
   ],
   "v2_formula": [
@@ -309,19 +308,19 @@
    ],
    [
     "liquidate",
-    87633634000000
+    87633620125000
    ],
    [
     "unlist",
-    587914533220000
+    587914431040000
    ],
    [
     "liquidate",
-    518882914375000
+    518882836075000
    ],
    [
     "checkpoint",
-    37333438760000
+    37333432640000
    ]
   ]
  }

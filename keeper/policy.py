@@ -287,15 +287,15 @@ def status(s, planned=None):
     if owed:
         out.append(("RECOVERY_REQUIRED", "action", f"FWA holds packs owed to the vault for listings {owed[:5]}"))
     if s.listing_paused and not s.winding_down:
-        out.append(("LISTING_PAUSED", "action", "guardian paused listing"))
+        out.append(("LISTING_PAUSED", "action", "owner paused listing"))
     if s.routine_budget == 0:
         out.append(("ROUTINE_BUDGET_EMPTY", "wait", "strategy work is unpaid until the routine budget refills"))
     if s.essential_budget == 0 and (s.locked_shares or s.winding_down):
         out.append(("ESSENTIAL_BUDGET_EMPTY", "action", "redemption and wind-down work is unpaid; holders can run it "
-                    "themselves, or the guardian/admin restores the essential budget"))
+                    "themselves, or the owner restores the essential budget"))
     if s.reserve < reserve_need(s) and not s.winding_down:
         out.append(("RESERVE_BELOW_NEED", "action", f"reserve {s.reserve / 1e18:.4f} ETH < {reserve_need(s) / 1e18:.4f} "
-                    "needed for one listing batch at the ceiling; admin raises it through the delay"))
+                    "needed for one listing batch at the ceiling; owner raises it"))
     if not out:
         out.append(("OK", "ok", "operating normally"))
     return out

@@ -17,7 +17,7 @@ non-transferable internal shares priced at checkpoints.
 | FWA main pool (holds vault backing) | custody of listed packs, backing escrow, flat fee shares | 10% of backing on a bid, 1% settlement fee on keep/silent |
 | FWA rewards module | FWA token rewards to depositors | nothing (tokens are burned) |
 | Shapes / ShapePacks | ETH-backed prize tokens | 0.001 ETH mint fee per 0.1 ETH minted |
-| Admin / guardian (may be one key, D44) | nothing | nothing, except what any keeper earns for verified work, inside the budgets (D54 F1, D56); admin changes apply at once (D58) |
+| Owner (one role, D59) | nothing | nothing, except what any keeper earns for verified work, inside the budgets (D54 F1, D56); changes apply at once (D58) |
 
 ## Buckets (A asset, L liability, R accounting representation of the same ETH)
 
@@ -59,7 +59,7 @@ bucket: it leaves `_free` after a call does necessary work or realizes more than
 - `highWaterMark` only rises: distributions pay only on new gains above it.
 - `redeemEra` / `epoch` / `lastCheckpointInterval` only advance; a checkpoint uses the interval's one slot, so a
   no-flow checkpoint is refused (LOW-1) to avoid delaying a deposit later in the same blackout.
-- `windingDown`, `depositsPaused`, `listingPaused` are one-way raises (guardian).
+- `windingDown`, `depositsPaused`, `listingPaused` are one-way raises (owner).
 - Mint fees (0.001 ETH per 0.1 ETH minted) never return; holders bear them pro rata.
 - Backing on a bid never returns (the vault keeps the pack instead); the 1% FWA settlement fee on keep/silent never
   returns.
