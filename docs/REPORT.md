@@ -293,3 +293,11 @@ hash to sign: `f23d05389860157fa782341e3a3cff2065e92d3d4f61a3dd28f4176ee0fcc3b0`
 | O8 | redemption paid with the oracle broken | 0.9975 of 1 ETH |
 | O9 | holder cost with zero acquisitions | 0.46% (bound 1.5%) |
 | O10 | staged relist activated | yes |
+
+## 12. Outcomes signed (2026-11-17)
+
+The owner signed outcome hash `f23d0538...0fcc3b0` with the `asset-flow` SSH key in the kit's
+allowed signers. `asset_gate.py .` returns **PASS** (16 regimes, 10 outcomes). Remaining before a
+canary deploy: an independent review recorded under `audit/` for the current source hash (the
+deploy step runs the gate with `--require-review`), the guardian/admin address, and the owner's
+deploy authorization.
