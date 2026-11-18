@@ -47,4 +47,16 @@ jobs:
           forge test --match-path test/fork/ForkBacking.t.sol
           --rpc-url https://mainnet.gateway.tenderly.co
           --fork-retries 30 --fork-retry-backoff 5000
-          --compute-units-per-second 100 -vvvv
+          --compute-units-per-second 100 -vv
+      - name: Validate vault lifecycle and holder withdrawals on mainnet fork
+        run: >
+          forge test --match-path test/fork/ForkVaultLifecycle.t.sol
+          --rpc-url https://mainnet.gateway.tenderly.co
+          --fork-retries 30 --fork-retry-backoff 5000
+          --compute-units-per-second 100 -vv
+      - name: Validate adversarial keeper and accounting paths on mainnet fork
+        run: >
+          forge test --match-path test/fork/ForkVaultAdversarial.t.sol
+          --rpc-url https://mainnet.gateway.tenderly.co
+          --fork-retries 30 --fork-retry-backoff 5000
+          --compute-units-per-second 100 -vv
