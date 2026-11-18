@@ -1,0 +1,539 @@
+{
+  "revision": "909e761f65883cab680355f32b0a1986d5b1500a",
+  "keeper_sha256": {
+    "keeper/index.py": "df14148c2626e7bc58d4728ce6e66a9d3ff8466475625813d363c66cc77fa6a9",
+    "keeper/keeper.py": "a4f017ba65715a1dcc6b942ae47ecb6cef82f95e2ab19449df50ab0f9d94a3d1",
+    "keeper/measure_gas.py": "2a3e11df2ebd4b38b46d7f9c99a76165cded2467091861183dd2149dc53eff0d",
+    "keeper/policy.py": "3eb4837f583a268b3e13d352ca142a9350517ddcce5e9e99350b1df57d648129",
+    "keeper/rehearsal_batch.py": "4f9351695722ee388ec09f3961b1686fcc6a13ddd324a36fd6a5a60f0df3a252",
+    "keeper/rehearse_canary.py": "938d36abab224d1b09032b30afda2041b51d0993505274da3ebe983a95686888",
+    "keeper/rehearse_current.py": "8c83d282ea417115ccaeacb80c05c22b95302543b1d01fa66c04d66c5447e3ac",
+    "keeper/rehearse_list_split.py": "71d792dc8aaffcde0a67ba40f8f7fc6d570c9a3476fcca53a817a10b730d9c28",
+    "keeper/test_inclusion.py": "96c406195844df1a70c719c418f598d56fe409c35e8aede000ec50988c3bc5c5",
+    "keeper/test_index.py": "f805b4f18c7e0c447567e6cee0a8295fdfe65c56efb66680116f3e5526560070",
+    "keeper/test_policy.py": "86600c71ae60e408ab85712e7f51c419e2a7b3bf6fe63751b856e631c0005af8",
+    "keeper/test_tx.py": "737b3df7e1ddb641928188f137097fc9ab63c0a5eca21069e57b81d843a02a58",
+    "keeper/tx.py": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"
+  },
+  "postflight": {
+    "endpoint": "http://127.0.0.1:8557",
+    "node_pid": 10583,
+    "old_paused_driver_pid": 10551,
+    "head": 26418606,
+    "automine": true,
+    "pool": {
+      "pending": "0x0",
+      "queued": "0x0"
+    },
+    "funding_wei": 60000000000000000000,
+    "actors_funded": 6,
+    "vault": "0xe7709640478bbf1b1d7fc5bac840ba3d657782d1",
+    "owner": "0x37Dcd875c4E367e080f1e05F18F10dB0D45a65B5",
+    "winding_down": "true",
+    "open": "0",
+    "idle": "0",
+    "recovery": "0",
+    "loose": "0",
+    "runtime_bytes": 24549,
+    "runtime_sha256": "81066a9b2cbdfcb1c2af4dacdb906732f6c760f13a50649529d1a2f8340d91e2",
+    "source_sha256": {
+      "src/PackVault.sol": "798e7ea0fc9968f8fe4d1ec14ce40275f47b5a10fb16872c73295929fc204fe9",
+      "src/VaultLib.sol": "a13b42c4ce02aebfa5e19e5fd3536c6c3da4caa2965f2e11d5952ed82bc158d9",
+      "src/interfaces/External.sol": "d50229cf80a4a036c9ba3f4f8bb60452129ee51dc7ca0263ad612b2ea76e499d",
+      "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a"
+    }
+  },
+  "quiet": {
+    "block": 26418573,
+    "positions_listed": 29,
+    "staged_after_listing": 0,
+    "deposited": 1990121185000000000,
+    "claimed": 1976995382678932508,
+    "holder_result": -13125802321067492,
+    "keeper_pay": 4125986789800000,
+    "keeper_net": 659482624011539,
+    "mints": 9,
+    "ledger_gap": 0,
+    "reverted": 0,
+    "sent": 20
+  },
+  "cash_flow": {
+    "seed_wei": 10000000000000000,
+    "deposited_wei": 1990121185000000000,
+    "claimed_wei": 1976995382678932508,
+    "keeper_paid_wei": 4125986789800000,
+    "keeper_gas_spent_wei": 3466504165788461,
+    "mint_fees_wei": 9000000000000000,
+    "ending_vault_wei": 9999815531267492,
+    "gap_wei": 0
+  },
+  "deployment": {
+    "operation": "production deployment",
+    "values": {
+      "fwa": "0x958C41181182e76F221331b2755b77D9e1426A98",
+      "shapes": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+      "packs": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+      "owner": "0x37Dcd875c4E367e080f1e05F18F10dB0D45a65B5",
+      "seedWei": 10000000000000000,
+      "minEdgeBps": 100,
+      "bufferBps": 0,
+      "distributionBps": 0,
+      "payMarkupBps": 0,
+      "keeperShareBps": 2500,
+      "allocatedBoundBps": 1000,
+      "packUnitsMask": 8,
+      "gasCeilingWei": 500000000,
+      "essentialCeilingWei": 2000000000,
+      "maxTipWei": 50000000,
+      "workFeeWei": 20000000000000,
+      "reserveWei": 5000000000000000,
+      "tvlCapWei": 2000000000000000000,
+      "routineCapWei": 30000000000000000,
+      "routineRatePerDayWei": 800000000000000,
+      "essentialCapWei": 0,
+      "essentialRatePerDayWei": 0
+    },
+    "deployments": [
+      {
+        "name": "KeeperPolicyV1",
+        "address": "0x321d151f896c205ac5c747c2cff4e9a0e185a27c",
+        "runtime_bytes": 216,
+        "gas_used": 100155,
+        "runtime_sha256": "d8f3f70dfb224ca9923e6e2b0be70ba2cd35c27255b590427af3c7b95dc54410",
+        "receipt": {
+          "type": "0x2",
+          "status": "0x1",
+          "cumulativeGasUsed": "0x1873b",
+          "logs": [],
+          "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+          "transactionHash": "0x02bd22932d7587c378622bee5524093c30d65449a82e38c581c096f5556d53ac",
+          "transactionIndex": "0x0",
+          "blockHash": "0xf52f12f96ee6eb1432f055e9399031d2d31c4f707e762973db868627aa970c95",
+          "blockNumber": "0x1931d8e",
+          "gasUsed": "0x1873b",
+          "effectiveGasPrice": "0x32720be",
+          "blobGasPrice": "0x2701bf4a1abf5194",
+          "from": "0xe0980b9f7f5fb4a98813552894f4e980836cda7c",
+          "to": null,
+          "contractAddress": "0x321d151f896c205ac5c747c2cff4e9a0e185a27c",
+          "blockTimestamp": 1794787264
+        }
+      },
+      {
+        "name": "PackVault",
+        "address": "0xe7709640478bbf1b1d7fc5bac840ba3d657782d1",
+        "runtime_bytes": 24549,
+        "gas_used": 5766663,
+        "runtime_sha256": "81066a9b2cbdfcb1c2af4dacdb906732f6c760f13a50649529d1a2f8340d91e2",
+        "receipt": {
+          "type": "0x2",
+          "status": "0x1",
+          "cumulativeGasUsed": "0x57fe07",
+          "logs": [
+            {
+              "address": "0x6fe9193276bf7abcbee44ab7afd717d637d6faf0",
+              "topics": [
+                "0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31",
+                "0x000000000000000000000000e7709640478bbf1b1d7fc5bac840ba3d657782d1",
+                "0x000000000000000000000000f21514b090da7df4390803497d6ae673801e5ca7"
+              ],
+              "data": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "blockHash": "0x8b35871c2bf536c78122d6655fe8df4463500d0dd8cd2dc068b521eac7d68b7f",
+              "blockNumber": "0x1931d8f",
+              "blockTimestamp": "0x6afa47c0",
+              "transactionHash": "0xd16ec417c9706d83d5d627938db608f7909ec7b8435d22446eef70339306e455",
+              "transactionIndex": "0x0",
+              "logIndex": "0x0",
+              "removed": false
+            },
+            {
+              "address": "0xf21514b090da7df4390803497d6ae673801e5ca7",
+              "topics": [
+                "0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31",
+                "0x000000000000000000000000e7709640478bbf1b1d7fc5bac840ba3d657782d1",
+                "0x000000000000000000000000958c41181182e76f221331b2755b77d9e1426a98"
+              ],
+              "data": "0x0000000000000000000000000000000000000000000000000000000000000001",
+              "blockHash": "0x8b35871c2bf536c78122d6655fe8df4463500d0dd8cd2dc068b521eac7d68b7f",
+              "blockNumber": "0x1931d8f",
+              "blockTimestamp": "0x6afa47c0",
+              "transactionHash": "0xd16ec417c9706d83d5d627938db608f7909ec7b8435d22446eef70339306e455",
+              "transactionIndex": "0x0",
+              "logIndex": "0x1",
+              "removed": false
+            }
+          ],
+          "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000008000000000008000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000040000000000000002008000000000000001000000200000000000000100000000004200000000000000000000000000000000000000000000000000000000000000000000000000408400000000000000200800000000000000000000000000000000000000000000000000000000",
+          "transactionHash": "0xd16ec417c9706d83d5d627938db608f7909ec7b8435d22446eef70339306e455",
+          "transactionIndex": "0x0",
+          "blockHash": "0x8b35871c2bf536c78122d6655fe8df4463500d0dd8cd2dc068b521eac7d68b7f",
+          "blockNumber": "0x1931d8f",
+          "gasUsed": "0x57fe07",
+          "effectiveGasPrice": "0x3219f6f",
+          "blobGasPrice": "0x1683447412a0665b",
+          "from": "0xe0980b9f7f5fb4a98813552894f4e980836cda7c",
+          "to": null,
+          "contractAddress": "0xe7709640478bbf1b1d7fc5bac840ba3d657782d1",
+          "blockTimestamp": 1794787264
+        }
+      },
+      {
+        "name": "VaultLib",
+        "address": "0x00c6B6d3C70270040d0390938853A58Bacd9A190",
+        "runtime_bytes": 20484,
+        "runtime_sha256": "7e5bbad66da42700f86a86550d4c38c6802e036ba48f78399f9cb8cdd651c37d",
+        "reused": true,
+        "artifact_match": true,
+        "gas_used": null,
+        "receipt": null
+      }
+    ],
+    "postflight_output": "chain 1, values deploy/rehearse-quiet.json, BROADCAST\nNo files changed, compilation skipped\nScript ran successfully.\n\n== Return ==\nvault: contract PackVault 0xe7709640478BbF1b1D7FC5bAC840ba3d657782D1\n\n== Logs ==\n  PackVault 0xe7709640478BbF1b1D7FC5bAC840ba3d657782D1\n  KeeperPolicy 0x321d151F896C205ac5C747C2CFF4e9A0E185a27c\n  postflight passed\n\n## Setting up 1 EVM.\n\n==========================\n\nChain 1\n\nEstimated max fee per gas: 0.056619276 gwei\nEstimated base fee per gas: 0.003309638 gwei\nEstimated max priority fee per gas: 0.05 gwei\n\nEstimated total gas used for script: 7626862\n\nEstimated amount required: 0.000431827404591912 ETH\n\n==========================\n\n\n==========================\n\nONCHAIN EXECUTION COMPLETE & SUCCESSFUL.\n\nTransactions saved to: /Users/dd/.codex/worktrees/da17/shapes-fwa-pool/broadcast/Deploy.s.sol/1/run-latest.json\n\nSensitive values saved to: /Users/dd/.codex/worktrees/da17/shapes-fwa-pool/cache/Deploy.s.sol/1/run-latest.json\n\n",
+    "vault": "0xe7709640478bbf1b1d7fc5bac840ba3d657782d1",
+    "source_sha256": {
+      "src/PackVault.sol": "798e7ea0fc9968f8fe4d1ec14ce40275f47b5a10fb16872c73295929fc204fe9",
+      "src/VaultLib.sol": "a13b42c4ce02aebfa5e19e5fd3536c6c3da4caa2965f2e11d5952ed82bc158d9",
+      "src/interfaces/External.sol": "d50229cf80a4a036c9ba3f4f8bb60452129ee51dc7ca0263ad612b2ea76e499d",
+      "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a"
+    },
+    "loaded_client": {
+      "rehearsal_batch": {
+        "source_sha256_at_import": "4f9351695722ee388ec09f3961b1686fcc6a13ddd324a36fd6a5a60f0df3a252",
+        "loaded_code_sha256": "ec85a9e0bd623f51f57748f8dabdd504f12ec6b636d84d20b6191ac056998aae"
+      },
+      "rehearse_canary": {
+        "source_sha256_at_import": "938d36abab224d1b09032b30afda2041b51d0993505274da3ebe983a95686888",
+        "loaded_code_sha256": "7ca31e0e47c0969399ac36ee5e837ed510fa61308dc328108c3027242b3ce5fb"
+      },
+      "tx": {
+        "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230",
+        "loaded_code_sha256": "4b64b57ba9cae304c4785c8b8cc6c5ec76b8920af46b6a1abba0844512dbcd41"
+      }
+    },
+    "client_source_sha256": {
+      "keeper/keeper.py": "a4f017ba65715a1dcc6b942ae47ecb6cef82f95e2ab19449df50ab0f9d94a3d1",
+      "keeper/policy.py": "3eb4837f583a268b3e13d352ca142a9350517ddcce5e9e99350b1df57d648129",
+      "keeper/rehearsal_batch.py": "4f9351695722ee388ec09f3961b1686fcc6a13ddd324a36fd6a5a60f0df3a252"
+    },
+    "vault_context": {
+      "vault": "0xe7709640478bbf1b1d7fc5bac840ba3d657782d1",
+      "source_sha256": {
+        "src/PackVault.sol": "798e7ea0fc9968f8fe4d1ec14ce40275f47b5a10fb16872c73295929fc204fe9",
+        "src/VaultLib.sol": "a13b42c4ce02aebfa5e19e5fd3536c6c3da4caa2965f2e11d5952ed82bc158d9",
+        "src/interfaces/External.sol": "d50229cf80a4a036c9ba3f4f8bb60452129ee51dc7ca0263ad612b2ea76e499d",
+        "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a"
+      },
+      "source_unchanged_during_deploy": true,
+      "runtimes": [
+        {
+          "name": "KeeperPolicyV1",
+          "address": "0x321d151f896c205ac5c747c2cff4e9a0e185a27c",
+          "runtime_bytes": 216,
+          "runtime_sha256": "d8f3f70dfb224ca9923e6e2b0be70ba2cd35c27255b590427af3c7b95dc54410"
+        },
+        {
+          "name": "PackVault",
+          "address": "0xe7709640478bbf1b1d7fc5bac840ba3d657782d1",
+          "runtime_bytes": 24549,
+          "runtime_sha256": "81066a9b2cbdfcb1c2af4dacdb906732f6c760f13a50649529d1a2f8340d91e2"
+        },
+        {
+          "name": "VaultLib",
+          "address": "0x00c6B6d3C70270040d0390938853A58Bacd9A190",
+          "runtime_bytes": 20484,
+          "runtime_sha256": "7e5bbad66da42700f86a86550d4c38c6802e036ba48f78399f9cb8cdd651c37d"
+        }
+      ]
+    }
+  },
+  "recovery": {
+    "operation": "keeper restart/lost-response/reorg",
+    "recovered": {
+      "label": "burnTokens",
+      "to": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6",
+      "hash": "0x8fd23bb3163b5846dd025c5f92839674def316c31860b240ae3af83d589fa104",
+      "block": 26418574,
+      "block_hash": "0x37aed969b8b2e919cdd1d004ef8315b54806794dcd217f6252304d98ce15a325",
+      "status": 1,
+      "gas_used": 184132,
+      "price": 52895934,
+      "cost": 9739834119288,
+      "pay": 0,
+      "net": -9739834119288,
+      "est": 211824,
+      "gas_limit": 264780,
+      "expected_pay": 0
+    },
+    "recovery_client": {
+      "test_tx": {
+        "source_sha256_at_import": "737b3df7e1ddb641928188f137097fc9ab63c0a5eca21069e57b81d843a02a58",
+        "loaded_code_sha256": "8ac61cc17c5e6be4a1d06872756eccca357789a83024139f704722158c4eb939"
+      },
+      "keeper": {
+        "source_sha256_at_import": "a4f017ba65715a1dcc6b942ae47ecb6cef82f95e2ab19449df50ab0f9d94a3d1",
+        "loaded_code_sha256": "11aa99de226ad667fc06175f0e1068ee62833589c2bd240cf30a7e4b86e67579"
+      },
+      "tx": {
+        "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230",
+        "loaded_code_sha256": "4b64b57ba9cae304c4785c8b8cc6c5ec76b8920af46b6a1abba0844512dbcd41"
+      },
+      "rehearse_canary": {
+        "source_sha256_at_import": "938d36abab224d1b09032b30afda2041b51d0993505274da3ebe983a95686888",
+        "loaded_code_sha256": "7ca31e0e47c0969399ac36ee5e837ed510fa61308dc328108c3027242b3ce5fb"
+      }
+    },
+    "reverted": {
+      "label": "burnTokens",
+      "to": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6",
+      "hash": "0x5ab34cb0c8462687bcb104b07071e3ca851aeab2fa48f2c5ca688a5ac5f08b9a",
+      "block": 26418575,
+      "block_hash": "0x162c3a604dd9857da62cbd2ad9627668ecbda0bfb75c6e05f9cfdc93f106b8e3",
+      "status": 0,
+      "gas_used": 118057,
+      "price": 52536165,
+      "cost": 6202262031405,
+      "pay": 0,
+      "net": -6202262031405,
+      "est": 211824,
+      "gas_limit": 264780,
+      "expected_pay": 0
+    },
+    "replaced": {
+      "label": "burnTokens",
+      "to": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6",
+      "hash": "0x40e88a5c1507a93adfd6006c18bbbaa8f16573e635c818b56490ff9d7694e405",
+      "block": 26418577,
+      "block_hash": "0xa12c392b7657039066207e3870c5ad63fed0831ddceee80da4c9bcebf2234951",
+      "status": 1,
+      "gas_used": 184132,
+      "price": 732421876,
+      "cost": 134862304871632,
+      "pay": 0,
+      "net": -134862304871632,
+      "est": 211824,
+      "gas_limit": 264780,
+      "expected_pay": 0
+    },
+    "index_reorg": {
+      "vault": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6",
+      "deployment_block": 26418542,
+      "real_withdrawal": true,
+      "durable_restart": true,
+      "canonical_projection_restore": true
+    },
+    "final_stats": {
+      "sent": 3,
+      "mined": 0,
+      "reverted": 0,
+      "replaced": 0,
+      "dropped": 0,
+      "reorged": 4,
+      "skipped_expected": 0,
+      "skipped_loss": 0,
+      "spent_wei": 0,
+      "paid_wei": 0
+    },
+    "token_supply_restored": 927838334758415010587789088,
+    "loaded_client": {
+      "rehearsal_batch": {
+        "source_sha256_at_import": "4f9351695722ee388ec09f3961b1686fcc6a13ddd324a36fd6a5a60f0df3a252",
+        "loaded_code_sha256": "12f146c0edfa2db989458adb73c2545d6a9c8318f7a38a70e56704809b24eb76"
+      },
+      "rehearse_canary": {
+        "source_sha256_at_import": "938d36abab224d1b09032b30afda2041b51d0993505274da3ebe983a95686888",
+        "loaded_code_sha256": "a7ac681303c92f00664adf65294c66620bd28e9a921ac21b41109c697e923c80"
+      },
+      "keeper": {
+        "source_sha256_at_import": "a4f017ba65715a1dcc6b942ae47ecb6cef82f95e2ab19449df50ab0f9d94a3d1",
+        "loaded_code_sha256": "80445ddc88e3cff2fd8afd65c9e77166d25842b943436605b353a647b95f60cc"
+      },
+      "policy": {
+        "source_sha256_at_import": "3eb4837f583a268b3e13d352ca142a9350517ddcce5e9e99350b1df57d648129",
+        "loaded_code_sha256": "772c8b1673f2e737b727e00e0f234484e21802983d73321a511de5f93d9f0bac"
+      },
+      "index": {
+        "source_sha256_at_import": "df14148c2626e7bc58d4728ce6e66a9d3ff8466475625813d363c66cc77fa6a9",
+        "loaded_code_sha256": "3b3f5629820d47f182729f53bafdbc5ea61e1c913c0deba1c9efe415611753dc"
+      },
+      "tx": {
+        "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230",
+        "loaded_code_sha256": "4b64b57ba9cae304c4785c8b8cc6c5ec76b8920af46b6a1abba0844512dbcd41"
+      }
+    },
+    "client_source_sha256": {
+      "keeper/keeper.py": "a4f017ba65715a1dcc6b942ae47ecb6cef82f95e2ab19449df50ab0f9d94a3d1",
+      "keeper/policy.py": "3eb4837f583a268b3e13d352ca142a9350517ddcce5e9e99350b1df57d648129",
+      "keeper/rehearsal_batch.py": "4f9351695722ee388ec09f3961b1686fcc6a13ddd324a36fd6a5a60f0df3a252"
+    },
+    "vault_context": {
+      "vault": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6",
+      "source_sha256": {
+        "src/PackVault.sol": "798e7ea0fc9968f8fe4d1ec14ce40275f47b5a10fb16872c73295929fc204fe9",
+        "src/VaultLib.sol": "612b06f37a7e58c4611943e6d939d74016dc08a1ad1b64b72586256735fb8464",
+        "src/interfaces/External.sol": "d50229cf80a4a036c9ba3f4f8bb60452129ee51dc7ca0263ad612b2ea76e499d",
+        "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a"
+      },
+      "source_unchanged_during_deploy": true,
+      "runtimes": [
+        {
+          "name": "VaultLib",
+          "address": "0x00c6b6d3c70270040d0390938853a58bacd9a190",
+          "runtime_bytes": 20484,
+          "runtime_sha256": "7e5bbad66da42700f86a86550d4c38c6802e036ba48f78399f9cb8cdd651c37d"
+        },
+        {
+          "name": "KeeperPolicyV1",
+          "address": "0x2d478b38a5eeadb8f2e5962d5ad36a15119d7db6",
+          "runtime_bytes": 216,
+          "runtime_sha256": "d8f3f70dfb224ca9923e6e2b0be70ba2cd35c27255b590427af3c7b95dc54410"
+        },
+        {
+          "name": "PackVault",
+          "address": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6",
+          "runtime_bytes": 24549,
+          "runtime_sha256": "df2af21d07b694f2c3d7846c09f160c236796b11eacef9d520e3d39caacefaf8"
+        }
+      ]
+    }
+  },
+  "cap_pool": {
+    "operation": "real uncertain replacement attempt cap",
+    "accepted_hash": "0x40e88a5c1507a93adfd6006c18bbbaa8f16573e635c818b56490ff9d7694e405",
+    "nonce": 21,
+    "attempt_count": 1,
+    "pool": {
+      "pending": {
+        "0x6B401c3364dFb17fe7D54237fC04aba3f7739dd0": {
+          "21": {
+            "type": "0x2",
+            "chainId": "0x1",
+            "nonce": "0x15",
+            "gas": "0x40a4c",
+            "maxFeePerGas": "0x5efeb1f1",
+            "maxPriorityFeePerGas": "0x3b9aca1",
+            "to": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6",
+            "value": "0x0",
+            "accessList": [],
+            "input": "0x67a531730000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000188ea00000000000000000000000000000000000000000000000000000000000188eb00000000000000000000000000000000000000000000000000000000000188ec00000000000000000000000000000000000000000000000000000000000188ed00000000000000000000000000000000000000000000000000000000000188ee00000000000000000000000000000000000000000000000000000000000188ef00000000000000000000000000000000000000000000000000000000000188f000000000000000000000000000000000000000000000000000000000000188f100000000000000000000000000000000000000000000000000000000000188f200000000000000000000000000000000000000000000000000000000000188f3",
+            "r": "0x1",
+            "s": "0x1",
+            "yParity": "0x0",
+            "v": "0x0",
+            "hash": "0x40e88a5c1507a93adfd6006c18bbbaa8f16573e635c818b56490ff9d7694e405",
+            "blockHash": null,
+            "blockNumber": null,
+            "transactionIndex": null,
+            "from": "0x6b401c3364dfb17fe7d54237fc04aba3f7739dd0",
+            "gasPrice": "0x5efeb1f1"
+          }
+        }
+      },
+      "queued": {}
+    },
+    "loaded_client": {
+      "rehearsal_batch": {
+        "source_sha256_at_import": "4f9351695722ee388ec09f3961b1686fcc6a13ddd324a36fd6a5a60f0df3a252",
+        "loaded_code_sha256": "12f146c0edfa2db989458adb73c2545d6a9c8318f7a38a70e56704809b24eb76"
+      },
+      "rehearse_canary": {
+        "source_sha256_at_import": "938d36abab224d1b09032b30afda2041b51d0993505274da3ebe983a95686888",
+        "loaded_code_sha256": "a7ac681303c92f00664adf65294c66620bd28e9a921ac21b41109c697e923c80"
+      },
+      "keeper": {
+        "source_sha256_at_import": "a4f017ba65715a1dcc6b942ae47ecb6cef82f95e2ab19449df50ab0f9d94a3d1",
+        "loaded_code_sha256": "80445ddc88e3cff2fd8afd65c9e77166d25842b943436605b353a647b95f60cc"
+      },
+      "policy": {
+        "source_sha256_at_import": "3eb4837f583a268b3e13d352ca142a9350517ddcce5e9e99350b1df57d648129",
+        "loaded_code_sha256": "772c8b1673f2e737b727e00e0f234484e21802983d73321a511de5f93d9f0bac"
+      },
+      "index": {
+        "source_sha256_at_import": "df14148c2626e7bc58d4728ce6e66a9d3ff8466475625813d363c66cc77fa6a9",
+        "loaded_code_sha256": "3b3f5629820d47f182729f53bafdbc5ea61e1c913c0deba1c9efe415611753dc"
+      },
+      "tx": {
+        "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230",
+        "loaded_code_sha256": "4b64b57ba9cae304c4785c8b8cc6c5ec76b8920af46b6a1abba0844512dbcd41"
+      }
+    },
+    "client_source_sha256": {
+      "keeper/keeper.py": "a4f017ba65715a1dcc6b942ae47ecb6cef82f95e2ab19449df50ab0f9d94a3d1",
+      "keeper/policy.py": "3eb4837f583a268b3e13d352ca142a9350517ddcce5e9e99350b1df57d648129",
+      "keeper/rehearsal_batch.py": "4f9351695722ee388ec09f3961b1686fcc6a13ddd324a36fd6a5a60f0df3a252"
+    },
+    "vault_context": {
+      "vault": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6",
+      "source_sha256": {
+        "src/PackVault.sol": "798e7ea0fc9968f8fe4d1ec14ce40275f47b5a10fb16872c73295929fc204fe9",
+        "src/VaultLib.sol": "612b06f37a7e58c4611943e6d939d74016dc08a1ad1b64b72586256735fb8464",
+        "src/interfaces/External.sol": "d50229cf80a4a036c9ba3f4f8bb60452129ee51dc7ca0263ad612b2ea76e499d",
+        "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a"
+      },
+      "source_unchanged_during_deploy": true,
+      "runtimes": [
+        {
+          "name": "VaultLib",
+          "address": "0x00c6b6d3c70270040d0390938853a58bacd9a190",
+          "runtime_bytes": 20484,
+          "runtime_sha256": "7e5bbad66da42700f86a86550d4c38c6802e036ba48f78399f9cb8cdd651c37d"
+        },
+        {
+          "name": "KeeperPolicyV1",
+          "address": "0x2d478b38a5eeadb8f2e5962d5ad36a15119d7db6",
+          "runtime_bytes": 216,
+          "runtime_sha256": "d8f3f70dfb224ca9923e6e2b0be70ba2cd35c27255b590427af3c7b95dc54410"
+        },
+        {
+          "name": "PackVault",
+          "address": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6",
+          "runtime_bytes": 24549,
+          "runtime_sha256": "df2af21d07b694f2c3d7846c09f160c236796b11eacef9d520e3d39caacefaf8"
+        }
+      ]
+    }
+  },
+  "commands": [
+    {
+      "command": "python3 keeper/rehearsal_batch.py --execute-approved-local-batch --calibration-first",
+      "status": "original driver paused after an intermediate failure; node preserved"
+    },
+    {
+      "command": "python3 keeper/test_policy.py",
+      "exit": 0
+    },
+    {
+      "command": "python3 keeper/test_index.py",
+      "exit": 0,
+      "scope": "pure codec/projection/concurrent real SQLite writers"
+    },
+    {
+      "command": "python3 keeper/test_inclusion.py --rpc http://127.0.0.1:8557",
+      "exit": 0,
+      "scope": "read-only actual BASEFEE probe"
+    },
+    {
+      "command": "manual approved final3 stdin wrapper invokes test_tx.exercise(existing actual vault) then fresh python3 keeper/rehearse_current.py",
+      "exit": 0,
+      "output": "/private/tmp/position-approved-final3-and-quiet.txt"
+    }
+  ],
+  "logs": {
+    "workdir": "/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/pack-vault-integration-batch-77gnn3vj",
+    "actions": "/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/pack-vault-integration-batch-77gnn3vj/actions.jsonl",
+    "quiet": "/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/pack-vault-integration-batch-77gnn3vj/final-quiet-repaired-client.log",
+    "focused": "/private/tmp/position-keeper-final-focused.txt",
+    "postflight": "/private/tmp/position-keeper-final-postflight.json",
+    "splitting": "/private/tmp/position-list-splitting-actual.txt",
+    "preserved_failed_pool_fixture": "/private/tmp/position-keeper-real-recovery-final.txt",
+    "preserved_intermediate_canary": "/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/pack-vault-integration-batch-77gnn3vj/final-rehearse_canary.py.log"
+  },
+  "limitations": [
+    "Local fork only, no production broadcast or owner signature.",
+    "Final canary optional buyback failed honest preflight after prior branch consumed the real opportunity; final quiet lifecycle and existing real token claims used instead.",
+    "Named oracle owner is a real3451-byte contract; its controller was outside approved signer set. No oracle impersonation/topup; local30-unit/kick branches skipped.",
+    "Successful VRF selection replay and largest30-unit gas evidence are separate Forge results, not local-node broadcast claims.",
+    "Final replacement witness authenticated a fresh real estimate and actual pad, but did not force a foreign-to-own journal workload increase.",
+    "Original driver10551 remains paused because it loaded old cleanup semantics; future source preserves node on every result.",
+    "Aggregate maintenance funding and unchanged owner acceptance failures remain for lead scorecard; no budgets changed."
+  ]
+}

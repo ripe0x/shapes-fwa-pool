@@ -1,0 +1,60 @@
+{
+  "history": {
+    "end_block": 26425092,
+    "end_timestamp": 1794802079,
+    "start_timestamp": 1792210079,
+    "completed": 18281,
+    "successful": 13191,
+    "refunded": 5090
+  },
+  "values_file": "deploy/canary.json",
+  "policy_sha256": "3eb4837f583a268b3e13d352ca142a9350517ddcce5e9e99350b1df57d648129",
+  "journal_batch": 16,
+  "minimum_calls": 1143,
+  "baseline_quoted_gas": 645585000,
+  "cases": [
+    {
+      "basefee_wei": 150000000,
+      "keeper_bid_wei": 200000000,
+      "quote_price_wei": 200000000,
+      "minimum_global_quote_30d_wei": 129117000000000000,
+      "minimum_global_quote_per_day_wei": 4303900000000000,
+      "maximum_budget_30d_wei": 54000000000000000,
+      "refill_per_day_wei": 800000000000000,
+      "shortfall_30d_wei": 75117000000000000,
+      "steady_refill_shortfall_per_day_wei": 3503900000000000
+    },
+    {
+      "basefee_wei": 450000000,
+      "keeper_bid_wei": 500000000,
+      "quote_price_wei": 500000000,
+      "minimum_global_quote_30d_wei": 322792500000000000,
+      "minimum_global_quote_per_day_wei": 10759750000000000,
+      "maximum_budget_30d_wei": 54000000000000000,
+      "refill_per_day_wei": 800000000000000,
+      "shortfall_30d_wei": 268792500000000000,
+      "steady_refill_shortfall_per_day_wei": 9959750000000000
+    },
+    {
+      "basefee_wei": 1000000000,
+      "keeper_bid_wei": 1050000000,
+      "quote_price_wei": 500000000,
+      "minimum_global_quote_30d_wei": 322792500000000000,
+      "minimum_global_quote_per_day_wei": 10759750000000000,
+      "maximum_budget_30d_wei": 54000000000000000,
+      "refill_per_day_wei": 800000000000000,
+      "shortfall_30d_wei": 268792500000000000,
+      "steady_refill_shortfall_per_day_wei": 9959750000000000
+    }
+  ],
+  "reserve_wei": 5000000000000000,
+  "keeper_reserve_need_wei": 4242500000000000,
+  "one_foreign_batch_quote_at_ceiling_wei": 282500000000000,
+  "one_batch_affordable_from_retained_reserve": true,
+  "limitations": [
+    "Optimistic fully packed calls across the whole30days; actual catchup can cost more.",
+    "All entries receive only the global component here; own selection/terminal/prune work is additional.",
+    "No claim of keeper profit, actual billed gas, ETH funding from future income, or a return-gate pass.",
+    "At gas above the routine ceiling a no-loss keeper waits; exits can still run unpaid."
+  ]
+}

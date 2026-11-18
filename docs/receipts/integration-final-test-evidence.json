@@ -1,0 +1,131 @@
+{
+  "base_revision": "f75ee770d0f0bce55a5f2607a23a3ee0104d1df1",
+  "asset_source_hash": "e2e2d2c3965d511c48587a04a135f2f8eaccdfb7d2b5dd3e218cb05e10b16895",
+  "artifacts": {
+    "PackVault": {
+      "runtime_bytes": 24549,
+      "source_sha256": "798e7ea0fc9968f8fe4d1ec14ce40275f47b5a10fb16872c73295929fc204fe9",
+      "unlinked_runtime_template_hex_text_sha256_including_0x": "d1363d5a38703dc73afb926f3098a82ac2543a3c5114cbdee9f8ae68dacf5e6a",
+      "note": "Compiler template fingerprint. PackVault library links and immutable constructor values are resolved at deployment; this is not an instance code hash."
+    },
+    "VaultLib": {
+      "runtime_bytes": 20484,
+      "source_sha256": "a13b42c4ce02aebfa5e19e5fd3536c6c3da4caa2965f2e11d5952ed82bc158d9",
+      "unlinked_runtime_template_hex_text_sha256_including_0x": "c0fc12c97f49b056c6cbd4dad9e07365863ee8820ac668365d3aed4fe5e22072",
+      "note": "Compiler template fingerprint. PackVault library links and immutable constructor values are resolved at deployment; this is not an instance code hash."
+    }
+  },
+  "final_selected_regression": {
+    "command": "CANDIDATE_RUN=1 SOURCE_HASH=e2e2d2c3965d511c48587a04a135f2f8eaccdfb7d2b5dd3e218cb05e10b16895 forge test --match-test '(invariant_.*|test_(flow_.*|reconcile.*|production.*|oversizedKeptGift.*|realTokenBid.*|payIgnores.*|splitting.*|depositListRedeem_roundTrip|keeperBatchesFitTxCap|buildAboveCeilingPaidAtCeilingPrice|manufacturedCycleLosesAtMaxima|oneExitEmptiesEssentialBudget|busyQueueRefusesListing|emptyOracleAddressRejectedBeforeWindDownExit|exemptListsAtFloor|gasOptimalAboveFloorAtHighCeiling|pendingBlockBasefeeNeedsFreshEconomicProposal|measure.*|invalidPolicyRejected|swapToDifferentFormulaPreservesAccounting|greedyPolicyCappedAtEnvelope|forcedEthAccruesToHolders_firstDepositorCannotInflate|dustDepositCannotManufacturePay|maximumLargePackOperationsFitTransactionCap|maximumEightMixedPacksWithRealCrownTakeoversFitTransactionCap|checkpointFullHolderMixCompleteGas))' --no-match-path 'test/research/**' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+    "exit_status": 0,
+    "result": "52 passed,0 failed,0 skipped across19 suites. The invariant group contains four invariant assertions over16 runs,400 handler calls,0 reverts.",
+    "raw": "integration-final-affected-results.txt",
+    "inputs": "integration-final-affected-inputs.json"
+  },
+  "final_exact_receiver_traces": {
+    "command": "CANDIDATE_RUN=1 forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-contract ForkProductionReceiptsTest --match-test 'test_productionCold(KeepFee0|KickAfterFalseSettledBidCandidate)' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vvvv",
+    "exit_status": 0,
+    "result": "2 passed,0 failed. Exact deployed production PackVault, no subclass instrumentation.",
+    "keep_fee0_gas": 46462,
+    "kick_after_false_old_bid_gas": 69730,
+    "callback_stipend": 100000,
+    "minimum_headroom": 30270,
+    "raw": "integration-final-receiver-traces.txt"
+  },
+  "receiver_low_gas_sweeps": {
+    "keep_attempts": 40,
+    "keep_atomic_failures": 22,
+    "keep_successfully_recorded_receipts": 18,
+    "kick_attempts": 59,
+    "kick_atomic_failures": 40,
+    "kick_successfully_recorded_receipts": 19,
+    "result": "Every tested low-gas call either recorded its receipt or reverted atomically; no silent committed unrecorded receipt among99 tested call limits."
+  },
+  "gas_context": {
+    "basefee_wei": 150000000,
+    "gasprice_wei": 200000000,
+    "note": "Set with vm.fee/vm.txGasPrice and asserted in executed state-changing calls. Selection replay uses its recorded historical request/fulfillment fees then restores this context. Gas measurements below are gross before refunds unless parent real transaction receipts say otherwise."
+  },
+  "max_operations": {
+    "restock_10_small_30_units_gross": 10357047,
+    "restock_1_large_30_units_gross": 7958318,
+    "list_1_large_gross": 1223942,
+    "list_8_large_gross": 6554114,
+    "list_8_mixed_with_5_real_crown_tenures_gross": 6527313,
+    "harvest_16_gross": 1069551,
+    "unlist_16_gross": 4113806,
+    "liquidate_10_small_30_shapes_gross": 1771562,
+    "liquidate_1_large_30_shapes_gross": 1155583,
+    "sync_16_real_kicked_receipts_gross": 2095652,
+    "checkpoint_complete_holder_mix_gross": 370178,
+    "tx_cap": 16777216,
+    "keeper_padding_percent": 25,
+    "note": "Independent setup is excluded; complete call includes calldata and intrinsic gas. Every measured successful maximum operation passes ceil(gross*1.25)<16,777,216. Harvest payment0 reflects the documented25% fee-payment gate and does not mean no fees were collected."
+  },
+  "foreign_journal": {
+    "actual_fulfilled_records": 16,
+    "startup_single_gross": 158812,
+    "steady_single_gross": 138930,
+    "steady_16_gross": 420622,
+    "steady_16_single_calls_gross": 2181216,
+    "single_pay_wei": 23000000000000,
+    "batch16_pay_wei": 113000000000000,
+    "split16_pay_wei": 368000000000000,
+    "note": "Actual historical FWA data after vm.rollFork; no own positions and no protocol persistence or state fakery. Keeper funded/checked after fork advancement. Guard initialized through real deposit/cancel for steady samples. Q_JOURNAL30k is conservative compensation, not a measured maximum marginal cost. Parent billed receipts are authoritative."
+  },
+  "list_splitting_final": {
+    "default_batch_gross": 2714707,
+    "default_split_gross": 3417816,
+    "default_batch_pay_wei": 611000000000000,
+    "default_split_pay_wei": 723000000000000,
+    "maximum_markup_bps": 1000,
+    "max_markup_batch_gross": 2714370,
+    "max_markup_split_gross": 3416805,
+    "max_markup_batch_pay_wei": 666100000000000,
+    "max_markup_split_pay_wei": 789300000000000,
+    "note": "Real replaceable PolicyGreedy offers max; vault clips to its authentic envelope. Equal final3 Active positions. Both default and maximum-markup split differences are below gross incremental cost. Parent approved billed batch/split receipts provide the stronger refund-aware calibration."
+  },
+  "scale_evidence": {
+    "production_book_model": "integration-production-model-inputs.json",
+    "result": "8 passed, including256x160 randomized transition attempts and301/1000/10000 bookkeeping positions. Binary harness and meter remain identical to final candidate; no new model run needed.",
+    "real301": "integration-complete-exits-real301.txt",
+    "real301_result": "301 actual FWA positions passed;9.1ETH real minted principal including7 loose Shapes; >10ETH active backing; cumulative fixture gas1,159,919,975 under separate10B setup allowance; cold complete checkpoint300,454 with explicit production cap and25% margin. The old default1.073B setup-budget OOG is retained in the broad receipt. This is not a production gas-limit increase."
+  },
+  "full_round_trips": {
+    "holder_keeper_pay_wei": 5811000000000000,
+    "attacker_net_after_conservative_basefee_only_gas_wei": -80062249940729552,
+    "attacker_result": "No remaining attacker shares, locked redemption or claimable balance after the real unwind/checkpoint/claim.",
+    "budget_exhaustion_result": "Actual20 positions withdrawn; two bounded30-Shape chunks spend0.01ETH essential budget; requester-funded checkpoint and claim complete >1.8ETH return from1.95ETH principal; no remaining holder rights."
+  },
+  "flows": {
+    "count": 16,
+    "all_mismatches": 0,
+    "O2_quoted_gas_per_built_listed_position": 1919655,
+    "O2_unchanged_max": 1750000,
+    "O6_spike_checkpoint_pay_wei": 220000000000000,
+    "O6_unchanged_max_wei": 200000000000000,
+    "winddown_holder_loss_bps": 44,
+    "winddown_claim_gap_wei": 0,
+    "winddown_locked": 0,
+    "winddown_residual_eth_wei": 10061058998589904,
+    "gate_command": "python3 /Users/dd/.agents/guidance/asset-flow-kit/asset_gate.py . --no-run",
+    "gate_exit_status": 2,
+    "gate_raw": "integration-final-asset-gate.txt",
+    "note": "Existing owner outcomes and signature unchanged. O2/O6 fail and approval mismatch is expected. Tests passing is not owner economic acceptance or release readiness."
+  },
+  "scope_limits": [
+    "One own selected vault listing plus29 real foreign fillers preserves the historical VRF weight exactly; do not claim30 simultaneous own selections.",
+    "The separate fee-witness fixture has2 own Active positions plus28 real fillers.",
+    "Scale1000/10000 is own production Book bookkeeping, not real external FWA listings. Actual301-listing evidence is separate.",
+    "No real16-allocation or expiry burst is claimed;16 actual kicked terminal receipts are exercised.",
+    "Failed NFT delivery and malicious FWAIR classification were not forced through immutable real dependencies; guard code is reviewed and those dynamic branches remain gaps.",
+    "Real oracle uint128 maximum, wrong-ABI real contract, and rejected EOA configuration are exercised. Historical synthetic2^255 ask, gas-burning successful oracle, and malformed uint48 source branches are not claimed as real integration coverage.",
+    "Staging witness5,227,714 gross includes ReceiptFixtureFiller real pack creation plus FWA.listNFT and15 incidental activations; it is not isolated FWA listing gas.",
+    "No mocks, vm.transact, protocol storage writes, protocol balance funding, or blockchain broadcasts. External actor wallet funding is setup."
+  ],
+  "things_that_do_not_make_sense": [
+    "Unchanged owner O2 and O6 cost outcomes fail on calibrated final behavior and need an explicit owner decision; no test change grants approval.",
+    "Per-entry journal allowance30k exceeds the measured roughly18.8k gross marginal cost for this fulfilled foreign prefix, while first-use singleton gross exceeds its fixed allowance; use the separately recorded billed receipts and label conservatism accurately.",
+    "Final PackVault runtime24,549 bytes leaves27 bytes under EIP-170; future source/toolchain changes require a fresh size check."
+  ]
+}

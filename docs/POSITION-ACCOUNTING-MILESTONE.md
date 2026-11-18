@@ -1,6 +1,6 @@
 # Incremental position accounting milestone
 
-November 18, 2026
+November 18, 2026. Historical research milestone at `3b9cd65`. Production integration is implemented in `909e761` and `c93ac2f`; funding and outcome acceptance remain blocked. See `POSITION-INTEGRATION-ACCEPTANCE.md`.
 
 ## Result
 

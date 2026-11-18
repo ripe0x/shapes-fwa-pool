@@ -1,0 +1,12 @@
+{
+  "base_revision": "f75ee770d0f0bce55a5f2607a23a3ee0104d1df1",
+  "command": "CANDIDATE_RUN=1 forge build --sizes --no-lint",
+  "asset_flow_source_hash": "93f173ea75b7768a9ba6fa04c6545b499946b39e56b43e9dacccf5c454992797",
+  "sha256": {
+    "src/PackVault.sol": "a62607f953c54d4c243628652a4715c7e1d75d3eae9de91150bc1d55e8add3a6",
+    "src/VaultLib.sol": "604159cafaea797b17b552f3498e7c15737571962c1067a88124266b61901366",
+    "src/interfaces/External.sol": "d50229cf80a4a036c9ba3f4f8bb60452129ee51dc7ca0263ad612b2ea76e499d",
+    "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a",
+    "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520"
+  }
+}

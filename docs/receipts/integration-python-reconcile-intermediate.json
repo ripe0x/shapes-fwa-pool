@@ -1,0 +1,19 @@
+{
+  "source_scope": "798e7ea0 PackVault / 612b06f3 VaultLib, Q_LIST 400000; final quote repair pending",
+  "trace_files": [
+    "sim/out/reconcile-trace.jsonl",
+    "sim/out/reconcile-partial-trace.jsonl"
+  ],
+  "runs": [
+    {
+      "command": "python3 sim/reconcile.py",
+      "exit_status": 1,
+      "result": "KeyError: initialCursor. Trace emits initCursor; Python schema consumer repaired without contract change."
+    },
+    {
+      "command": "python3 sim/reconcile.py",
+      "exit_status": 0,
+      "result": "Both cycles match every financial bucket to the wei. Complete-cycle fees 24976235593068, keeper 1967000000000000, mint fees 1000000000000000, backing lost 36300000000000000 wei. Partial claim 992731571530066734, keeper 4436000000000000, mint fees 3000000000000000, residual redemption reserve 4 wei."
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+Intermediate integration record, before final source/quote freeze.
+Base revision: f75ee770d0f0bce55a5f2607a23a3ee0104d1df1 plus working changes.
+Exit status: 1
+Scope/limits: exact whole-tree source hash was not captured at execution for this intermediate run. The final frozen acceptance manifest supersedes intermediate pass counts. Gas meters report gross execution plus intrinsic/calldata, before transaction refunds, unless explicitly labeled otherwise. Historical real Tenderly forks only; pure static checks do not claim execution. The exact command follows.
+Command: forge test --match-path test/fork/ForkVaultLifecycle.t.sol --match-test 'test_depositListRedeem_roundTrip|test_edgeGateStopsListingWhenCrownShareRaised|test_paddedSyncPaysOnlyForWorkDone' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv
+
+Compiling 8 files with Solc 0.8.30
+Solc 0.8.30 finished in 1.47s
+Error: Compiler run failed:
+Error: Variable value_10 is 1 too deep in the stack [ _37 expr_20 value_10 _37 value2_2 value1_1 _33 value_12 var_resolved value4 value5 var_processed _32 value_11 dataSlot_3 cleaned_2 var_own _48 _47 ]
+memoryguard was present.

@@ -1,0 +1,66 @@
+{"label": "split comparison batch3", "sig": "list(uint256[],uint256)", "gas": 2624113, "keeper_paid_wei": 635000000000000, "gas_limit": 3368867, "gas_margin": 3280142, "basefee_wei": 150000000, "effective_price_wei": 200000000, "block": 26418570, "transaction": "0x2b708bd3f1147680cc145f25a5af8fd48d7ef682edb6c67938dc764b2fcfd72c", "items": 3}
+{"label": "split comparison singleton1", "sig": "list(uint256[],uint256)", "gas": 1063186, "keeper_paid_wei": 265000000000000, "gas_limit": 1362708, "gas_margin": 1328983, "basefee_wei": 150000000, "effective_price_wei": 200000000, "block": 26418570, "transaction": "0x516e0c6ef67205fff77c6d69eb62072f0ae42285ffc34a39e03b9d406a5f7f62", "items": 1}
+{"label": "split comparison singleton2", "sig": "list(uint256[],uint256)", "gas": 1114498, "keeper_paid_wei": 265000000000000, "gas_limit": 1426848, "gas_margin": 1393123, "basefee_wei": 150000000, "effective_price_wei": 200000000, "block": 26418572, "transaction": "0x2f229c04a7f625f5bff1b643275f9bbf768f1ea155742b78fc1ce170d372b63e", "items": 1}
+{"label": "split comparison singleton3", "sig": "list(uint256[],uint256)", "gas": 1097398, "keeper_paid_wei": 265000000000000, "gas_limit": 1405473, "gas_margin": 1371748, "basefee_wei": 150000000, "effective_price_wei": 200000000, "block": 26418574, "transaction": "0x8c80fab1abe70f6024871db1e94091f149ae12ca0cb2122ca2cb8889c8ee42ec", "items": 1}
+{
+  "rows": [
+    {
+      "label": "split comparison batch3",
+      "sig": "list(uint256[],uint256)",
+      "gas": 2624113,
+      "keeper_paid_wei": 635000000000000,
+      "gas_limit": 3368867,
+      "gas_margin": 3280142,
+      "basefee_wei": 150000000,
+      "effective_price_wei": 200000000,
+      "block": 26418570,
+      "transaction": "0x2b708bd3f1147680cc145f25a5af8fd48d7ef682edb6c67938dc764b2fcfd72c",
+      "items": 3
+    },
+    {
+      "label": "split comparison singleton1",
+      "sig": "list(uint256[],uint256)",
+      "gas": 1063186,
+      "keeper_paid_wei": 265000000000000,
+      "gas_limit": 1362708,
+      "gas_margin": 1328983,
+      "basefee_wei": 150000000,
+      "effective_price_wei": 200000000,
+      "block": 26418570,
+      "transaction": "0x516e0c6ef67205fff77c6d69eb62072f0ae42285ffc34a39e03b9d406a5f7f62",
+      "items": 1
+    },
+    {
+      "label": "split comparison singleton2",
+      "sig": "list(uint256[],uint256)",
+      "gas": 1114498,
+      "keeper_paid_wei": 265000000000000,
+      "gas_limit": 1426848,
+      "gas_margin": 1393123,
+      "basefee_wei": 150000000,
+      "effective_price_wei": 200000000,
+      "block": 26418572,
+      "transaction": "0x2f229c04a7f625f5bff1b643275f9bbf768f1ea155742b78fc1ce170d372b63e",
+      "items": 1
+    },
+    {
+      "label": "split comparison singleton3",
+      "sig": "list(uint256[],uint256)",
+      "gas": 1097398,
+      "keeper_paid_wei": 265000000000000,
+      "gas_limit": 1405473,
+      "gas_margin": 1371748,
+      "basefee_wei": 150000000,
+      "effective_price_wei": 200000000,
+      "block": 26418574,
+      "transaction": "0x8c80fab1abe70f6024871db1e94091f149ae12ca0cb2122ca2cb8889c8ee42ec",
+      "items": 1
+    }
+  ],
+  "starting_idle_count": 4,
+  "extra_billed_gas": 650969,
+  "extra_keeper_pay_wei": 160000000000000,
+  "extra_billed_cost_wei": 130193800000000,
+  "max_base_quote_at_10percent_markup": 295895,
+  "q300k_extra_envelope_wei": 132000000000000
+}

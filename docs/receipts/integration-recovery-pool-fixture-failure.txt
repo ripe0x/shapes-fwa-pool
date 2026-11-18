@@ -1,0 +1,19 @@
+loaded recovery client {"test_tx": {"source_sha256_at_import": "8046cce86e939fdb490489786d8f1d7a9f8b531461975d7687b4f3a1691da8a6", "loaded_code_sha256": "32d395d95cdbbd52a9ebb24605367179ea6e91235c4da950e7f363fe767c34d4"}, "keeper": {"source_sha256_at_import": "a4f017ba65715a1dcc6b942ae47ecb6cef82f95e2ab19449df50ab0f9d94a3d1", "loaded_code_sha256": "11aa99de226ad667fc06175f0e1068ee62833589c2bd240cf30a7e4b86e67579"}, "tx": {"source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230", "loaded_code_sha256": "4b64b57ba9cae304c4785c8b8cc6c5ec76b8920af46b6a1abba0844512dbcd41"}, "rehearse_canary": {"source_sha256_at_import": "938d36abab224d1b09032b30afda2041b51d0993505274da3ebe983a95686888", "loaded_code_sha256": "7ca31e0e47c0969399ac36ee5e837ed510fa61308dc328108c3027242b3ce5fb"}}
+error: broadcast of burnTokens uncertain (nonce 21 kept pending): test lost response after real node acceptance
+mined burnTokens gas 184132 (est 211824) cost 9739834119288 pay 0 net -9739834119288 wei
+error: reorg: burnTokens 0x8fd23bb3163b5846dd025c5f92839674def316c31860b240ae3af83d589fa104 no longer in block 26418574; chain state is re-read
+sent burnTokens nonce 21 hash 0x8fd23bb3163b5846dd025c5f92839674def316c31860b240ae3af83d589fa104
+mined burnTokens gas 184132 (est 211824) cost 9739834119288 pay 0 net -9739834119288 wei
+sent burnTokens nonce 22 hash 0x5ab34cb0c8462687bcb104b07071e3ca851aeab2fa48f2c5ca688a5ac5f08b9a
+REVERTED burnTokens gas 118057 (est 211824) cost 6202262031405 pay 0 net -6202262031405 wei
+error: burnTokens reverted on chain: 0x5ab34cb0c8462687bcb104b07071e3ca851aeab2fa48f2c5ca688a5ac5f08b9a
+error: reorg: burnTokens 0x8fd23bb3163b5846dd025c5f92839674def316c31860b240ae3af83d589fa104 no longer in block 26418574; chain state is re-read
+error: reorg: burnTokens 0x5ab34cb0c8462687bcb104b07071e3ca851aeab2fa48f2c5ca688a5ac5f08b9a no longer in block 26418575; chain state is re-read
+sent burnTokens nonce 21 hash 0x8fd23bb3163b5846dd025c5f92839674def316c31860b240ae3af83d589fa104
+error: replacement of burnTokens failed: test lost accepted replacement response
+error: burnTokens nonce 21 still pending after 1 replacements
+Traceback (most recent call last):
+  File "<stdin>", line 14, in <module>
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/test_tx.py", line 131, in exercise
+    raise RuntimeError("unexpected transaction count at the replacement cap")
+RuntimeError: unexpected transaction count at the replacement cap

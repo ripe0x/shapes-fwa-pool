@@ -1,3 +1,60 @@
+# Current position-accounting integration
+
+2026-11-18. **Implemented and locally verified; milestone acceptance is blocked by maintenance
+funding and changed economic outcomes.** Branch `codex/incremental-position-integration` starts at
+research handoff `f75ee77` (proof `3b9cd65`, main baseline `063b6c7`).
+
+Production/test/deployment commit: `909e761`. Keeper/simulation commit: `c93ac2f`.
+The implementation removes the total position ceiling, full valuation and ordinary keeper scans.
+One exact book, ordered global journal, authenticated receipts and fee witness now price the
+existing share vault. Paid primary mints, their fees, the mint/split/pack recipe, pack sizing and
+holder rules remain. There is no factory, shared exposure book or new holder charge policy.
+
+- Final affected regressions: **52/52**, plus detailed final receiver traces and the separate real
+  301-listing setup. All 13 failures from the first 120/133 broad run are preserved and resolved by
+  affected passing checks. The reused eight-test production model includes 40,960 steps and
+  301/1,000/10,000 bookkeeping positions; it is not 10,000 external FWA listings.
+- Exact production receiver: **46,462 gas keep / 69,730 kick**, at least 30,270 below the 100,000
+  stipend; all 99 sampled gas boundaries record or fail atomically. Every measured maximum
+  operation fits 16,777,216 with 25% margin. Runtime is **24,549 bytes**, only 27 below EIP-170.
+- Both Python/fork traces match every financial bucket to the wei; ten accounting tests and seven
+  focused forward scenarios pass. Final quiet local lifecycle: 29 listings, 20 keeper transactions,
+  no reverted receipts, full holder exit and zero ledger gap. Root's pinned readback confirms no
+  positions, inventory, allocations, pending receipts or holder requests; 2 wei rounding reserve
+  remains beside the dead-share seed slice.
+- Independent implementation review covered immutable production and keeper inputs and affected
+  repairs. It is not a full security audit or release approval.
+
+**Unchanged settings do not fund continuous journal progress.** At 0.5 gwei the recorded 30-day
+global-only quote is at least 0.3227925 ETH, against at most 0.25 ETH of mainnet routine budget:
+0.0727925 ETH shortfall before own work. Canary's 0.054 ETH permits less than the 0.129117 ETH
+quote even at 0.2 gwei. The 0.005 ETH reserve covers individual batches, not the recurring cost.
+No budget, reserve, mint fee or keeper maximum was raised to make this appear affordable.
+
+The asset gate exits 2. O2 is **1,919,655 quoted gas versus 1,750,000**; O6 is **0.00022 ETH versus
+0.0002 ETH**. Every asset-flow bucket balances across 16 regimes, but the historical signature
+and outcomes do not approve this changed candidate. No new signature is supplied.
+
+Details, exact inputs/commands, gas, deployment receipts, budget options and gaps:
+`POSITION-INTEGRATION-ACCEPTANCE.md`. Draft PR body: `POSITION-INTEGRATION-PR.md`. One-screen
+scorecard: `receipts/integration-economic-scorecard.md`.
+
+Only the explicitly approved isolated local batch ran. No public-network transaction, real funds,
+push, merge or owner signature occurred. Local node PID 10583 and the paused original driver
+PID 10551 remain preserved at 127.0.0.1:8557. Current pending/queued pools are empty.
+
+Next action: review the funding/outcome proposal in the acceptance report before changing policy
+or preparing a funded release candidate. The current annual return report is historical.
+
+Things that don't make sense: each vault must pay for new global FWA activity even without an
+own selection. Conservatively quoting batches while some singleton calls lose money also means
+balanced books and an affordable single batch cannot establish continuous keeper liveness.
+
+---
+
+The report below is historical evidence for the earlier main candidate and is not a release
+recommendation for this integration.
+
 # PackVault: validation and repair report
 
 2026-11-16, second pass. Scope: does the automation work, are the performance claims supported,

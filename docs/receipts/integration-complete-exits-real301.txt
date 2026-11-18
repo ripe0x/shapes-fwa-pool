@@ -1,0 +1,58 @@
+Compiling 2 files with Solc 0.8.30
+Solc 0.8.30 finished in 10.16s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:177:35:
+    |
+177 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:574:5:
+    |
+574 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+
+Ran 1 test for test/audit/release-b/AuditB.t.sol:AuditBBudget
+[PASS] test_oneExitEmptiesEssentialBudget() (gas: 46601524)
+Logs:
+  built, listed 20 20
+  routine paid for the build, routine budget left 8392000000000000 21608000000000000
+  idle packs, idle ETH 0 614608000001900001
+  alice's redeem charge (checkpoint + unwind) wei 15419189719642996
+  unlist pay 6780000000000000
+  liquidate #1 pay 2125000000000000
+  liquidate #2 pay 1095000000000000
+  essential budget after unlist + liquidate 0
+  idle packs left, loose shapes left 0 0
+  essential paid in total vs unwind charge alice paid 10000000000000000 15419189719642996
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.35s (187.46ms CPU time)
+
+Ran 1 test for test/fork/ForkKeeperPay.t.sol:ForkKeeperPayTest
+[FAIL: UnlistNotAllowed()] test_manufacturedCycleLosesAtMaxima() (block: 26424971) (gas: 69242395)
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 1.42s (346.73ms CPU time)
+
+Ran 1 test for test/fork/ForkVaultAdversarial.t.sol:ForkVaultAdversarialTest
+[PASS] test_checkpointGasWith301RealListings() (gas: 1159919975)
+Logs:
+  cold complete checkpoint gas with 301 real listings: 300454
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 10.28s (9.21s CPU time)
+
+Ran 3 test suites in 10.63s (13.05s CPU time): 2 tests passed, 1 failed, 0 skipped (3 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/fork/ForkKeeperPay.t.sol:ForkKeeperPayTest
+[FAIL: UnlistNotAllowed()] test_manufacturedCycleLosesAtMaxima() (block: 26424971) (gas: 69242395)
+
+Encountered a total of 1 failing tests, 2 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 1 failed test
+Tip: Run `forge test --debug --match-test <TEST_NAME>` to inspect one failing test in the debugger

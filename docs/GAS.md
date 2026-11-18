@@ -1,3 +1,94 @@
+# Position-accounting gas and compensation
+
+**The locally verified candidate has a funding blocker and failed historical economic outcomes.** Current acceptance
+and numerical outcomes are in `POSITION-INTEGRATION-ACCEPTANCE.md`. The tables below the separator
+are historical and do not validate this candidate.
+
+Compensation is a fixed quote for verified work. It is not reimbursement of measured transaction
+gas. The replaceable policy offer is capped by the vault envelope, free cash, the applicable
+routine/essential budget and `minPay`. Request-funded checkpoints use only their existing shared
+processing charge. Foreign/refunded journal entries earn no flat work fee; operation 4 is retired.
+
+| Component | Quoted gas |
+| --- | ---: |
+| Checkpoint | 400,000, independent of position count |
+| Restock base | 280,000 |
+| Pack assembly | 325,000 for three Shapes, plus 35,000 per additional Shape |
+| Paid primary mint and split | 2,200,000 per ten 0.01 ETH Shapes |
+| List | 280,000 base + 825,000 per admitted position |
+| Sync | 85,000 base + 30,000 per completed global record |
+| Own selection / terminal / head prune | 160,000 / 120,000 / 45,000 |
+| Unlist | 340,000 base + 285,000 per moved position |
+| Liquidate | 75,000 base + 80,000 per ordinary pack + 35,000 per actual packed Shape burned |
+| Loose Shape redemption | 65,000 per Shape |
+| Oversized gift recovery | 100,000 + 35,000 per actual Shape burned + 70,000 once for unseal, plus liquidation base |
+| Harvest | 125,000 base + 80,000 per listing actually harvested |
+
+The mandatory own-position sync components sum to 355,000. Recurring cycle economics include that
+sum, relisting and fee harvesting exactly once. Entry charges retain build plus initial listing;
+exit charges retain unlisting plus liquidation. Canary essential cap zero means self-serve exits
+remain unpaid with zero unwind charge. No budget, reserve value, markup maximum or flat fee maximum
+was raised.
+
+Listing is capped at eight per call. Every real FWA `listNFT` receives at most 1.2 million gas;
+ordinary Active identity, non-FWAIR classification and exactly one additional active listing are
+required. Other caller work limits remain sixteen, with restock/liquidation capped at thirty
+ordinary backing units and oversized gifts claimed in isolated thirty-Shape chunks.
+
+## Evidence interpretation
+
+Foundry gross meters include execution plus intrinsic/calldata before transaction refunds. They
+bound the gas limit; they are not billed-gas or keeper-profit receipts. Actual local transaction
+receipts are reported separately. `sim/out/gas-quotes-incremental.json` is the earlier partial
+local calibration, not the final schedule or a profitability pass. Relevant fee tests set and assert both basefee and transaction
+gas price inside an executed call. Pending RPC simulations use explicit fee fields and authenticate
+executed BASEFEE against the deterministic next header.
+
+Earlier focused complete-operation measurements include restock ten three-unit packs at 10,356,704
+gross gas, a full holder checkpoint at 370,178, harvest sixteen at 1,084,228, unlist sixteen at
+4,113,806, and thirty-Shape liquidation at 1,153,746. These pre-final measurements have explicit
+input limitations in `receipts/integration-*`. Final focused measurements now include eight largest packs at 6,554,114 gross gas, eight mixed
+packs with five crown tenures at 6,527,313, and restock ten small packs at 10,357,047. The largest
+measured operation with 25% margin is 12,946,309, below 16,777,216. Runtime is 24,549 bytes for
+PackVault (27 bytes spare) and 20,484 for VaultLib. Final receiver and linked deployment results are recorded below and in the acceptance report.
+
+Final exact production receiver: 46,462 gas for the cold keep and 69,730 for the difficult kick
+following a false settled-bid candidate. At least 30,270 gas remains below FWA's 100,000 stipend.
+All 99 sampled low-gas limits recorded completely or failed atomically. This does not prove every
+possible gas amount; exact traces and scope are in `receipts/integration-final-test-evidence.json`.
+
+Normal approved local script deployment used 5,766,663 billed gas for the 24,549-byte vault and
+100,155 for the 216-byte policy. The linked 20,484-byte library was reused; its actual prior
+approved-deployer CREATE2 receipt used 4,490,075 gas. Its 20,516-byte initcode exactly matches the
+frozen artifact. Only the compiler-declared self-address immutable is normalized for runtime
+comparison. See `receipts/integration-keeper-context-correction.json` for factory, salt, receipts
+and source attribution. No actual code or gas limit was increased.
+
+The broad run exposed profitable listing-base splitting. Actual matched-fee receipts measured
+650,969 extra billed gas for three singletons versus the same three-item batch. Q_LIST 280,000
+makes the extra pay at maximum 10% markup 0.0001232 ETH, below the measured extra 0.0001301938 ETH
+cost at 0.2 gwei. The previous 400,000 base was excessive; even 300,000 failed that billed bound.
+Per-listing pay and work fees are unchanged. This sampled comparison does not bound all future
+orderings or external protocol changes.
+
+## Reserve and recurring funding
+
+At a 0.5 gwei quote, one full foreign journal batch costs 0.0002825 ETH and the keeper's reserve
+model requires 0.0042425 ETH against the retained 0.005 ETH reserve. That reserve can afford bounded
+progress; it does not fund continuing activity.
+
+Recorded 30-day global work requires at least 0.3227925 ETH of quotes at 0.5 gwei, before any own
+position work, versus a maximum mainnet routine budget of 0.25 ETH. At 0.2 gwei the lower bound is
+0.129117 ETH. Canary permits only 0.054 ETH over the same thirty days. Exact source/data context,
+shortfalls and a narrow proposed owner decision are in the acceptance report and maintenance JSONs.
+
+Batch quotes are conservative relative to some measured calls; a successful cold singleton can
+still cost more than its quote. Do not claim every call profits or identify gross gas with actual
+billed cost. The keeper estimates the real transaction and obeys its per-call and cumulative loss
+limits. Delayed or concurrent state changes can still cause atomic rejection and real gas loss.
+
+---
+
 # Gas and keeper compensation
 
 ## Pay rule (contract, D56/D57)

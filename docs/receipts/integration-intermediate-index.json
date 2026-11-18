@@ -1,0 +1,170 @@
+[
+  {
+    "file": "docs/receipts/integration-holder-repairs-first.txt",
+    "exit_status": 1,
+    "original_output": "/private/tmp/position-lifecycle-repairs.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkVaultLifecycle.t.sol --match-test 'test_depositListRedeem_roundTrip|test_edgeGateStopsListingWhenCrownShareRaised|test_paddedSyncPaysOnlyForWorkDone' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-holder-repairs-second.txt",
+    "exit_status": 1,
+    "original_output": "/private/tmp/position-lifecycle-repairs2.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkVaultLifecycle.t.sol --match-test 'test_depositListRedeem_roundTrip|test_edgeGateStopsListingWhenCrownShareRaised|test_paddedSyncPaysOnlyForWorkDone' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-holder-stage1-pass.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-lifecycle-final.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkVaultLifecycle.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-receiver-stage1-sweeps.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-receiver-final-sweeps.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test 'LowGas' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-fees-stage1.txt",
+    "exit_status": 1,
+    "original_output": "/private/tmp/position-fees-stage1.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-contract ForkProductionFeeWitnessTest --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-fees-stage1-pass.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-fees-stage1-retry.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-contract ForkProductionFeeWitnessTest --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-journal-initial.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-journal-gas.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkJournalGas.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-journal-funded.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-journal-funded-gas.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkJournalGas.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-journal-funded-recipient.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-journal-funded-receiver-gas.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkJournalGas.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-journal-optimized-funded.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-journal-optimized-funded-gas.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkJournalGas.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-max-batch-withdraw-window-failure.txt",
+    "exit_status": 1,
+    "original_output": "/private/tmp/position-maxbatch-gas.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "CANDIDATE_RUN=1 forge test --match-path test/fork/ForkMaxBatchGas.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-max-batch-calibration.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-maxbatch-calibration.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "CANDIDATE_RUN=1 forge test --match-path test/fork/ForkMaxBatchGas.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-max-batch-components.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-maxbatch-additional-calibration.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "CANDIDATE_RUN=1 forge test --match-path test/fork/ForkMaxBatchGas.t.sol --match-test test_maximumLargePackOperationsFitTransactionCap --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-terminal-max-calibration.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-terminal-max-gas.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "CANDIDATE_RUN=1 forge test --match-path test/fork/ForkMaxBatchGas.t.sol --match-test test_maximumLargePackOperationsFitTransactionCap --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-recovery-refund-calibration.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-recovery-refund-gas.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test 'test_oversizedKeptGift|test_realRefundedJournalEntry' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-recovery-pending-repairs.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-recovery-pending-repairs.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test 'test_oversizedKeptGift|test_pendingBlockBasefee' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-optimized-refund-prune.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-optimized-refund-prune.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test 'test_realRefundedJournalEntryGasAndVerifiedPay|test_staleAllocationHeadNeedsBoundedPruneAndCannotUseProcessingPool' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-consumer-alias-repair.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-consumer-compile.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkKeeperPolicy.t.sol --match-test test_largeDepositChargeNotTruncated --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-token-bid-static-failure.txt",
+    "exit_status": 1,
+    "original_output": "/private/tmp/position-token-bid-production.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test test_realTokenBidReturnsPack --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-token-bid-stage1-pass.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-token-bid-production-retry.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test test_realTokenBidReturnsPack --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+  },
+  {
+    "file": "docs/receipts/integration-partial-trace-static-compile.txt",
+    "exit_status": 0,
+    "original_output": "/private/tmp/position-partial-trace-compile.log",
+    "stage": "intermediate calibration or repair",
+    "final_acceptance": false,
+    "command": "forge test --match-path test/fork/ForkPartialReconcile.t.sol --list"
+  }
+]

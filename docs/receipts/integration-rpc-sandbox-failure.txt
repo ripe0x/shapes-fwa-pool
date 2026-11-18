@@ -1,0 +1,25 @@
+Infrastructure failure before tests, not a test result. Retried approved outside sandbox.
+Compiling 1 files with Solc 0.8.30
+Solc 0.8.30 finished in 3.84s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:165:35:
+    |
+165 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:561:5:
+    |
+561 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Error: failed to retrieve chain ID from fork endpoint
+
+Context:
+- MPP HTTP request to https://mainnet.gateway.tenderly.co/ failed: HTTP request failed: error sending request: error sending request: client error (Connect): dns error: failed to lookup address information: nodename nor servname provided, or not known

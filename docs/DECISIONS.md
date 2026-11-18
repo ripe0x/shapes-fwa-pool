@@ -845,3 +845,80 @@ from about 0.055 to 0.045 ETH. Supersedes the essential-budget sizing question i
 **Evidence:** `test_selfServeExitWithoutEssentialBudget`; 106 fork, audit and scenario tests;
 rehearsals at the pinned and current block, where the withdrawer and owner run the exit steps
 (ledgers exact; current-block holder round trip -0.0151 ETH, was -0.0169).
+
+
+## D65. Incremental production position accounting (owner, 2026-11-18)
+
+The owner accepted the accounting design in `POSITION-ACCOUNTING-PLAN.md` and requested integration
+from research proof `3b9cd65`, preserving the newer documentation handoff `f75ee77`.
+One vault retains all holder and mint behavior. Exact running Shapes backing, active FWA backing,
+a fee-debt histogram, ordered acquisition cursor, authenticated payment receipts and an allocation
+queue replace valuation scans. This supersedes D6/D24's count cap and D62's spare-slot spread and
+no-list-argument instruction. Backing proposals are offchain, quantized to 10,000 wei, unique among
+outstanding identifiers, and authenticated against current economics and capital onchain. The max
+ordinary 5% keep fee requires B >= ceil(P * 10000 / 9500).
+
+Staged listing admission is rejected atomically, so D36's production activation operation is
+retired. Operation identifier 4 is left unused; other keeper operation identifiers retain meaning.
+D61's shared checkpoint charge remains, with fixed measured work replacing the portfolio component.
+New global journal work is funded only from actual free ETH within existing budgets; foreign and
+refunded entries earn only their completed-work gas component, without a per-entry flat fee.
+
+Implementation API intentionally changes. Operational callers migrate together; no permanent unused
+full-array getters or compatibility wrapper remains in production. Bounded test-only enumeration
+remains an independent reference. The existing signature and historical audit evidence do not approve
+this candidate. Final measurements, fork reconciliation, independent review and outcome approval
+remain separate gates. No production broadcast or remote publication is authorized.
+
+## D66. Measured work quotes and prospective keeper context (engineering, 2026-11-18)
+
+Production bookkeeping adds real work to listing, fee harvesting, withdrawal and redemption.
+Update the measured cost inputs while retaining the entry build/list charge, exit unlist/liquidate
+charge, shared checkpoint charge and recurring-maintenance funding policies. No budget maximum,
+refill, reserve, mint fee, pack mask or allocated exposure limit is loosened by this decision.
+
+Ordinary pack redemption and oversized gift claims authenticate actual burned Shape count through
+`Shapes.totalSupply()` immediately before/after the immutable redemption path. The path burns
+exactly its actual batch before its sole ETH callback, and the guarded vault cannot interleave a
+second supply mutation. Recovery pays an unseal component once, then components for completed
+actual work; a final one-Shape claim no longer receives a thirty-Shape quote. No unbounded pack
+contents getter is used onchain or required by the normal keeper.
+
+Both the ordinary keeper and production list at most eight packs per transaction. The other
+sixteen-item work limits remain. The local event index bounds RPC candidate hydration independently
+of total unchanged inventory. Reserve analysis distinguishes funded essential work from D64's unpaid
+self-serve exits and includes global work that returns no backing.
+
+A proposal within a few 10,000 wei tags of a live target is sensitive to basefee when the build
+repayment term binds. The keeper authenticates a prospective pending header against the pinned
+parent's deterministic next basefee and uses explicit fee fields for price and pay simulations.
+Actual Tenderly reads showed that omitting fees could execute `BASEFEE` as zero despite a nonzero
+pending header. The parent hash is checked before submission; later state/head changes can still
+reject a transaction atomically. No admission tolerance or economic gate is relaxed.
+
+The owner explicitly approved the isolated local batch in `receipts/position-local-batch-plan.json`:
+127.0.0.1:8557, fork 26,418,539, six named fresh test signers, 60 simulated ETH total, normal code
+and transaction limits, plus the named oracle owner's local calls with zero added funding. This
+approval authorizes no public-network transaction, merge, owner signature or real-fund spending.
+
+Gas setup correction: the inherited 8,000-block expiry wait was unnecessary for the deployed
+30-block word timeout. Rehearsal helpers now use each request's actual snapshotted deadline. The
+already-started mining operation and its node were preserved; no protocol state was fabricated.
+Final receipts, quote calibration and funding conclusions belong in the acceptance report.
+
+FWA's acquisition queue can be drained while its private staging FIFO still contains foreign
+listings. FWA exposes no public staging-head getter. Each production admission forwards at most
+1.2 million gas to `listNFT` and requires the active count to increase by exactly one, alongside
+the ordinary Active identity checks. Incidental foreign activation or a staged result reverts the
+whole vault transaction, including earlier batch work. The eight-listing limit reserves transaction
+headroom for this bounded external work; the vault does not pay to drain foreign staging. This can
+leave admission waiting for FWA's permissionless activation to be performed by another actor.
+Journal processing, pricing eligibility and exits do not depend on a staging-head read.
+
+The broad integration run exposed profitable splitting of the 400,000-gas listing base. Actual
+matched-fee receipts measured 650,969 additional billed gas for three singleton calls versus the
+same three listings in one batch. The base is now 280,000, leaving 6.9938 microETH of loss for the
+split at 0.2 gwei even at the maximum 10% markup. Per-listing gas and work fees are unchanged.
+This is measured sample evidence, not a universal future gas guarantee. The final O2 build/list
+cost and O6 checkpoint cost exceed their historical signed amounts; those bounds and the signature
+are retained, with gate failure reported rather than changing them without owner approval.

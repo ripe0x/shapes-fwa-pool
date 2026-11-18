@@ -1,0 +1,55 @@
+Production integration evidence
+Base revision: f75ee770d0f0bce55a5f2607a23a3ee0104d1df1 + working changes
+Command: forge test --match-path test/fork/ForkVaultLifecycle.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv
+Exit status: 1
+Scope: historical real Tenderly fork; fixture transactions replayed through real VRF; one vault listing plus 29 real third-party listings, not 30 vault positions.
+
+Compiling 3 files with Solc 0.8.30
+Solc 0.8.30 finished in 3.82s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:165:35:
+    |
+165 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:561:5:
+    |
+561 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+
+Ran 13 tests for test/fork/ForkVaultLifecycle.t.sol:ForkVaultLifecycleTest
+[PASS] test_cancelDepositBeforePricing() (gas: 280239)
+[FAIL: assertion failed: 669286999999550000 != 669287000000000000] test_depositListRedeem_roundTrip() (block: 26424971) (gas: 19719736)
+[FAIL: Error != expected error: InvalidBacking() != EdgeGate()] test_edgeGateStopsListingWhenCrownShareRaised() (block: 26424971) (gas: 6388032)
+[PASS] test_edgeMatchesLiveFwa() (gas: 87644)
+[PASS] test_kickReturnsFullBackingAndPack() (gas: 6485737)
+[PASS] test_ownerStopsCannotMoveAssets() (gas: 5804105)
+[FAIL: quote for one resolved position: 59000000000000 != 50000000000000] test_paddedSyncPaysOnlyForWorkDone() (block: 26424971) (gas: 6851577)
+[PASS] test_paramsBoundsAppliedAtOnce() (gas: 184799)
+[PASS] test_proRataRedemptionAcrossCheckpoints() (gas: 39680649)
+[PASS] test_staleQuoteDoesNotUnlockUnlisting() (gas: 5824714)
+[PASS] test_staleQuoteStopsListing() (gas: 79415)
+[PASS] test_windDownCompletesWithNoAcquisitions() (gas: 20338908)
+[PASS] test_windDownSurvivesBrokenOracle() (gas: 8514160)
+Suite result: FAILED. 10 passed; 3 failed; 0 skipped; finished in 927.68ms (835.48ms CPU time)
+
+Ran 1 test suite in 1.24s (927.68ms CPU time): 10 tests passed, 3 failed, 0 skipped (13 total tests)
+
+Failing tests:
+Encountered 3 failing tests in test/fork/ForkVaultLifecycle.t.sol:ForkVaultLifecycleTest
+[FAIL: assertion failed: 669286999999550000 != 669287000000000000] test_depositListRedeem_roundTrip() (block: 26424971) (gas: 19719736)
+[FAIL: Error != expected error: InvalidBacking() != EdgeGate()] test_edgeGateStopsListingWhenCrownShareRaised() (block: 26424971) (gas: 6388032)
+[FAIL: quote for one resolved position: 59000000000000 != 50000000000000] test_paddedSyncPaysOnlyForWorkDone() (block: 26424971) (gas: 6851577)
+
+Encountered a total of 3 failing tests, 10 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 3 failed tests
+Tip: Run `forge test --debug --match-test <TEST_NAME>` to inspect one failing test in the debugger

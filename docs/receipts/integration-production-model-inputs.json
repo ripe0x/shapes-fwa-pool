@@ -1,0 +1,26 @@
+{
+  "base_revision": "f75ee770d0f0bce55a5f2607a23a3ee0104d1df1",
+  "command": "CANDIDATE_RUN=1 forge test --match-path test/fork/ProductionLedgerModel.t.sol --gas-limit 10000000000 -vv",
+  "hashes": {
+    "src/VaultLib.sol": "57ae5b9c71fdca5c4221d76d36f8d19a882d8dc6c35cea6678a1972ca4ded2e8",
+    "src/PackVault.sol": "a62607f953c54d4c243628652a4715c7e1d75d3eae9de91150bc1d55e8add3a6",
+    "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520",
+    "test/fork/ProductionLedgerModel.t.sol": "8b287d86cc6eaa80974bc2058672bdc0152d2f67d63070e634758f3b103020e4"
+  },
+  "scope": "Production VaultLib pure accounting kernel. Scale positions are bookkeeping only, not real FWA listings. Ten billion gas budget belongs to cumulative test fixture setup, not any production transaction.",
+  "exit_status": 0,
+  "result": "8 passed; 0 failed; 0 skipped; randomized256x160; scale301/1000/10000. Pure bookkeeping, not real FWA listings.",
+  "ProductionLedgerHarness_runtime_hex_text_sha256": "5648ca84e97161101116e0306eb8cdd2422749b2fe6bbf1b1058f33295da9934",
+  "ProductionLedgerGasMeter_runtime_hex_text_sha256": "96b2fc438474d7b53a61f0c64fc4ba097ab84bfe800f224140567ee47b47617c",
+  "ProductionLedgerHarness_runtime_rebuilt_matches_executed_model": true,
+  "ProductionLedgerHarness_runtime_sha256": "36f11783221a7464af202e672e23bde5bbfe7a9b0d2b04634a942f817186ee6f",
+  "ProductionLedgerHarness_runtime_bytes": 4525,
+  "ProductionLedgerGasMeter_runtime_rebuilt_matches_executed_model": true,
+  "ProductionLedgerGasMeter_runtime_sha256": "cfb98518f59368f13fdcd73e0d6c85494cb8f37c75d77a3eb831ba98391a886a",
+  "ProductionLedgerGasMeter_runtime_bytes": 567,
+  "runtime_hex_text_hash_includes_0x_prefix": true,
+  "ProductionLedgerHarness_runtime_matches_broad_candidate": true,
+  "ProductionLedgerGasMeter_runtime_matches_broad_candidate": true,
+  "ProductionLedgerHarness_runtime_matches_final_candidate": true,
+  "ProductionLedgerGasMeter_runtime_matches_final_candidate": true
+}

@@ -1,110 +1,102 @@
 # Keeper operations and recovery
 
-`keeper/keeper.py` runs the vault. `keeper/policy.py` decides what is worth doing from chain state
-(the year-long simulation runs the same file). `keeper/tx.py` gets each call mined exactly once.
-Anyone may run a keeper; every vault call is permissionless and the vault pays the caller.
-
-## Run
+`keeper/keeper.py` executes one operation, checks its receipt, then replans. `policy.py` owns the
+economic decisions and is imported by the simulation. `tx.py` retains nonce, replacement, restart,
+lost-response and receipt-reorg handling. The vault authenticates financial facts independently.
 
 ```sh
-# print status and the plan, send nothing
 python3 keeper/keeper.py <vault> --rpc https://mainnet.gateway.tenderly.co
-
-# operate: signs through a cast keystore (cast prompts for its password or reads ETH_PASSWORD)
 python3 keeper/keeper.py <vault> --send --account <keystore> --rpc https://mainnet.gateway.tenderly.co \
   --loop 300 --confirmations 2 --health-port 8788 --burn-tokens
-
-# status, in-flight transaction and keeper P&L from the state file
 python3 keeper/keeper.py <vault> --status
 ```
 
-| Flag | Default | Meaning |
-|---|---|---|
-| `--state` | `keeper/state-<vault>.json` | in-flight transaction, counted receipts, P&L; gitignored |
-| `--confirmations` | 1 | blocks before a receipt counts; use 2+ on mainnet |
-| `--replace-after` / `--max-replacements` | 3 / 5 | same-nonce replacement at +25% fees |
-| `--max-fee-gwei` | none | never bid a max fee above this |
-| `--max-loss-wei` | 0 | expected loss accepted per call, judged at the signed fees. Not an absolute bound: a state change between the final check and inclusion can still revert a sent call and cost its gas |
-| `--burn-tokens` | off | claim and burn FWA token rewards; unpaid, the operator pays |
-| `--pending-timeout` | 120 s | how long a pass waits for a receipt before leaving it for the next pass |
-| `--health-port` | off | `GET /health` on 127.0.0.1: 200 healthy, 503 stale or errors in the last pass |
-| `--slowdown-volume` | 0 | stop building new packs while trailing 7-day acquisitions/day are below this |
+Signing uses the existing cast keystore. No raw key belongs in an argument or file. The keeper
+needs its own ETH for gas. Token burns remain unpaid and require operator opt-in.
 
-Fund the keeper address with ETH for gas (a 10-pack restock uses about 9.2M gas: 0.005 ETH at
-0.5 gwei). Use a plain account: an address with code that forwards ETH (an EIP-7702 sweeper, as
-anvil's public dev keys carry on mainnet) passes the vault's pay on.
+| State | Default or behavior |
+| --- | --- |
+| Transaction state | `keeper/state-<vault>.json`; `--state` overrides it |
+| Event index | `keeper/index-<chain>-<vault>-<deploymentBlock>.sqlite`; `--index` overrides it |
+| Initial reconstruction | starts at the earlier of deployment and the trailing-seven-day volume boundary |
+| Log ingestion | at most eight ranges of 2,000 blocks per pass; saved progress resumes on the next pass |
+| Ordinary candidates | bounded active, terminal, inventory and optional token candidates, at most 16 per class |
+| Reorg repair | verify saved canonical hashes, roll back affected ranges and replay retained events |
+| Financial authority | onchain acquisition cursor, pending receipt count, listing authentication and exact book |
 
-## Each pass
+The index tracks active fee debt, outstanding backing identifiers, idle packs, allocations,
+receipts and oversized gift recovery. Its minimum-debt active listing is the preferred fee witness.
+Successful acquisition events supply trailing volume; refunded requests do not count as revenue.
+A large initial reconstruction may take several passes. Deleting the index does not remove any
+onchain state; it requires reconstruction before ordinary operation resumes.
 
-1. Re-check receipts counted in the last 64 blocks (reorgs) and settle the in-flight transaction.
-2. Read the vault, FWA and rewards state; `policy.plan` returns the calls worth making, in order.
-3. For the first call: preflight (`eth_estimateGas` from the keeper's address). A vault error that
-   means the state moved on (Nothing, NotCheckpointWindow, AlreadyCheckpointed,
-   Paused, WindingDown, AllocatedExposure) is a quiet skip; any other revert is an error.
-4. Expected pay is read by simulating the exact call (`cast call` returns the pay the active
-   policy and the vault's caps give), so a policy swap needs no keeper change. Execution cost is
-   the estimate x the billed/estimate ratio calibrated from the keeper's own receipts, at the bid.
-   Send when pay + `--max-loss-wei` covers that cost; `minPay` is 80% of the simulated pay, and a
-   replacement re-quotes before re-bidding. Pay is simulated, and the final call (minPay included)
-   re-estimated, with the fee fields the keeper signs, so a policy that prices on `tx.gasprice`
-   is seen as it will act (audit E1). Activation goes in batches of 20; a distribution-only
-   checkpoint is planned when simulating it succeeds. Building and listing wait until FWA's queue
-   is drained, so the keeper's own listings never stage (audit E7). `--status` and `/health` show the active policy and
-   any queued replacement.
-5. Save the pending entry, broadcast at basefee + maxTip (max fee 2 x basefee + maxTip), wait for
-   the receipt, count it, re-read the chain, repeat.
+Related financial reads use one pinned block and a final canonical-hash check. New events are
+indexed once; unchanged positions are not enumerated each pass. Optional token reads rotate through
+a bounded candidate set. Complete portfolio getters are absent from the production ABI.
 
-## Status codes
+| Call | Required inputs and bounds |
+| --- | --- |
+| `restock(units, backingProposals, minPay)` | allowed pack size; at most 30 total new units; actual proposed funding plus maintained waiting-inventory funding |
+| `list(backingProposals, minPay)` | at most 8 proposals, each an unused 10,000 wei multiple inside the live target interval and every economic gate |
+| `sync(maxJournal, ids, maxPrune, minPay)` | `maxJournal + ids.length <= 16`, `maxPrune <= 16`; verified completed global entries, own selections, terminal transitions and queue cleanup |
+| `checkpoint(witnessId, minPay)` | one authenticated live fee witness when active count is nonzero; complete journal, no receipts, clean nonexpired allocation head, blackout and drained requests |
+| `unlist(ids, minPay)` / `harvest(ids, minPay)` | at most 16 IDs; harvest IDs strictly ascending; crown exit protection remains |
+| `liquidate(maxCount, minPay)` | at most 16 items and 30 ordinary backing units; oversized gifts use an isolated claim of at most 30 Shapes |
+| `burnTokens(ids)` | at most 16 candidates; unpaid; stale IDs cannot block credit withdrawal and burning |
 
-`--status`, every pass's log and `/health` report these. "wait" clears by itself; "action" needs
-someone.
+Operation identifier 4 (old staged activation) is retired. New admission atomically requires an
+ordinary Active listing, even after a drained-queue precheck. Other operation identifiers retain
+meaning. An unconsumed old identifier is retired before its returned pack can be reused.
 
-| Code | Kind | Meaning | What to do |
-|---|---|---|---|
-| OK | ok | operating normally | none |
-| GAS_ABOVE_CEILING | wait | bid above the vault's gas ceiling; only liability work is planned | none; to process redemptions now, run with `--max-loss-wei`; if gas stays high, the admin raises the ceiling and the reserve with it (immediate, D58) |
-| WAITING_SETTLEMENT | wait | a purchaser is inside FWA's settlement window | none |
-| WAITING_CHECKPOINT_WINDOW | wait | deposits or redemptions wait for FWA's blackout with its queue drained | none; anyone may call FWA `processAcquisitions` to drain the queue |
-| QUOTE_UNAVAILABLE | wait | FWA admission is off or its floor quote is invalid: nothing new lists | none; existing positions keep earning and can be unlisted |
-| BID_CYCLE_UNPROFITABLE | wait | gas too high for a relist to repay itself | none |
-| STAGED_PENDING_ACTIVATION | wait | listings FWA staged; activated once its queue drains | none |
-| REDEMPTION_LIQUIDITY_SHORT | wait / action | ETH owed to redeemers beyond free ETH; "action" when nothing is planned to release it | if gas is above the ceiling, run with `--max-loss-wei`; if FWA's queue never drains, call FWA `processAcquisitions` |
-| TOKENS_UNBURNED | info | FWA token rewards not yet burned | optional: `--burn-tokens`, or anyone calls `burnTokens(ids)` |
-| EDGE_GATE_FAILED | action | FWA's live fees leave less than the minimum edge; the keeper unlists positions | owner considers `startWindDown()` |
-| RECOVERY_REQUIRED | action | FWA holds a pack owed to the vault (failed delivery) | the keeper retries through `sync`; if it persists, see D23 |
-| LISTING_PAUSED | action | the owner paused listing | owner decision |
-| RESERVE_BELOW_NEED | action | the reserve is below one checkpoint plus one listing batch at the ceiling | admin raises `reserve` (immediate, D58) |
-| WINDING_DOWN | info | wind-down in progress | keep the keeper running until no positions remain |
+FWA's private staging FIFO has no public head getter, and can remain nonempty after requests drain.
+The vault caps each `listNFT` call at 1.2 million gas and requires exactly one added active listing.
+Incidental foreign activation, a staged result or insufficient external call gas reverts admission
+atomically. The keeper's bounded pending preflight waits on such rejection. Another actor must
+perform FWA's permissionless activation; there is no paid vault activation operation. This admission
+condition does not prevent journal catchup, eligible checkpoints or exits.
 
-A malfunction shows as `/health` 503: no pass for 3 loop intervals, an RPC failure, a preflight
-revert outside the list above, an on-chain revert, a replacement that failed, a reorged receipt,
-or a transaction still pending after 5 replacements.
+Restock may repeat a valid unreserved funding quote. Listing then chooses fresh unique identifiers
+from current outstanding reservations; it never assumes future tags are already reserved. Collisions,
+stale fee witnesses and another keeper winning a race trigger bounded refresh/replanning. No keeper
+can bypass the live economic floor, oracle ceiling, capital check or liquidity reserve.
 
-## Recovery
+An extended returned gift can be too large for the current oracle cap while new three-unit packs
+remain viable. If the idle head has no valid listing proposal, the keeper can build valid packs
+above it, retaining the vault's maintained `idleFunding()` commitment for older inventory. A viable
+but currently unaffordable listing retains relist priority. No inventory scan or new liquidation
+strategy is needed; the gift remains fully accounted for and redeemable through normal exits.
 
-| Situation | What the keeper does | Operator action |
-|---|---|---|
-| Process killed or host restarted | state file holds the in-flight nonce; the next run waits for it or replaces it at the same nonce | restart it |
-| RPC lost the broadcast response | the entry is saved before broadcasting; the keeper looks the nonce up, counts the transaction if it landed, resends at the same nonce if it did not | none |
-| Transaction stuck | same-nonce +25% replacement every 3 blocks, up to 5 times and under `--max-fee-gwei` | if still stuck, raise `--max-fee-gwei` or wait |
-| Another keeper did the work first | our preflight reverts with an expected error; a stuck transaction of ours is not bumped | none |
-| Two keeper processes on one state file | the second exits (lock) | run one per state file; separate keepers need separate keys |
-| Nonce used outside this process | counted if it was our call, otherwise tracking is dropped; nothing is resent | do not share the key |
-| Reorg | receipts in the last 64 blocks are re-checked; a vanished one is uncounted and reported; the plan is re-read from chain | none |
-| State file deleted | the keeper starts fresh; the vault's state is on chain | wait for any in-flight transaction to clear first |
-| Keeper down for days | positions keep earning; deposits and redemptions wait; anyone may run a keeper or call any function | restart; or call `checkpoint()`, `unlist(ids)`, `liquidate(n)` by hand |
-| Gas above the ceiling for long | only liability work, and only with `--max-loss-wei` | admin raises `gasCeiling` and `reserve` together if the market moved |
+A backing target can depend on basefee. The keeper authenticates the deterministic pending header
+against its pinned parent and checks executed `BASEFEE` with explicit fee fields. It uses that
+context for proposals, payment simulation and gas estimation, then checks the parent before sending.
+Later inclusion or concurrent changes can still reject atomically. See
+`POSITION-INTEGRATION-ACCEPTANCE.md` for the verified context and remaining limits.
 
-## Wind-down
+Payment remains a fixed verified-work quote, capped by the replaceable policy offer, vault envelope,
+free cash and the applicable budget. Foreign/refunded entries earn no flat work fee. `processingPool`
+funds the fixed shared checkpoint charge only. With `minPay=0`, maintenance remains permissionless
+when unpaid; higher `minPay` reverts the whole operation if payment is insufficient.
 
-Owner `startWindDown()` (one way). The keeper unlists every position (FWA's queue must be
-drained), liquidates packs and Shapes back to ETH, and checkpoints redemptions in each blackout.
-Holders `requestRedeem`, then `claim` after the next checkpoint. Anyone can run every step.
+| Condition | Recovery |
+| --- | --- |
+| `INDEX_CATCHUP` | run another bounded index pass; persistent progress is retained |
+| `JOURNAL_CATCHUP` | process completed global entries in bounded sync calls |
+| `RECEIPTS_PENDING` | sync the event-discovered IDs after their acquisition entries |
+| `ALLOCATION_CLEANUP` | prune resolved queue heads through bounded sync |
+| Overdue allocation / owed NFT | permissionless sync resolves expiry or retries FWA's real return claim |
+| `InvalidBacking` / `BadWitness` | refresh index and live candidates; retry within the bounded race allowance |
+| Gas above routine ceiling | routine work waits; holders may accept bounded losses for necessary exits |
+| Essential budget zero | D64: withdrawer or owner executes exit work unpaid; no unwind charge |
+| Policy failure | work can run for zero pay; the policy cannot release protected holder balances |
+| Stuck transaction | same-nonce replacement under configured fee, retry and cumulative-loss limits |
+| Lost response / restart | durable nonce tracking reconciles the original transaction before resending |
+| Reorg | transaction accounting and event projections both roll back and replay |
 
-## Rehearse locally
+Owner `startWindDown()` remains one-way. Process journal/receipts, resolve allocations, unlist with
+crown protection, liquidate in bounded calls, and checkpoint redemptions in blackout. Holders claim
+their own balances. Oracle or admission failures cannot block the recovery paths.
 
-```sh
-anvil --fork-url https://mainnet.gateway.tenderly.co --fork-block-number 26418539 --port 8547 --base-fee 150000000
-python3 keeper/rehearse_canary.py      # canary values, production deploy script and this keeper
-python3 keeper/test_tx.py              # restart, replacement, lost response, reorg, lock (plain anvil)
-```
+Local rehearsal is prepared by `python3 keeper/rehearsal_batch.py --plan`. Its execution entry is
+reserved for an explicitly approved isolated local batch. Current command receipts and remaining
+launch gates are recorded in `docs/REPORT.md`; historical keeper profit tables do not validate the
+new quote schedule.

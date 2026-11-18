@@ -1,0 +1,64 @@
+Production integration evidence
+Base revision: f75ee770d0f0bce55a5f2607a23a3ee0104d1df1 + working changes
+Command: forge test --match-path test/fork/ForkIncrementalProduction.t.sol --no-match-test 'LowGas|oversized|Cold' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv
+Exit status: 0
+Post-run working-tree SHA256 src/PackVault.sol: 7646074c4865e27208ebee79252d4ae840ffdaaff829546fb77380156f2d03f6
+SHA256 src/VaultLib.sol: 28cbd416844e1286c5e9b8ea2663888d5d21403018fda17aa7ce41e5d6c6ae15
+SHA256 src/interfaces/External.sol: 20a957cd8ad0c7f105c1b06f9b233d6be74a8fea5b24715984855e1c8bff99fe
+SHA256 test/fork/ForkIncrementalProduction.t.sol: 2075418f233e785654f75a8f7b2f9b0b7156f7b6c18dafe05d0ea9ff6f146b37
+SHA256 test/fork/ForkSelection.t.sol: 6b7c5772ff40095ded9b886698bec905d4ff1bad1e178f0406f350be8fefaec7
+SHA256 test/utils/TestVaultOps.sol: d3b0c37ba1870a242c1c2f0068a36e8729ba96ff34d61089c1f84f9e3385d8b8
+Scope: historical real Tenderly fork; fixture transactions replayed through real VRF; one vault listing plus 29 real third-party listings, not 30 vault positions.
+
+Compiling 2 files with Solc 0.8.30
+Solc 0.8.30 finished in 7.05s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:171:35:
+    |
+171 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:564:5:
+    |
+564 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkIncrementalProduction.t.sol:25:5:
+   |
+25 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Ran 2 tests for test/fork/ForkIncrementalProduction.t.sol:ForkProductionInventoryTest
+[PASS] test_paidMintSplitLooseAssemblyListingWithdrawalAndRedemptionMatchFullReference() (gas: 10767607)
+[PASS] test_pendingEscrowProcessingClaimsAndCancellationExcludedFromNAV() (gas: 1348974)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 912.78ms (283.31ms CPU time)
+
+Ran 4 tests for test/fork/ForkIncrementalProduction.t.sol:ForkProductionReceiptsTest
+[PASS] test_burnedKeptPackCanStillConsumeReceipt() (gas: 48109823)
+Logs:
+  production vault runtime bytes: 24130
+
+[PASS] test_extendedKeptGiftAdoptsActualBackingOnce() (gas: 48527149)
+Logs:
+  production vault runtime bytes: 24130
+
+[PASS] test_feeChangeDoesNotReinterpretReceipt() (gas: 48116236)
+Logs:
+  production vault runtime bytes: 24130
+
+[PASS] test_receiptBeforeJournalBlocksPricingAndCannotRetireEarly() (gas: 48233038)
+Logs:
+  production vault runtime bytes: 24130
+
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 6.25s (23.52s CPU time)
+
+Ran 2 test suites in 6.61s (7.16s CPU time): 6 tests passed, 0 failed, 0 skipped (6 total tests)

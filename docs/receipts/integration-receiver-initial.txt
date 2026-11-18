@@ -1,0 +1,51 @@
+Production integration evidence
+Base revision: f75ee770d0f0bce55a5f2607a23a3ee0104d1df1 + working changes
+Command: forge test --match-path test/fork/ForkIncrementalProduction.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv
+Exit status: 0
+Scope: historical real Tenderly fork; fixture transactions replayed through real VRF; one vault listing plus 29 real third-party listings, not 30 vault positions.
+
+No files changed, compilation skipped
+
+Ran 10 tests for test/fork/ForkIncrementalProduction.t.sol:ForkProductionReceiptsTest
+[PASS] test_burnedKeptPackCanStillConsumeReceipt() (gas: 47996753)
+Logs:
+  production vault runtime bytes: 23618
+
+[PASS] test_extendedKeptGiftAdoptsActualBackingOnce() (gas: 48413436)
+Logs:
+  production vault runtime bytes: 23618
+
+[PASS] test_feeChangeDoesNotReinterpretReceipt() (gas: 48003184)
+Logs:
+  production vault runtime bytes: 23618
+
+[PASS] test_productionColdKeepFee0() (gas: 47386446)
+Logs:
+  production vault runtime bytes: 23618
+
+[PASS] test_productionColdKeepFee100() (gas: 47401183)
+Logs:
+  production vault runtime bytes: 23618
+
+[PASS] test_productionColdKeepFee500() (gas: 47406856)
+Logs:
+  production vault runtime bytes: 23618
+
+[PASS] test_productionColdKickAfterFalseSettledBidCandidate() (gas: 50798604)
+[PASS] test_productionLowGasKeepRecordsOrFailsAtomically() (gas: 54581393)
+Logs:
+  keep atomic failures: 22
+  keep recorded successes: 18
+
+[PASS] test_productionLowGasKickRecordsOrFailsAtomically() (gas: 67443592)
+Logs:
+  kick atomic failures: 40
+  kick recorded successes: 19
+
+[PASS] test_receiptBeforeJournalBlocksPricingAndCannotRetireEarly() (gas: 48119062)
+Logs:
+  production vault runtime bytes: 23618
+
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 7.33s (65.51s CPU time)
+
+Ran 1 test suite in 7.65s (7.33s CPU time): 10 tests passed, 0 failed, 0 skipped (10 total tests)

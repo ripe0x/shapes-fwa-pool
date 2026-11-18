@@ -4,11 +4,11 @@
 
 Use one vault with running accounting totals. Read a position when it changes. Process the deployed FWA contract's new acquisition records in sequence. Price shares from those totals after proving that all relevant changes have been accounted for.
 
-The current 300 position ceiling exists because checkpoint pricing reads every open position and every idle pack. Removing that ceiling requires removing those scans from required runtime paths. Dividing the same scan across transactions would preserve unnecessary work and introduce snapshot consistency problems.
+The earlier 300 position ceiling existed because checkpoint pricing read every open position and every idle pack. Removing that ceiling requires removing those scans from required runtime paths. Dividing the same scan across transactions would preserve unnecessary work and introduce snapshot consistency problems.
 
 This document concerns position accounting only. Mint policy, fee revenue, pack size selection, distributions, and the broader architecture cleanup remain outside this work.
 
-Status: the isolated running ledger milestone has now passed. The accounting kernel matches an independent reference through 40,960 randomized steps and at 301, 1,000, and 10,000 bookkeeping positions, with identical valuation gas. Twenty five distinct real FWA fork tests cover the adapter and lifecycle. See `POSITION-ACCOUNTING-MILESTONE.md` for exact evidence and limits. Production contracts remain unchanged; production share flow integration and removal of the 300 position ceiling are the next milestone.
+Status: the isolated running ledger milestone has now passed. The accounting kernel matches an independent reference through 40,960 randomized steps and at 301, 1,000, and 10,000 bookkeeping positions, with identical valuation gas. Twenty five distinct real FWA fork tests cover the adapter and lifecycle. See `POSITION-ACCOUNTING-MILESTONE.md` for exact evidence and limits. Production integration is now implemented on `codex/incremental-position-integration`, with local verification complete and acceptance blocked by funding and changed cost outcomes. See `POSITION-INTEGRATION-ACCEPTANCE.md`; the research evidence below does not establish integrated acceptance.
 
 ## 1. Preserve value instead of rediscovering it
 
@@ -209,7 +209,7 @@ The suite covered ordinary keep fees of 0, 100, and 500 basis points; buyer reli
 
 Two gas sweeps tested 99 call limits in total. The keep sweep tested 40 limits from 20,000 through 800,000 in 20,000 increments, with 22 atomic failures and 18 recorded successes. The kick sweep tested 59 limits from 20,000 through 600,000 in 10,000 increments, with 39 atomic failures and 20 recorded successes. Every successful tested payment was recorded. These sampled limits are evidence, not an exhaustive proof of every possible gas amount.
 
-The original receipt probe alone does not implement the ledger. The subsequent `IncrementalFWA` and `IncrementalLedger` prototype now covers acquisition ordering, receipt consumption, lookup retirement and reuse, later fee changes, nft gifts and burns after a keep, differential valuation, and model scale tests. Owed claims are covered in the pure model; failed delivery was not manufactured on the real fork. Production share flow integration remains outstanding, and its exact receiver must be measured again. The production 300 position limit has not yet been removed.
+The original receipt probe alone does not implement the ledger. The subsequent `IncrementalFWA` and `IncrementalLedger` prototype now covers acquisition ordering, receipt consumption, lookup retirement and reuse, later fee changes, nft gifts and burns after a keep, differential valuation, and model scale tests. Owed claims are covered in the pure model; failed delivery was not manufactured on the real fork. At the research milestone, production integration and its exact receiver measurements were outstanding. The integration branch now removes the limit; its separate measurements and funding acceptance are recorded in `REPORT.md`.
 
 Reproduce the adapter suite with:
 

@@ -1,0 +1,62 @@
+[
+  {
+    "original": "/private/tmp/position-keeper-final-evidence.json",
+    "archived": "docs/receipts/integration-keeper-final-evidence.json",
+    "bytes": 27002,
+    "sha256": "27f84c212eb8f9caef4052773844fcb67027dcbfd11f3e389a85ce05fda63477"
+  },
+  {
+    "original": "/private/tmp/position-keeper-context-correction.json",
+    "archived": "docs/receipts/integration-keeper-context-correction.json",
+    "bytes": 49032,
+    "sha256": "28ede5f62c72a997da81486679142ea2093c7a6bb50c98b7946c8bbf18f7133b"
+  },
+  {
+    "original": "/private/tmp/position-approved-final3-and-quiet.txt",
+    "archived": "docs/receipts/integration-keeper-final3-and-quiet.txt",
+    "bytes": 3100,
+    "sha256": "ff5ff2c4b0b281dd72d0c0bc740ee7daba88add9a201a1dbde88f0566d49af62"
+  },
+  {
+    "original": "/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/pack-vault-integration-batch-77gnn3vj/actions.jsonl",
+    "archived": "docs/receipts/integration-approved-actions.jsonl",
+    "bytes": 2096628,
+    "sha256": "49e3a8c90818f8e44f1e5a24eaeb865891a4613906e121570e3e01c49fc32230"
+  },
+  {
+    "original": "/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/pack-vault-integration-batch-77gnn3vj/final-quiet-repaired-client.log",
+    "archived": "docs/receipts/integration-quiet-final.txt",
+    "bytes": 13556,
+    "sha256": "4946ad53b2524d92df7e16deec899ebd47a45019e6103e8045533b5f278cab3b"
+  },
+  {
+    "original": "/private/tmp/position-keeper-final-focused.txt",
+    "archived": "docs/receipts/integration-keeper-focused-final.txt",
+    "bytes": 821,
+    "sha256": "ff71e0f39984ff08dff9278db1d3141fd23183e215c5f5a9cc7568a0333bc48f"
+  },
+  {
+    "original": "/private/tmp/position-keeper-final-postflight.json",
+    "archived": "docs/receipts/integration-keeper-postflight-final.json",
+    "bytes": 985,
+    "sha256": "097f8e313a75758b04df934ccbda7bbaa24960954426e5d89b771ca71970687c"
+  },
+  {
+    "original": "/private/tmp/position-list-splitting-actual.txt",
+    "archived": "docs/receipts/integration-list-splitting-billed.txt",
+    "bytes": 3343,
+    "sha256": "21bd9f2700ab5fe9133727338e7b806414d71efd345924f26c3c183ba56b63bf"
+  },
+  {
+    "original": "/private/tmp/position-keeper-real-recovery-final.txt",
+    "archived": "docs/receipts/integration-recovery-pool-fixture-failure.txt",
+    "bytes": 2486,
+    "sha256": "783174ab3c69abce276083c1f746629d4911304058fea0470be22b83c0bc4838"
+  },
+  {
+    "original": "/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/pack-vault-integration-batch-77gnn3vj/final-rehearse_canary.py.log",
+    "archived": "docs/receipts/integration-canary-intermediate-failure.txt",
+    "bytes": 4330,
+    "sha256": "b69d8fa54118025aa4b149135416c7b3d72595c5f926da614d96f105a4e961f6"
+  }
+]

@@ -1,0 +1,88 @@
+Compiling 2 files with Solc 0.8.30
+Solc 0.8.30 finished in 5.82s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:177:35:
+    |
+177 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:574:5:
+    |
+574 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkJournalGas.t.sol:12:5:
+   |
+12 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkMaxBatchGas.t.sol:16:5:
+   |
+16 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Ran 1 test for test/fork/ForkJournalGas.t.sol:ForkJournalGasTest
+[PASS] test_realForeignHistoryOneVersusSixteenEntriesAndSplitPay() (gas: 4510444)
+Logs:
+  actual fulfilled foreign entries: 16
+  actual refunded entries: 0
+  startup one entry gross complete gas: 158812
+  startup one entry pay wei: 23000000000000
+  steady one entry gross complete gas: 138930
+  steady sixteen entries gross complete gas: 420622
+  steady sixteen split calls gross complete gas: 2181216
+  one entry pay wei: 23000000000000
+  sixteen entries pay wei: 113000000000000
+  sixteen split calls pay wei: 368000000000000
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.52s (696.78ms CPU time)
+
+Ran 3 tests for test/fork/ForkMaxBatchGas.t.sol:ForkMaxBatchGasTest
+[PASS] test_checkpointFullHolderMixCompleteGas() (gas: 86705198)
+Logs:
+  checkpoint redemption index distribution deposit payment complete gas: 370178
+  checkpoint redemption index distribution deposit payment complete gas pay wei: 100000000000000
+
+[PASS] test_maximumEightMixedPacksWithRealCrownTakeoversFitTransactionCap() (gas: 49322923)
+Logs:
+  list maximum eight mixed packs with crown takeovers complete gas: 6527313
+  list maximum eight mixed packs with crown takeovers complete gas pay wei: 1560000000000000
+
+[PASS] test_maximumLargePackOperationsFitTransactionCap() (gas: 159684337)
+Logs:
+  restock ten small packs thirty total units complete gas: 10357047
+  restock ten small packs thirty total units complete gas pay wei: 2226000000000000
+  liquidate ten small packs thirty total units complete gas: 1771562
+  liquidate ten small packs thirty total units complete gas pay wei: 585000000000000
+  restock one largest 30-unit pack complete gas: 7958318
+  restock one largest 30-unit pack complete gas pay wei: 1650000000000000
+  list single largest pack complete gas: 1223942
+  list single largest pack complete gas pay wei: 265000000000000
+  list maximum eight largest packs complete gas: 6554114
+  list maximum eight largest packs complete gas pay wei: 1560000000000000
+  harvest single active debt complete gas: 200770
+  harvest single active debt complete gas pay wei: 0
+  harvest maximum sixteen active debts complete gas: 1069551
+  harvest maximum sixteen active debts complete gas pay wei: 0
+  unlist single largest pack complete gas: 616905
+  unlist single largest pack complete gas pay wei: 145000000000000
+  unlist maximum sixteen largest packs complete gas: 4113806
+  unlist maximum sixteen largest packs complete gas pay wei: 1300000000000000
+  liquidate maximum units from largest pack complete gas: 1155583
+  liquidate maximum units from largest pack complete gas pay wei: 261000000000000
+  sync maximum sixteen kicked receipts complete gas: 2095652
+  sync maximum sixteen kicked receipts complete gas pay wei: 721000000000000
+
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 11.17s (18.59s CPU time)
+
+Ran 2 test suites in 11.75s (12.69s CPU time): 4 tests passed, 0 failed, 0 skipped (4 total tests)

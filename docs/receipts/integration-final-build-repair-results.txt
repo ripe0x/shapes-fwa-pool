@@ -1,0 +1,145 @@
+Command: CANDIDATE_RUN=1 forge build --sizes --no-lint
+Exit status: 0
+Scope: old frozen production source plus all migrated consumer bytecode. Subsequent staging-admission repair supersedes its production hash.
+
+Warning: lib/forge-std: missing from foundry.lock (found 6e8c4a92c9a8b31c1b0f0c39296d1fa4695c7df8)
+Warning: lib/solady: missing from foundry.lock (found acd959aa4bd04720d640bf4e6a5c71037510cc4b)
+Compiling 28 files with Solc 0.8.30
+Solc 0.8.30 finished in 66.95s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:175:35:
+    |
+175 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:572:5:
+    |
+572 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditActivationGas.t.sol:12:5:
+   |
+12 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditAllocatedValuation.t.sol:29:5:
+   |
+29 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditDistribution.t.sol:10:5:
+   |
+10 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditFreeMismatch.t.sol:10:5:
+   |
+10 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditMaliciousPolicy.t.sol:19:5:
+   |
+19 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditMaxPackGas.t.sol:13:5:
+   |
+13 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditOracleGas.t.sol:11:5:
+   |
+11 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkIncrementalProduction.t.sol:35:5:
+   |
+35 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+   --> test/fork/ForkIncrementalProduction.t.sol:566:5:
+    |
+566 |     function assertPendingGasEnvironment() external {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkJournalGas.t.sol:12:5:
+   |
+12 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkMaxBatchGas.t.sol:15:5:
+   |
+15 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkTokens.t.sol:80:5:
+   |
+80 |     function assertTokenGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+╭-----------------------------+------------------+-------------------+--------------------+---------------------╮
+| Contract                    | Runtime Size (B) | Initcode Size (B) | Runtime Margin (B) | Initcode Margin (B) |
++===============================================================================================================+
+| ForceSender                 | 3                | 97                | 24,573             | 49,055              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| GasPriceSwitchPolicy        | 123              | 147               | 24,453             | 49,005              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| GasProbe                    | 134              | 158               | 24,442             | 48,994              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| HostileNft                  | 2,036            | 2,062             | 22,540             | 47,090              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| IncrementalFWA              | 14,068           | 14,819            | 10,508             | 34,333              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| IndependentCheckpointCaller | 1,638            | 1,664             | 22,938             | 47,488              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| KeeperPolicyFlat            | 168              | 192               | 24,408             | 48,960              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| KeeperPolicyV1              | 216              | 240               | 24,360             | 48,912              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| PackVault                   | 24,509           | 27,277            | 67                 | 21,875              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| PolicyGasBurner             | 186              | 210               | 24,390             | 48,942              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| PolicyGreedy                | 110              | 134               | 24,466             | 49,018              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| PolicyNoVersion             | 3                | 27                | 24,573             | 49,125              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| PolicyReverting             | 141              | 165               | 24,435             | 48,987              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| PolicyShortReturn           | 60               | 84                | 24,516             | 49,068              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| PolicyVersionZero           | 61               | 85                | 24,515             | 49,067              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| ProductionLedgerGasMeter    | 567              | 593               | 24,009             | 48,559              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| ProductionLedgerHarness     | 4,525            | 4,551             | 20,051             | 44,601              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| ReceiptFixtureFiller        | 961              | 1,253             | 23,615             | 47,899              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| ReceiptIdentityProbe        | 4,926            | 5,315             | 19,650             | 43,837              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| ReentrantHolder             | 766              | 916               | 23,810             | 48,236              |
+|-----------------------------+------------------+-------------------+--------------------+---------------------|
+| VaultLib                    | 20,259           | 20,291            | 4,317              | 28,861              |
+╰-----------------------------+------------------+-------------------+--------------------+---------------------╯
+

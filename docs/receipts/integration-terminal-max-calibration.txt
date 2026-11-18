@@ -1,0 +1,62 @@
+Intermediate integration record, before final source/quote freeze.
+Base revision: f75ee770d0f0bce55a5f2607a23a3ee0104d1df1 plus working changes.
+Exit status: 0
+Scope/limits: exact whole-tree source hash was not captured at execution for this intermediate run. The final frozen acceptance manifest supersedes intermediate pass counts. Gas meters report gross execution plus intrinsic/calldata, before transaction refunds, unless explicitly labeled otherwise. Historical real Tenderly forks only; pure static checks do not claim execution. The exact command follows.
+Command: CANDIDATE_RUN=1 forge test --match-path test/fork/ForkMaxBatchGas.t.sol --match-test test_maximumLargePackOperationsFitTransactionCap --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv
+
+Compiling 1 files with Solc 0.8.30
+Solc 0.8.30 finished in 3.80s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:173:35:
+    |
+173 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:566:5:
+    |
+566 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkMaxBatchGas.t.sol:15:5:
+   |
+15 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Ran 1 test for test/fork/ForkMaxBatchGas.t.sol:ForkMaxBatchGasTest
+[PASS] test_maximumLargePackOperationsFitTransactionCap() (gas: 158563358)
+Logs:
+  restock ten small packs thirty total units complete gas: 10356704
+  restock ten small packs thirty total units complete gas pay wei: 1976000000000000
+  liquidate ten small packs thirty total units complete gas: 1769717
+  liquidate ten small packs thirty total units complete gas pay wei: 515000000000000
+  restock one largest 30-unit pack complete gas: 7957945
+  restock one largest 30-unit pack complete gas pay wei: 1436000000000000
+  list single largest pack complete gas: 1221292
+  list single largest pack complete gas pay wei: 177000000000000
+  list maximum sixteen largest packs complete gas: 12505734
+  list maximum sixteen largest packs complete gas pay wei: 2067000000000000
+  harvest single active debt complete gas: 200770
+  harvest single active debt complete gas pay wei: 0
+  harvest maximum sixteen active debts complete gas: 1084228
+  harvest maximum sixteen active debts complete gas pay wei: 64000000000000
+  unlist single largest pack complete gas: 616905
+  unlist single largest pack complete gas pay wei: 102000000000000
+  unlist maximum sixteen largest packs complete gas: 4113806
+  unlist maximum sixteen largest packs complete gas pay wei: 912000000000000
+  liquidate maximum units from largest pack complete gas: 1153746
+  liquidate maximum units from largest pack complete gas pay wei: 65000000000000
+  sync maximum sixteen kicked receipts complete gas: 2095652
+  sync maximum sixteen kicked receipts complete gas pay wei: 719000000000000
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.28s (1.55s CPU time)
+
+Ran 1 test suite in 2.65s (2.28s CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)

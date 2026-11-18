@@ -1,0 +1,53 @@
+Intermediate integration record, before final source/quote freeze.
+Base revision: f75ee770d0f0bce55a5f2607a23a3ee0104d1df1 plus working changes.
+Exit status: 0
+Scope/limits: exact whole-tree source hash was not captured at execution for this intermediate run. The final frozen acceptance manifest supersedes intermediate pass counts. Gas meters report gross execution plus intrinsic/calldata, before transaction refunds, unless explicitly labeled otherwise. Historical real Tenderly forks only; pure static checks do not claim execution. The exact command follows.
+Command: forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test 'test_realRefundedJournalEntryGasAndVerifiedPay|test_staleAllocationHeadNeedsBoundedPruneAndCannotUseProcessingPool' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv
+
+Compiling 2 files with Solc 0.8.30
+Solc 0.8.30 finished in 10.98s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:175:35:
+    |
+175 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:572:5:
+    |
+572 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkIncrementalProduction.t.sol:35:5:
+   |
+35 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+   --> test/fork/ForkIncrementalProduction.t.sol:533:5:
+    |
+533 |     function assertPendingGasEnvironment() external {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Ran 2 tests for test/fork/ForkIncrementalProduction.t.sol:ForkProductionReceiptsTest
+[PASS] test_realRefundedJournalEntryGasAndVerifiedPay() (gas: 48009826)
+Logs:
+  one refunded entry complete gas: 131833
+  one refunded entry pay wei: 19400000000000
+
+[PASS] test_staleAllocationHeadNeedsBoundedPruneAndCannotUseProcessingPool() (gas: 48849823)
+Logs:
+  one resolved allocation head prune gross complete gas: 136137
+  one resolved allocation head prune pay wei: 17000000000000
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.50s (2.02s CPU time)
+
+Ran 1 test suite in 1.85s (1.50s CPU time): 2 tests passed, 0 failed, 0 skipped (2 total tests)
