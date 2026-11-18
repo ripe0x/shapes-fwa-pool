@@ -1,0 +1,22 @@
+name: Research and keeper safety checks
+
+on:
+  push:
+    branches: [research/mint-revenue-adaptive-sizing]
+  pull_request:
+
+jobs:
+  python-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify keeper policy, including staged-backlog regressions
+        run: python3 keeper/test_policy.py
+      - name: Verify revenue model and full-budget admission arithmetic
+        run: python3 -m unittest discover -s sim -p "test_mint_policy_research.py" -v
+
+# This workflow is intentionally not a substitute for Foundry's current-block
+# mainnet fork tests, complete asset-flow reconciliation or security review.
