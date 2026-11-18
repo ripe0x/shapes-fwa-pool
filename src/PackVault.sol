@@ -283,6 +283,8 @@ contract PackVault is ReentrancyGuard {
         _requireOperating();
         _precheck(minPay, false);
         if (listingPaused) revert Paused();
+        // Never spend on new paid mints while FWA would stage their listings.
+        if (fwa.unsettledAcquisitionCount() != 0 || fwa.stagingHead() != 0) revert Nothing();
         if (count == 0 || (params.packUnitsMask >> units) & 1 == 0) revert Amount();
         if (_open.length + _idlePacks.length + count > params.maxPositions) revert Amount();
         (uint256 k, uint256 backing, bool ok) = edge(units);
