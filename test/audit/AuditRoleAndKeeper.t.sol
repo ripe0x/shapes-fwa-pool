@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {TestVaultOps} from "../utils/TestVaultOps.sol";
+
 import {ForkBase} from "../fork/ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
@@ -50,7 +52,7 @@ contract AuditRoleAndKeeperTest is ForkBase {
         toBlackout();
         uint256 before = owner.balance;
         vm.prank(owner);
-        uint256 pay = vault.checkpoint(0);
+        uint256 pay = TestVaultOps.checkpoint(vault, 0);
         assertEq(owner.balance - before, pay, "returned pay is what was paid");
         assertGt(pay, 0);
         emit log_named_uint("charge paid (wei)", charge);
@@ -74,7 +76,7 @@ contract AuditRoleAndKeeperTest is ForkBase {
         toOpen();
 
         // Guardian zeroes the ceiling. Paid keeper work now reimburses 0.
-        lowerTo(100 ether, 150, 0, 0);
+        lowerTo(100 ether, 0, 0);
 
         uint256 shares = vault.shareBalance(alice);
         {
@@ -87,7 +89,7 @@ contract AuditRoleAndKeeperTest is ForkBase {
         // A keeper gets nothing now; alice must price her own redemption (callable by anyone).
         uint256 kBefore = keeper.balance;
         vm.prank(keeper);
-        vault.checkpoint(0);
+        TestVaultOps.checkpoint(vault, 0);
         // D55: the owner zeroed both the ceiling and the work fee, so no keeper pay at all.
         assertEq(keeper.balance, kBefore, "zero ceiling and zero work fee => keeper reimbursed nothing");
 

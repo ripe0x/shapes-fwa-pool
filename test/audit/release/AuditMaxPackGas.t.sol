@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
+
+import {TestVaultOps} from "../../utils/TestVaultOps.sol";
 import {DeployCore} from "../../../script/DeployCore.sol";
 import {ForkBase} from "../../fork/ForkBase.sol";
 import {PackVault} from "../../../src/PackVault.sol";
@@ -26,22 +28,24 @@ contract AuditMaxPackGas is ForkBase {
 
         p.packUnitsMask = uint64(1) << 30;
         (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether);
+        uint256 gross = Charges.grossFor(vault, 5 ether);
         vm.prank(alice);
-        vault.deposit{value: Charges.grossFor(vault, 5 ether)}();
+        vault.deposit{value: gross}();
         toBlackout();
         checkpoint();
         toOpen();
-        setPackAsk(0.30 ether);
+        setPackAsk(0.33 ether); // Ceiling 0.363 covers a 0.30 / 0.9 cash bid.
         (,, bool ok) = vault.edge(30);
         assertTrue(ok, "30-unit pack edge must be live");
         assertEq(vault.looseShapeCount(), 0, "empty inventory");
+        uint256[] memory proposals = TestVaultOps.proposals(vault, 1, 30);
         uint256 beforeGas = gasleft();
         vm.prank(keeper);
-        (bool underCap,) = address(vault).call{gas: 16_777_216}(abi.encodeCall(PackVault.restock, (1, 30, 0)));
+        (bool underCap,) = address(vault).call{gas: 16_777_216}(abi.encodeCall(PackVault.restock, (30, proposals, 0)));
         uint256 used = beforeGas - gasleft();
         emit log_named_uint("30 unit restock gas", used);
         assertTrue(underCap, "largest allowed pack builds under the transaction cap");
         assertLt(used, 12_000_000, "with headroom");
-        assertEq(vault.idlePacks().length, 1);
+        assertEq(TestVaultOps.idle(vault).length, 1);
     }
 }

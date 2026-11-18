@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
+
+import {TestVaultOps} from "../../utils/TestVaultOps.sol";
 import {SelectionBase, IFwaSettle} from "../../fork/ForkSelection.t.sol";
 import {PackVault} from "../../../src/PackVault.sol";
 import {Charges} from "../../utils/Charges.sol";
@@ -51,19 +53,21 @@ contract AuditAllocatedValuation is SelectionBase {
         vm.prank(bob);
         vault.deposit{value: gross}();
         toBlackout();
+        vault.sync(16, new uint256[](0), 0, 0);
         uint256 interval = vault.lastCheckpointInterval();
+        uint256 planned24 = TestVaultOps.witness(vault);
         vm.expectRevert(PackVault.SyncFirst.selector);
-        vault.checkpoint(0);
+        vault.checkpoint(planned24, 0);
         assertEq(vault.lastCheckpointInterval(), interval, "slot not consumed");
         assertEq(vault.shareBalance(bob), 0, "not priced");
 
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
         uint256 bal = address(vault).balance;
-        vault.sync(one, 0);
+        TestVaultOps.sync(vault, one, 0);
         // Net backing 0.035937 ETH > pack 0.03 ETH: sync reclaimed the backing.
         assertGt(address(vault).balance, bal, "backing reclaimed");
-        vault.checkpoint(0);
+        TestVaultOps.checkpoint(vault, 0);
         assertGt(vault.shareBalance(bob), 0, "priced after the sync, same blackout");
     }
 }

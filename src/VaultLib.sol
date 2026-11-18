@@ -5,10 +5,11 @@ import {FixedPointMathLib as M} from "solady/utils/FixedPointMathLib.sol";
 import {IKeeperPolicy} from "./KeeperPolicy.sol";
 import {
     IFWAV2,
+    IFWAView,
     IFloorOracle,
     IShapePacks,
+    IShapes,
     LISTING_ACTIVE,
-    LISTING_STAGED,
     LISTING_ALLOCATED,
     LISTING_SETTLED,
     LISTING_WITHDRAWN
@@ -32,13 +33,12 @@ library VaultLib {
         uint64 gasCeiling; // wei per gas, routine work
         uint64 essentialCeiling; // wei per gas, redemption and wind-down work (essential budget)
         uint64 maxTip; // reimbursed price is at most basefee + this
-        uint64 workFee; // flat wei per unit of work done: position listed, resolved, activated,
+        uint64 workFee; // flat wei per unit of work done: position listed, resolved,
         //                 unlisted, item liquidated, or a checkpoint that priced flows
         uint64 routineCap; // keeper budget for strategy work: capacity (wei) and refill per day
         uint64 routineRate;
         uint64 essentialCap; // keeper budget for redemption and wind-down work
         uint64 essentialRate;
-        uint96 maxPositions;
         uint128 reserve; // ETH kept idle
         uint128 tvlCap; // deposits refused above this NAV
     }
@@ -48,7 +48,6 @@ library VaultLib {
 
     // ---------------------------------------------------------------- bounds and quotes
 
-    uint256 internal constant MAX_POSITIONS = 300;
     uint256 internal constant MAX_WORK_FEE = 0.00005 ether; // per unit of work (D55, D56)
     uint256 internal constant MAX_MIN_EDGE_BPS = 1_000;
     uint256 internal constant MAX_BUFFER_BPS = 2_000;
@@ -69,66 +68,107 @@ library VaultLib {
     /// gas on real receipts (keeper/measure_gas.py, docs/GAS.md). Each base sits at most at the
     /// measured fixed cost of a call divided by 1.1, so splitting a job never earns a second base.
     // One checkpoint per interval cannot be split, so it is quoted at measured billed gas.
-    uint256 internal constant Q_CHECKPOINT = 225_000;
-    uint256 internal constant Q_CHECKPOINT_POS = 33_000; // per open position valued
+    uint256 internal constant Q_CHECKPOINT = 400_000;
     uint256 internal constant Q_RESTOCK = 280_000;
-    uint256 internal constant Q_PACK = 200_000; // createPack
+    uint256 internal constant Q_PACK = 325_000; // createPack at the three-Shape reference size
+    uint256 internal constant Q_PACK_UNIT = 35_000; // each additional packed Shape
     uint256 internal constant Q_MINT = 2_200_000; // one 0.1 ETH mint split ten ways (2.10M-2.26M by block)
-    uint256 internal constant Q_LIST = 255_000;
-    uint256 internal constant Q_LISTED = 530_000;
-    uint256 internal constant Q_SYNC = 75_000;
-    uint256 internal constant Q_SYNCED = 75_000;
-    uint256 internal constant Q_ACTIVATE = 50_000;
-    uint256 internal constant Q_ACTIVATED = 450_000; // FWA inserts it into its selection tree (~470k measured)
-    uint256 internal constant Q_UNLIST = 240_000;
-    uint256 internal constant Q_UNLISTED = 170_000;
+    uint256 internal constant Q_LIST = 280_000;
+    uint256 internal constant Q_LISTED = 825_000;
+    uint256 internal constant Q_SYNC = 85_000;
+    uint256 internal constant Q_JOURNAL = 30_000; // each completed global acquisition
+    uint256 internal constant Q_SELECTED = 160_000; // own selection bookkeeping
+    uint256 internal constant Q_SYNCED = 120_000; // terminal or recovered return
+    uint256 internal constant Q_PRUNED = 45_000; // resolved allocation head
+    uint256 internal constant Q_POSITION_SYNC = Q_JOURNAL + Q_SELECTED + Q_SYNCED + Q_PRUNED;
+    uint256 internal constant Q_UNLIST = 340_000;
+    uint256 internal constant Q_UNLISTED = 285_000;
     uint256 internal constant Q_LIQUIDATE = 75_000;
-    uint256 internal constant Q_LIQ_PACK = 150_000;
+    uint256 internal constant Q_LIQ_PACK = 80_000; // fixed work per ordinary pack
+    uint256 internal constant Q_REDEEM_SHAPE = 35_000;
+    uint256 internal constant Q_RECOVERY_BASE = 100_000;
+    uint256 internal constant Q_RECOVERY_SHAPE = 35_000;
+    uint256 internal constant Q_RECOVERY_UNSEAL = 70_000;
     uint256 internal constant Q_LIQ_SHAPE = 65_000;
-    uint256 internal constant Q_HARVEST = 80_000;
-    uint256 internal constant Q_HARVESTED = 15_000; // per listing with fees claimed
+    uint256 internal constant Q_HARVEST = 125_000;
+    uint256 internal constant Q_HARVESTED = 80_000; // per listing with fees claimed
     /// A 3-unit position (0.03 ETH pack + ~0.0363 backing): what request charges are scaled by.
     uint256 internal constant POSITION_VALUE = 0.0663 ether;
 
+    uint256 internal constant MAX_BATCH = 16;
+    uint256 internal constant MAX_LIST_BATCH = 8;
+    uint256 internal constant LIST_CALL_GAS = 1_200_000;
+    uint256 internal constant MAX_RESTOCK_UNITS = 30;
+    uint8 internal constant NONE = 0;
+    uint8 internal constant ACTIVE = 1;
+    uint8 internal constant ALLOCATED = 2;
+    uint8 internal constant OWED = 3;
+
     struct Position {
-        uint64 packId;
-        uint64 units; // pack value in 0.01 ETH
-        uint128 backing;
+        uint256 packId;
+        uint256 value;
+        uint256 backing;
+        uint256 feeDebt;
+        uint64 allocatedAt;
+        uint8 state;
     }
 
-    /// @notice Value of every open position from FWA state, read-only (checkpoint pricing).
-    ///         Active: pack + backing + pending fees. Staged: pack + backing. Allocated: the lesser of
-    ///         the pack and the net backing (both outcomes pay at least that). Settled or withdrawn
-    ///         and not yet synced: the pack, if the vault holds it or FWA owes it (every ETH leg
-    ///         already reached the balance or fee credit).
-    function valueOpen(IFWAV2 f, IShapePacks packs, mapping(uint256 => Position) storage positions, uint256[] storage open)
-        external
-        view
-        returns (uint256 nav, uint256 allocated, bool expired)
-    {
-        uint256 s = f.ownerSettlementFeeBps();
-        uint256 window = f.settlementWindow();
-        for (uint256 i; i < open.length; ++i) {
-            uint256 id = open[i];
-            Position memory pos = positions[id];
-            (,,,,,,,,, uint64 allocatedAt, uint8 status) = f.listings(id);
-            uint256 value = pos.units * UNIT;
-            if (status == LISTING_ACTIVE) {
-                nav += value + pos.backing + f.pendingFees(id);
-            } else if (status == LISTING_STAGED) {
-                nav += value + pos.backing;
-            } else if (status == LISTING_ALLOCATED) {
-                // Past the window the vault can resolve it with sync (the purchaser may still act
-                // first, so the value is not certain); pricing waits for that (audit E6).
-                if (block.timestamp >= allocatedAt + window) expired = true;
-                uint256 floorValue = value < pos.backing * (BPS - s) / BPS ? value : pos.backing * (BPS - s) / BPS;
-                nav += floorValue;
-                allocated += floorValue;
-            } else if (owns(packs, pos.packId) || f.stuckNFTRecipient(id) == address(this)) {
-                nav += value;
-            }
-        }
+    struct Work { uint256 processed; uint256 own; uint256 resolved; uint256 pruned; }
+
+    struct Receipt { uint128 amount; uint16 feeBps; uint8 kind; bool initialized; }
+
+    /// @dev Inventory indexes and all financial totals share this single authoritative book.
+    struct Book {
+        mapping(uint256 => Position) positions;
+        mapping(uint256 => uint256) idleValueOf;
+        mapping(uint256 => uint256) packToListing;
+        uint256 trackedValue;
+        uint256 idleValue;
+        uint256 activeBacking;
+        uint256 activeCount;
+        uint256 feeDebtSum;
+        mapping(uint256 => uint256) countByDebt;
+        uint256 allocatedValue;
+        uint256[] allocationQueue;
+        uint256 allocationHead;
+        uint64 lastAllocatedAt;
+        uint256[] open;
+        mapping(uint256 => uint256) openIndex;
+        uint256[] idlePacks;
+        uint256[] recoveryPacks;
+        mapping(uint256 => bool) recoveryUnsealed;
+        uint256[] looseShapes;
+        mapping(uint256 => uint256) idleQuote;
+        uint256 idleFunding;
+        mapping(uint256 => uint256) idForBacking;
+        mapping(uint256 => Receipt) receipts;
+        uint256 pendingPlusOne;
+        uint256 reservedCount;
+        uint64 acquisitionCursor;
+        bool controlled;
     }
+
+    event PositionUpdated(uint256 indexed listingId, uint256 packId, uint256 value, uint256 backing, uint256 feeDebt, uint64 allocatedAt, uint8 state);
+    event InventoryUpdated(uint256 indexed packId, uint256 value);
+    event RecoveryUpdated(uint256 indexed packId, uint256 value, bool unsealed);
+    event CashReceipt(uint256 indexed listingId, uint8 outcome, uint256 amount);
+    event ReceiptConsumed(uint256 indexed listingId);
+    event JournalProgress(uint64 cursor, uint256 processed, uint256 own);
+
+    error Duplicate();
+    error MissingInventory();
+    error WrongState();
+    error InsufficientBacking();
+    error BadWitness();
+    error NeedsPrune();
+    error OutOfOrder();
+    error InvalidListing();
+    error InvalidJournal();
+    error MissingReceipt();
+    error CatchUpFirst();
+    error PendingReceipts();
+    error InvalidBacking();
+    error BadBatch();
 
     /// @notice One checkpoint's redemption fill. Owed rounds up and a partial fill leaves 2 wei of
     ///         headroom, so the rounded-up reserve never exceeds the ETH actually freed. `unit` is
@@ -258,23 +298,24 @@ library VaultLib {
             p.minEdgeBps > MAX_MIN_EDGE_BPS || p.bufferBps > MAX_BUFFER_BPS || p.distributionBps > MAX_DISTRIBUTION_BPS
                 || p.payMarkupBps > MAX_PAY_MARKUP_BPS || p.workFee > MAX_WORK_FEE || p.keeperShareBps > MAX_KEEPER_SHARE_BPS
                 || p.allocatedBoundBps > MAX_ALLOCATED_BOUND_BPS
-                || p.gasCeiling > MAX_GAS_CEILING || p.essentialCeiling > MAX_GAS_CEILING || p.maxTip > p.gasCeiling || p.maxPositions > MAX_POSITIONS
+                || p.gasCeiling > MAX_GAS_CEILING || p.essentialCeiling > MAX_GAS_CEILING || p.maxTip > p.gasCeiling
                 || p.routineCap > MAX_ROUTINE_CAP || p.routineRate > MAX_ROUTINE_RATE || p.essentialCap > MAX_ESSENTIAL_CAP
                 || p.essentialRate > MAX_ESSENTIAL_RATE
                 || p.packUnitsMask >> (MAX_PACK_UNITS + 1) != 0 || p.packUnitsMask & ((1 << MIN_PACK_UNITS) - 1) != 0
         ) revert OutOfBounds();
     }
 
+    function packGas(uint256 units) internal pure returns (uint256) {
+        return Q_PACK + (units > MIN_PACK_UNITS ? units - MIN_PACK_UNITS : 0) * Q_PACK_UNIT;
+    }
+
     function cycleNet(Params storage p, uint256 k1e18, uint256 backing) external view returns (uint256) {
-        if (k1e18 <= 1e18) return 0;
-        uint256 gross = backing * (k1e18 - 1e18) / 1e18;
-        uint256 cost = quote(p, Q_SYNCED + Q_LISTED + Q_HARVESTED, 2, false);
-        return gross > cost ? gross - cost : 0;
+        return _cycleNet(p, k1e18, backing);
     }
 
     /// @notice A request's checkpoint charge: one checkpoint at its envelope, at cost plus one unit.
-    function requestCharge(Params storage p, uint256 openPositions) external view returns (uint256) {
-        return quote(p, Q_CHECKPOINT + openPositions * Q_CHECKPOINT_POS, 1, true);
+    function requestCharge(Params storage p) external view returns (uint256) {
+        return quote(p, Q_CHECKPOINT, 1, true);
     }
 
     /// @notice Deployment charge per POSITION_VALUE deposited: building and listing one position
@@ -291,7 +332,7 @@ library VaultLib {
     function unwindCharge(Params storage p) external view returns (uint256) {
         // No essential budget means exit work is unpaid (withdrawers run it): nothing to charge.
         if (p.essentialCap == 0) return 0;
-        return quote(p, Q_UNLISTED + Q_LIQ_PACK, 2, true);
+        return quote(p, Q_UNLISTED + Q_LIQ_PACK + MIN_PACK_UNITS * Q_REDEEM_SHAPE, 2, true);
     }
 
 
@@ -307,9 +348,8 @@ library VaultLib {
     ///           build gate), so new packs stay possible as gas rises;
     ///         - gas-optimal (c + sqrt(c^2 + a c P)) / a, with a = k - 1 and c a cycle's pay at the
     ///           routine ceiling: above the floor only when gas is high;
-    ///         - `spread`: spare capital per open slot when the position count, not capital, binds;
     ///         capped at FWA's oracle cap less the buffer unless FWA exempts the collection.
-    function edge(Params storage p, IFWAV2 f, address packs, uint256 units, uint256 spread, uint256 build)
+    function edge(Params storage p, IFWAV2 f, address packs, uint256 units, uint256 build)
         public
         view
         returns (uint256 k1e18, uint256 backing, bool ok)
@@ -322,13 +362,10 @@ library VaultLib {
         backing = floor;
         if (k1e18 > 1e18) {
             uint256 a = k1e18 - 1e18;
-            uint256 c = (Q_SYNCED + Q_LISTED + Q_HARVESTED) * p.gasCeiling * (BPS + p.payMarkupBps) / BPS + 2 * p.workFee;
+            uint256 c = (Q_POSITION_SYNC + Q_LISTED + Q_HARVESTED) * p.gasCeiling * (BPS + p.payMarkupBps) / BPS + 2 * p.workFee;
             backing = M.max(backing, (c + M.sqrt(c * c + a * c / 1e18 * value)) * 1e18 / a);
-            backing = M.max(backing, M.divUp((build + quote(p, Q_SYNCED + Q_LISTED + Q_HARVESTED, 2, false)) * 1e18, a));
+            backing = M.max(backing, M.divUp((build + quote(p, Q_POSITION_SYNC + Q_LISTED + Q_HARVESTED, 2, false)) * 1e18, a));
         }
-        // Spare capital raises backing to at most twice what the rules above need: past that it
-        // only concentrates capital (and could win FWA's crown, which locks an exit for a window).
-        backing = M.max(backing, M.min(spread, 2 * backing));
         if (cap != type(uint256).max) backing = M.min(backing, cap * (BPS - p.bufferBps) / BPS);
         // Bid outcome B (k - 1) > 0 given k >= 1 + edge; spending callers also require it to clear
         // the keeper pay it causes (cycleNet). Keep outcome B (k - s) >= P holds from the floor.
@@ -345,72 +382,6 @@ library VaultLib {
     {
         (uint256 r, uint256 e) = budgetNow(p, b);
         if (minPay > M.min(free, essential ? e : r)) revert Payment();
-    }
-
-    event Resolved(uint256 indexed listingId, uint8 status, bool packReturned);
-    event PackOwed(uint256 indexed listingId); // FWA holds the pack as a pull claim; sync retries
-
-    /// @notice Resolve a position FWA has moved on: reclaim an allocated one the purchaser left past
-    ///         the settlement window, fold a settled or withdrawn one back into inventory. A pack
-    ///         FWA failed to deliver stays open until it arrives; a later sync retries the pull.
-    ///         The outcome comes from FWA's own record, never from inference: a pack is the
-    ///         vault's if the vault holds it or FWA owes it; anything else went to the purchaser.
-    function sync(
-        mapping(uint256 => Position) storage positions,
-        uint256[] storage open,
-        mapping(uint256 => uint256) storage openIndex,
-        uint256[] storage idle,
-        IFWAV2 f,
-        IShapePacks packs,
-        uint256 listingId
-    ) external returns (bool) {
-        Position memory pos = positions[listingId];
-        if (openIndex[listingId] == 0) return false;
-        (,,,,,,,,, uint64 allocatedAt, uint8 status) = f.listings(listingId);
-        if (status == LISTING_ALLOCATED) {
-            if (block.timestamp < allocatedAt + f.settlementWindow()) return false;
-            // Purchaser went silent: pick the better outcome for the vault.
-            uint256 back = pos.backing * (BPS - f.ownerSettlementFeeBps()) / BPS;
-            if (back >= pos.units * UNIT) f.depositorReclaimBacking(listingId);
-            else f.depositorReclaimNFT(listingId);
-            (,,,,,,,,,, status) = f.listings(listingId);
-        }
-        if (status != LISTING_SETTLED && status != LISTING_WITHDRAWN) return false;
-        if (f.stuckNFTRecipient(listingId) == address(this)) {
-            // Reverts while the collection still fails; the claim survives for the next try.
-            (bool ok,) = address(f).call(abi.encodeCall(IFWAV2.recoverStuckNFT, (listingId)));
-            if (!ok || !owns(packs, pos.packId)) {
-                emit PackOwed(listingId);
-                return false;
-            }
-        }
-        bool packBack = owns(packs, pos.packId);
-        if (packBack) idle.push(pos.packId);
-        removeOpen(positions, open, openIndex, listingId);
-        emit Resolved(listingId, status, packBack);
-        return true;
-    }
-
-    function removeOpen(
-        mapping(uint256 => Position) storage positions,
-        uint256[] storage open,
-        mapping(uint256 => uint256) storage openIndex,
-        uint256 listingId
-    ) public {
-        uint256 idx = openIndex[listingId] - 1;
-        uint256 last = open[open.length - 1];
-        open[idx] = last;
-        openIndex[last] = idx + 1;
-        open.pop();
-        delete openIndex[listingId];
-        delete positions[listingId];
-    }
-
-    /// @notice Redeemable value of idle packs.
-    function valueIdle(IShapePacks packs, uint256[] storage idle) external view returns (uint256 v) {
-        for (uint256 i; i < idle.length; ++i) {
-            v += packs.valueOf(idle[i]);
-        }
     }
 
     function owns(IShapePacks packs, uint256 packId) public view returns (bool) {
@@ -461,5 +432,462 @@ library VaultLib {
         if (block.timestamp - observedAt > f.maxOracleAge()) return (k1e18, 0, s);
         if (periodUsed < f.minOracleChallengePeriod()) return (k1e18, 0, s);
         cap = ask * (BPS + f.oracleCeilingPremiumBps()) / BPS;
+    }
+
+    function _emitPosition(Book storage b, uint256 id) private {
+        Position storage p = b.positions[id];
+        emit PositionUpdated(id, p.packId, p.value, p.backing, p.feeDebt, p.allocatedAt, p.state);
+    }
+
+    function addInventory(Book storage b, uint256 packId, uint256 value) internal {
+        addInventory(b, packId, value, 0);
+    }
+
+    function addInventory(Book storage b, uint256 packId, uint256 value, uint256 backingQuote) internal {
+        if (value == 0 || b.idleValueOf[packId] != 0 || b.packToListing[packId] != 0) revert Duplicate();
+        b.trackedValue += value;
+        b.idleValue += value;
+        _toIdle(b, packId, value, backingQuote);
+    }
+
+    function _toIdle(Book storage b, uint256 packId, uint256 value, uint256 backingQuote) private {
+        if (b.idleValueOf[packId] != 0) revert Duplicate();
+        b.idleValueOf[packId] = value;
+        if (value > MAX_PACK_UNITS * UNIT) {
+            b.recoveryPacks.push(packId);
+            emit RecoveryUpdated(packId, value, false);
+        } else {
+            b.idlePacks.push(packId);
+            emit InventoryUpdated(packId, value);
+        }
+        b.idleQuote[packId] = backingQuote;
+        b.idleFunding += backingQuote;
+    }
+
+    function list(Book storage b, uint256 id, uint256 packId, uint256 backing, uint256 debt) internal {
+        if (id == 0 || b.positions[id].value != 0 || b.packToListing[packId] != 0) revert Duplicate();
+        uint256 value = b.idleValueOf[packId];
+        if (value == 0) revert MissingInventory();
+        if (backing < value + value / 19 + (value % 19 == 0 ? 0 : 1)) revert InsufficientBacking();
+        delete b.idleValueOf[packId];
+        b.idleValue -= value;
+        b.idleFunding -= b.idleQuote[packId];
+        delete b.idleQuote[packId];
+        if (b.idlePacks[b.idlePacks.length - 1] != packId) revert MissingInventory();
+        b.idlePacks.pop();
+        emit InventoryUpdated(packId, 0);
+        b.positions[id] = Position(packId, value, backing, debt, 0, ACTIVE);
+        b.packToListing[packId] = id;
+        b.open.push(id);
+        b.openIndex[id] = b.open.length;
+        b.activeBacking += backing;
+        ++b.activeCount;
+        b.feeDebtSum += debt;
+        ++b.countByDebt[debt];
+        _emitPosition(b, id);
+    }
+
+    function select(Book storage b, uint256 id, uint64 at) internal {
+        Position storage p = b.positions[id];
+        if (p.state != ACTIVE) revert WrongState();
+        if (at < b.lastAllocatedAt) revert OutOfOrder();
+        _removeActive(b, p);
+        p.state = ALLOCATED;
+        p.allocatedAt = at;
+        b.lastAllocatedAt = at;
+        b.allocatedValue += p.value;
+        b.allocationQueue.push(id);
+        _emitPosition(b, id);
+    }
+
+    function keep(Book storage b, uint256 id) internal returns (Position memory p) {
+        p = b.positions[id];
+        if (p.state != ALLOCATED) revert WrongState();
+        b.allocatedValue -= p.value;
+        b.trackedValue -= p.value;
+        _retire(b, id, p.packId);
+    }
+
+    function returnPack(Book storage b, uint256 id, bool owned) internal returns (Position memory p) {
+        Position storage live = b.positions[id];
+        p = live;
+        if (p.state == ACTIVE) _removeActive(b, live);
+        else if (p.state == ALLOCATED) b.allocatedValue -= p.value;
+        else revert WrongState();
+        if (owned) {
+            _retire(b, id, p.packId);
+            b.idleValue += p.value;
+            _toIdle(b, p.packId, p.value, p.backing);
+        } else {
+            live.state = OWED;
+            _emitPosition(b, id);
+        }
+    }
+
+    function claimReturned(Book storage b, uint256 id) internal returns (Position memory p) {
+        p = b.positions[id];
+        if (p.state != OWED) revert WrongState();
+        _retire(b, id, p.packId);
+        b.idleValue += p.value;
+        _toIdle(b, p.packId, p.value, p.backing);
+    }
+
+    function redeemInventory(Book storage b, uint256 packId) internal returns (uint256 value) {
+        value = b.idleValueOf[packId];
+        if (value == 0 || b.idlePacks[b.idlePacks.length - 1] != packId) revert MissingInventory();
+        delete b.idleValueOf[packId];
+        b.idleValue -= value;
+        b.trackedValue -= value;
+        b.idleFunding -= b.idleQuote[packId];
+        delete b.idleQuote[packId];
+        b.idlePacks.pop();
+        emit InventoryUpdated(packId, 0);
+    }
+
+    function updateFeeDebt(Book storage b, uint256 id, uint256 debt) internal {
+        Position storage p = b.positions[id];
+        if (p.state != ACTIVE) revert WrongState();
+        uint256 old = p.feeDebt;
+        if (old == debt) return;
+        if (debt < old) revert OutOfOrder();
+        --b.countByDebt[old];
+        ++b.countByDebt[debt];
+        b.feeDebtSum = b.feeDebtSum - old + debt;
+        p.feeDebt = debt;
+        _emitPosition(b, id);
+    }
+
+    function pendingFees(Book storage b, uint256 witnessId, uint256 actualPending) internal view returns (uint256) {
+        uint256 n = b.activeCount;
+        if (n == 0) return 0;
+        Position storage p = b.positions[witnessId];
+        if (p.state != ACTIVE) revert BadWitness();
+        uint256 d = p.feeDebt;
+        if (actualPending == 0) {
+            if (b.countByDebt[d] + b.countByDebt[d + 1] != n) revert BadWitness();
+            return 0;
+        }
+        uint256 a = d + actualPending;
+        return n * a + b.countByDebt[a + 1] - b.feeDebtSum;
+    }
+
+    function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+        internal view returns (uint256)
+    {
+        return freeEth + b.trackedValue + b.activeBacking + credit + pendingFees(b, witnessId, actualPending);
+    }
+
+    function prune(Book storage b, uint256 maxCount) internal returns (uint256 advanced) {
+        uint256 head = b.allocationHead;
+        while (advanced < maxCount && head < b.allocationQueue.length) {
+            if (b.positions[b.allocationQueue[head]].state == ALLOCATED) break;
+            delete b.allocationQueue[head];
+            ++head;
+            ++advanced;
+        }
+        b.allocationHead = head;
+    }
+
+    function oldestAllocation(Book storage b) internal view returns (uint256 id, uint64 at) {
+        if (b.allocationHead == b.allocationQueue.length) return (0, 0);
+        id = b.allocationQueue[b.allocationHead];
+        Position storage p = b.positions[id];
+        if (p.state != ALLOCATED) revert NeedsPrune();
+        at = p.allocatedAt;
+    }
+
+    function _removeActive(Book storage b, Position storage p) private {
+        b.activeBacking -= p.backing;
+        --b.activeCount;
+        b.feeDebtSum -= p.feeDebt;
+        --b.countByDebt[p.feeDebt];
+    }
+
+    function _retire(Book storage b, uint256 id, uint256 packId) private {
+        b.positions[id].state = NONE;
+        delete b.packToListing[packId];
+        uint256 idx = b.openIndex[id] - 1;
+        uint256 last = b.open[b.open.length - 1];
+        b.open[idx] = last;
+        b.openIndex[last] = idx + 1;
+        b.open.pop();
+        delete b.openIndex[id];
+        _emitPosition(b, id);
+    }
+
+    function listing(IFWAV2 f, uint256 id) internal view returns (IFWAView.Listing memory) {
+        return IFWAView(address(f)).listings(id);
+    }
+
+    function _validate(IFWAView.Listing memory l, IShapePacks packs, uint256 packId, uint256 backing) private view {
+        if (l.depositor != address(this) || l.collection != address(packs)
+            || l.tokenId != packId || l.value != backing) revert InvalidListing();
+    }
+
+    function admit(Book storage b, IFWAV2 f, IShapePacks packs, uint256 packId, uint256 backing)
+        external returns (uint256 id)
+    {
+        uint256 active = f.activeListingCount();
+        // FWA's private staging FIFO may activate foreign listings during admission.
+        // Bound even a reverting attempt, and reject every incidental activation atomically.
+        try f.listNFT{value: backing, gas: LIST_CALL_GAS}(address(packs), packId) returns (uint256 admitted) {
+            id = admitted;
+        } catch {
+            revert InvalidListing();
+        }
+        IFWAView.Listing memory l = listing(f, id);
+        if (l.status != LISTING_ACTIVE || f.activeListingCount() != active + 1 || f.fwairListing(id)) revert InvalidListing();
+        _validate(l, packs, packId, backing);
+        b.receipts[id].initialized = true;
+        b.idForBacking[backing] = id;
+        ++b.reservedCount;
+        list(b, id, packId, backing, l.feeDebt);
+    }
+
+    function release(Book storage b, uint256 id, uint256 backing) private {
+        if (b.idForBacking[backing] != id) revert InvalidListing();
+        delete b.idForBacking[backing];
+        --b.reservedCount;
+        if (b.receipts[id].kind != 0) {
+            --b.pendingPlusOne;
+            emit ReceiptConsumed(id);
+        }
+        delete b.receipts[id];
+    }
+
+    function syncChanges(Book storage b, IFWAV2 f, IShapePacks packs, uint256 maxJournal,
+        uint256[] calldata ids, uint256 maxPrune)
+        external returns (Work memory work)
+    {
+        if (maxJournal + ids.length > MAX_BATCH || maxPrune > MAX_BATCH) revert BadBatch();
+        (work.processed, work.own) = _syncJournal(b, f, packs, maxJournal);
+        for (uint256 i; i < ids.length; ++i) if (_syncTerminal(b, f, packs, ids[i])) ++work.resolved;
+        work.pruned = prune(b, maxPrune);
+    }
+
+    function _syncJournal(Book storage b, IFWAV2 f, IShapePacks packs, uint256 maxJournal)
+        private returns (uint256 processed, uint256 own)
+    {
+        uint64 cursor = b.acquisitionCursor;
+        uint64 end = f.nextSequenceToProcess();
+        while (cursor < end && processed < maxJournal) {
+            uint256 requestId = f.requestIdAtSequence(cursor);
+            if (requestId == 0) revert InvalidJournal();
+            IFWAV2.Acquisition memory a = f.acquisitions(requestId);
+            if (a.status == 2) {
+                if (a.listingId == 0) revert InvalidJournal();
+                if (b.positions[a.listingId].value != 0) {
+                    Position memory p = b.positions[a.listingId];
+                    if (p.state != ACTIVE) revert InvalidJournal();
+                    IFWAView.Listing memory l = listing(f, a.listingId);
+                    _validate(l, packs, p.packId, p.backing);
+                    if (l.status != LISTING_ALLOCATED && l.status != LISTING_SETTLED) revert InvalidJournal();
+                    select(b, a.listingId, l.allocatedAt);
+                    ++own;
+                }
+            } else if (a.status != 3 && a.status != 4) revert InvalidJournal();
+            ++cursor;
+            ++processed;
+        }
+        b.acquisitionCursor = cursor;
+        if (processed != 0) emit JournalProgress(cursor, processed, own);
+    }
+
+    function _syncTerminal(Book storage b, IFWAV2 f, IShapePacks packs, uint256 id) private returns (bool) {
+        Position memory p = b.positions[id];
+        if (p.state == NONE) return false;
+        IFWAView.Listing memory l = listing(f, id);
+        _validate(l, packs, p.packId, p.backing);
+        if (p.state == OWED) {
+            if (f.stuckNFTRecipient(id) == address(this)) {
+                (bool ok,) = address(f).call(abi.encodeCall(IFWAV2.recoverStuckNFT, (id)));
+                if (!ok) return false;
+            }
+            if (!owns(packs, p.packId)) return false;
+            claimReturned(b, id);
+            return true;
+        }
+        if (l.status == LISTING_ALLOCATED) {
+            if (p.state != ALLOCATED || block.timestamp < uint256(l.allocatedAt) + f.settlementWindow()) return false;
+            // Expiry resolution must still identify its genuine keep payment.
+            if (p.backing * (BPS - f.ownerSettlementFeeBps()) / BPS >= p.value) f.depositorReclaimBacking(id);
+            else f.depositorReclaimNFT(id);
+            l = listing(f, id);
+        }
+        if (l.status == LISTING_ACTIVE) return false;
+        uint8 kind = b.receipts[id].kind;
+        if (l.status == LISTING_SETTLED) {
+            if (p.state == ACTIVE) return false;
+            if (p.state != ALLOCATED) revert InvalidListing();
+            if (kind == 1) {
+                release(b, id, p.backing);
+                keep(b, id);
+                if (owns(packs, p.packId)) addInventory(b, p.packId, packs.valueOf(p.packId));
+                return true;
+            }
+            if (kind != 0) revert MissingReceipt();
+        } else if (l.status == LISTING_WITHDRAWN) {
+            if (p.state != ACTIVE || kind != 2) revert MissingReceipt();
+        } else return false;
+        bool owned = owns(packs, p.packId);
+        if (!owned && f.stuckNFTRecipient(id) != address(this)) revert MissingReceipt();
+        release(b, id, p.backing);
+        returnPack(b, id, owned);
+        return true;
+    }
+
+    function withdraw(Book storage b, IFWAV2 f, IShapePacks packs, uint256 id) external {
+        Position memory p = b.positions[id];
+        if (p.state != ACTIVE) revert WrongState();
+        b.controlled = true;
+        f.withdrawListing(id);
+        b.controlled = false;
+        bool owned = owns(packs, p.packId);
+        if (!owned && f.stuckNFTRecipient(id) != address(this)) revert InvalidListing();
+        release(b, id, p.backing);
+        returnPack(b, id, owned);
+    }
+
+    function harvest(Book storage b, IFWAV2 f, uint256[] calldata ids) external returns (uint256 n) {
+        if (ids.length > MAX_BATCH) revert BadBatch();
+        uint256 eligible;
+        for (uint256 i; i < ids.length; ++i) {
+            if (i != 0 && ids[i] <= ids[i - 1]) revert BadBatch();
+            Position memory p = b.positions[ids[i]];
+            IFWAView.Listing memory l = listing(f, ids[i]);
+            if (p.state == ACTIVE && l.status == LISTING_ACTIVE && f.pendingFees(ids[i]) != 0) ++eligible;
+        }
+        b.controlled = true;
+        if (ids.length != 0) {
+            try f.claimListingFees(ids) {
+                for (uint256 i; i < ids.length; ++i) {
+                    IFWAView.Listing memory l = listing(f, ids[i]);
+                    if (b.positions[ids[i]].state == ACTIVE && l.status == LISTING_ACTIVE) updateFeeDebt(b, ids[i], l.feeDebt);
+                }
+                n = eligible;
+            } catch {}
+        }
+        if (f.feeCredit(address(this)) != 0) f.withdrawEarnings();
+        b.controlled = false;
+    }
+
+    function harvestCredit(Book storage b, IFWAV2 f) external {
+        b.controlled = true;
+        if (f.feeCredit(address(this)) != 0) f.withdrawEarnings();
+        b.controlled = false;
+    }
+
+    function accountedNav(Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
+        external view returns (uint256)
+    {
+        if (b.acquisitionCursor != f.nextSequenceToProcess()) revert CatchUpFirst();
+        if (b.pendingPlusOne != 1) revert PendingReceipts();
+        uint256 pending;
+        if (b.activeCount != 0) {
+            Position memory p = b.positions[witnessId];
+            IFWAView.Listing memory l = listing(f, witnessId);
+            if (p.state != ACTIVE || l.status != LISTING_ACTIVE || p.feeDebt != l.feeDebt) revert BadWitness();
+            _validate(l, packs, p.packId, p.backing);
+            pending = f.pendingFees(witnessId);
+        }
+        return nav(b, freeEth, f.feeCredit(address(this)), witnessId, pending);
+    }
+
+    function validateBacking(Params storage p, Book storage b, IFWAV2 f, address packs,
+        uint256 units, uint256 backing, uint256 build, bool newlyBuilt) public view
+    {
+        (uint256 k, uint256 desired, bool ok) = edge(p, f, packs, units, build);
+        if (!ok || backing == 0 || backing > type(uint128).max || backing % BPS != 0
+            || b.idForBacking[backing] != 0) revert InvalidBacking();
+        uint256 delta = backing > desired ? backing - desired : desired - backing;
+        if (delta > (b.reservedCount + 1) * BPS) revert InvalidBacking();
+        (, uint256 cap, uint256 s) = economics(f, packs);
+        uint256 value = units * UNIT;
+        uint256 floor = M.max(M.divUp(value * BPS, BPS - s), M.divUp(value * BPS, f.settlementDiscountBps()));
+        floor = M.max(floor, value + value / 19 + (value % 19 == 0 ? 0 : 1));
+        if (backing < floor || (cap != type(uint256).max && backing > cap * (BPS - p.bufferBps) / BPS)
+            || backing * (k - s * 1e14) < value * 1e18) revert InvalidBacking();
+        uint256 net = _cycleNet(p, k, backing);
+        if (net == 0 || (newlyBuilt && build > net)) revert InvalidBacking();
+    }
+
+    function _cycleNet(Params storage p, uint256 k, uint256 backing) private view returns (uint256) {
+        if (k <= 1e18) return 0;
+        uint256 gross = backing * (k - 1e18) / 1e18;
+        uint256 cost = quote(p, Q_POSITION_SYNC + Q_LISTED + Q_HARVESTED, 2, false);
+        return gross > cost ? gross - cost : 0;
+    }
+
+    function restock(Params storage p, Book storage b, IFWAV2 f, IShapePacks packs, IShapes shapes,
+        uint256 units, uint256[] calldata backingProposals, uint256 available) external returns (uint256 mints)
+    {
+        uint256 count = backingProposals.length;
+        if (count == 0 || units < MIN_PACK_UNITS || units > MAX_PACK_UNITS
+            || count * units > MAX_RESTOCK_UNITS || (p.packUnitsMask >> units) & 1 == 0) revert BadBatch();
+        uint256 fee = shapes.mintFee();
+        uint256 build = quote(p, packGas(units) + Q_MINT * units / SHAPES_PER_MINT + Q_LISTED, 2, false) + fee * units / SHAPES_PER_MINT;
+        uint256 funding = b.idleFunding;
+        for (uint256 i; i < count; ++i) {
+            validateBacking(p, b, f, address(packs), units, backingProposals[i], build, true);
+            funding += backingProposals[i];
+        }
+        uint256 need = count * units;
+        uint256 have = b.looseShapes.length;
+        mints = need > have ? (need - have + SHAPES_PER_MINT - 1) / SHAPES_PER_MINT : 0;
+        if (available < mints * (0.1 ether + fee) + funding) revert InsufficientBacking();
+        if (mints != 0) {
+            uint8[] memory outs = new uint8[](SHAPES_PER_MINT);
+            for (uint256 i; i < mints; ++i) {
+                uint256 big = shapes.mint{value: 0.1 ether + fee}(0.1 ether);
+                b.trackedValue += 0.1 ether;
+                b.idleValue += 0.1 ether;
+                uint256[] memory ids = shapes.split(big, outs);
+                for (uint256 j; j < ids.length; ++j) b.looseShapes.push(ids[j]);
+            }
+        }
+        uint32[] memory noMint = new uint32[](9);
+        for (uint256 c; c < count; ++c) {
+            uint256[] memory ids = new uint256[](units);
+            for (uint256 j; j < units; ++j) {
+                ids[j] = b.looseShapes[b.looseShapes.length - 1];
+                b.looseShapes.pop();
+            }
+            uint256 packId = packs.createPack(ids, noMint);
+            _toIdle(b, packId, units * UNIT, backingProposals[c]);
+        }
+    }
+
+    /// @dev An extended gift may contain arbitrarily many Shapes. Never enumerate its contents.
+    function recoverInventory(Book storage b, IShapePacks packs, IShapes shapes) external returns (uint256 gasQ) {
+        uint256 id = b.recoveryPacks[b.recoveryPacks.length - 1];
+        gasQ = Q_RECOVERY_BASE;
+        if (!b.recoveryUnsealed[id]) {
+            packs.unseal(id, address(this));
+            b.recoveryUnsealed[id] = true;
+            gasQ += Q_RECOVERY_UNSEAL;
+        }
+        uint256 before = address(this).balance;
+        uint256 supply = shapes.totalSupply();
+        packs.claimEth(id, MAX_RESTOCK_UNITS, payable(address(this)));
+        uint256 out = address(this).balance - before;
+        // The immutable Shapes path burns exactly the claimed IDs before its sole ETH callback.
+        // No other supply mutation can interleave while this guarded vault receives that ETH.
+        uint256 burned = supply - shapes.totalSupply();
+        if (out == 0 || burned == 0 || burned > MAX_RESTOCK_UNITS) revert MissingInventory();
+        gasQ += burned * Q_RECOVERY_SHAPE;
+        b.trackedValue -= out;
+        b.idleValue -= out;
+        b.idleValueOf[id] -= out;
+        bool unsealed = true;
+        if (packs.claimantOf(id) == address(0)) {
+            if (b.idleValueOf[id] != 0) revert MissingInventory();
+            delete b.idleValueOf[id];
+            delete b.recoveryUnsealed[id];
+            b.idleFunding -= b.idleQuote[id];
+            delete b.idleQuote[id];
+            b.recoveryPacks.pop();
+            unsealed = false;
+        }
+        emit RecoveryUpdated(id, b.idleValueOf[id], unsealed);
     }
 }

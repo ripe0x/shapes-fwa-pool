@@ -14,6 +14,7 @@ interface IERC721Min {
 }
 
 interface IShapes is IERC721Min {
+    function totalSupply() external view returns (uint256);
     function mint(uint256 amountWei) external payable returns (uint256 tokenId);
     function mintFee() external view returns (uint256);
     function split(uint256 tokenId, uint8[] calldata outDenoms) external returns (uint256[] memory newIds);
@@ -27,6 +28,9 @@ interface IShapePacks is IERC721Min {
         payable
         returns (uint256 packId);
     function redeem(uint256 packId) external;
+    function unseal(uint256 packId, address claimant) external;
+    function claimEth(uint256 packId, uint256 maxCount, address payable recipient) external;
+    function claimantOf(uint256 packId) external view returns (address);
     function valueOf(uint256 packId) external view returns (uint256);
     function contentsOf(uint256 packId) external view returns (uint256[] memory);
 }
@@ -45,10 +49,28 @@ uint8 constant LISTING_WITHDRAWN = 3;
 uint8 constant LISTING_SETTLED = 4;
 uint8 constant LISTING_STAGED = 5;
 
+/// @dev Struct return is ABI-identical to the deployed public mapping getter.
+interface IFWAView {
+    struct Listing {
+        address collection; address depositor; address purchaser;
+        uint256 tokenId; uint256 weight; uint256 value; uint256 feeShare;
+        uint256 feeDebt; uint256 slot; uint64 allocatedAt; uint8 status;
+    }
+    function listings(uint256 id) external view returns (Listing memory);
+}
+
 interface IFWAV2 {
+    struct Acquisition {
+        address purchaser; uint256 requestBlock; uint256 priceEscrowed;
+        uint256 listingId; uint8 status;
+    }
+    function nextSequenceToProcess() external view returns (uint64);
+    function lastIssuedSequence() external view returns (uint64);
+    function requestIdAtSequence(uint64 sequence) external view returns (uint256);
+    function acquisitions(uint256 requestId) external view returns (Acquisition memory);
+    function fwairListing(uint256 id) external view returns (bool);
     function listNFT(address collection, uint256 tokenId) external payable returns (uint256 listingId);
     function withdrawListing(uint256 listingId) external;
-    function activateListings(uint256 maxCount) external;
     function claimListingFees(uint256[] calldata listingIds) external returns (uint256 total);
     function withdrawEarnings() external returns (uint256 amount);
     function depositorReclaimBacking(uint256 listingId) external;

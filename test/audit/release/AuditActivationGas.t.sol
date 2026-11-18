@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
+
+import {TestVaultOps} from "../../utils/TestVaultOps.sol";
 import {SelectionBase, IFwaSettle} from "../../fork/ForkSelection.t.sol";
 import {PackVault} from "../../../src/PackVault.sol";
 import {VaultLib} from "../../../src/VaultLib.sol";
@@ -22,8 +24,9 @@ contract AuditActivationGas is SelectionBase {
         assertTrue(ok);
         // Repaired (audit B): the vault refuses to list into a busy queue, so 100 staged listings
         // (whose activation exceeded EIP-7825) can no longer arise.
-        vault.restock(10, 3, 0);
+        TestVaultOps.restock(vault, 10, 3, 0);
+        uint256[] memory planned25 = TestVaultOps.proposals(vault, vault.MAX_LIST_BATCH(), 3);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.list(10, 0);
+        vault.list(planned25, 0);
     }
 }

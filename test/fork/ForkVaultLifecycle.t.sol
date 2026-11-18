@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {TestVaultOps} from "../utils/TestVaultOps.sol";
+
 import {ForkBase, IFwaAdmin, IOwnable} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
@@ -23,10 +25,10 @@ contract ForkVaultLifecycleTest is ForkBase {
 
     function _listN(uint256 n) internal returns (uint256[] memory ids) {
         vm.startPrank(keeper);
-        vault.restock(n, 3, 0);
-        vault.list(n, 0);
+        TestVaultOps.restock(vault, n, 3, 0);
+        TestVaultOps.list(vault, n, 0);
         vm.stopPrank();
-        ids = vault.openListings();
+        ids = TestVaultOps.open(vault);
     }
 
     function test_edgeMatchesLiveFwa() public view {
@@ -59,10 +61,10 @@ contract ForkVaultLifecycleTest is ForkBase {
         // Absolute flows: 3 mints of 0.1 ETH + 0.001 fee, 10 listings at 0.0363, keeper gas pay.
         uint256 pay = keeper.balance - kBefore;
         assertGt(pay, 0, "restock and list are paid");
-        assertEq(balBefore - address(vault).balance, 3 * 0.101 ether + 10 * B + pay);
+        assertEq(balBefore - address(vault).balance, 3 * 0.101 ether + 10 * B - 45 * 10_000 + pay);
         for (uint256 i; i < ids.length; ++i) {
             (,,,,, uint256 value,,,,, uint8 status) = FWA.listings(ids[i]);
-            assertEq(value, B);
+            assertEq(value, B - i * 10_000, "actual unique quantized backing");
             assertEq(status, LISTING_ACTIVE);
         }
 
@@ -76,10 +78,10 @@ contract ForkVaultLifecycleTest is ForkBase {
 
         // The shortfall unlocks unlisting and liquidation, then the next checkpoint fills the rest.
         vm.startPrank(keeper);
-        vault.unlist(ids, 0);
+        TestVaultOps.unlist(vault, ids, 0);
         vault.liquidate(40, 0);
         vm.stopPrank();
-        assertEq(vault.openListings().length, 0);
+        assertEq(TestVaultOps.open(vault).length, 0);
         toOpen();
         toBlackout();
         uint256 payBeforeLast = keeper.balance - kBefore;
@@ -100,16 +102,21 @@ contract ForkVaultLifecycleTest is ForkBase {
         assertLe(got, (inflow - 0.003 ether) * shares / supply);
         assertGe(got, (inflow - 0.003 ether - allPay) * (shares) / supply - charge);
         payBeforeLast;
-        // About 20.7M gas reimbursed at 0.2 gwei plus 10%: restock 10 (9.2M), list 10 (5.7M),
-        // unlist, liquidate and three checkpoints.
-        // Gas pay, plus the work fee: 10 listed + 10 unlisted + liquidated items + 2 pricing checkpoints.
-        assertLt(allPay, 0.005 ether + 40 * vault.getParams().workFee);
+        // Ten packs use three mints, two list batches, one unlist and one liquidation.
+        // Only two checkpoints have requester funding; the final fill has a zero charge pool.
+        uint256 quotedGas = VaultLib.Q_RESTOCK + 10 * VaultLib.Q_PACK + 3 * VaultLib.Q_MINT
+            + 2 * VaultLib.Q_LIST + 10 * VaultLib.Q_LISTED
+            + VaultLib.Q_UNLIST + 10 * VaultLib.Q_UNLISTED
+            + VaultLib.Q_LIQUIDATE + 10 * VaultLib.Q_LIQ_PACK + 30 * VaultLib.Q_REDEEM_SHAPE
+            + 2 * VaultLib.Q_CHECKPOINT;
+        assertEq(allPay, quotedGas * 0.2 gwei + 42 * vault.getParams().workFee, "complete independent operation sum");
+        emit log_named_uint("complete holder round-trip keeper pay wei", allPay);
     }
 
     function test_kickReturnsFullBackingAndPack() public {
         _depositAndPrice(alice, 1 ether);
         uint256[] memory ids = _listN(2);
-        (,, uint128 posted) = vault.positions(ids[0]);
+        (,, uint128 posted) = TestVaultOps.position(vault, ids[0]);
         // FWA's oracle owner lowers the ask: 0.030 x 1.10 = 0.033 < the posted backing (D62 floor
         // 0.0333 or more).
         assertGt(posted, 0.033 ether);
@@ -120,38 +127,46 @@ contract ForkVaultLifecycleTest is ForkBase {
         assertEq(address(vault).balance - before, posted, "kick returns full backing");
         (,,,,,,,,,, uint8 status) = FWA.listings(ids[0]);
         assertEq(status, LISTING_WITHDRAWN);
-        vault.sync(ids, 0);
-        assertEq(vault.openListings().length, 1);
-        assertEq(vault.idlePacks().length, 1);
+        TestVaultOps.sync(vault, ids, 0);
+        assertEq(TestVaultOps.open(vault).length, 1);
+        assertEq(TestVaultOps.idle(vault).length, 1);
         // New cap 0.033 is below the floor at which a purchaser takes the bid (P / 0.9): no relist.
         (, uint256 backing, bool ok) = vault.edge(3);
         assertFalse(ok);
         assertEq(backing, 0);
     }
 
-    /// D56: pay is the quote for completed work. Padding a sync with 399 ids the vault never held
-    /// costs the caller gas and earns nothing: the pay equals the quote for one resolved position,
-    /// (75k base + 75k per resolved) x 0.2 gwei + one work fee (V1: no markup), to the wei.
+    /// D56: a bounded batch of stale identifiers costs gas but cannot increase completed work or pay.
     function test_paddedSyncPaysOnlyForWorkDone() public {
         _depositAndPrice(alice, 1 ether);
         uint256[] memory ids = _listN(2);
         setPackAsk(0.03 ether);
         toBlackout();
         IFwaAdmin(address(FWA)).kickListing(ids[0]); // a real kick: one position to resolve
-        uint256[] memory padded = new uint256[](400);
+        uint256[] memory padded = new uint256[](16);
         padded[0] = ids[0];
         for (uint256 i = 1; i < padded.length; ++i) {
             padded[i] = 1e9 + i; // ids the vault never held
         }
+        uint256 snapshot = vm.snapshotState();
+        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(address(PACKS));
         uint256 before = keeper.balance;
         uint256 g = gasleft();
         vm.prank(keeper);
-        uint256 pay = vault.sync(padded, 0);
+        uint256 pay = vault.sync(0, padded, 0, 0);
         uint256 used = g - gasleft();
         assertEq(keeper.balance - before, pay);
-        assertGt(used, 1_000_000, "the padding really cost gas");
-        assertEq(pay, 150_000 * 0.2 gwei + vault.getParams().workFee, "quote for one resolved position");
-        assertEq(vault.idlePacks().length, 1);
+        assertEq(pay, (VaultLib.Q_SYNC + VaultLib.Q_SYNCED) * 0.2 gwei + vault.getParams().workFee, "quote for one resolved position");
+        assertTrue(vm.revertToState(snapshot));
+        uint256[] memory single = new uint256[](1); single[0] = ids[0];
+        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(address(PACKS));
+        g = gasleft();
+        vm.prank(keeper);
+        uint256 singlePay = vault.sync(0, single, 0, 0);
+        uint256 singleUsed = g - gasleft();
+        assertEq(pay, singlePay, "stale padding earns no extra payment");
+        assertGt(used, singleUsed, "bounded stale reads actually cost more gas");
+        assertEq(TestVaultOps.idle(vault).length, 1);
     }
 
     function test_edgeGateStopsListingWhenCrownShareRaised() public {
@@ -159,7 +174,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         uint256[] memory ids = _listN(2);
         vm.prank(keeper);
         vm.expectRevert(PackVault.UnlistNotAllowed.selector);
-        vault.unlist(ids, 0);
+        TestVaultOps.unlist(vault, ids, 0);
 
         // FWA's owner puts the crown share back to 5%: k = 0.9875, the edge is gone.
         vm.prank(IOwnable(address(FWA)).owner());
@@ -167,15 +182,16 @@ contract ForkVaultLifecycleTest is ForkBase {
         (uint256 k,, bool ok) = vault.edge(3);
         assertFalse(ok);
         assertLt(k, 1e18);
+        uint256[] memory planned8 = TestVaultOps.proposals(vault, 1, 3);
         vm.startPrank(keeper);
         // No edge: no capital goes into new packs or listings.
-        vm.expectRevert(PackVault.EdgeGate.selector);
-        vault.restock(1, 3, 0);
+        vm.expectRevert(VaultLib.InvalidBacking.selector);
+        vault.restock(3, planned8, 0);
         uint256 before = address(vault).balance;
         uint256 kBefore = keeper.balance;
-        vault.unlist(ids, 0);
+        TestVaultOps.unlist(vault, ids, 0);
         vm.stopPrank();
-        assertEq(address(vault).balance - before + (keeper.balance - kBefore), 2 * B, "backing back, less gas pay");
+        assertEq(address(vault).balance - before + (keeper.balance - kBefore), 2 * B - 10_000, "actual unique backings back, less gas pay");
     }
 
     /// Repair: a gas spike or a stale quote stops new listings but must not let anyone unwind
@@ -188,7 +204,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         assertFalse(ok);
         vm.prank(keeper);
         vm.expectRevert(PackVault.UnlistNotAllowed.selector);
-        vault.unlist(ids, 0);
+        TestVaultOps.unlist(vault, ids, 0);
     }
 
     /// Repair: unlisting read the oracle through edge(), so an oracle FWA's owner repoints to a
@@ -207,7 +223,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         vault.startWindDown();
         uint256 before = address(vault).balance;
         vm.prank(keeper);
-        vault.unlist(ids, 0);
+        TestVaultOps.unlist(vault, ids, 0);
         assertGe(address(vault).balance + (keeper.balance - 1 ether), before + 3 * B, "backing back");
         vm.prank(keeper);
         vault.liquidate(40, 0);
@@ -235,7 +251,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         uint256 gBal = owner.balance;
         vm.prank(owner);
         vault.guard(true, true);
-        lowerTo(1 ether, 10, 1 gwei, 0);
+        lowerTo(1 ether, 1 gwei, 0);
         vm.prank(owner);
         vault.startWindDown();
         assertEq(address(vault).balance, bal);
@@ -326,7 +342,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         vm.prank(owner);
         vault.startWindDown();
         vm.prank(keeper);
-        vault.unlist(ids, 0);
+        TestVaultOps.unlist(vault, ids, 0);
         uint256 aShares = vault.shareBalance(alice);
         uint256 bShares = vault.shareBalance(bob);
         uint256 rc = Charges.redeemCharge(vault, aShares);
@@ -339,7 +355,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         vault.requestRedeem{value: rc}(bShares);
         vm.prank(keeper);
         vault.liquidate(40, 0); // wind-down: every idle pack and loose Shape back to ETH
-        assertEq(vault.idlePacks().length, 0);
+        assertEq(TestVaultOps.idle(vault).length, 0);
         assertEq(vault.looseShapeCount(), 0);
         toBlackout();
         uint256 pool = vault.processingPool();
