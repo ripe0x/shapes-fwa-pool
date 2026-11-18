@@ -295,29 +295,41 @@ contract PackVault is ReentrancyGuard {
         // and its first listing, all at the pay they cause.
         uint256 build = VaultLib.quote(params, VaultLib.Q_PACK + VaultLib.Q_MINT * units / SHAPES_PER_MINT + VaultLib.Q_LISTED, 2, false);
         if (!ok || build + fee * units / SHAPES_PER_MINT > _cycleNet(k, backing)) revert EdgeGate();
-        uint256 need = count * units;
-        uint256 have = _looseShapes.length;
-        uint256 mints = need > have ? (need - have + SHAPES_PER_MINT - 1) / SHAPES_PER_MINT : 0;
-        // Capital for the Shapes and the backing of every pack waiting to list, new ones included.
+        // Whole 0.1 ETH denominations can be minted straight into the pack.
+        // Primary Shapes mint fees are identical to mint-and-split, but no
+        // redundant split or loose-token transfers are needed.
+        bool whole = units % SHAPES_PER_MINT == 0;
+        uint256 mints;
+        if (whole) {
+            mints = count * (units / SHAPES_PER_MINT);
+        } else {
+            uint256 need = count * units;
+            uint256 have = _looseShapes.length;
+            mints = need > have ? (need - have + SHAPES_PER_MINT - 1) / SHAPES_PER_MINT : 0;
+        }
         if (_idle() < mints * (0.1 ether + fee) + (count + _idlePacks.length) * backing) revert Liquidity();
-        if (mints != 0) {
+        if (!whole && mints != 0) {
             uint8[] memory outs = new uint8[](SHAPES_PER_MINT); // index 0 = 0.01 ETH
             for (uint256 i; i < mints; ++i) {
                 uint256 big = shapes.mint{value: 0.1 ether + fee}(0.1 ether);
                 uint256[] memory ids = shapes.split(big, outs);
-                for (uint256 j; j < ids.length; ++j) {
-                    _looseShapes.push(ids[j]);
-                }
+                for (uint256 j; j < ids.length; ++j) _looseShapes.push(ids[j]);
             }
         }
-        uint32[] memory noMint = new uint32[](9);
+        uint32[] memory mintCounts = new uint32[](9);
+        uint256[] memory emptyIds = new uint256[](0);
+        if (whole) mintCounts[DENOM_0_1] = uint32(units / SHAPES_PER_MINT);
         for (uint256 c; c < count; ++c) {
-            uint256[] memory ids = new uint256[](units);
-            for (uint256 j; j < units; ++j) {
-                ids[j] = _looseShapes[_looseShapes.length - 1];
-                _looseShapes.pop();
+            if (whole) {
+                _idlePacks.push(packs.createPack{value: units * UNIT + mintCounts[DENOM_0_1] * fee}(emptyIds, mintCounts));
+            } else {
+                uint256[] memory ids = new uint256[](units);
+                for (uint256 j; j < units; ++j) {
+                    ids[j] = _looseShapes[_looseShapes.length - 1];
+                    _looseShapes.pop();
+                }
+                _idlePacks.push(packs.createPack(ids, mintCounts));
             }
-            _idlePacks.push(packs.createPack(ids, noMint));
         }
         emit Restocked(count, units);
         return _pay(OP_RESTOCK, VaultLib.Q_RESTOCK + count * VaultLib.Q_PACK + mints * VaultLib.Q_MINT, count, false, minPay, type(uint256).max);
