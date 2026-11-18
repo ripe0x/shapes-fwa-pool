@@ -20,6 +20,16 @@ contract ForkBackingTest is ForkBase {
         assertEq(FWA.oracleExemptCollections(address(PACKS)), on);
     }
 
+    /// @dev This pinned fork has an independent staged backlog even when
+    ///      unsettledAcquisitionCount is zero. Listings would stage and
+    ///      earn no immediate fees until the backlog is activated.
+    function _drainExternalStaging() internal {
+        for (uint256 i; i < 100 && FWA.stagingHead() != 0; ++i) {
+            FWA.activateListings(20);
+        }
+        assertEq(FWA.stagingHead(), 0, "real FWA staging backlog did not drain");
+    }
+
     function _priced(uint256 escrow) internal {
         uint256 gross = vault.requestCharge() + escrow;
         vm.prank(alice);
@@ -27,6 +37,7 @@ contract ForkBackingTest is ForkBase {
         toBlackout();
         checkpoint();
         toOpen();
+        _drainExternalStaging();
     }
 
     function _setPositions(uint96 maxPositions, uint64 ceiling) internal {
