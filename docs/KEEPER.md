@@ -20,8 +20,9 @@ needs its own ETH for gas. Token burns remain unpaid and require operator opt-in
 | Event index | `keeper/index-<chain>-<vault>-<deploymentBlock>.sqlite`; `--index` overrides it |
 | Initial reconstruction | starts at the earlier of deployment and the trailing-seven-day volume boundary |
 | Log ingestion | at most eight ranges of 2,000 blocks per pass; saved progress resumes on the next pass |
-| Ordinary candidates | bounded active, terminal, inventory and optional token candidates, at most 16 per class |
-| Reorg repair | verify saved canonical hashes, roll back affected ranges and replay retained events |
+| Ordinary candidates | independent returned/receipt, unseen-selection, expired and rotating OWED candidates, at most 16 per class; at most 80 hydrated positions including active witnesses |
+| Discovery upgrade | replay missing allocation/bid history in at most eight adaptive ranges per pass, independently of the financial head |
+| Reorg repair | verify both saved canonical prefixes, roll back affected ranges and replay retained events |
 | Financial authority | onchain acquisition cursor, pending receipt count, listing authentication and exact book |
 
 The index tracks active fee debt, outstanding backing identifiers, idle packs, allocations,
@@ -44,7 +45,7 @@ a bounded candidate set. Complete portfolio getters are absent from the producti
 | --- | --- |
 | `restock(units, backingProposals, minPay)` | allowed pack size; at most 30 total new units; actual proposed funding plus maintained waiting-inventory funding |
 | `list(backingProposals, minPay)` | at most 8 proposals, each an unused 10,000 wei multiple inside the live target interval and every economic gate |
-| `sync(maxJournal, ids, maxPrune, minPay)` | `maxJournal + ids.length <= 16`, `maxPrune <= 16`; verified completed global entries, own selections, terminal transitions and queue cleanup |
+| `sync(ids, witnessId, minPay)` | automatic job: at most 128 global records, 16 actual own selections, 16 supplied terminal IDs and 16 pruned heads; independent bounds |
 | `checkpoint(witnessId, minPay)` | one authenticated live fee witness when active count is nonzero; complete journal, no receipts, clean nonexpired allocation head, blackout and drained requests |
 | `unlist(ids, minPay)` / `harvest(ids, minPay)` | at most 16 IDs; harvest IDs strictly ascending; crown exit protection remains |
 | `liquidate(maxCount, minPay)` | at most 16 items and 30 ordinary backing units; oversized gifts use an isolated claim of at most 30 Shapes |
@@ -60,6 +61,31 @@ can propose that checkpoint directly and avoids a standalone unpaid sync. Any op
 including OWED custody, or pending receipt keeps strict ordered processing. Idle inventory is
 allowed by the proof. The public `accountedNav` view remains strict until a state-changing operation
 advances the cursor.
+
+Journal compensation is enforced onchain. A full 128-record batch, actual own selection or
+terminal reconciliation qualifies. A shorter foreign-only tail qualifies only in a fresh checkpoint
+window with a drained queue and pending holder flows, or an authenticated distribution that can
+still exceed its minimum after the maximum sync payment. Distribution-only tails require the live
+fee witness. A distribution setting alone is insufficient. The cursor stops before a seventeenth
+own transition; supplying terminal IDs cannot shrink the journal job. No completion bonus exists.
+
+An optional short foreign tail can advance unpaid with `minPay=0`; positive `minPay` rolls back
+insufficient payment atomically. The normal keeper waits for useful batches or an actual checkpoint
+candidate. All sync, including mixed jobs during redemption/wind-down, spends routine permission.
+D64 still leaves unlisting and liquidation to callers when essential permission is zero.
+
+Returned-pack discovery authenticates FWA's `NFTAllocated`, `DepositorBidAccepted` and
+`DepositorBidAcceptedAsTokens` events and this vault's depositor identity. It retains selections
+until the book catches up; an ETH or token bid independently prioritizes that return. Expiry
+and rotating OWED discovery stay independent. Upgrades replay the newly subscribed history without
+resetting transaction state or the ordinary financial head. Both projections retain identity,
+canonical-hash and transactional stale-writer checks.
+
+The keeper compares the known packed journal quote with actual free ETH and routine permission.
+If either is insufficient it pauses new builds/listings, reports `JOURNAL_FUNDING` and continues
+reconciliation and holder actions. This is a reversible planning pause, not automatic wind-down.
+The quote covers known global entries; additional own work and future records may cost more.
+The theoretical full-job reserve envelope is informational and supplies no ETH.
 
 FWA's private staging FIFO has no public head getter, and can remain nonempty after requests drain.
 The vault caps each `listNFT` call at 1.2 million gas and requires exactly one added active listing.
@@ -93,13 +119,14 @@ when unpaid; higher `minPay` reverts the whole operation if payment is insuffici
 | Condition | Recovery |
 | --- | --- |
 | `INDEX_CATCHUP` | run another bounded index pass; persistent progress is retained |
-| `JOURNAL_CATCHUP` | process completed global entries in bounded sync calls |
+| `JOURNAL_CATCHUP` | process a qualified bounded journal job; optional short foreign tails wait |
+| `MAINTENANCE_UNFUNDED` / `JOURNAL_FUNDING` | compare known backlog, free cash and routine permission; new exposure waits while reconciliation stays available |
 | `RECEIPTS_PENDING` | sync the event-discovered IDs after their acquisition entries |
 | `ALLOCATION_CLEANUP` | prune resolved queue heads through bounded sync |
 | Overdue allocation / owed NFT | permissionless sync resolves expiry or retries FWA's real return claim |
 | `InvalidBacking` / `BadWitness` | refresh index and live candidates; retry within the bounded race allowance |
 | Gas above routine ceiling | routine work waits; holders may accept bounded losses for necessary exits |
-| Essential budget zero | D64: withdrawer or owner executes exit work unpaid; no unwind charge |
+| Essential budget zero | D64: withdrawer or owner executes unlisting/liquidation unpaid; sync remains routine; no unwind charge |
 | Policy failure | work can run for zero pay; the policy cannot release protected holder balances |
 | Stuck transaction | same-nonce replacement under configured fee, retry and cumulative-loss limits |
 | Lost response / restart | durable nonce tracking reconciles the original transaction before resending |

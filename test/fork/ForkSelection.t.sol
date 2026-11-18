@@ -250,7 +250,7 @@ contract ForkSelectionTest is SelectionBase {
         _select(c);
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
-        vault.sync(16, new uint256[](0), 0, 0); // Journal work is paid even while the purchaser may still act.
+        vault.sync(new uint256[](0), 0, 0); // Journal work is paid even while the purchaser may still act.
         vm.expectRevert(PackVault.Nothing.selector);
         TestVaultOps.sync(vault, one, 0); // purchaser's window still open
         vm.warp(block.timestamp + FWA.settlementWindow());

@@ -61,9 +61,9 @@ contract ForkProductionReceiptsTest is SelectionBase {
 
     function _catchUp(uint256[] memory ids) private {
         while (vault.acquisitionCursor() < FWA.nextSequenceToProcess()) {
-            vault.sync(16, new uint256[](0), 16, 0);
+            vault.sync(new uint256[](0), 0, 0);
         }
-        if (ids.length != 0) vault.sync(0, ids, 16, 0);
+        if (ids.length != 0) vault.sync(ids, 0, 0);
     }
 
     function _drain() private {
@@ -93,17 +93,18 @@ contract ForkProductionReceiptsTest is SelectionBase {
     function test_productionColdKeepFee100() public { _keep(100); }
     function test_productionColdKeepFee500() public { _keep(500); }
 
-    function test_receiptBeforeJournalBlocksPricingAndCannotRetireEarly() public {
+    function test_receiptBeforeJournalBlocksPricingAndSyncOrdersReconciliation() public {
         _keep(100);
         uint64 cursor = vault.acquisitionCursor();
         vm.expectRevert(VaultLib.CatchUpFirst.selector);
         vault.accountedNav(0);
-        vm.expectRevert(PackVault.Nothing.selector);
-        vault.sync(0, _one(selected), 0, 0);
+        vm.expectRevert(VaultLib.Payment.selector);
+        vault.sync(_one(selected), 0, type(uint256).max);
         assertEq(vault.acquisitionCursor(), cursor);
         assertEq(vault.pendingReceipts(), 1);
         assertEq(vault.idForBacking(B), selected);
-        _catchUp(_one(selected));
+        vault.sync(_one(selected), 0, 0);
+        assertGt(vault.acquisitionCursor(), cursor, "journal precedes terminal reconciliation in the same job");
         assertEq(vault.pendingReceipts(), 0);
         assertEq(vault.idForBacking(B), 0);
         (uint256 tracked, uint256 idle,,, , uint256 allocated) = vault.totals();
@@ -113,7 +114,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
         uint256 nav = vault.accountedNav(0);
         assertEq(nav, address(vault).balance + 0.07 ether + FWA.feeCredit(address(vault)));
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.sync(0, _one(selected), 16, 0);
+        vault.sync(_one(selected), 0, 0);
         assertEq(vault.accountedNav(0), nav);
     }
 
@@ -158,7 +159,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
 
     function test_bidReturnPreservesFloorBeforeInventorySyncAndReusesIdentifierAfterRetirement() public {
         _select(late()); _environment();
-        vault.sync(1, new uint256[](0), 0, 0);
+        vault.sync(new uint256[](0), 0, 0);
         address buyer = late().purchaser;
         uint256 before = buyer.balance;
         vm.prank(buyer); IFwaSettle(address(FWA)).acceptDepositorBid(selected);
@@ -169,7 +170,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
         (uint256 tracked, uint256 idle,,,, uint256 allocated) = vault.totals();
         assertEq(tracked, 0.1 ether); assertEq(idle, 0.07 ether); assertEq(allocated, 0.03 ether);
         assertEq(vault.accountedNav(0), address(vault).balance + 0.1 ether + FWA.feeCredit(address(vault)), "unsynced bid return cannot raise NAV");
-        vault.sync(0, _one(selected), 16, 0);
+        vault.sync(_one(selected), 0, 0);
         assertEq(vault.idForBacking(B), 0);
         assertEq(vault.idlePackCount(), 1);
         (tracked, idle,,,, allocated) = vault.totals();
@@ -186,7 +187,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
 
     function test_realTokenBidReturnsPackPreservesPrincipalAndCreatesNoEthReceipt() public {
         _select(late()); _environment();
-        vault.sync(1, new uint256[](0), 0, 0);
+        vault.sync(new uint256[](0), 0, 0);
         address buyer = late().purchaser;
         IFWAToken rewardToken = IFWAToken(FWA.token());
         uint256 buyerBefore = rewardToken.balanceOf(buyer);
@@ -217,7 +218,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
         }
         assertTrue(identified, "authenticated actual token-bid outcome");
         assertEq(vault.accountedNav(0), vaultEth + 0.1 ether + FWA.feeCredit(address(vault)), "token route preserves the same conservative principal");
-        vault.sync(0, _one(selected), 16, 0);
+        vault.sync(_one(selected), 0, 0);
         (uint256 tracked, uint256 idle,,,, uint256 allocated) = vault.totals();
         assertEq(tracked, 0.1 ether); assertEq(idle, tracked); assertEq(allocated, 0);
         assertEq(vault.idForBacking(B), 0);
@@ -254,7 +255,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(vault.idForBacking(B), 0);
         uint256 before = vault.accountedNav(0);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.sync(0, _one(selected), 16, 0);
+        vault.sync(_one(selected), 0, 0);
         assertEq(vault.accountedNav(0), before);
     }
 
@@ -319,10 +320,10 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(vault.pendingReceipts(), 0);
     }
 
-    function test_realRefundedJournalEntryGasAndVerifiedPay() public {
+    function test_realRefundedForeignTailDoesNotEarnImmediateCompensation() public {
         _select(late());
         _environment();
-        vault.sync(1, new uint256[](0), 0, 0);
+        vault.sync(new uint256[](0), 0, 0);
         _drain();
         uint64 cursor = vault.acquisitionCursor();
         assertEq(FWA.nextSequenceToProcess(), cursor + 1);
@@ -330,24 +331,33 @@ contract ForkProductionReceiptsTest is SelectionBase {
         IFWAV2.Acquisition memory a = FWA.acquisitions(request);
         assertTrue(a.status == 3 || a.status == 4, "real abandoned request was refunded through FWA");
         uint256 before = address(vault).balance;
+        vm.expectRevert(VaultLib.Payment.selector);
+        vault.sync(new uint256[](0), 0, 1);
+        assertEq(vault.acquisitionCursor(), cursor);
         _cold();
         vm.cool(address(VaultLib));
         uint256 start = gasleft();
-        uint256 paid = vault.sync(1, new uint256[](0), 0, 0);
+        uint256 paid = vault.sync(new uint256[](0), 0, 0);
         uint256 used = start - gasleft() + 21_000;
         assertEq(before - address(vault).balance, paid);
-        assertEq(paid, (VaultLib.Q_SYNC + VaultLib.Q_JOURNAL) * 0.2 gwei);
+        assertEq(paid, 0, "unrelated short tails wait for a qualified job");
         assertEq(vault.acquisitionCursor(), cursor + 1);
         emit log_named_uint("one refunded entry complete gas", used);
         emit log_named_uint("one refunded entry pay wei", paid);
     }
 
-    function test_staleAllocationHeadNeedsBoundedPruneAndCannotUseProcessingPool() public {
+    function test_terminalReconciliationPrunesItsHeadWithoutAnotherPaidCall() public {
         _select(late()); _environment();
         vm.prank(late().purchaser); IFwaSettle(address(FWA)).acceptDepositorBid(selected);
-        vault.sync(1, _one(selected), 0, 0);
+        uint64 cursor = vault.acquisitionCursor();
+        uint256 paid = vault.sync(_one(selected), 0, 0);
+        uint256 processed = vault.acquisitionCursor() - cursor;
+        assertEq(paid, (VaultLib.Q_SYNC + processed * VaultLib.Q_JOURNAL + VaultLib.Q_SELECTED
+            + VaultLib.Q_SYNCED + VaultLib.Q_PRUNED) * 0.2 gwei + vault.getParams().workFee);
+        (uint256 head, uint256 length,,,) = vault.allocationState();
+        assertEq(head, length, "terminal work includes bounded head cleanup");
         _drain();
-        vault.sync(16, new uint256[](0), 0, 0);
+        vault.sync(new uint256[](0), 0, 0);
         address holder = makeAddr("pack-vault-test-prune-holder");
         assertEq(holder.code.length, 0); assertEq(holder.balance, 0);
         uint256 deposit = vault.requestCharge() + 0.1 ether;
@@ -356,21 +366,12 @@ contract ForkProductionReceiptsTest is SelectionBase {
         uint256 next = block.timestamp - block.timestamp % 12 hours + 11 hours + 46 minutes;
         if (next <= block.timestamp) next += 12 hours;
         vm.warp(next);
-        vm.expectRevert(VaultLib.NeedsPrune.selector);
-        vault.checkpoint(0, 0);
         uint256 processing = vault.processingPool();
         uint256 before = address(vault).balance;
-        _cold(); vm.cool(address(VaultLib));
-        uint256 start = gasleft();
-        uint256 paid = vault.sync(0, new uint256[](0), 16, 0);
-        uint256 used = start - gasleft() + 21_000;
+        vm.expectRevert(VaultLib.Nothing.selector);
+        vault.sync(new uint256[](0), 0, 0);
         assertEq(vault.processingPool(), processing, "cleanup cannot use protected checkpoint charges");
-        assertEq(before - address(vault).balance, paid);
-        assertEq(paid, (VaultLib.Q_SYNC + VaultLib.Q_PRUNED) * 0.2 gwei);
-        emit log_named_uint("one resolved allocation head prune gross complete gas", used);
-        emit log_named_uint("one resolved allocation head prune pay wei", paid);
-        vm.expectRevert(PackVault.Nothing.selector);
-        vault.sync(0, new uint256[](0), 16, 0);
+        assertEq(address(vault).balance, before);
         vault.checkpoint(0, 0);
         assertGt(vault.shareBalance(holder), 0, "same pricing window opens after bounded cleanup");
     }
@@ -664,7 +665,7 @@ contract ForkProductionFeeWitnessTest is ForkBase {
         (,,,,,,,,,, uint8 secondStatus) = FWA.listings(second);
         assertEq(firstStatus, 1, "first witness remains Active");
         assertEq(secondStatus, 1, "second witness remains Active");
-        vault.sync(16, new uint256[](0), 16, 0);
+        vault.sync(new uint256[](0), 0, 0);
     }
 
     function _independentNav(uint256 first, uint256 second) private view returns (uint256) {

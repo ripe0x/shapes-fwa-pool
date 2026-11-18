@@ -1,0 +1,95 @@
+{
+  "baseline_revision": "d1b59f1",
+  "scope": "Returned ETH/token-bid discovery, unseen own selections, independent expiry/recovery, bounded durable event-set upgrade; no transactions",
+  "source_sha256": {
+    "keeper/index.py": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63",
+    "keeper/test_index.py": "a3a8c4165ed1faa9e24aed9620634b7729db15647cd6392340d591c5a7970de8",
+    "keeper/fixtures/returned-events.json": "3e2f5ff923f3d3f260def7445d5860440046487c0c9d988c1822c91bd4264a10"
+  },
+  "keeper_function_scope_sha256": {
+    "cast": "1813e705be71916fe41e2f3640db795a4be0850496dc46530d319d758a1bac74",
+    "sync_index": "c1f2e5e4bd72c1174a5f2b099b1eb8a2d1a0f141b27d21efcdeb7a28bf15d462",
+    "sync_discovery": "9338273930d71129a8d48c9e1ba1a85954c1d344bf93ebec328133bb3dcdd67e",
+    "read_state": "469b385253f67714023bccc311ae80c803524ba8d6a79ab96aba21f30956e6cd"
+  },
+  "checks": [
+    {
+      "command": [
+        "/private/tmp/packvault-review-packaging-venv/bin/python",
+        "keeper/test_index.py",
+        "--canonical-read-check"
+      ],
+      "exit_status": 0,
+      "output": "docs/receipts/efficient-return-index-canonical.txt"
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "py_compile",
+        "keeper/index.py",
+        "keeper/keeper.py",
+        "keeper/test_index.py"
+      ],
+      "exit_status": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "/private/tmp/packvault-review-packaging-venv/bin/python",
+        "keeper/keeper.py",
+        "--help"
+      ],
+      "exit_status": 0,
+      "output": "parser smoke passed"
+    }
+  ],
+  "regression": {
+    "baseline": "docs/receipts/efficient-return-discovery-baseline.json",
+    "baseline_command": "python /private/tmp/efficient-return-discovery-baseline.py",
+    "baseline_exit_status": 1,
+    "result": "Both real returned IDs omitted behind17older allocated cache slots; source d1b59f1"
+  },
+  "data_context": {
+    "rpc": "https://mainnet.gateway.tenderly.co",
+    "fixture": "keeper/fixtures/returned-events.json",
+    "allocation_records_per_scale_case": 18,
+    "genuine_depositors": 2,
+    "types": [
+      "DepositorBidAccepted",
+      "DepositorBidAcceptedAsTokens"
+    ],
+    "changed_only": "Cached PackVault book serialization states are synthetic. External event IDs, source addresses, depositors, data and block/log identities are actual historical records."
+  },
+  "bounds": {
+    "active_candidates": 16,
+    "terminal_classes": 4,
+    "candidate_quota_per_class": 16,
+    "maximum_distinct_hydrated_ids": 80,
+    "discovery_pass_attempts": 8,
+    "initial_discovery_block_span": 50000,
+    "recognized_result_limit_shrink": "halved span persists across passes;other RPC errors propagate without resetting financial index"
+  },
+  "money_effect": "Index is candidate discovery only. It changes no vault NAV/holder liability/payment authority; all candidate transitions remain authenticated onchain. ETH bid payout83160000000000000wei and tokenbidETHpayout39682500000000000wei/tokenOut5219964958490271949378raw independently asserted from actual payloads. Token bid creates no cash receipt.",
+  "preserved_failures": [
+    {
+      "command": "first edited keeper/test_index.py run",
+      "test_exit_status": 1,
+      "outer_batch_exit_status": 0,
+      "result": "NameError from indexed-ABI type variable; fixed before final focused passes"
+    }
+  ],
+  "limitations": [
+    "18actualhistoricalallocationrecords per depositor do not establish18simultaneous actual PackVault allocations. SQLite cached-book states are explicit serialization fixtures, not RPC success responses.",
+    "Prefix rollback/replay and corrupt cached discoveryhash plus real canonicalRPC reads are exercised; no live returned-bid chain-reorg branch was broadcast. Existing actual-vault reorg hook remains for authorized rehearsal.",
+    "Full read_state hydration and ordinary keeper submission against the final Solidity candidate belong to root approved rehearsal; this worker performed no broadcast/funding/reset/signature.",
+    "Historical event backfill gates readiness until covered;large sparse history may take multiple bounded passes. Main event head and transaction state are preserved."
+  ],
+  "things_that_do_not_make_sense": [
+    "Event-index persistence alone could preserve a permanently incomplete candidate subscription.",
+    "A stable oldest-allocation candidate list can repeatedly hide a newer already-returned pack.",
+    "Resetting the complete financial index for two missing channels would recreate the known mature-backup rebuild delay;upgrade now replays only relevant FWA channels."
+  ],
+  "repair_race_guard": "Rollback verifies the observed ordinary/discovery prefix under BEGINIMMEDIATE; a stale repair does not erase a newer writer prefix.",
+  "migration_concurrency": "Four simultaneous discovery writers of the same authentic event range yield exactly one commit; remaining callers retain the completed cursor."
+}

@@ -1,3 +1,16 @@
+# Superseded funding proposal
+
+The owner superseded the recommendation below with the efficient-journal revision dated2026-11-18
+(`EFFICIENT-JOURNAL-REVISION.md`, D69). Default funding is vault operating cash, with full expenses
+subtracted from holder returns. Recurring sponsorship from creator mint revenue is not the default.
+No completion bonus, new minimum TVL, budget/refill increase or outcome revision is adopted.
+The old16-record model, essential sync classification, incomplete marked returns and342,766
+Foundry checkpoint deduction below are historical and do not describe the new candidate. The
+refund deduction double-counted finalized refunds; see `receipts/restock-efficiency-meter-correction.json`.
+The new measured operating/complete-exit proposal will be recorded with the efficient revision.
+
+---
+
 # Review follow-up: journal compensation and funding
 
 **Journal compensation and recurring funding remain unresolved; no journal quote, allowance, refill, fee, or accepted owner outcome is changed by this proposal.** The separately implemented checkpoint correction is 360,000 gas. The numerical operating model below has been refreshed for that correction. The actual local journal/exit receipt matrix ran on the preceding 400,000 checkpoint source; its original source/deployment hashes remain attached.

@@ -40,7 +40,12 @@ LISTING_T = "(address,address,address,uint256,uint256,uint256,uint256,uint256,ui
 
 
 def cast(*args):
-    return subprocess.check_output(["cast", *map(str, args), "--rpc-url", RPC], text=True).strip()
+    try:
+        return subprocess.check_output(["cast", *map(str, args), "--rpc-url", RPC], text=True, stderr=subprocess.PIPE).strip()
+    except subprocess.CalledProcessError as exc:
+        if exc.stderr:
+            sys.stderr.write(exc.stderr)
+        raise
 
 
 def call(to, sig, *args, block=None, fees=()):
@@ -68,6 +73,7 @@ INDEXES = {}
 INDEX_PATH = None
 MAX_LOG_RANGE = 2_000
 MAX_LOG_RANGES = 8
+MAX_DISCOVERY_RANGE = 50_000
 MAX_CANDIDATES = 16
 
 
@@ -92,11 +98,11 @@ def sync_index(index, head):
     index.repair(block_hash)
     for _ in range(MAX_LOG_RANGES):
         if index.head >= head:
-            return
+            break
         start, end = index.head + 1, min(index.head + MAX_LOG_RANGE, head)
         before = block_hash(end)
         logs = rpc("eth_getLogs", {"address": [index.vault, FWA], "fromBlock": hex(start), "toBlock": hex(end),
-                                   "topics": [list(event_index.TOPICS) + [event_index.ALLOCATION_TOPIC]]})
+                                   "topics": [list(event_index.TOPICS) + list(event_index.BID_TOPICS) + [event_index.ALLOCATION_TOPIC]]})
         timestamps = {}
         for log in logs:
             if log["topics"][0] == event_index.ALLOCATION_TOPIC:
@@ -112,6 +118,50 @@ def sync_index(index, head):
         index.append(start, end, before, logs)
     if index.head < head:
         raise IndexBehind(f"event index at block {index.head}; target {head}; next pass resumes bounded replay")
+    sync_discovery(index, head)
+
+
+def sync_discovery(index, head):
+    # Older indexes did not subscribe to bids or retain own allocation IDs. Replay only
+    # those FWA channels; preserve their financial projection and transaction state.
+    span = min(MAX_DISCOVERY_RANGE, max(1, int(index.meta("discovery_span", MAX_DISCOVERY_RANGE))))
+    for _ in range(MAX_LOG_RANGES):
+        if index.discovery_head >= head:
+            return
+        start, end = index.discovery_head + 1, min(index.discovery_head + span, head)
+        before = block_hash(end)
+        try:
+            bids = rpc("eth_getLogs", {"address": FWA, "fromBlock": hex(start), "toBlock": hex(end),
+                                       "topics": [list(event_index.BID_TOPICS), None, None,
+                                                  "0x" + index.vault[2:].lower().zfill(64)]})
+            allocations = rpc("eth_getLogs", {"address": FWA, "fromBlock": hex(start), "toBlock": hex(end),
+                                              "topics": [event_index.ALLOCATION_TOPIC]})
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or "").lower()
+            if span > 1 and any(s in detail for s in ("too many results", "query returned more than", "response size", "block range")):
+                span = max(1, span // 2)
+                with index.db:
+                    index.set_meta("discovery_span", span)
+                continue  # Each smaller attempt consumes the same fixed pass budget.
+            raise
+        timestamps = {}
+        own = [log for log in allocations if event_index.own_allocation(log, index.vault)]
+        for log in own:
+            timestamp = index.allocation_timestamp(log)
+            if timestamp is None:
+                number = quantity(log["blockNumber"])
+                if number not in timestamps:
+                    b = rpc("eth_getBlockByNumber", hex(number), False)
+                    if b["hash"] != log["blockHash"]:
+                        raise RuntimeError("allocation replay block changed; retry range")
+                    timestamps[number] = quantity(b["timestamp"])
+                timestamp = timestamps[number]
+            log["_timestamp"] = timestamp
+        if not before or block_hash(end) != before:
+            raise RuntimeError("chain changed while replaying discovery events")
+        index.append_discovery(start, end, before, bids + own)
+    if index.discovery_head < head:
+        raise IndexBehind(f"return/selection replay at block {index.discovery_head}; target {head}; existing financial index preserved")
 
 
 def first_block_at(timestamp, head):
@@ -206,8 +256,8 @@ def read_state(vault, slowdown, burn=False):
     k, backing = "0", "0"  # prospective economics are read after pinned financial hydration
     window = num(at(FWA, "settlementWindow()(uint256)"))
     top, top_since = num(at(FWA, "topListingId()(uint256)")), num(at(FWA, "topListingSince()(uint64)"))
-    active_ids, terminal_ids = index.candidates(MAX_CANDIDATES, MAX_CANDIDATES)
-    listings, witness = [], 0
+    active_ids, terminal_ids = index.candidates(MAX_CANDIDATES, MAX_CANDIDATES, now, window)
+    listings, witness, own_journal_pending = [], 0, False
     for i in dict.fromkeys(terminal_ids + active_ids):
         f = at(FWA, f"listings(uint256)({LISTING_T})", i).strip("()").split(", ")
         status, allocated_at = num(f[10]), num(f[9])
@@ -217,6 +267,8 @@ def read_state(vault, slowdown, burn=False):
         if status == policy.ACTIVE and not witness:
             witness = i  # candidates are minimum cached debt first
         cached = index.position(i)
+        if cached and cached["state"] == 1 and status in (policy.ALLOCATED, policy.SETTLED):
+            own_journal_pending = True
         listings.append(policy.Listing(i, status, allocated_at, pend, owed,
                                        crown_locked=(i == top and now < top_since + 12 * 3600),
                                        value=int(cached["value"]) if cached else 0, backing=num(f[5])))
@@ -251,6 +303,7 @@ def read_state(vault, slowdown, burn=False):
         journal_cursor=num(at(vault, "acquisitionCursor()(uint64)")),
         completed_prefix=num(at(FWA, "nextSequenceToProcess()(uint64)")),
         pending_receipts=num(at(vault, "pendingReceipts()(uint256)")), allocation_stale=allocation[4] == "true",
+        own_journal_pending=own_journal_pending,
         winding_down=at(vault, "windingDown()(bool)") == "true",
         listing_paused=at(vault, "listingPaused()(bool)") == "true", distribution_bps=dist_bps,
         recent_volume=index.recent_volume(now), slowdown_volume=slowdown, burn_tokens=burn,
@@ -321,7 +374,7 @@ def to_cast(step, min_pay=0):
     if fn in ("harvest", "unlist", "list"):
         return [f"{fn}(uint256[],uint256)", array(args[0]), min_pay]
     if fn == "sync":
-        return ["sync(uint256,uint256[],uint256,uint256)", args[0], array(args[1]), args[2], min_pay]
+        return ["sync(uint256[],uint256,uint256)", array(args[0]), args[1], min_pay]
     if fn == "liquidate":
         return ["liquidate(uint256,uint256)", args[0], min_pay]
     if fn == "restock":
@@ -367,6 +420,12 @@ def execution_cost(est, bid, fail_rate_bps, ratio=1.0):
     """What the keeper expects to spend: billed gas (the estimate calibrated by receipts) at its
     bid, grossed up for competing transactions it expects to lose."""
     return int(est * ratio) * bid * (10_000 + fail_rate_bps) // 10_000
+
+
+def profitability_gate(est, bid, pay, fail_rate_bps, min_return_bps, max_loss_wei, ratio=1.0):
+    cost = execution_cost(est, bid, fail_rate_bps, ratio)
+    need = cost * (10_000 + min_return_bps) // 10_000
+    return cost, need, pay + max_loss_wei >= need
 
 
 def refresh_after_race(operation, reason, benign, refreshed):
@@ -454,9 +513,9 @@ def run_pass(a, tm):
         bid = state.base_fee + state.max_tip
         fees = fee_args(state.base_fee, state.max_tip)
         pay = compensation(a.vault, args, tm.sender, fees)
-        cost_ = execution_cost(est, bid, a.fail_rate_bps, billed_ratio(tm, step[0]))
-        need = cost_ * (10_000 + a.min_return_bps) // 10_000
-        if pay + max_loss < need and step[0] != "burnTokens":  # burns are the operator's opt-in cost
+        cost_, need, accepted = profitability_gate(est, bid, pay, a.fail_rate_bps, a.min_return_bps,
+                                                  max_loss, billed_ratio(tm, step[0]))
+        if not accepted and step[0] != "burnTokens":  # burns are the operator's opt-in cost
             skip.add(step[0])
             tm.state["stats"]["skipped_loss"] += 1
             # Liability work this keeper declined: holders wait on it, so monitoring must see it.

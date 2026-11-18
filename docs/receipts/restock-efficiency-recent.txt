@@ -1,0 +1,18 @@
+No files changed, compilation skipped
+
+Warning: the following cheatcode(s) are deprecated and will be removed in future versions:
+  lastCallGas(): replaced by `lastFrameGas`
+Ran 1 test for test/fork/RestockEfficiency.t.sol:RestockEfficiencyTest
+[PASS] test_recentHeadSmallRestock() (gas: 9787983)
+Logs:
+  recent explicitly pinned mainnet block: 26444840
+  recent three-unit primary mint call meter plus intrinsic: 2779627
+  recent three-unit primary mint isolated receipt-equivalent gas: 2752737
+  recent three-unit primary mint finalized frame refund: 88000
+  recent three-unit primary mint isolated gross before refund: 2840737
+  recent three-unit primary mint keeper pay wei: 581000000000000
+  recent three-unit primary mint newly paid mints: 1
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 9.25s (8.09s CPU time)
+
+Ran 1 test suite in 9.58s (9.25s CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)

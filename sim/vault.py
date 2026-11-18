@@ -231,16 +231,21 @@ class Vault:
         self.allocation_queue.append(listing_id)
 
     def process_journal(self, entries):
-        """Authenticated completed IDs or None for foreign/refunded entries, at most16 per call."""
-        if len(entries) > 16 or self.acquisition_cursor + len(entries) > self.completed_prefix:
+        """One fixed journal job: at most128 reads and16 authenticated own transitions."""
+        if len(entries) > 128 or self.acquisition_cursor + len(entries) > self.completed_prefix:
             raise RuntimeError("BadBatch")
         if entries and self.advance_unexposed():
             return 0
+        processed = own = 0
         for listing_id in entries:
             if listing_id is not None:
+                if own == 16:
+                    break
                 self.select(listing_id)
+                own += 1
             self.acquisition_cursor += 1
-        return len(entries)
+            processed += 1
+        return processed
 
     def advance_unexposed(self):
         """Owner-approved O(1) completeness proof; no journal payment is earned."""
@@ -249,6 +254,24 @@ class Vault:
             return False
         self.acquisition_cursor = self.completed_prefix
         return True
+
+    def distribution_tail(self, cost, credit=0):
+        """Conservative checkpoint proof after the largest routine sync payment."""
+        if (self.receipts or self.total_shares <= DEAD_SHARES or not self.distribution_bps
+                or self.pending_total or self.locked_shares):
+            return False
+        if self.allocation_head < len(self.allocation_queue):
+            p = self.positions.get(self.allocation_queue[self.allocation_head])
+            if p is None or p.state != ALLOCATED or p.expired:
+                return False
+        nav = self.free() + self.tracked_value + self.active_backing + self.pending_active_fees() + credit - cost
+        if nav <= 0 or self.allocated_value * BPS > nav * self.allocated_bound_bps:
+            return False
+        per_share = nav * E // self.total_shares
+        if per_share <= self.high_water_mark:
+            return False
+        gain = mul_div(per_share - self.high_water_mark, self.total_shares, E)
+        return min(gain * self.distribution_bps // BPS, self.free() + credit - self.reserve - cost) >= MIN_DISTRIBUTION
 
     def harvest_listing(self, listing_id, new_debt=None):
         p = self.positions[listing_id]

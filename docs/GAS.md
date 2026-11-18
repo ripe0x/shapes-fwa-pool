@@ -1,103 +1,87 @@
-# Position-accounting gas and compensation
+# Efficient journal gas and compensation
 
-**The candidate has a funding blocker and O2 remains above its accepted limit.** Checkpoint's gas
-component is now 360,000, bringing O6 to its existing 0.0002 ETH limit at the configured routine
-ceiling and work fee (D68). Full-holder refund calculations support this bounded calibration;
-actual billed full-holder receipts remain a release evidence gap. Current acceptance
-and numerical outcomes are in `POSITION-INTEGRATION-ACCEPTANCE.md`. The tables below the separator
-are historical and do not validate this candidate.
+The current revision keeps fixed quotes while calibrating enforceable jobs. Economic acceptance
+remains open: O2 is above1,750,000 quoted gas, recurring expense must be paid from vault cash,
+and exposed successful-foreign bills remain missing. No spending allowance or accepted outcome
+has changed. The active implementation scope is `EFFICIENT-JOURNAL-REVISION.md`.
 
-Compensation is a fixed quote for verified work. It is not reimbursement of measured transaction
-gas. The replaceable policy offer is capped by the vault envelope, free cash, the applicable
-routine/essential budget and `minPay`. Request-funded checkpoints use only their existing shared
-processing charge. Foreign/refunded journal entries earn no flat work fee; operation 4 is retired.
+Compensation is a fixed quote for verified work, capped by the replaceable policy offer, envelope,
+free cash, applicable permission and `minPay`. It is not measured-gas reimbursement. Request-funded
+checkpoint charges remain protected in the processing pool. Foreign records earn no flat work fee.
 
 | Component | Quoted gas |
-| --- | ---: |
-| Checkpoint | 360,000, independent of position count |
-| Restock base | 280,000 |
-| Pack assembly | 325,000 for three Shapes, plus 35,000 per additional Shape |
-| Paid primary mint and split | 2,200,000 per ten 0.01 ETH Shapes |
-| List | 280,000 base + 825,000 per admitted position |
-| Sync | 85,000 base + 30,000 per completed global record |
-| Own selection / terminal / head prune | 160,000 / 120,000 / 45,000 |
-| Unlist | 340,000 base + 285,000 per moved position |
-| Liquidate | 75,000 base + 80,000 per ordinary pack + 35,000 per actual packed Shape burned |
-| Loose Shape redemption | 65,000 per Shape |
-| Oversized gift recovery | 100,000 + 35,000 per actual Shape burned + 70,000 once for unseal, plus liquidation base |
-| Harvest | 125,000 base + 80,000 per listing actually harvested |
+|---|---:|
+| Checkpoint |360,000|
+| Restock base / three-Shape pack |280,000 /325,000|
+| Additional Shape in a pack |35,000|
+| Paid primary mint and ten-way split |2,200,000|
+| List base / admitted position |280,000 /825,000|
+| Sync ordinary base / qualifying foreign-tail base |85,000 /85,000; choose one|
+| Completed global journal record |30,000|
+| Own selection / terminal reconciliation / head prune |160,000 /120,000 /45,000|
+| Unlist base / moved position |340,000 /285,000|
+| Liquidate base / ordinary pack / actual packed Shape burned |75,000 /80,000 /35,000|
+| Loose Shape redemption |65,000|
+| Oversized gift recovery |100,000 +35,000 per actual burned Shape +70,000 once for unseal, plus liquidation base|
+| Harvest base / listing actually harvested |125,000 /80,000|
 
-The mandatory own-position sync components sum to 355,000. Recurring cycle economics include that
-sum, relisting and fee harvesting exactly once. Entry charges retain build plus initial listing;
-exit charges retain unlisting plus liquidation. Canary essential cap zero means self-serve exits
-remain unpaid with zero unwind charge. No budget, reserve value, markup maximum or flat fee maximum
-was raised.
+Sync automatically reads up to128 completed records, with separate16-own-selection,16-terminal-ID
+and16-prune limits. The cursor stops before a seventeenth own transition. Full jobs and actual
+own transitions qualify; a smaller foreign tail requires a genuine fresh checkpoint opportunity.
+Distribution-only tails authenticate NAV, witness, high-water mark and liquidity after the maximum
+sync envelope. Optional tails and provably unexposed advances are unpaid. No completion bonus.
+All sync uses routine permission even during redemption or wind-down; D64 retains caller-funded
+unlisting/liquidation. A supplied terminal list cannot manufacture a smaller paid journal job.
 
-Listing is capped at eight per call. Every real FWA `listNFT` receives at most 1.2 million gas;
-ordinary Active identity, non-FWAIR classification and exactly one additional active listing are
-required. Other caller work limits remain sixteen, with restock/liquidation capped at thirty
-ordinary backing units and oversized gifts claimed in isolated thirty-Shape chunks.
+## Current measured scope
 
-## Evidence interpretation
+`receipts/efficient-focused-results.json` binds the five real refund/journal/distribution tests,
+seventeen affected lifecycle/selection tests, unexposed authentic successful history, fourteen
+accounting tests and keeper policy checks. `current-three-arg-reconciliation-results.json` contains
+fresh exact accounting replays and unchanged46,462/69,730 receiver samples. Runtime is24,451 bytes
+for PackVault and22,997 for VaultLib, leaving125 and1,579 bytes of EIP-170 space respectively.
+Maximum combined128-global/16-own/16-terminal/16-prune work has not been reached in one real call.
 
-Current repair evidence is `receipts/review-bootstrap-q360-results.json`: vault runtime 24,322
-bytes, library 21,313, unchanged 46,462/69,730-gas receiver samples and 99 sampled atomicity cases.
-The Q360 full-holder and essential-spike fork checks pass; full-holder gross/refund measurements
-do not replace a standalone billed receipt. `receipts/review-journal-local-results.json` contains
-the preceding Q400 source's actual refunded prefixes/tails and exposed exit. Its singleton bills
-112,515 gas and sixteen records bill 361,632, against unchanged quotes of 115,000 and 565,000.
-The deployment and maximum-operation figures below describe the earlier linked source and remain
-valid only for those exact inputs.
+Restock keeps immediately consumed new Shape IDs in memory and caches the unchanged economics
+before minting. Seven matched authentic inventory cases retain exact mint fees, recipes, principal
+and keeper payout. Ten three-unit packs save674,385 receipt-equivalent gas (6.53%); a first
+three-unit pack saves36,025 (1.28%). See `receipts/restock-efficiency-results.json`.
+These are execution savings with unchanged holder compensation, pending receipt calibration.
 
-Foundry gross meters include execution plus intrinsic/calldata before transaction refunds. They
-bound the gas limit; they are not billed-gas or keeper-profit receipts. Actual local transaction
-receipts are reported separately. `sim/out/gas-quotes-incremental.json` is the earlier partial
-local calibration, not the final schedule or a profitability pass. Relevant fee tests set and assert both basefee and transaction
-gas price inside an executed call. Pending RPC simulations use explicit fee fields and authenticate
-executed BASEFEE against the deterministic next header.
+**Meter correction:** installed Foundry's isolated `lastCallGas().gasTotalUsed` has already applied
+finalized refunds. Subtracting `gasRefunded` again was incorrect. The old342,766 checkpoint bound
+and derived5.03% headroom are withdrawn. The current direct finalized sample is345,937; adding
+its29,600 refund reconstructs375,537 pre-refund gas. The360,000 component has14,063 (4.07%) sample
+headroom. Caller `gasleft` plus intrinsic meters are proxies, not true gross or billed receipts.
+Primary Foundry implementation and preserved raw values are bound in
+`receipts/restock-efficiency-meter-correction.json`. Actual signed Anvil receipts are separate.
 
-Earlier focused complete-operation measurements include restock ten three-unit packs at 10,356,704
-gross gas, a full holder checkpoint at 370,178, harvest sixteen at 1,084,228, unlist sixteen at
-4,113,806, and thirty-Shape liquidation at 1,153,746. These pre-final measurements have explicit
-input limitations in `receipts/integration-*`. Final focused measurements now include eight largest packs at 6,554,114 gross gas, eight mixed
-packs with five crown tenures at 6,527,313, and restock ten small packs at 10,357,047. The largest
-measured operation with 25% margin is 12,946,309, below 16,777,216. Runtime is 24,549 bytes for
-PackVault (27 bytes spare) and 20,484 for VaultLib. Final receiver and linked deployment results are recorded below and in the acceptance report.
+The preceding Q400-source local receipts remain historical evidence for their source: refunded
+singletons bill112,515 and sixteen bill361,632; arbitrary splitting added95,878–95,902 billed gas.
+That rejects a105,000 base under the old arbitrary-slice rules. It neither proves the new tail
+profitability nor supplies exposed successful-foreign bills. Standalone current full-holder and
+new128-record receipts require the separately authorized prepared batch.
 
-Final exact production receiver: 46,462 gas for the cold keep and 69,730 for the difficult kick
-following a false settled-bid candidate. At least 30,270 gas remains below FWA's 100,000 stipend.
-All 99 sampled low-gas limits recorded completely or failed atomically. This does not prove every
-possible gas amount; exact traces and scope are in `receipts/integration-final-test-evidence.json`.
+## Operating cost and cash source
 
-Normal approved local script deployment used 5,766,663 billed gas for the 24,549-byte vault and
-100,155 for the 216-byte policy. The linked 20,484-byte library was reused; its actual prior
-approved-deployer CREATE2 receipt used 4,490,075 gas. Its 20,516-byte initcode exactly matches the
-frozen artifact. Only the compiler-declared self-address immutable is normalized for runtime
-comparison. See `receipts/integration-keeper-context-correction.json` for factory, salt, receipts
-and source attribution. No actual code or gas limit was increased.
+At unchanged85,000+30,000 quotes, the archived18,281 completed-record window needs at least143
+packed jobs with128-record bounds:0.112117 ETH at0.2gwei or0.2802925 ETH at0.5gwei, before own
+work and additional small jobs. The latter is0.0093430833 ETH/day, above mainnet's0.005 daily
+steady refill. Initial permission is not recurring funding; a reserve is not income.
 
-The broad run exposed profitable listing-base splitting. Actual matched-fee receipts measured
-650,969 extra billed gas for three singletons versus the same three-item batch. Q_LIST 280,000
-makes the extra pay at maximum 10% markup 0.0001232 ETH, below the measured extra 0.0001301938 ETH
-cost at 0.2 gwei. The previous 400,000 base was excessive; even 300,000 failed that billed bound.
-Per-listing pay and work fees are unchanged. This sampled comparison does not bound all future
-orderings or external protocol changes.
+The theoretical retained-cap reserve model is0.0059225 ETH at0.5gwei, above the configured0.005.
+It is an informational conservative combined envelope, not a requirement to raise reserve.
+The keeper separately compares the known packed backlog with actual free cash and routine
+permission, reversibly pausing new exposure when insufficient.
 
-## Reserve and recurring funding
+Vault operating cash is the default expense source. Complete returns must subtract all keeper
+payments, paid mint fees, transferred principal and holder caller costs, clear backlog and finish
+claims. Creator mint revenue is reported separately and is not an assumed subsidy. No minimum TVL,
+budget increase, mint-fee reduction or changed O2 acceptance is introduced.
 
-At a 0.5 gwei quote, one full foreign journal batch costs 0.0002825 ETH and the keeper's reserve
-model requires 0.0042425 ETH against the retained 0.005 ETH reserve. That reserve can afford bounded
-progress; it does not fund continuing activity.
-
-Recorded 30-day global work requires at least 0.3227925 ETH of quotes at 0.5 gwei, before any own
-position work, versus a maximum mainnet routine budget of 0.25 ETH. At 0.2 gwei the lower bound is
-0.129117 ETH. Canary permits only 0.054 ETH over the same thirty days. Exact source/data context,
-shortfalls and a narrow proposed owner decision are in the acceptance report and maintenance JSONs.
-
-Batch quotes are conservative relative to some measured calls; a successful cold singleton can
-still cost more than its quote. Do not claim every call profits or identify gross gas with actual
-billed cost. The keeper estimates the real transaction and obeys its per-call and cumulative loss
-limits. Delayed or concurrent state changes can still cause atomic rejection and real gas loss.
+Things that don't make sense: global maintenance scales with unrelated protocol activity while
+small-vault income does not; execution savings do not automatically become holder savings; a
+replayed model cannot replace authentic successful-foreign receipts or standalone keeper preflight.
 
 ---
 

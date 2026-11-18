@@ -1,58 +1,66 @@
-# Remove the position ceiling with incremental production accounting
+# Remove the position ceiling with incremental accounting and efficient journal jobs
 
-PackVault prices one authoritative book of exact inventory, active backing, fee debt, allocations
-and authenticated receipts. It removes the 300-position ceiling and portfolio valuation scans.
-Maintenance and ordinary keeper reads are bounded; the keeper reconstructs candidates in SQLite.
-Paid primary mints, the mint/split/pack recipe, pack sizing and protected holder liabilities remain.
+PackVault maintains one authoritative incremental book instead of a 300-position ceiling and
+portfolio scans. Paid Shapes mints, packing recipes, creator fees and protected holder liabilities
+remain. Provably unexposed history advances unpaid, preserving the minimum seed and first deposit.
 
-An owner-approved completeness refinement advances past completed history without journal pay
-only when onchain state proves no outstanding FWA exposure. Checkpoint and first admission share
-that proof. This prevents irrelevant global work from exhausting the minimum seed before the
-first deposit. Exposure, including OWED custody and pending receipts, retains ordered processing.
+This revision makes journal processing an automatic bounded job: 128 global records, with separate
+16-own-selection, 16-terminal-ID and 16-prune bounds. Callers cannot choose a smaller paid slice.
+Small foreign tails require a genuine checkpoint opportunity, including authenticated post-cost
+distribution eligibility. There is no completion bonus. Sync remains routine upkeep during
+redemption; D64's caller-funded unlisting/liquidation stays intact.
 
-The production image installs pinned Python dependencies and the Ethereum Keccak backend. Both
-transaction state and SQLite now use the mounted `/data` directory. Checkpoint's gas component is
-calibrated to 360,000, meeting O6's existing limit. No journal quote, budget, reserve, accepted
-outcome or owner signature was changed during these repairs.
+The keeper discovers returned packs from authenticated ETH/token bid events, retains unseen own
+selections, independently discovers expiry, and upgrades existing indexes through bounded replay.
+It pauses new exposure when known upkeep exceeds free cash or routine permission. Restock avoids
+storing immediately consumed minted IDs and caches shared economics before minting.
 
 ## Verification
 
-- Real old-source reproduction: 673 foreign records exhausted 0.010000000000000001 ETH and caused
-  first-deposit division by zero. Repaired source passes three bootstrap and five real
-  exposure/admission regressions, including the actual mutating checkpoint gate.
-- Refreshed exact receiver: 46,462 gas keep / 69,730 difficult kick; 99 sampled low-gas attempts
-  record or fail atomically. Both fresh fork traces reconcile every financial bucket to the wei.
-- Actual production Docker image builds and starts; transaction state and index head survive
-  separate containers sharing `/data`. [Isolated verification job](https://github.com/ripe0x/shapes-fwa-pool/actions/runs/44393965532).
-  This does not claim a live Fly machine replacement.
-- Eleven Python accounting tests, keeper policy checks and seven focused forward scenarios pass.
-  Refreshed asset-flow scenarios retain O2's failure and meet O6's unchanged 0.0002 ETH limit.
-- Approved local calibration completed in **77/80 transactions**, using 1.7559/3 simulated ETH
-  aggregate transaction value. Real refunded prefixes/tails and a complete exposed backlog exit
-  have billed receipts on the preceding Q400 source. Six exit calls cost **0.0003838206 ETH** at
-  0.2 gwei, with **0.0001 ETH** checkpoint pay; other essential exit work paid zero.
-- Current runtime: **24,322 / 24,576 bytes**, 254 spare; linked library 21,313 bytes.
+- Five new real FWA journal/distribution cases, 17 lifecycle/real-selection callers, five
+  bootstrap/cash-only callers, 14 accounting tests and keeper/index checks pass. Three obsolete
+  selective-work assertions are repaired; their failures remain archived.
+- Both fresh fork traces reconcile every financial bucket to the wei. Cold receiver samples are
+  unchanged at 46,462 / 69,730 gas. Runtime: **24,451 bytes**, 125 below EIP-170; library 22,997.
+- Seven inventory profiles preserve fees/principal and improve receipt-equivalent restock execution
+  by 1.28–7.24%. Fixed quotes are unchanged, so holder savings are not yet established.
+- Earlier production-image startup and shared-volume replacement checks remain valid for their
+  unchanged packaging. [Isolated image verification](https://github.com/ripe0x/shapes-fwa-pool/actions/runs/44393965532).
 
-The earlier candidate's 52 affected checks, 301 real listings, 1,000/10,000 bookkeeping-position
-models and quiet local lifecycle remain archived evidence for their exact inputs. They were not
-rerun as broad release verification of this repair. New source hashes, commands, preserved failures
-and limits are in the [acceptance report](docs/POSITION-INTEGRATION-ACCEPTANCE.md).
+The all-cost model includes 84 primary cases and 28 separate holder-rescue diagnostics: 56 primary
+exits complete, 28 more need holder-paid sync, and only 40 primary cases avoid routine funding
+stalls. All 112 ledgers balance. These stochastic scenarios use historical gas proxies and do not
+establish expected returns or funded operation. The inherited daily clock uses a 10^12-second
+settlement surrogate versus actual 3,600 seconds, so its exit counts and returns are hypothetical
+accounting diagnostics, not achievable operating evidence or grounds for raising an allowance.
+
+Current commands, hashes, preserved failures and scope: [revision results](docs/EFFICIENT-JOURNAL-RESULTS.md).
+The prior 52 affected checks and real 301-listing rehearsal are archived evidence for their named
+inputs, not a new broad release verification of this revision.
 
 ## Things that don't make sense
 
-| Observation | Consequence |
-| --- | --- |
-| Exposed vaults pay for all global FWA history. | The recorded 18,281 entries require at least **0.3227925 ETH / 30 days at 0.5 gwei**, versus **0.25 ETH** mainnet permission, before own work. Canary needs **0.129117 ETH at 0.2 gwei** versus **0.054 ETH** permission. Empty-vault rebasing removes this cost only while provably unexposed. |
-| Budget permission provides no cash. | Global-only refill need **0.01075975 ETH/day** exceeds the configured **0.005** and hard maximum **0.01**. The funding proposal distinguishes actual cash, harvested income and allowances. |
-| Balanced books still fail O2. | **1,919,655 vs 1,750,000 quoted gas/position.** Perfect batching still leaves 1,810,000 marginal quoted build/list gas. O6 is now **0.0002 ETH**, meeting its existing limit; actual billed full-holder calibration remains a release evidence gap. |
-| The journal schedule poorly matches batch costs. | A refunded singleton bills **112,515 vs 115,000 quoted gas**; sixteen bill **361,632 vs 565,000**. A larger base can reward splitting. Successful-foreign billed small/full/tail costs are still missing, so journal quotes remain unchanged. |
-| Essential budgets are zero while exposed exits require foreign catchup. | The measured caller-funded exit includes unrelated refunded history despite routine allowance remaining. Its gas cost exceeds checkpoint compensation by **0.0002838206 ETH**. |
-| FWA's drained request queue can retain foreign staging. | Incidental foreign activation reverts admission atomically. Another actor must clear staging before listing can resume. |
+- **Economics remains blocked.** At current quotes, the archived 18,281-record window needs at
+  least **0.2802925 ETH / 30 days at 0.5 gwei**, before own work. That is **0.0093430833 ETH/day**
+  versus the configured 0.005 refill. Vault operating cash is the default funding source;
+  creator mint revenue is not an assumed subsidy.
+- **O2 remains unresolved:** fresh max-load 1,919,655 versus 1,750,000 quoted gas; components are
+  unchanged. Execution savings alone do not lower holder compensation. No outcome or signature changed.
+- **Receipt gaps remain.** The new bounded local matrix is prepared, awaiting explicit approval.
+  Authentic exposed successful-foreign bills are still unavailable under this local setup;
+  refund receipts cannot substitute for them. Maximum combined own-transition work is unmeasured.
+- **The old 342,766 checkpoint bound was wrong.** It subtracted finalized Foundry refunds twice.
+  Current direct finalized gas is 345,937 against Q360; standalone billed full-holder proof remains pending.
+- **Permission does not supply liquid cash.** Partial redemption can encumber the cash needed
+  to reconcile a later returned pack; the existing holder rescue is explicit, not a funded
+  keeper pass. Available authentic fixtures cannot reproduce this timing, so the finding is
+  model/source evidence only.
+- **The daily model is not an economics gate.** Its settlement/blackout timing surrogate can
+  change terminal work, cash and rescue need. Fixing that model and obtaining authentic receipts
+  remain necessary before accepting holder returns.
+- **Foreign staging can still block new admission.** Another actor must clear that staging; bounded
+  journal/accounting recovery remains available.
 
-[Funding and return proposal](docs/REVIEW-FUNDING-PROPOSAL.md) includes eight illustrative 30-day
-regimes with absolute costs, cash and holder marks. Positive marked value does not establish
-continuous keeper operation or realized returns. Historical annual-return claims remain historical.
-
-**Keep this PR draft.** Funding, complete journal calibration and O2 remain acceptance blockers.
-Focused independent repair review is not a full security audit or release approval. No public
-network transaction, real-fund spending, owner signature or merge is included.
+**Keep this PR draft.** No allowance increase, sponsorship assumption, minimum TVL, public-chain
+transaction, real-fund spending, owner signature or merge is included. Affected review is not a
+full security audit or release approval.

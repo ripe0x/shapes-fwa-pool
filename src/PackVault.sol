@@ -76,8 +76,8 @@ contract PackVault is ReentrancyGuard {
     /// Spending budgets: capacity and refill per day, maxima in bytecode (D56).
     uint256 internal constant MIN_PACK_UNITS = 3; // ShapePacks minimum pack value 0.03 ETH
     uint256 internal constant MIN_DEPOSIT = 0.01 ether;
-    uint256 internal constant MIN_DISTRIBUTION = 0.01 ether;
-    uint256 public constant DEAD_SHARES = 1e15;
+    uint256 internal constant MIN_DISTRIBUTION = VaultLib.MIN_DISTRIBUTION;
+    uint256 public constant DEAD_SHARES = VaultLib.DEAD_SHARES;
     uint256 internal constant MAX_LIQUIDATIONS = MAX_BATCH;
 
     // ------------------------------------------------------------------ immutables
@@ -325,13 +325,16 @@ contract PackVault is ReentrancyGuard {
         return _pay(OP_LIST, VaultLib.Q_LIST + listed * VaultLib.Q_LISTED, listed, false, minPay, type(uint256).max);
     }
 
-    /// @notice Process only new global journal entries and supplied changed positions.
-    function sync(uint256 maxJournal, uint256[] calldata listingIds, uint256 maxPrune, uint256 minPay)
+    /// @notice Process a full bounded journal job, independent terminal IDs and head cleanup.
+    function sync(uint256[] calldata listingIds, uint256 witnessId, uint256 minPay)
         external nonReentrant returns (uint256)
     {
-        (uint256 gasQ, uint256 units) = VaultLib.syncChanges(book, fwa, packs, maxJournal, listingIds, maxPrune);
-        bool essential = windingDown || lockedShares != 0;
-        return _pay(OP_SYNC, gasQ, units, essential, minPay, type(uint256).max);
+        uint256 checkpointMode;
+        if (block.timestamp / INTERVAL != lastCheckpointInterval) {
+            checkpointMode = pendingDepositTotal != 0 || lockedShares != 0 ? 1 : params.distributionBps != 0 ? 2 : 0;
+        }
+        (uint256 gasQ, uint256 units) = VaultLib.syncChanges(params, book, fwa, packs, listingIds, checkpointMode, witnessId);
+        return _pay(OP_SYNC, gasQ, units, false, minPay, type(uint256).max);
     }
 
     /// @notice Withdraw active listings: allowed in wind-down, when FWA's live fees leave no edge
@@ -847,6 +850,9 @@ contract PackVault is ReentrancyGuard {
 
     function idleEth() external view returns (uint256) {
         return _idle();
+    }
+    function freeEth() external view returns (uint256) {
+        return _free();
     }
 
     /// @notice Keeper budget available now: routine (strategy) and essential (redemption, wind-down).

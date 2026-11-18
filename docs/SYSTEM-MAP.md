@@ -3,7 +3,7 @@
 Current design: one production vault and one capital pool. Exact running values live in
 `VaultLib.Book`; its inventory indexes describe custody, not additional assets. Historical
 measurements for earlier candidates remain under `docs/receipts/flow/` until regenerated.
-Owner requirements: `OWNER-REQUIREMENTS.md`; decisions: `docs/DECISIONS.md` (D65).
+Owner requirements: `OWNER-REQUIREMENTS.md`; decisions: `docs/DECISIONS.md` (D65–D69).
 
 | Actor | Brings | Receives |
 | --- | --- | --- |
@@ -52,11 +52,24 @@ receipts, a clean allocation head, no overdue allocation and acceptable allocati
 redemptions use preflow NAV, eligible distributions follow, and deposits use resulting NAV.
 Protected balances remain protected through maintenance, cancellation and wind-down.
 
-Routine and essential maintenance draw from free vault ETH inside their existing budgets.
+All journal synchronization, including mixed work during redemption or wind-down, draws from
+free vault ETH under routine permission. D64 keeps unlisting/liquidation caller-funded when
+essential permission is zero. Other maintenance retains its existing classes and cash sources.
 Foreign/refunded journal entries do not return backing: their completed-work gas cost is an
 explicit NAV expense with no per-entry flat work fee. This cost grows with new global activity.
 Checkpoint valuation work does not grow with unchanged positions. Processing charges remain for
-checkpoint work only. Token burning remains an operator expense.
+checkpoint work only. Token burning remains an operator expense. The new journal job automatically
+reads up to128 completed records with independent16-own/terminal/prune bounds. Paid small foreign
+tails need a real fresh checkpoint opportunity; no exposure means an unpaid completeness rebase.
+Vault expenses reduce holder NAV; creator mint revenue is not recycled as an assumed subsidy.
+The keeper can pause new exposure reversibly when known mandatory work exceeds free cash or
+routine permission, while leaving reconciliation/holder actions available.
+
+Returned-bid events and unseen selection events independently nominate bounded reconciliation
+candidates. The index moves no assets and proves no completeness: every selected transition still
+passes the onchain journal, identity, receipt and custody gates. Restock keeps immediately consumed
+new split IDs in memory; only actual leftover Shapes enter inventory storage, with unchanged
+principal, mint fee and representation flows.
 
 Monotone values: journal cursor, allocation head, epochs, redemption era and interval marker advance
 so completed work is not replayed. The high-water mark only rises so gains are not distributed

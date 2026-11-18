@@ -53,7 +53,7 @@ contract AuditAllocatedValuation is SelectionBase {
         vm.prank(bob);
         vault.deposit{value: gross}();
         toBlackout();
-        vault.sync(16, new uint256[](0), 0, 0);
+        vault.sync(new uint256[](0), 0, 0);
         uint256 interval = vault.lastCheckpointInterval();
         uint256 planned24 = TestVaultOps.witness(vault);
         vm.expectRevert(PackVault.SyncFirst.selector);

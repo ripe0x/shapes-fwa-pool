@@ -1,0 +1,88 @@
+No files changed, compilation skipped
+
+Warning: the following cheatcode(s) are deprecated and will be removed in future versions:
+  lastCallGas(): replaced by `lastFrameGas`
+Ran 8 tests for test/fork/RestockEfficiency.t.sol:RestockEfficiencyTest
+[PASS] test_allProposalsValidatedBeforeAnyPaidMint() (gas: 360793)
+[PASS] test_existingIdleFundingPreventsUnfundedLeftoverPack() (gas: 10322830)
+Logs:
+  funding boundary first pack gross gas: 2803503
+  funding boundary first pack frame refund: 88000
+  funding boundary first pack sample net gas upper bound: 2715503
+  funding boundary first pack keeper pay wei: 581000000000000
+  funding boundary first pack newly paid mints: 1
+
+[PASS] test_fourUnitLeftoversAndMixedMintsPreserveExactRecipe() (gas: 9306672)
+Logs:
+  four first leftover6 gross gas: 2836859
+  four first leftover6 frame refund: 88000
+  four first leftover6 sample net gas upper bound: 2748859
+  four first leftover6 keeper pay wei: 588000000000000
+  four first leftover6 newly paid mints: 1
+  four mixed old6 new10 gross gas: 3022237
+  four mixed old6 new10 frame refund: 76500
+  four mixed old6 new10 sample net gas upper bound: 2945737
+  four mixed old6 new10 keeper pay wei: 680000000000000
+  four mixed old6 new10 newly paid mints: 1
+  four leftover only0 gross gas: 1140823
+  four leftover only0 frame refund: 56400
+  four leftover only0 sample net gas upper bound: 1084423
+  four leftover only0 keeper pay wei: 240000000000000
+  four leftover only0 newly paid mints: 0
+
+[PASS] test_largePackLeavesExistingLoosePrefixUntouched() (gas: 13109625)
+Logs:
+  large prefix setup gross gas: 2803503
+  large prefix setup frame refund: 88000
+  large prefix setup sample net gas upper bound: 2715503
+  large prefix setup keeper pay wei: 581000000000000
+  large prefix setup newly paid mints: 1
+  large consumes thirty new leaves old7 gross gas: 7712281
+  large consumes thirty new leaves old7 frame refund: 207100
+  large consumes thirty new leaves old7 sample net gas upper bound: 7505181
+  large consumes thirty new leaves old7 keeper pay wei: 1650000000000000
+  large consumes thirty new leaves old7 newly paid mints: 3
+
+[PASS] test_maximumThirtyUnitNoLeftovers() (gas: 20618671)
+Logs:
+  thirty units ten small packs gross gas: 9678225
+  thirty units ten small packs frame refund: 263700
+  thirty units ten small packs sample net gas upper bound: 9414525
+  thirty units ten small packs keeper pay wei: 2226000000000000
+  thirty units ten small packs newly paid mints: 3
+  thirty units one large pack gross gas: 7719114
+  thirty units one large pack frame refund: 241300
+  thirty units one large pack sample net gas upper bound: 7477814
+  thirty units one large pack keeper pay wei: 1650000000000000
+  thirty units one large pack newly paid mints: 3
+
+[PASS] test_mintedPrincipalRoundTripRetainsArtistFeeRevenue() (gas: 4601311)
+Logs:
+  roundtrip two small packs gross gas: 3110099
+  roundtrip two small packs frame refund: 90800
+  roundtrip two small packs sample net gas upper bound: 3019299
+  roundtrip two small packs keeper pay wei: 666000000000000
+  roundtrip two small packs newly paid mints: 1
+
+[SKIP] test_recentHeadSmallRestock() (gas: 0)
+[PASS] test_threeUnitLeftoversAndMixedMintsPreserveExactRecipe() (gas: 9152384)
+Logs:
+  three first leftover7 gross gas: 2803503
+  three first leftover7 frame refund: 88000
+  three first leftover7 sample net gas upper bound: 2715503
+  three first leftover7 keeper pay wei: 581000000000000
+  three first leftover7 newly paid mints: 1
+  three leftover only4 gross gas: 623803
+  three leftover only4 frame refund: 20000
+  three leftover only4 sample net gas upper bound: 603803
+  three leftover only4 keeper pay wei: 141000000000000
+  three leftover only4 newly paid mints: 0
+  three mixed old4 new10 gross gas: 3262186
+  three mixed old4 new10 frame refund: 79300
+  three mixed old4 new10 sample net gas upper bound: 3182886
+  three mixed old4 new10 keeper pay wei: 751000000000000
+  three mixed old4 new10 newly paid mints: 1
+
+Suite result: ok. 7 passed; 0 failed; 1 skipped; finished in 1.01s (799.09ms CPU time)
+
+Ran 1 test suite in 1.30s (1.01s CPU time): 7 tests passed, 0 failed, 1 skipped (8 total tests)

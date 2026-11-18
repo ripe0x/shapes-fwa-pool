@@ -13,7 +13,7 @@ import {LISTING_ACTIVE} from "../../src/interfaces/External.sol";
 ///         sim/out/reconcile-trace.jsonl. sim/reconcile.py replays the same steps through the
 ///         Python vault model (sim/vault.py, the one the forward simulation uses) and must match
 ///         every vault number to the wei. Inputs the model takes as given: FWA's fee formula
-///         inputs, keeper gas pay (it depends on gasleft), and the live backing on each listing.
+///         inputs, observed fixed-quote keeper payouts, and each listing's live backing.
 contract ForkReconcileTest is SelectionBase {
     string constant OUT = "sim/out/reconcile-trace.jsonl";
     address alice = makeAddr("pack-vault-test-alice");
@@ -21,6 +21,11 @@ contract ForkReconcileTest is SelectionBase {
     uint256 lastBal; // this contract's balance before the step: keeper pay is the delta
 
     receive() external payable {}
+
+    function assertGasContext() external {
+        assertEq(block.basefee, 0.4 gwei);
+        assertEq(tx.gasprice, 0.45 gwei);
+    }
 
     function _snap(string memory step) internal {
         ReconcileTrace.snapshot(vault, alice, bob, address(this).balance - lastBal, step, OUT);
@@ -41,7 +46,7 @@ contract ForkReconcileTest is SelectionBase {
         // permissionless processor expires them after their word deadline, draining the queue.
         if (FWA.unsettledAcquisitionCount() != 0) IFwaSettle(address(FWA)).processAcquisitions(50);
         assertEq(FWA.unsettledAcquisitionCount(), 0, "queue drained");
-        if (vault.acquisitionCursor() < FWA.nextSequenceToProcess()) vault.sync(16, new uint256[](0), 16, 0);
+        if (vault.acquisitionCursor() < FWA.nextSequenceToProcess()) vault.sync(new uint256[](0), 0, 0);
     }
 
     function test_reconcileFullCycle() public {
@@ -63,6 +68,7 @@ contract ForkReconcileTest is SelectionBase {
         // Vault operations at a set fee environment from here on.
         vm.fee(0.4 gwei);
         vm.txGasPrice(0.45 gwei);
+        this.assertGasContext();
         _snap("selected");
 
         vm.prank(c.purchaser);

@@ -27,14 +27,14 @@ ACTIVE, ALLOCATED, WITHDRAWN, SETTLED = 1, 2, 3, 4
 # The vault's quoted-gas schedule, line for line (PackVault Q_* constants, D56). Pay is a quote
 # fixed by the operation and its completed work, never the caller's gas.
 Q = dict(checkpoint=360_000, restock=280_000, pack=325_000, pack_unit=35_000, mint=2_200_000,
-         list=280_000, listed=825_000, sync=85_000, synced=120_000, journal=30_000, selected=160_000,
+         list=280_000, listed=825_000, sync=85_000, journal_tail=85_000, synced=120_000, journal=30_000, selected=160_000,
          pruned=45_000, unlist=340_000, unlisted=285_000, liquidate=75_000, liq_pack=80_000,
          redeem_shape=35_000, liq_shape=65_000, recovery_base=100_000, recovery_shape=35_000,
          recovery_unseal=70_000, harvest=125_000, harvested=80_000)
 POSITION_VALUE = 663 * 10**14  # 0.0663 ETH: what request charges are scaled by
 Q_POSITION_SYNC = Q["journal"] + Q["selected"] + Q["synced"] + Q["pruned"]
 CYCLE_GAS = Q_POSITION_SYNC + Q["listed"] + Q["harvested"]  # a bid cycle's quoted gas (gates)
-MAX_BATCH = dict(sync=16, journal=16, prune=16, harvest=16, list=8, restock=10, unlist=16, liquidate=16, tokens=16)
+MAX_BATCH = dict(sync=16, journal=128, selected=16, prune=16, harvest=16, list=8, restock=10, unlist=16, liquidate=16, tokens=16)
 
 
 @dataclass
@@ -84,6 +84,7 @@ class State:
     completed_prefix: int = 0
     pending_receipts: int = 0
     allocation_stale: bool = False
+    own_journal_pending: bool = False
     witness_id: int = 0
     pending_parent: str = ""
     backing_proposals: list = field(default_factory=list)
@@ -248,14 +249,16 @@ def plan(s):
                or (l.status == ALLOCATED and s.now >= l.allocated_at + s.settlement_window)))
     active = [l for l in s.listings if l.status == ACTIVE]
     shortfall = max(0, s.owed_estimate - s.free - s.pending_deposits)
-    # Above the ceiling, only when ETH is owed or a redemption checkpoint needs expired
-    # allocations resolved first (the vault refuses to price them unsynced).
     catchup = s.journal_cursor < s.completed_prefix
     unexposed = not s.open_positions and not s.active_count and not s.pending_receipts and not s.listings
-    if (due or (catchup and not unexposed) or s.allocation_stale) and (not spike or s.winding_down or s.locked_shares):
-        ids = due[:MAX_BATCH["sync"] // 2 if catchup else MAX_BATCH["sync"]]
-        journal = min(s.completed_prefix - s.journal_cursor, MAX_BATCH["journal"] - len(ids)) if catchup else 0
-        out.append(("sync", journal, ids, MAX_BATCH["prune"]))
+    checkpoint_due = (s.blackout and s.queue_drained and not s.checkpoint_done_this_interval
+                      and (s.pending_deposits or s.locked_shares or s.distribution_bps))
+    journal_due = catchup and not unexposed and (
+        s.completed_prefix - s.journal_cursor >= MAX_BATCH["journal"]
+        or s.own_journal_pending or checkpoint_due)
+    # All sync work uses routine funding, including while holders are withdrawing.
+    if (due or journal_due or s.allocation_stale) and not spike:
+        out.append(("sync", due[:MAX_BATCH["sync"]], s.witness_id))
 
     redeeming = shortfall > 0  # deploy nothing this pass while redeemers wait for ETH
     # FWA's live fees leave no edge: every further cycle loses, so unwind (the vault allows it).
@@ -310,6 +313,8 @@ def plan(s):
     if spike or s.winding_down or broken or s.listing_paused or redeeming or not s.backing \
             or not s.queue_drained:
         return out
+    if journal_backlog_floor(s) > min(s.free, s.routine_budget):
+        return out
     net = cycle_net(s)
     if not net:
         return out
@@ -348,9 +353,16 @@ def reserve_need(s):
     listing = (Q["list"] + Q["listed"] * MAX_BATCH["list"]) * s.gas_ceiling * (BPS + s.markup_bps) // BPS
     catchup = (Q["sync"] + MAX_BATCH["journal"] * Q["journal"] + MAX_BATCH["prune"] * Q["pruned"])
     routine = catchup * s.gas_ceiling * (BPS + s.markup_bps) // BPS
-    ceiling = s.essential_ceiling if s.essential_ceiling is not None else s.gas_ceiling
-    essential = 0 if s.essential_cap == 0 else catchup * ceiling
-    return listing + MAX_BATCH["list"] * s.work_fee + max(routine, essential)
+    return listing + MAX_BATCH["list"] * s.work_fee + routine
+
+
+def journal_backlog_floor(s):
+    """Packed journal envelope; own transitions and terminal work can add cost."""
+    if not s.open_positions and not s.active_count and not s.pending_receipts and not s.listings:
+        return 0
+    records = s.completed_prefix - s.journal_cursor
+    full, tail = divmod(records, MAX_BATCH["journal"])
+    return quote(s, full * Q["sync"] + (Q["journal_tail"] if tail else 0) + records * Q["journal"])
 
 
 def status(s, planned=None):
@@ -379,6 +391,10 @@ def status(s, planned=None):
         out.append(("BID_CYCLE_UNPROFITABLE", "wait", "gas too high for a bid cycle to repay itself"))
     if s.journal_cursor < s.completed_prefix:
         out.append(("JOURNAL_CATCHUP", "wait", f"{s.completed_prefix - s.journal_cursor} completed global entries remain"))
+        floor = journal_backlog_floor(s)
+        out.append(("JOURNAL_FUNDING", "info", f"packed backlog envelope {floor} wei; free {s.free} wei; routine permission {s.routine_budget} wei"))
+        if floor > min(s.free, s.routine_budget):
+            out.append(("MAINTENANCE_UNFUNDED", "wait", "new exposure waits for maintenance cash or routine permission"))
     if s.pending_receipts:
         out.append(("RECEIPTS_PENDING", "wait", f"{s.pending_receipts} identified payments require reconciliation"))
     if s.allocation_stale:
@@ -397,11 +413,9 @@ def status(s, planned=None):
     if s.routine_budget == 0:
         out.append(("ROUTINE_BUDGET_EMPTY", "wait", "strategy work is unpaid until the routine budget refills"))
     if s.essential_budget == 0 and (s.locked_shares or s.winding_down):
-        out.append(("ESSENTIAL_BUDGET_EMPTY", "action", "redemption and wind-down work is unpaid; holders can run it "
-                    "themselves, or the owner restores the essential budget"))
+        out.append(("ESSENTIAL_BUDGET_EMPTY", "action", "unlisting and liquidation are unpaid; holders can run them; sync uses routine permission"))
     if s.reserve < reserve_need(s) and not s.winding_down:
-        out.append(("RESERVE_BELOW_NEED", "action", f"reserve {s.reserve / 1e18:.4f} ETH < {reserve_need(s) / 1e18:.4f} "
-                    "needed for a listing batch and journal catchup at the ceilings; owner raises it"))
+        out.append(("RESERVE_BELOW_NEED", "info", f"reserve {s.reserve / 1e18:.4f} ETH; maximum listing and sync batches quote {reserve_need(s) / 1e18:.4f} ETH"))
     if not out:
         out.append(("OK", "ok", "operating normally"))
     return out

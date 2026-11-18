@@ -117,13 +117,13 @@ library TestVaultOps {
 
     function sync(PackVault v, uint256[] memory ids, uint256 minPay) internal returns (uint256 pay) {
         (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
-        if (ids.length <= 8) { _resumePrank(mode, sender, origin); return v.sync(16 - ids.length, ids, 16, minPay); }
-        for (uint256 start; start < ids.length; start += 8) {
-            uint256 count = ids.length - start < 8 ? ids.length - start : 8;
+        if (ids.length <= 16) { _resumePrank(mode, sender, origin); return v.sync(ids, 0, minPay); }
+        for (uint256 start; start < ids.length; start += 16) {
+            uint256 count = ids.length - start < 16 ? ids.length - start : 16;
             uint256[] memory batch = new uint256[](count);
             for (uint256 i; i < count; ++i) batch[i] = ids[start + i];
             _resumePrank(mode, sender, origin);
-            pay += v.sync(16 - count, batch, 16, minPay);
+            pay += v.sync(batch, 0, minPay);
         }
     }
 

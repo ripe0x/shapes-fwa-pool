@@ -15,10 +15,19 @@ import {
     LISTING_WITHDRAWN
 } from "./interfaces/External.sol";
 
+interface ISyncVault {
+    function accountedNav(uint256 witnessId) external view returns (uint256);
+    function freeEth() external view returns (uint256);
+    function totalShares() external view returns (uint256);
+    function highWaterMark() external view returns (uint256);
+}
+
 /// @notice Linked library for PackVault: the live FWA economics read. Split out only to keep
 ///         PackVault under EIP-170; it runs in the vault's context and holds no state.
 library VaultLib {
     uint256 internal constant BPS = 10_000;
+    uint256 internal constant DEAD_SHARES = 1e15;
+    uint256 internal constant MIN_DISTRIBUTION = 0.01 ether;
 
     /// @notice PackVault's governed parameters (moved here so library code can read them by
     ///         storage pointer; EIP-170 size).
@@ -76,6 +85,7 @@ library VaultLib {
     uint256 internal constant Q_LIST = 280_000;
     uint256 internal constant Q_LISTED = 825_000;
     uint256 internal constant Q_SYNC = 85_000;
+    uint256 internal constant Q_REQUIRED_TAIL = 85_000;
     uint256 internal constant Q_JOURNAL = 30_000; // each completed global acquisition
     uint256 internal constant Q_SELECTED = 160_000; // own selection bookkeeping
     uint256 internal constant Q_SYNCED = 120_000; // terminal or recovered return
@@ -96,6 +106,10 @@ library VaultLib {
     uint256 internal constant POSITION_VALUE = 0.0663 ether;
 
     uint256 internal constant MAX_BATCH = 16;
+    uint256 internal constant MAX_JOURNAL = 128;
+    uint256 internal constant MAX_SELECTIONS = 16;
+    uint256 internal constant MAX_TERMINALS = 16;
+    uint256 internal constant MAX_PRUNES = 16;
     uint256 internal constant MAX_LIST_BATCH = 8;
     uint256 internal constant LIST_CALL_GAS = 1_200_000;
     uint256 internal constant MAX_RESTOCK_UNITS = 30;
@@ -114,6 +128,17 @@ library VaultLib {
     }
 
     struct Work { uint256 processed; uint256 own; uint256 resolved; uint256 pruned; }
+
+    struct BackingTerms {
+        uint256 k;
+        uint256 desired;
+        uint256 cap;
+        uint256 settlementFee;
+        uint256 value;
+        uint256 floor;
+        uint256 cycleCost;
+        bool ok;
+    }
 
     struct Receipt { uint128 amount; uint16 feeBps; uint8 kind; bool initialized; }
 
@@ -355,24 +380,32 @@ library VaultLib {
         view
         returns (uint256 k1e18, uint256 backing, bool ok)
     {
-        uint256 cap;
-        uint256 s;
-        (k1e18, cap, s) = economics(f, packs);
-        uint256 value = units * UNIT;
-        uint256 floor = M.max(M.divUp(value * BPS, BPS - s), M.divUp(value * BPS, f.settlementDiscountBps()));
-        backing = floor;
-        if (k1e18 > 1e18) {
-            uint256 a = k1e18 - 1e18;
+        BackingTerms memory t = _backingTerms(p, f, packs, units, build);
+        return (t.k, t.desired, t.ok);
+    }
+
+    function _backingTerms(Params storage p, IFWAV2 f, address packs, uint256 units, uint256 build)
+        private view returns (BackingTerms memory t)
+    {
+        (t.k, t.cap, t.settlementFee) = economics(f, packs);
+        t.value = units * UNIT;
+        uint256 floor = M.max(M.divUp(t.value * BPS, BPS - t.settlementFee),
+            M.divUp(t.value * BPS, f.settlementDiscountBps()));
+        t.desired = floor;
+        if (t.k > 1e18) {
+            t.cycleCost = quote(p, Q_POSITION_SYNC + Q_LISTED + Q_HARVESTED, 2, false);
+            uint256 a = t.k - 1e18;
             uint256 c = (Q_POSITION_SYNC + Q_LISTED + Q_HARVESTED) * p.gasCeiling * (BPS + p.payMarkupBps) / BPS + 2 * p.workFee;
-            backing = M.max(backing, (c + M.sqrt(c * c + a * c / 1e18 * value)) * 1e18 / a);
-            backing = M.max(backing, M.divUp((build + quote(p, Q_POSITION_SYNC + Q_LISTED + Q_HARVESTED, 2, false)) * 1e18, a));
+            t.desired = M.max(t.desired, (c + M.sqrt(c * c + a * c / 1e18 * t.value)) * 1e18 / a);
+            t.desired = M.max(t.desired, M.divUp((build + t.cycleCost) * 1e18, a));
         }
-        if (cap != type(uint256).max) backing = M.min(backing, cap * (BPS - p.bufferBps) / BPS);
+        if (t.cap != type(uint256).max) t.desired = M.min(t.desired, t.cap * (BPS - p.bufferBps) / BPS);
         // Bid outcome B (k - 1) > 0 given k >= 1 + edge; spending callers also require it to clear
         // the keeper pay it causes (cycleNet). Keep outcome B (k - s) >= P holds from the floor.
-        ok = cap != 0 && k1e18 >= 1e18 + uint256(p.minEdgeBps) * 1e14 && k1e18 > s * 1e14 && backing >= floor
-            && backing * (k1e18 - s * 1e14) >= value * 1e18;
-        if (!ok) backing = 0;
+        t.ok = t.cap != 0 && t.k >= 1e18 + uint256(p.minEdgeBps) * 1e14 && t.k > t.settlementFee * 1e14
+            && t.desired >= floor && t.desired * (t.k - t.settlementFee * 1e14) >= t.value * 1e18;
+        if (!t.ok) t.desired = 0;
+        t.floor = M.max(floor, t.value + t.value / 19 + (t.value % 19 == 0 ? 0 : 1));
     }
 
 
@@ -657,28 +690,66 @@ library VaultLib {
         delete b.receipts[id];
     }
 
-    function syncChanges(Book storage b, IFWAV2 f, IShapePacks packs, uint256 maxJournal,
-        uint256[] calldata ids, uint256 maxPrune)
+    function syncChanges(Params storage p, Book storage b, IFWAV2 f, IShapePacks packs,
+        uint256[] calldata ids, uint256 checkpointMode, uint256 witnessId)
         external returns (uint256 gasQ, uint256 units)
     {
-        if (maxJournal + ids.length > MAX_BATCH || maxPrune > MAX_BATCH) revert BadBatch();
+        if (ids.length > MAX_TERMINALS) revert BadBatch();
         Work memory work;
         // No outstanding custody, identifiers or receipts means an unseen selection cannot be ours.
         bool unexposed = _unexposed(b);
         bool rebased;
         if (unexposed) {
-            if (maxJournal != 0) rebased = _rebaseUnexposed(b, f);
+            rebased = _rebaseUnexposed(b, f);
         } else {
-            (work.processed, work.own) = _syncJournal(b, f, packs, maxJournal);
+            (work.processed, work.own) = _syncJournal(b, f, packs);
         }
         for (uint256 i; i < ids.length; ++i) if (_syncTerminal(b, f, packs, ids[i])) ++work.resolved;
-        work.pruned = prune(b, maxPrune);
+        work.pruned = prune(b, MAX_PRUNES);
         if (work.processed + work.resolved + work.pruned == 0 && !rebased) revert Nothing();
         // Rebase is unpaid. Empty-vault head cleanup also cannot consume its bootstrap cash.
         if ((unexposed && b.trackedValue == 0) || work.processed + work.resolved + work.pruned == 0) return (0, 0);
-        gasQ = Q_SYNC + work.processed * Q_JOURNAL + work.own * Q_SELECTED
+        bool journalPaid = work.processed == MAX_JOURNAL || work.own + work.resolved != 0;
+        bool requiredTail;
+        if (!journalPaid && work.processed != 0 && checkpointMode != 0) {
+            journalPaid = f.isPurchaseBlackout() && f.unsettledAcquisitionCount() == 0;
+            if (journalPaid && checkpointMode == 2) {
+                journalPaid = _distributionTail(p, b, f, witnessId,
+                    Q_REQUIRED_TAIL + work.processed * Q_JOURNAL + work.pruned * Q_PRUNED);
+            }
+            requiredTail = journalPaid;
+        }
+        if (!journalPaid && work.own + work.resolved + work.pruned == 0) return (0, 0);
+        gasQ = (requiredTail ? Q_REQUIRED_TAIL : Q_SYNC) + (journalPaid ? work.processed * Q_JOURNAL : 0) + work.own * Q_SELECTED
             + work.resolved * Q_SYNCED + work.pruned * Q_PRUNED;
         units = work.resolved;
+    }
+
+    function _distributionTail(Params storage p, Book storage b, IFWAV2 f, uint256 witnessId, uint256 gasQ)
+        private view returns (bool)
+    {
+        if (b.allocationHead < b.allocationQueue.length) {
+            Position storage oldest = b.positions[b.allocationQueue[b.allocationHead]];
+            if (oldest.state != ALLOCATED || block.timestamp >= uint256(oldest.allocatedAt) + f.settlementWindow()) return false;
+        }
+        ISyncVault v = ISyncVault(address(this));
+        uint256 nav_;
+        try v.accountedNav(witnessId) returns (uint256 n) { nav_ = n; } catch { return false; }
+        // Prove a real distribution remains possible even after the largest sync payment.
+        uint256 cost = quote(p, gasQ, 0, false);
+        if (nav_ <= cost) return false;
+        nav_ -= cost;
+        if (b.allocatedValue * BPS > nav_ * p.allocatedBoundBps) return false;
+        uint256 supply = v.totalShares();
+        uint256 perShare = nav_ * 1e18 / supply;
+        uint256 high = v.highWaterMark();
+        if (supply <= DEAD_SHARES || perShare <= high) return false;
+        uint256 liquid = v.freeEth() + f.feeCredit(address(this));
+        if (liquid <= p.reserve) return false;
+        liquid -= p.reserve;
+        if (liquid <= cost) return false;
+        uint256 gain = M.mulDiv(perShare - high, supply, 1e18);
+        return M.min(gain * p.distributionBps / BPS, liquid - cost) >= MIN_DISTRIBUTION;
     }
 
     function _unexposed(Book storage b) private view returns (bool) {
@@ -696,18 +767,19 @@ library VaultLib {
         }
     }
 
-    function _syncJournal(Book storage b, IFWAV2 f, IShapePacks packs, uint256 maxJournal)
+    function _syncJournal(Book storage b, IFWAV2 f, IShapePacks packs)
         private returns (uint256 processed, uint256 own)
     {
         uint64 cursor = b.acquisitionCursor;
         uint64 end = f.nextSequenceToProcess();
-        while (cursor < end && processed < maxJournal) {
+        while (cursor < end && processed < MAX_JOURNAL) {
             uint256 requestId = f.requestIdAtSequence(cursor);
             if (requestId == 0) revert InvalidJournal();
             IFWAV2.Acquisition memory a = f.acquisitions(requestId);
             if (a.status == 2) {
                 if (a.listingId == 0) revert InvalidJournal();
                 if (b.positions[a.listingId].value != 0) {
+                    if (own == MAX_SELECTIONS) break;
                     Position memory p = b.positions[a.listingId];
                     if (p.state != ACTIVE) revert InvalidJournal();
                     IFWAView.Listing memory l = listing(f, a.listingId);
@@ -840,18 +912,20 @@ library VaultLib {
     function validateBacking(Params storage p, Book storage b, IFWAV2 f, address packs,
         uint256 units, uint256 backing, uint256 build, bool newlyBuilt) public view
     {
-        (uint256 k, uint256 desired, bool ok) = edge(p, f, packs, units, build);
-        if (!ok || backing == 0 || backing > type(uint128).max || backing % BPS != 0
+        _validateBacking(p, b, _backingTerms(p, f, packs, units, build), backing, build, newlyBuilt);
+    }
+
+    function _validateBacking(Params storage p, Book storage b, BackingTerms memory t,
+        uint256 backing, uint256 build, bool newlyBuilt) private view
+    {
+        if (!t.ok || backing == 0 || backing > type(uint128).max || backing % BPS != 0
             || b.idForBacking[backing] != 0) revert InvalidBacking();
-        uint256 delta = backing > desired ? backing - desired : desired - backing;
+        uint256 delta = backing > t.desired ? backing - t.desired : t.desired - backing;
         if (delta > (b.reservedCount + 1) * BPS) revert InvalidBacking();
-        (, uint256 cap, uint256 s) = economics(f, packs);
-        uint256 value = units * UNIT;
-        uint256 floor = M.max(M.divUp(value * BPS, BPS - s), M.divUp(value * BPS, f.settlementDiscountBps()));
-        floor = M.max(floor, value + value / 19 + (value % 19 == 0 ? 0 : 1));
-        if (backing < floor || (cap != type(uint256).max && backing > cap * (BPS - p.bufferBps) / BPS)
-            || backing * (k - s * 1e14) < value * 1e18) revert InvalidBacking();
-        uint256 net = _cycleNet(p, k, backing);
+        if (backing < t.floor || (t.cap != type(uint256).max && backing > t.cap * (BPS - p.bufferBps) / BPS)
+            || backing * (t.k - t.settlementFee * 1e14) < t.value * 1e18) revert InvalidBacking();
+        uint256 gross = backing * (t.k - 1e18) / 1e18;
+        uint256 net = gross > t.cycleCost ? gross - t.cycleCost : 0;
         if (net == 0 || (newlyBuilt && build > net)) revert InvalidBacking();
     }
 
@@ -870,15 +944,18 @@ library VaultLib {
             || count * units > MAX_RESTOCK_UNITS || (p.packUnitsMask >> units) & 1 == 0) revert BadBatch();
         uint256 fee = shapes.mintFee();
         uint256 build = quote(p, packGas(units) + Q_MINT * units / SHAPES_PER_MINT + Q_LISTED, 2, false) + fee * units / SHAPES_PER_MINT;
+        BackingTerms memory terms = _backingTerms(p, f, address(packs), units, build);
         uint256 funding = b.idleFunding;
         for (uint256 i; i < count; ++i) {
-            validateBacking(p, b, f, address(packs), units, backingProposals[i], build, true);
+            _validateBacking(p, b, terms, backingProposals[i], build, true);
             funding += backingProposals[i];
         }
         uint256 need = count * units;
         uint256 have = b.looseShapes.length;
         mints = need > have ? (need - have + SHAPES_PER_MINT - 1) / SHAPES_PER_MINT : 0;
         if (available < mints * (0.1 ether + fee) + funding) revert InsufficientBacking();
+        uint256 freshCount = mints * SHAPES_PER_MINT;
+        uint256[] memory fresh = new uint256[](freshCount);
         if (mints != 0) {
             uint8[] memory outs = new uint8[](SHAPES_PER_MINT);
             for (uint256 i; i < mints; ++i) {
@@ -886,19 +963,24 @@ library VaultLib {
                 b.trackedValue += 0.1 ether;
                 b.idleValue += 0.1 ether;
                 uint256[] memory ids = shapes.split(big, outs);
-                for (uint256 j; j < ids.length; ++j) b.looseShapes.push(ids[j]);
+                for (uint256 j; j < ids.length; ++j) fresh[i * SHAPES_PER_MINT + j] = ids[j];
             }
         }
         uint32[] memory noMint = new uint32[](9);
         for (uint256 c; c < count; ++c) {
             uint256[] memory ids = new uint256[](units);
             for (uint256 j; j < units; ++j) {
-                ids[j] = b.looseShapes[b.looseShapes.length - 1];
-                b.looseShapes.pop();
+                if (freshCount != 0) ids[j] = fresh[--freshCount];
+                else {
+                    ids[j] = b.looseShapes[b.looseShapes.length - 1];
+                    b.looseShapes.pop();
+                }
             }
             uint256 packId = packs.createPack(ids, noMint);
             _toIdle(b, packId, units * UNIT, backingProposals[c]);
         }
+        // Only genuine leftovers enter the persistent loose-Shape stack.
+        for (uint256 i; i < freshCount; ++i) b.looseShapes.push(fresh[i]);
     }
 
     /// @dev An extended gift may contain arbitrarily many Shapes. Never enumerate its contents.

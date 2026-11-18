@@ -1,3 +1,17 @@
+# Efficient journal revision in progress
+
+2026-11-18. Current scope and measured limits: `EFFICIENT-JOURNAL-RESULTS.md`.
+The new128-record jobs, required-tail eligibility, routine sync, returned-bid discovery and restock
+optimization supersede the16-record job and essential-sync descriptions below. Current runtime
+is24,451 bytes. Numerical quotes and allowances remain unchanged pending actual receipts.
+The earlier342,766 checkpoint deduction is withdrawn because it double-subtracted finalized
+refunds; the current direct finalized sample is345,937. Standalone signed receipts remain pending.
+The prepared new local batch needs separate owner approval. No milestone acceptance is claimed.
+
+Everything below is prior revision evidence for its named source, retained as history.
+
+---
+
 # Current review repair
 
 2026-11-18. Empty-vault bootstrap capital is protected by the owner-approved unexposed cursor

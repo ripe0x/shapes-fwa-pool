@@ -125,3 +125,27 @@ recorded here.
     allocated membership, or pending receipt can hide relevant work. Any exposure retains strict
     ordered journal processing. Idle inventory held by the vault is not FWA exposure. Checkpoint
     may apply the same proof so an empty seed vault can price its first deposit without rescue ETH.
+
+22. (2026-11-18) Efficient-journal revision: "Separate cheap reads from expensive changes." Global
+    journal reads have an independent bounded batch; terminal IDs must not shrink it. Stop before
+    exceeding actual own-transition limits. Compensate full jobs, verified own selections/returns,
+    and necessary residual tails at FWA's checkpoint window with its request queue drained.
+    Unexposed cursor advances remain unpaid. Enforce eligibility onchain and schedule it efficiently.
+23. (2026-11-18) "Keep the current journal base until the new job boundaries are measured."
+    No completion bonus. Measure32/64/128; finish actual successful-foreign and standaloneQ360
+    full-holder receipts at matched0.2/0.5gwei, default policy and maximum markup, and ordinary
+    keeper profitability preflight. Gas-limit padding is separate from billed expense.
+24. (2026-11-18) "Use vault operating expenses as the default funding model." Measure optimized
+    costs, pay required work when needed, clear the backlog, finish exits, and assess holder returns
+    before proposing allowances. No assumed recurring mint-revenue sponsorship or silent minimumTVL.
+25. (2026-11-18) Profile memory use for newly minted IDs and shared restock economics once per
+    validation batch. Preserve the paid primary mint, ten-way split, pack recipe and creator fee.
+    "Treat O2 as a bounded expense decision after one focused optimization pass." No revised O2
+    number is approved by this request.
+26. (2026-11-18) "keep ordinary synchronization funded as routine upkeep while preserving caller
+    funded unlisting and liquidation." Mixed sync calls and gas ceilings follow the same class.
+    Display known backlog cost, available cash and permission separately; reversibly stop new
+    exposure when mandatory work is unaffordable. No automatic permanent wind-down/reserve system.
+27. (2026-11-18) Complete event-based returned-pack discovery: authenticate both actual bid events,
+    retain unreconciled own selections, discover expiry independently, replay missing history on
+    existing-index upgrade, and verify more than16allocations with restart/reorg behavior.

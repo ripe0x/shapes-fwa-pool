@@ -79,7 +79,7 @@ contract ReviewBootstrapTest is ForkBase {
         }
         uint256 totalPay;
         while (vault.acquisitionCursor() < FWA.nextSequenceToProcess()) {
-            vm.prank(keeper); totalPay += vault.sync(16, new uint256[](0), 16, 0);
+            vm.prank(keeper); totalPay += vault.sync(new uint256[](0), 0, 0);
         }
         emit log_named_uint("authentic completed records", vault.acquisitionCursor() - begin);
         emit log_named_uint("remaining bootstrap cash before first deposit", address(vault).balance);
@@ -87,7 +87,7 @@ contract ReviewBootstrapTest is ForkBase {
         toBlackout(); _drainActualRequests();
         vm.fee(0.45 gwei); vm.txGasPrice(0.5 gwei); this.assertGasContext();
         while (vault.acquisitionCursor() < FWA.nextSequenceToProcess()) {
-            vm.prank(keeper); totalPay += vault.sync(16, new uint256[](0), 16, 0);
+            vm.prank(keeper); totalPay += vault.sync(new uint256[](0), 0, 0);
         }
         uint256 escrow = 0.1 ether;
         uint256 ck = vault.requestCharge();
@@ -133,15 +133,15 @@ contract ReviewBootstrapTest is ForkBase {
         VaultLib.Params memory p = vault.getParams(); p.reserve = 0;
         vm.prank(owner); vault.setParams(p);
         vm.expectRevert(VaultLib.Payment.selector);
-        vm.prank(keeper); vault.sync(16, new uint256[](0), 0, 1);
+        vm.prank(keeper); vault.sync(new uint256[](0), 0, 1);
         assertEq(vault.acquisitionCursor(), beforeCursor, "minPay refusal reverts the cursor advance");
         uint256 beforeKeeper = keeper.balance;
-        vm.prank(keeper); assertEq(vault.sync(16, new uint256[](0), 0, 0), 0);
+        vm.prank(keeper); assertEq(vault.sync(new uint256[](0), 0, 0), 0);
         assertEq(keeper.balance, beforeKeeper);
         assertEq(address(vault).balance, seed, "zero reserve does not allow bootstrap depletion");
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
         vm.expectRevert(VaultLib.Nothing.selector);
-        vm.prank(keeper); vault.sync(16, new uint256[](0), 0, 0);
+        vm.prank(keeper); vault.sync(new uint256[](0), 0, 0);
     }
 
 }

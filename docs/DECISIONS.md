@@ -950,11 +950,12 @@ O6 limit. At the configured 0.5 gwei routine ceiling and 0.00002 ETH work fee, c
 0.0002 ETH. Shared request charges use the reduced component as well.
 
 The current full-holder fixture combines a redemption remainder, distribution and new deposit.
-It measured 372,366 gross gas and a 29,600 refund counter, yielding a 342,766 refund-adjusted
-sample upper bound. This supports testing 360,000 rather than comparing a billed compensation
-component directly with gross execution gas. Independent review accepted this as an in-scope
-candidate calibration, conditional on fresh affected checks. The earlier 400,000-source sample
-and subsequent changed-source evidence are recorded separately.
+The original interpretation of 372,366 caller-meter gas minus a 29,600 refund as a
+342,766 upper bound was incorrect: isolated Foundry calls had already finalized refunds.
+That derived bound is withdrawn, with raw evidence preserved. The current direct finalized
+meter is 345,937 gas, below 360,000 by 14,063 (4.07%). See
+`receipts/restock-efficiency-meter-correction.json` for installed Foundry source and meter
+provenance. Actual signed full-holder receipts remain separate required evidence.
 
 This is a bounded sample, not a universal keeper profit guarantee. Foundry original-slot/refund
 context can differ from a standalone transaction. Actual billed full-holder receipts remain a
@@ -962,3 +963,38 @@ release evidence gap. Above-ceiling caller gas can still exceed capped compensat
 quotes are unchanged: new real refund receipts show that raising their call base can reward
 splitting even when an older successful-foreign gross series suggested otherwise. O2 and exposed
 global funding remain acceptance blockers.
+
+
+## D69. Enforce efficient journal jobs and fund sync as routine upkeep (owner, 2026-11-18)
+
+The owner's detailed seven-item next revision request is recorded in
+`EFFICIENT-JOURNAL-REVISION.md` and OWNER-REQUIREMENTS items22–27. The global read job has its
+own128-record bound; actual own transitions, supplied terminal IDs and head pruning each retain
+independent16-item bounds. A seventeenth own transition remains unconsumed. Callers cannot select
+a smaller paid prefix or reduce the journal with irrelevant terminal IDs. Full jobs and verified
+own work qualify; residual foreign work qualifies only for a fresh, drained checkpoint window
+with actual holder flows or an authenticated post-cost distribution. Unexposed advance remains
+unpaid. Optional unqualified tails can advance unpaid. No completion bonus is introduced.
+
+`sync(ids,witnessId,minPay)` intentionally replaces the earlier four-argument interface. Normal
+keeper/test callers migrate together. Historical receipt drivers remain tied to their old ABI.
+All sync uses routine cash and spending permission, including during redemption and wind-down.
+D64's caller-funded unlisting/liquidation remains. The keeper reversibly pauses new exposure if
+the known journal quote exceeds free cash or routine permission. Reconciliation and holder paths
+remain permissionless. No reserve, budget, cap, refill or permanent wind-down policy changes.
+
+Default funding is vault operating cash, reducing holder returns. Mint revenue is not an assumed
+subsidy, principal movements are not income, and no minimum TVL is introduced. Any allowance
+proposal must show ETH/day, actual vault cash, all remaining work, completed exits and net holder
+returns. A separately approved capped experiment subsidy must be excluded from earned return.
+O2 and other accepted outcome numbers and the existing signature are unchanged.
+
+Keep the85,000 ordinary base while measuring the new boundaries. `Q_REQUIRED_TAIL` initially
+names the same85,000 base for qualified foreign tails, replacing rather than adding the base.
+Numerical calibration must follow real estimates/bills, including keeper willingness. The
+memory-only consumed mint IDs and shared pre-mutation restock context preserve paid mints,
+ten-way splitting, recipes and creator fees; execution savings alone do not reduce holder pay.
+
+Bid settlement events now independently identify returned packs, with historical upgrade replay,
+retained unseen selections, independent expiry/OWED discovery and canonical rollback checks.
+This index supplies candidates, not completeness or accounting authority.

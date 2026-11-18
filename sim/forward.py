@@ -19,6 +19,7 @@ equally over active listings; selection odds proportional to 1 / backing. FWA to
 import json
 import copy
 from itertools import islice
+from fractions import Fraction
 from collections import deque
 import sqlite3
 import sys
@@ -245,7 +246,7 @@ def run(sc, n_target, seed, days=365, values=None):
         others = rng.choice(POOL, int(len(POOL) * sc["pool_scale"]))
     W_o, N_o = float(np.sum(1 / others)), len(others)
     g_of = sc.get("gwei", 0.15)  # scenario basefee; the actual bid also includes maxTip
-    deposit = int((n_target * (0.0363 + 0.03) + 0.06 + 0.11) * E)
+    deposit = sc.get("deposit_wei", int((n_target * (0.0363 + 0.03) + 0.06 + 0.11) * E))
     values = values or json.loads((ROOT.parent / "deploy/mainnet.json").read_text())
     ceiling, tip = values["gasCeilingWei"], values["maxTipWei"]
     essential_ceiling = values["essentialCeilingWei"]
@@ -268,8 +269,56 @@ def run(sc, n_target, seed, days=365, values=None):
     ck0, d0 = policy.request_charge(st0), policy.deploy_charge(st0)
     v.deposit("h", deposit, ck0, deposit * d0 // (policy.POSITION_VALUE + d0))
     paid_in = deposit + ck0
+    exit_all = sc.get("exit_all", False)
+    exit_days = sc.get("exit_days", 30) if exit_all else 0
+    user_gas = sc.get("user_gas_proxy", {})
+    holder_gas = (int(g0 * GWEI) + tip) * user_gas.get("deposit", 0)
+    unknown_user_gas = int(exit_all and "deposit" not in user_gas)
+    holder_claimed = holder_cancelled = holder_keeper_pay = holder_maintenance_gas = 0
+    exit_requested = False
+    operation_end_backlog = 0
+    operation_end_cash = operation_end_keeper_paid = operation_end_fees = 0
+    operation_end_idle = operation_end_funding = operation_end_loose = operating_active_days = 0
+    rescue_sync = sc.get("holder_rescue_sync", False)
+    trace = sc.get("trace_sink")
+    routine_paid = essential_paid = request_paid = 0
+    routine_unfunded = unpaid_routine_calls = zero_quote_sync_calls = 0
+    last_unfunded_offer = last_cash_shortfall = last_permission_shortfall = 0
+    op_names = ("sync", "harvest", "unlist", "liquidate", "checkpoint", "restock", "list")
+    op_paid = dict.fromkeys(op_names, 0)
+    op_calls = dict.fromkeys(op_names, 0)
+    holder_calls = dict.fromkeys(op_names, 0)
     min_free = v.free()
     next_id, credit = 1, 0
+
+    def locked_holder():
+        r = v.redemptions.get("h")
+        return (r.shares * v.redeem_g // r.g0) if r and r.shares and r.era == v.redeem_era else 0
+
+    def trace_state(action, day):
+        if trace is not None:
+            trace.append(dict(day=day, action=action, cash=v.balance, free=v.free(), routine_budget=v.routine_budget,
+                              protected=v.redemption_reserve + v.distribution_reserve + v.claimable_total + v.processing_pool,
+                              locked=locked_holder(), global_locked=v.locked_shares, positions=len(v.positions),
+                              returned_value=sum(p.value for p in v.positions.values() if p.status == SETTLED and p.pack_owned),
+                              journal=len(journal), claimed=holder_claimed))
+
+    def claim_available(gas_price, day):
+        nonlocal holder_claimed, holder_gas, unknown_user_gas
+        r = v.redemptions.get("h")
+        redemption_pay = 0
+        if r and r.shares:
+            q = v.era_final_q[r.era] if r.era < v.redeem_era else v.redeem_q
+            redemption_pay = r.shares * (q - r.q0) // r.g0
+        distribution_pay = v.shares.get("h", 0) * v.dist_per_share // E - v.dist_debt.get("h", 0)
+        if v.claimable.get("h", 0) + redemption_pay + distribution_pay <= 0:
+            return
+        received = v.claim("h")
+        assert received > 0
+        holder_claimed += received
+        holder_gas += user_gas.get("claim", 0) * gas_price
+        unknown_user_gas += int("claim" not in user_gas)
+        trace_state("claim", day)
     allocated_day = {}
     ask, crown = ASK, 0.001
     vol_hist, open_days = [], []
@@ -279,7 +328,7 @@ def run(sc, n_target, seed, days=365, values=None):
     max_calls = sc.get("max_keeper_calls_per_day", 512)
     self_serve = sc.get("self_serve_exits", True)  # D64: the withdrawing holder executes unpaid exit work
 
-    for d in range(days):
+    for d in range(days + exit_days):
         v.sync_budget(d * DAY)
         gas = int((g_of(d) if callable(g_of) else g_of) * GWEI)
         for day, key, val in sc.get("changes", []):
@@ -313,6 +362,8 @@ def run(sc, n_target, seed, days=365, values=None):
         # Clamp the sampled set to A so the approximation cannot invent journal records.
         act = [i for i, p in v.positions.items() if p.status == ACTIVE]
         n = len(act)
+        if d < days:
+            operating_active_days += int(n > 0)
         weights = np.array([E / v.positions[i].backing for i in act])
         W = W_o + float(weights.sum())
         share = float(weights.sum()) / W if n else 0
@@ -352,8 +403,9 @@ def run(sc, n_target, seed, days=365, values=None):
         open_days.append(len(v.positions))
         calls = 0
         checkpoint_done = False
+        holder_finished = False
         for blackout in (False, True):
-            while not congested and calls < max_calls:
+            while not congested and not holder_finished and calls < max_calls:
                 listings = [policy.Listing(i, p.status, allocated_at=p.allocated_at, pending_fees=p.pending_fees,
                                            value=p.value, backing=p.backing) for i, p in v.positions.items()]
                 st = policy.State(
@@ -373,9 +425,11 @@ def run(sc, n_target, seed, days=365, values=None):
                     recent_volume=float(np.mean(vol_hist[-7:])), work_fee=work_fee,
                     slowdown_volume=sc.get("slowdown", 0.0), essential_ceiling=essential_ceiling,
                     pack_units_mask=values["packUnitsMask"], reserve=values["reserveWei"],
-                    processing_pool=v.processing_pool,
+                    processing_pool=v.processing_pool, distribution_bps=v.distribution_bps,
                     allocation_stale=(v.allocation_head < len(v.allocation_queue) and
-                                      v.allocation_queue[v.allocation_head] not in v.positions))
+                                      v.allocation_queue[v.allocation_head] not in v.positions),
+                    own_journal_pending=any(p.state == ACTIVE and p.status in (ALLOCATED, SETTLED)
+                                            for p in v.positions.values()))
                 if backing:
                     up = lambda a, b: -(-a // b)
                     keep_bps = int(S_FEE * 10_000)
@@ -396,53 +450,113 @@ def run(sc, n_target, seed, days=365, values=None):
                 executed = False
 
                 def affordable(gas_q, units=0, ess=False, funding_cap=None, cash_delta=0, liability=False):
-                    nonlocal skipped_funding
+                    nonlocal skipped_funding, routine_unfunded
+                    nonlocal last_unfunded_offer, last_cash_shortfall, last_permission_shortfall
                     offer = policy.pay_v1(st, gas_q, units, ess)
                     funds = funding_cap if funding_cap is not None else (v.essential_budget if ess else v.routine_budget)
                     paid = min(offer, funds, max(0, v.free() + cash_delta))
-                    if paid < offer and not (self_serve and liability):
+                    holder_fallback = self_serve and liability and (not exit_all or fn != "sync"
+                        or (rescue_sync and exit_requested and v.locked_shares))
+                    if paid < offer and not holder_fallback:
                         skipped_funding += 1
+                        last_unfunded_offer = offer
+                        last_cash_shortfall = max(0, offer - max(0, v.free() + cash_delta))
+                        last_permission_shortfall = max(0, offer - funds)
+                        if not ess and fn != "checkpoint":
+                            routine_unfunded += 1
+                        if exit_requested:
+                            trace_state("unfunded-" + fn, d)
                         return False
                     return True
 
                 def pay(gas_q, units=0, ess=False, funding_cap=None, liability=False):
-                    nonlocal self_serve_cost
-                    paid = v.pay_keeper(policy.pay_v1(st, gas_q, units, ess), essential=ess, cap=funding_cap)
+                    nonlocal self_serve_cost, holder_gas, holder_keeper_pay, holder_maintenance_gas
+                    nonlocal routine_paid, essential_paid, request_paid, unpaid_routine_calls
+                    offer = policy.pay_v1(st, gas_q, units, ess)
+                    paid = v.pay_keeper(offer, essential=ess, cap=funding_cap)
+                    op_paid[fn] += paid
+                    op_calls[fn] += 1
+                    if fn == "checkpoint" and funding_cap is not None:
+                        request_paid += paid
+                    elif ess:
+                        essential_paid += paid
+                    else:
+                        routine_paid += paid
+                        unpaid_routine_calls += int(paid < offer)
                     if self_serve and liability:
                         # Proxy from the operation quote, not a measured gas claim. Kept outside
                         # vault NAV because the withdrawing holder pays this gas personally.
                         self_serve_cost += max(0, gas_q * st.gas_price - paid)
+                        if exit_all and paid < offer:
+                            # Variable-size unpaid maintenance retains the explicitly labeled
+                            # operation-quote gas proxy until matching receipt curves exist.
+                            cost = user_gas.get(fn, gas_q) * st.gas_price
+                            holder_gas += cost
+                            holder_maintenance_gas += cost
+                            holder_keeper_pay += paid
+                            holder_calls[fn] += 1
                     return paid
 
                 for action in planned:
                     fn = action[0]
                     if fn == "sync":
                         unexposed = not v.positions and not v.receipts and not v.active_count and not v.active_backing and not v.allocated_value
-                        rebase_count = len(journal) if unexposed and action[1] else 0
-                        entries = list(islice(journal, action[1]))
+                        rebase_count = len(journal) if unexposed else 0
+                        entries = []
+                        own = 0
+                        for entry in islice(journal, policy.MAX_BATCH["journal"]):
+                            if entry[0] is not None:
+                                if own == policy.MAX_BATCH["selected"]:
+                                    break
+                                own += 1
+                            entries.append(entry)
                         if rebase_count:
                             assert all(i is None for i, _ in journal)
                             entries = []
                         own_ids = [i for i, _ in entries if i is not None]
-                        resolved = [i for i in action[2] if i in v.positions and
+                        resolved = [i for i in action[1] if i in v.positions and
                                     (v.positions[i].status == WITHDRAWN or
                                      (v.positions[i].status == SETTLED and
                                       (v.positions[i].state == ALLOCATED or i in own_ids)))]
                         prospective = [v.allocation_queue[j] for j in range(v.allocation_head,
-                                      min(len(v.allocation_queue), v.allocation_head + action[3]))] + own_ids
+                                      min(len(v.allocation_queue), v.allocation_head + policy.MAX_BATCH["prune"]))] + own_ids
                         pruned = 0
-                        for i in prospective[:action[3]]:
+                        for i in prospective[:policy.MAX_BATCH["prune"]]:
                             p = v.positions.get(i)
                             if i not in resolved and (i in own_ids or (p and p.state == ALLOCATED)):
                                 break
                             pruned += 1
                         if not entries and not resolved and not pruned and not rebase_count:
                             continue
-                        gas_q = Q["sync"] + len(entries) * Q["journal"] + len(own_ids) * Q["selected"] \
+                        checkpoint_due = (st.blackout and st.queue_drained and not st.checkpoint_done_this_interval
+                                          and (st.pending_deposits or st.locked_shares or st.distribution_bps))
+                        tail_q = Q["journal_tail"] + len(entries) * Q["journal"] + pruned * Q["pruned"]
+                        distribution_probe = v
+                        if pruned and st.distribution_bps and not (st.pending_deposits or st.locked_shares):
+                            distribution_probe = copy.deepcopy(v)
+                            distribution_probe.prune(policy.MAX_BATCH["prune"])
+                        tail_paid = checkpoint_due and (st.pending_deposits or st.locked_shares
+                            or distribution_probe.distribution_tail(policy.quote(st, tail_q), credit))
+                        journal_paid_work = (len(entries) == policy.MAX_BATCH["journal"] or own_ids or resolved
+                                             or (entries and tail_paid))
+                        required_tail = (entries and len(entries) < policy.MAX_BATCH["journal"]
+                                         and not own_ids and not resolved and tail_paid)
+                        base_q = Q["journal_tail"] if required_tail else Q["sync"]
+                        gas_q = base_q + (len(entries) * Q["journal"] if journal_paid_work else 0) + len(own_ids) * Q["selected"] \
                             + len(resolved) * Q["synced"] + pruned * Q["pruned"]
-                        if (unexposed and not v.tracked_value) or (rebase_count and not pruned):
+                        if ((unexposed and not v.tracked_value) or (rebase_count and not pruned)
+                                or (not journal_paid_work and not own_ids and not resolved and not pruned)):
                             gas_q = 0
-                        if not affordable(gas_q, len(resolved), essential, liability=essential):
+                        if exit_all and gas_q == 0:
+                            if not (exit_requested and v.locked_shares):
+                                continue  # No operator gratuity is invented for an unpaid job.
+                            cost = user_gas.get("unexposed_sync", 0) * st.gas_price
+                            holder_gas += cost
+                            holder_maintenance_gas += cost
+                            unknown_user_gas += int("unexposed_sync" not in user_gas)
+                            holder_calls["sync"] += 1
+                            zero_quote_sync_calls += 1
+                        if not affordable(gas_q, len(resolved), False, liability=essential):
                             continue
                         if rebase_count:
                             assert v.advance_unexposed()
@@ -458,8 +572,8 @@ def run(sc, n_target, seed, days=365, values=None):
                                 v.consume_keep(i)
                             else:
                                 v.sync_owned(i)
-                        assert v.prune(action[3]) == pruned
-                        journal_paid += pay(gas_q, len(resolved), essential, liability=essential)
+                        assert v.prune(policy.MAX_BATCH["prune"]) == pruned
+                        journal_paid += pay(gas_q, len(resolved), False, liability=essential)
                         journal_own += len(own_ids)
                         journal_foreign += len(entries) - len(own_ids)
                         journal_pruned += pruned
@@ -508,7 +622,8 @@ def run(sc, n_target, seed, days=365, values=None):
                                 break
                         if not packs + shapes:
                             continue
-                        gas_q = Q["liquidate"] + Q["liq_pack"] * packs + Q["liq_shape"] * shapes
+                        gas_q = (Q["liquidate"] + Q["liq_pack"] * packs
+                                 + Q["redeem_shape"] * (units - shapes) + Q["liq_shape"] * shapes)
                         if not affordable(gas_q, packs + shapes, True, cash_delta=cash, liability=True):
                             continue
                         for _ in range(packs + shapes):
@@ -574,21 +689,50 @@ def run(sc, n_target, seed, days=365, values=None):
                     min_free = min(min_free, v.free())
                     executed = True
                     calls += 1
+                    trace_state(fn, d)
+                    if exit_all and exit_requested and fn == "checkpoint":
+                        claim_available(gas + tip, d)
+                        holder_finished = not v.share_balance("h") and not locked_holder() and not v.locked_shares
                     break  # The real keeper re-reads state after every successful transaction.
                 if not executed:
                     break
         if calls == max_calls:
             call_limit_days += 1
-        for day, frac in sc.get("redeem", []):
+        redemptions = list(sc.get("redeem", []))
+        if d == days - 1:
+            operation_end_backlog = len(journal)
+            operation_end_cash, operation_end_keeper_paid, operation_end_fees = v.balance, v.keeper_paid, v.fees_received
+            operation_end_idle, operation_end_funding, operation_end_loose = v.idle_value, v.idle_funding, v.loose_shapes * policy.UNIT
+        if exit_all:
+            redemptions.append((days - 1, 1.0))
+        for day, frac in redemptions:
             if day == d:
-                sh = int(v.share_balance("h") * frac)
+                fraction = Fraction(str(frac))
+                sh = v.share_balance("h") * fraction.numerator // fraction.denominator
+                if exit_all and frac == 1.0:
+                    exit_requested = True
+                if sh == 0:
+                    if exit_requested and v.pending_total:
+                        holder_cancelled += v.cancel("h")
+                        holder_gas += user_gas.get("cancel", 0) * (gas + tip)
+                        unknown_user_gas += int("cancel" not in user_gas)
+                    continue
                 st1 = charge_state(gas, len(v.positions), v.processing_pool)
                 st1.gas_ceiling, st1.essential_ceiling, st1.max_tip = ceiling, essential_ceiling, tip
                 st1.work_fee, st1.essential_cap = work_fee, values["essentialCapWei"]
                 ck = policy.request_charge(st1)
                 unwind = (sh * v.last_nav // v.total_shares) * policy.unwind_charge(st1) // policy.POSITION_VALUE
                 v.request_redeem("h", sh, ck, unwind)
+                trace_state("request-redeem", d)
                 paid_in += ck + unwind
+                holder_gas += user_gas.get("request_redeem", 0) * (gas + tip)
+                unknown_user_gas += int(exit_all and "request_redeem" not in user_gas)
+        if exit_all and exit_requested:
+            claim_available(gas + tip, d)
+            if (not v.share_balance("h") and not locked_holder()
+                    and not v.claimable.get("h", 0) and not v.pending_total and not journal and not v.receipts
+                    and not v.locked_shares):
+                break
 
     end_nav = economic_nav(v, credit)
     unexposed = not v.positions and not v.receipts and not v.active_count and not v.active_backing and not v.allocated_value
@@ -606,28 +750,83 @@ def run(sc, n_target, seed, days=365, values=None):
     claimed = v.claimable.get("h", 0) + v.redemption_reserve + unpriced_refund
     holder = v.share_balance("h") * end_nav // supply + claimed
     locked_val = v.locked_shares * end_nav // supply
-    value_end = holder + locked_val - self_serve_cost
+    value_end = (holder + locked_val + holder_claimed + holder_cancelled + holder_keeper_pay - holder_gas
+                 if exit_all else holder + locked_val - self_serve_cost)
     ret = value_end / paid_in - 1
     deployed = sum(p.backing + p.value for p in v.positions.values() if p.status == ACTIVE)
-    return dict(ret=ret * 365 / days, keeper=v.keeper_paid / deposit, mint=v.mint_fees / deposit,
+    remaining_locked = locked_holder()
+    exit_complete = (exit_requested and not v.share_balance("h") and not remaining_locked
+                     and not v.claimable.get("h", 0) and not unpriced and not journal and not v.receipts
+                     and not v.locked_shares and not end_blocked)
+    physical = (v.balance + sum(v.idle_packs) + v.loose_shapes * policy.UNIT + sum(v.recovery_packs)
+                + sum(p.value for p in v.positions.values() if p.status in (ACTIVE, ALLOCATED) or p.pack_owned)
+                + sum(p.backing for p in v.positions.values() if p.status in (ACTIVE, ALLOCATED)))
+    unreconciled_keep = sum(p.value for p in v.positions.values() if p.status == SETTLED and not p.pack_owned)
+    ledger_gap = (v.seed + paid_in + v.fees_received - v.keeper_paid - v.mint_fees - v.backing_lost
+                  - v.settlement_fees - unreconciled_keep - holder_claimed - holder_cancelled - physical)
+    assert ledger_gap == 0, ("operating asset ledger", ledger_gap)
+    assert routine_paid + essential_paid + request_paid == v.keeper_paid
+    if exit_complete:
+        assert not v.locked_shares and not v.receipts
+        value_end = holder_claimed + holder_cancelled + holder_keeper_pay - holder_gas
+        ret = value_end / paid_in - 1
+    elapsed = d + 1
+    result = dict(ret=ret * 365 / (elapsed if exit_all else days), keeper=v.keeper_paid / deposit, mint=v.mint_fees / deposit,
                 fees=v.fees_received / deposit, lost=v.backing_lost / deposit, util=deployed / max(1, end_nav),
                 positions=len(v.positions), pos_mean=float(np.mean(open_days)), pos_max=max(open_days),
                 checkpoints=checkpoints, journal_paid=journal_paid / deposit, journal_backlog=len(journal),
                 journal_own=journal_own, journal_foreign=journal_foreign, journal_pruned=journal_pruned, journal_rebased=journal_rebased,
                 terminal_work=terminal_work, pending_receipts=len(v.receipts), end_pricing_blocked=end_blocked,
                 skipped_unfunded=skipped_funding, call_limit_days=call_limit_days,
-                self_serve_gas_proxy=self_serve_cost / deposit,
-                k_eff=accrued / selected_backing if selected_backing else 0.0, missed_alloc=missed_alloc, keeper_unpaid=self_serve_cost / deposit,
+                self_serve_gas_proxy=(holder_maintenance_gas - holder_keeper_pay if exit_all else self_serve_cost) / deposit,
+                k_eff=accrued / selected_backing if selected_backing else 0.0, missed_alloc=missed_alloc,
+                keeper_unpaid=(holder_maintenance_gas - holder_keeper_pay if exit_all else self_serve_cost) / deposit,
                 issued_entries=v.completed_prefix, processed_entries=v.acquisition_cursor,
                 routine_budget_wei=v.routine_budget, essential_budget_wei=v.essential_budget,
                 economic_nav_wei=end_nav, free_wei=v.free(), keeper_paid_wei=v.keeper_paid,
                 principal_deposit_wei=deposit, holder_paid_in_wei=paid_in,
-                holder_end_value_before_external_gas_wei=holder + locked_val,
+                holder_end_value_before_external_gas_wei=(0 if exit_complete else holder + locked_val)
+                    + holder_claimed + holder_cancelled + holder_keeper_pay,
                 min_free_wei=min_free, fees_received_wei=v.fees_received,
                 mint_fees_wei=v.mint_fees, backing_lost_wei=v.backing_lost,
-                journal_paid_wei=journal_paid, elapsed_days=days,
-                external_exit_gas_proxy_wei=self_serve_cost,
-                vol=float(np.mean(vol_hist)))
+                journal_paid_wei=journal_paid, elapsed_days=elapsed,
+                external_exit_gas_proxy_wei=holder_maintenance_gas - holder_keeper_pay if exit_all else self_serve_cost,
+                vol=float(np.mean(vol_hist)), operating_days=days, exit_requested=exit_requested,
+                exit_complete=exit_complete, exit_days_elapsed=max(0, elapsed - days),
+                holder_claimed_wei=holder_claimed, holder_cancelled_wei=holder_cancelled,
+                holder_keeper_pay_wei=holder_keeper_pay, holder_gas_proxy_cost_wei=holder_gas,
+                holder_maintenance_gas_proxy_wei=holder_maintenance_gas,
+                unknown_user_gas_calls=unknown_user_gas, holder_remaining_shares=v.share_balance("h"),
+                holder_remaining_locked_shares=remaining_locked, holder_remaining_claimable_wei=v.claimable.get("h", 0),
+                holder_net_realized_wei=holder_claimed + holder_cancelled + holder_keeper_pay - holder_gas - paid_in,
+                routine_keeper_paid_wei=routine_paid, essential_keeper_paid_wei=essential_paid,
+                request_funded_keeper_paid_wei=request_paid, routine_unfunded_attempts=routine_unfunded,
+                unpaid_routine_calls=unpaid_routine_calls, zero_quote_holder_sync_calls=zero_quote_sync_calls,
+                uninterrupted_routine_funding=routine_unfunded == 0,
+                fully_paid_routine=routine_unfunded == 0 and unpaid_routine_calls == 0,
+                operation_end_backlog=operation_end_backlog,
+                operation_end_cash_wei=operation_end_cash, operation_end_keeper_paid_wei=operation_end_keeper_paid,
+                operation_end_fees_received_wei=operation_end_fees, holder_rescue_sync_enabled=rescue_sync,
+                operating_active_days=operating_active_days, operation_end_idle_value_wei=operation_end_idle,
+                operation_end_idle_funding_wei=operation_end_funding, operation_end_loose_value_wei=operation_end_loose,
+                exit_stall_journal=bool(journal and not unexposed), exit_stall_receipts=bool(v.receipts),
+                exit_stall_pending_deposit=bool(unpriced), exit_stall_locked=bool(v.locked_shares),
+                exit_stall_free_cash=bool(not exit_complete and last_cash_shortfall),
+                exit_stall_routine_budget=bool(not exit_complete and last_permission_shortfall),
+                last_unfunded_offer_wei=last_unfunded_offer, last_unfunded_cash_shortfall_wei=last_cash_shortfall,
+                last_unfunded_permission_shortfall_wei=last_permission_shortfall,
+                end_unreconciled_returned_value_wei=sum(p.value for p in v.positions.values() if p.status == SETTLED and p.pack_owned),
+                end_allocated_book_value_wei=v.allocated_value,
+                creator_mint_fees_wei=v.mint_fees, settlement_fees_wei=v.settlement_fees,
+                physical_assets_wei=physical, vault_cash_wei=v.balance, holder_liability_wei=v.redemption_reserve + v.distribution_reserve + v.claimable_total,
+                ledger_gap_wei=ledger_gap, routine_initial_cap_wei=values["routineCapWei"],
+                routine_refill_per_day_wei=values["routineRatePerDayWei"],
+                routine_period_permission_upper_wei=values["routineCapWei"] + d * values["routineRatePerDayWei"])
+    for name in op_names:
+        result[f"keeper_paid_{name}_wei"] = op_paid[name]
+        result[f"keeper_calls_{name}"] = op_calls[name]
+        result[f"holder_calls_{name}"] = holder_calls[name]
+    return result
 
 
 def self_check():

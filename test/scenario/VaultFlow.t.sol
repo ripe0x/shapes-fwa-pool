@@ -459,12 +459,14 @@ contract VaultFlowPinnedTest is VaultFlowBase {
             if (_kTryRestock(keeper, c, 3)) { built += c; listed += _kList(keeper, c); }
             else --c;
         }
-        // Reimbursed price here: min(0.2 gwei bid, basefee 0.15 + maxTip 0.05, ceiling 0.5), no markup (V1).
+        // Fixed quote price: min(0.2 gwei bid, basefee 0.15 + maxTip 0.05, ceiling 0.5), no markup (V1).
         // Both completed construction and listing earn their stated work units.
         assertLt(keeperPaidCum - pay0, routineBefore, "payment is not clipped by the starting budget");
         (uint256 routineAfter,) = vault.budget();
         assertEq(routineBefore - routineAfter, keeperPaidCum - pay0, "no intervening refill or budget clipping");
         uint256 feePaid = (built + listed) * vault.getParams().workFee;
+        assertGt(listed, 0, "max-load reaches real pack admission");
+        assertEq(feePaid, listed * 0.00004 ether, "two unchanged work fees per admitted position");
         uint256 quotedGasPerPosition = (keeperPaidCum - pay0 - feePaid) / 0.2 gwei / listed;
         Fact[] memory f = _facts("open_listings", TestVaultOps.open(vault).length);
         f[1] = Fact("packs_listed", listed);
@@ -533,6 +535,8 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         uint256 kb = keeper.balance;
         _kCheckpoint(keeper); // prices bob's deposit; keeper pay capped at the ceiling
         uint256 pay = keeper.balance - kb;
+        assertGt(pay, 0, "checkpoint compensation is funded");
+        assertLe(pay, 0.0002 ether, "O6 existing absolute holder expense limit");
         Fact[] memory f = _facts("open_listings", TestVaultOps.open(vault).length);
         f[1] = Fact("gas_price_gwei_x100", 200);
         f[2] = Fact("checkpoint_pay_wei", pay);

@@ -92,15 +92,15 @@ def witness():
                "listings(uint256)(address,address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint64,uint8)", id_).splitlines()[7]))
 
 
-def journal(maximum=16):
+def journal():
     for _ in range(128):
         cursor = R.num(R.call(R.VAULT, "acquisitionCursor()(uint64)"))
         prefix = R.num(R.call(R.FWA, "nextSequenceToProcess()(uint64)"))
         if cursor == prefix:
             return
-        n = min(maximum, prefix - cursor)
-        tx(f"completed global prefix{n}", "sync(uint256,uint256[],uint256,uint256)", n, "[]", 16, 0,
-           entries=n, require_paid=True, winding_down=False, locked_shares=0)
+        n = min(128, prefix - cursor)
+        tx(f"completed global prefix{n}", "sync(uint256[],uint256,uint256)", "[]", 0, 0,
+           entries=n, require_paid=False, winding_down=False, locked_shares=0)
         if R.num(R.call(R.VAULT, "acquisitionCursor()(uint64)")) != cursor + n:
             raise RuntimeError("journal receipt did not advance exactly its verified entry count")
     raise RuntimeError("bounded journal calibration did not catch up")
@@ -137,7 +137,7 @@ def refunded_prefix(count, basefee):
             raise RuntimeError(f"real request did not refund/expire: {request} status{status}")
     R.cast("rpc", "anvil_setNextBlockBaseFeePerGas", hex(basefee))
     R.cast("rpc", "evm_mine")
-    journal(count)
+    journal()
     R.send(R.KICKER, R.FWA, "withdrawAcquisitionRefund()")
 
 
@@ -236,7 +236,7 @@ def main():
     R.send(owner, oracle, "setFloor(address,uint256)", R.PACKS, 30_000_000_000_000_000)
     for id_ in listed:
         R.send(R.KICKER, R.FWA, "kickListing(uint256)", id_)
-    tx("terminal kick sync16", "sync(uint256,uint256[],uint256,uint256)", 0, array(listed), 16, 0, items=16)
+    tx("terminal kick sync16", "sync(uint256[],uint256,uint256)", array(listed), 0, 0, items=16)
     report(values, ["Successful foreign and own selections/settlements need recorded Forge VRF replay.",
                     "Fee-bearing active harvest16, allocation prune16, and token claim16 need their real replay fixtures.",
                     "Oversized kept-gift recovery needs a real selected keep path; no local VRF proof is manufactured."])

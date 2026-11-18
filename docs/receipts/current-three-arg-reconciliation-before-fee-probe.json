@@ -1,0 +1,152 @@
+{
+  "recorded_at_utc": "2026-11-18T22:56:06.217851+00:00",
+  "base_revision": "d1b59f11fb74ed6ae9b3841298e70fb189eaaa6f",
+  "scope": "Exactly two existing real-fork reconciliation functions, both Python replays, and exact two cold production receiver frames on the current frozen three-argument sync candidate; no product or test edits.",
+  "source_sha256": {
+    "src/PackVault.sol": "448106b8915413badef411355a5cb729ca15046743be768919d74e9349ddcd8b",
+    "src/VaultLib.sol": "1a5407f1044f0e79b874ee77cd6936bb53438b020f4c8e093db200909990490f",
+    "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a",
+    "test/fork/ForkReconcile.t.sol": "66af6a44f0cd3c1bf24a425d9342c5d613429b91e7f2779471a68f1eb892edfa",
+    "test/fork/ForkPartialReconcile.t.sol": "1e47036316c3471575abd8d1a06f36e2c87ddec63ffd1f28e74f9982bb48dc82",
+    "test/fork/ForkIncrementalProduction.t.sol": "8f291879a30db49a4f1bdf640aaa096e0f68aba012f13afd12c2fc84ada65a8f",
+    "test/fork/ForkSelection.t.sol": "bbab3d70af0fa573832824fb15ad66852dd9c84b1a69c7dee11935381f63cd12",
+    "test/fork/ForkBase.sol": "617a9de43d608ee4399647256557d142f573900c9c4a19c52d77b9e02e73e0e5",
+    "test/utils/TestVaultOps.sol": "f2397c303b8e33b5664efde087a678cc54f3a2c41dc12f4f5f0a25530e10ec9d",
+    "test/utils/ReconcileTrace.sol": "263db09582efe0fba32e835812a6adc2725a4a5c73b84102af1c11113b93f320",
+    "sim/reconcile.py": "cbbe9121e1a1bf6c68fb6ef2b8d430a761175d31a2cc727ff2e000a5fce9eaff",
+    "sim/vault.py": "e958d86859ff9ddd9e2766459683f77cf9caea9ac87691be6360d2e92614ba7a",
+    "keeper/policy.py": "89910cd9ca399a49533499af619fd50035725399bdcd7ba0ad3a5ecb8987d6ba",
+    "sim/out/reconcile-trace.jsonl": "4d2869399b6eea132edb2672d40817e7940df3a01f0b6bf1d26b1f7a1308e781",
+    "sim/out/reconcile-partial-trace.jsonl": "64b10025a54a4a08934dc28f44e31c47f20a7533abd8dc6b17ef43678287b030",
+    "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520"
+  },
+  "compiled_artifacts": {
+    "PackVault": {
+      "runtime_bytes": 24451,
+      "artifact_sha256": "a8d523608280914a0a886096458a1af774cdcf6fcfcdda5358980221de29d972",
+      "deployed_bytecode_object_sha256": "1598dbf4f64562f11418b95cf2983918ae46a39fb49b5abe98b8a02a6b88e737"
+    },
+    "VaultLib": {
+      "runtime_bytes": 22997,
+      "artifact_sha256": "0dec5ac7f09c319e17f3da3874ab84fd95a9035125dd961d0f9724138dfb37b8",
+      "deployed_bytecode_object_sha256": "49236592e00377fb0036055e3329e3bd6702557ce20361189a1eea4604d8ee19"
+    }
+  },
+  "current_sync_context": {
+    "signature": "sync(uint256[] listingIds,uint256 witnessId,uint256 minPay)",
+    "legacy_four_argument_payloads_used": false,
+    "classification": "OP_SYNC always routine (essential=false), including redemption/wind-down bookkeeping.",
+    "journal_job_limit": 128,
+    "own_selection_limit": 16,
+    "independent_terminal_limit": 16,
+    "prune_limit": 16,
+    "initial_fixed_sync_base": 85000,
+    "initial_required_tail_base": 85000,
+    "initial_per_journal_entry_quote": 30000,
+    "checkpoint_quote": 360000,
+    "note": "Source-bound initial quote context only; no profitability/funding or recalibration acceptance implied. No caller-selectable journal/prune work-size payload."
+  },
+  "runs": [
+    {
+      "command": "forge test --match-path test/fork/ForkReconcile.t.sol --match-test test_reconcileFullCycle --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "log": "current-three-arg-reconcile-cycle.txt",
+      "exit_status": 0,
+      "tests": 1,
+      "compilation_duration_if_performed": "4.97s",
+      "reported_suite_summary": "Ran 1 test suite in 1.82s (1.50s CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)"
+    },
+    {
+      "command": "forge test --match-path test/fork/ForkPartialReconcile.t.sol --match-test test_reconcilePartialRedemptionAndWindDown --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "log": "current-three-arg-reconcile-partial.txt",
+      "exit_status": 0,
+      "tests": 1,
+      "compilation_duration_if_performed": "4.05s",
+      "reported_suite_summary": "Ran 1 test suite in 6.25s (5.96s CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)"
+    },
+    {
+      "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test 'test_(productionColdKeepFee0|productionColdKickAfterFalseSettledBidCandidate)' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vvvv",
+      "log": "current-three-arg-receiver-traces.txt",
+      "exit_status": 0,
+      "tests": 2,
+      "compilation_duration_if_performed": "No compilation performed",
+      "reported_suite_summary": "Ran 1 test suite in 2.89s (1.27s CPU time): 2 tests passed, 0 failed, 0 skipped (2 total tests)"
+    },
+    {
+      "command": "python3 sim/reconcile.py",
+      "log": "current-three-arg-python-reconcile.txt",
+      "exit_status": 0,
+      "scope": "Both newly executed traces, all modeled vault fields and buckets to the wei.",
+      "compilation_duration_if_performed": "No compilation performed",
+      "reported_suite_summary": null
+    }
+  ],
+  "results": {
+    "cycle_every_modeled_vault_field_and_bucket_matches_to_wei": true,
+    "cycle_fees_received_wei": 24976235593068,
+    "cycle_keeper_paid_wei": 1801250000000000,
+    "cycle_shapes_mint_fee_wei": 1000000000000000,
+    "cycle_backing_lost_on_real_bid_wei": 36300000000000000,
+    "partial_every_modeled_vault_field_and_bucket_matches_to_wei": true,
+    "partial_holder_claim_wei": 992779091300853720,
+    "partial_keeper_paid_wei": 4372000000000000,
+    "partial_shapes_mint_fees_wei": 3000000000000000,
+    "partial_remaining_redemption_rounding_reserve_wei": 6,
+    "current_cycle_trace_sha256": "4d2869399b6eea132edb2672d40817e7940df3a01f0b6bf1d26b1f7a1308e781",
+    "current_partial_trace_sha256": "64b10025a54a4a08934dc28f44e31c47f20a7533abd8dc6b17ef43678287b030",
+    "current_partial_trace_bit_identical_to_preserved_prior_trace": true,
+    "cycle_financial_snapshots_identical_to_prior_trace": true,
+    "cycle_changed_fields_only": {
+      "step": "gas",
+      "sync1": {
+        "prior": 374978,
+        "current": 375813
+      },
+      "harvest29": {
+        "prior": 95257,
+        "current": 95297
+      },
+      "list1": {
+        "prior": 1406587,
+        "current": 1379628
+      },
+      "checkpoint30": {
+        "prior": 330769,
+        "current": 330787
+      }
+    }
+  },
+  "exact_receiver_frames": {
+    "method": "Nested PackVault.receive call gas from verbose real FWA execution traces; no manual intrinsic addition or refund subtraction.",
+    "cold_keep_fee0_gas": 46462,
+    "cold_difficult_kick_after_false_settled_bid_candidate_gas": 69730,
+    "fwa_stipend": 100000,
+    "minimum_stipend_headroom": 30270,
+    "fee_context": {
+      "base_fee_wei": 150000000,
+      "transaction_gas_price_wei": 200000000,
+      "set_and_asserted_from_executed_call": true
+    },
+    "sample_transfer_amounts_wei": {
+      "keep": 36300000000000000,
+      "difficult_kick": 35937000000000000
+    },
+    "runtime_bytes": 24451,
+    "sweeps_rerun": false
+  },
+  "trace_preservation": [
+    "current-three-arg-pre-refresh-reconcile-trace-f8e0834bcd.jsonl",
+    "current-three-arg-pre-refresh-reconcile-partial-trace-64b10025a5.jsonl"
+  ],
+  "limitations": [
+    "Real Tenderly forks and model replay only; no broadcasts or actual signed transaction receipts. No full production profile,99-point sweep,restock matrix or16-regime suite duplicated.",
+    "Full-cycle fixture sets0.4gwei basefee and0.45gwei transaction price after authentic selection replay, but lacks its own direct executed gas-probe assertion at that reset. Payment/model equality uses the declared context; do not call this a direct fee-probe proof. Partial and receiver fixtures do have direct executed fee assertions.",
+    "The existing full-cycle fixture comment claims keeper pay depends on gasleft; that is stale. Pay uses fixed source quotes. The trace gas row is a caller-side meter, not billed/gross gas evidence, and no cost or compensation calibration is derived from it here.",
+    "Exact receiver frame measurements bound only the two executed cases; they do not independently rerun or establish all99 low-gas cases.",
+    "Equal accounting buckets do not establish affordable maintenance, acceptable holder returns, gate acceptance or release readiness."
+  ],
+  "things_that_do_not_make_sense": [
+    "A stale full-cycle comment still describes measured-gas keeper pay despite the fixed quote policy.",
+    "The full-cycle fee reset should eventually get a direct executed probe to match the stronger partial/receiver setup; this narrow run changed no test source.",
+    "Unchanged trace gas-row names harvest29/checkpoint30 are historical labels even though the fixture now contains one vault listing; they must not be presented as29/30-position gas measurements."
+  ]
+}

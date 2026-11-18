@@ -1,0 +1,46 @@
+{
+  "scope": "Restore missing compiled PolicyGreedy bytecode from exact frozen source after ABI-only Forge cache; no source edits or cache deletion",
+  "source_sha256": "803b97992b420327c08098fc40a9eb8380879988ea01d686cafc55130f50b026",
+  "compiler": "/Users/dd/.svm/0.8.30/solc-0.8.30",
+  "command": [
+    "solc-0.8.30",
+    "--base-path",
+    "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool",
+    "--include-path",
+    "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/lib",
+    "--standard-json"
+  ],
+  "settings": {
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "viaIR": true,
+    "evmVersion": "cancun",
+    "metadata": {
+      "bytecodeHash": "none",
+      "appendCBOR": false
+    },
+    "remappings": [
+      "forge-std/=lib/forge-std/src/",
+      "solady/=lib/solady/src/"
+    ],
+    "outputSelection": {
+      "test/fork/ForkKeeperPolicy.t.sol": {
+        "PolicyGreedy": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode"
+        ]
+      }
+    }
+  },
+  "compiler_exit_status": 0,
+  "work": "/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/efficient-policy-artifact-a0kz0sio",
+  "input_sha256": "66de64f8b8c93c1325ab843b5b7f065a7dc0e8d5433ce6783ebc3268740608fe",
+  "compiled_artifact_template_sha256": "6fda2616f0ee3138834f6381bca5bc601650545d2a8e50a90ff91e540d384ac9",
+  "expected_approved_plan_template_sha256": "6fda2616f0ee3138834f6381bca5bc601650545d2a8e50a90ff91e540d384ac9",
+  "exact_template_match": true,
+  "source_unchanged": true,
+  "broadcasts": 0
+}

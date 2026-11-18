@@ -1,0 +1,48 @@
+Compiling 1 files with Solc 0.8.30
+Solc 0.8.30 finished in 4.31s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:203:35:
+    |
+203 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:608:5:
+    |
+608 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+
+Ran 13 tests for test/fork/ForkVaultLifecycle.t.sol:ForkVaultLifecycleTest
+[PASS] test_cancelDepositBeforePricing() (gas: 280401)
+[PASS] test_depositListRedeem_roundTrip() (gas: 23707777)
+Logs:
+  complete holder round-trip keeper pay wei: 5795000000000000
+
+[PASS] test_edgeGateStopsListingWhenCrownShareRaised() (gas: 6848927)
+[PASS] test_edgeMatchesLiveFwa() (gas: 88558)
+[PASS] test_kickReturnsFullBackingAndPack() (gas: 6575514)
+[PASS] test_ownerStopsCannotMoveAssets() (gas: 5885523)
+[PASS] test_paddedSyncPaysOnlyForWorkDone() (gas: 6876976)
+[PASS] test_paramsBoundsAppliedAtOnce() (gas: 184893)
+[PASS] test_proRataRedemptionAcrossCheckpoints() (gas: 39677648)
+[PASS] test_staleQuoteDoesNotUnlockUnlisting() (gas: 5910767)
+[PASS] test_staleQuoteStopsListing() (gas: 80296)
+[PASS] test_windDownCompletesWithNoAcquisitions() (gas: 20230164)
+[PASS] test_windDownSurvivesBrokenOracle() (gas: 8573889)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 1.66s (989.63ms CPU time)
+
+Ran 4 tests for test/fork/ForkSelection.t.sol:ForkSelectionTest
+[PASS] test_bidOutcome_packReturnsBackingSpent() (gas: 47968700)
+[PASS] test_earlyCandidate_afterRealAdmissionCalls() (gas: 49055614)
+[PASS] test_keepOutcome_backingBackLessFee() (gas: 47887003)
+[PASS] test_silentPurchaser_vaultReclaimsBacking() (gas: 48041454)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 2.31s (7.00s CPU time)
+
+Ran 2 test suites in 2.68s (3.97s CPU time): 17 tests passed, 0 failed, 0 skipped (17 total tests)

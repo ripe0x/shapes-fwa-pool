@@ -45,19 +45,20 @@ def main():
               owed_estimate=3 * E // 10, open_positions=11, fee_credit=10**16, **spike)
     got = fns(plan(s))
     assert set(got) <= {"sync", "harvest", "liquidate", "unlist", "checkpoint"}, got
-    assert {"sync", "harvest", "unlist", "liquidate"} <= set(got)
+    assert {"harvest", "unlist", "liquidate"} <= set(got)
+    assert "sync" not in got
     assert "checkpoint" not in got
     assert fns(plan(state(listings=act, free=E, locked_shares=E, owed_estimate=3 * E // 10, **spike))) == ["checkpoint"]
     assert {"unlist", "liquidate"} <= set(fns(plan(state(listings=act, winding_down=True, idle_packs=1, **spike))))
     assert plan(state(listings=act, free=E, pending_deposits=10**17, **spike)) == []
 
     # Absolute envelope cash at0.5gwei: list8=(280k+8*825k)*0.55gwei=0.003784ETH;
-    # routine journal16+prune16=(85k+16*30k+16*45k)*0.55gwei=0.00070675ETH.
-    assert reserve_need(state()) == 4_490_750_000_000_000
+    # routine journal128+prune16=(85k+128*30k+16*45k)*0.55gwei=0.00255475ETH.
+    assert reserve_need(state()) == 6_338_750_000_000_000
     s = state(essential_ceiling=2 * G, work_fee=20_000_000_000_000)
-    assert reserve_need(s) == 6_514_000_000_000_000
+    assert reserve_need(s) == 6_498_750_000_000_000
     unpaid = state(essential_ceiling=2 * G, work_fee=20_000_000_000_000, essential_cap=0)
-    assert reserve_need(unpaid) == 4_650_750_000_000_000  # D64: no essential vault pay
+    assert reserve_need(unpaid) == 6_498_750_000_000_000  # Sync is routine even with unpaid exits.
     assert "RESERVE_BELOW_NEED" in {c for c, _, _ in status(state(reserve=10**15))}
     assert P.checkpoint_cost(state(open_positions=301)) == P.checkpoint_cost(state(open_positions=10_000))
     assert P.request_charge(state(open_positions=1000)) == P.request_charge(state(open_positions=10_000))
@@ -66,21 +67,32 @@ def main():
                              markup_bps=0, work_fee=20_000_000_000_000)
     assert P.pay_v1(spike_checkpoint, P.Q["checkpoint"], 1) == 200_000_000_000_000
 
-    # Necessary global catchup is bounded even with a huge foreign-only backlog; it runs at the
-    # essential gas class for locked exits, and never pretends foreign entries are own positions.
+    # Global reads and terminal IDs have independent bounds; small unrelated tails wait.
     s = state(journal_cursor=7, completed_prefix=100_007, open_positions=1, active_count=1)
     sync = plan(s)[0]
-    assert sync == ("sync", 16, [], 16), sync
-    s = state(journal_cursor=7, completed_prefix=100_007, listings=settled * 20)
+    assert sync == ("sync", [], 0), sync
+    s = state(journal_cursor=7, completed_prefix=100_007,
+              listings=[Listing(30 + i, SETTLED) for i in range(20)])
     sync = plan(s)[0]
-    assert sync[1] + len(sync[2]) <= 16
+    assert len(sync[1]) == 16
+    assert "sync" not in fns(plan(state(journal_cursor=7, completed_prefix=8, open_positions=1)))
+    assert "sync" in fns(plan(state(journal_cursor=7, completed_prefix=8, open_positions=1, own_journal_pending=True)))
+    assert "sync" in fns(plan(state(journal_cursor=7, completed_prefix=8, open_positions=1, pending_deposits=E)))
+    assert "sync" in fns(plan(state(journal_cursor=7, completed_prefix=8, open_positions=1,
+                                   distribution_bps=5000, distribution_due=False, witness_id=91)))
+    blocked = state(journal_cursor=0, completed_prefix=128, open_positions=1, free=E,
+                    idle_eth=E, idle_packs=1, routine_budget=1, markup_bps=0)
+    assert P.journal_backlog_floor(blocked) == 785_000_000_000_000
+    assert "sync" in fns(plan(blocked))
+    assert not {"restock", "list"} & set(fns(plan(blocked)))
+    assert "MAINTENANCE_UNFUNDED" in {c for c, _, _ in status(blocked)}
     assert "checkpoint" not in fns(plan(state(journal_cursor=7, completed_prefix=8, pending_deposits=E, open_positions=1)))
     assert "checkpoint" in fns(plan(state(journal_cursor=7, completed_prefix=100_007, pending_deposits=E)))
     assert "sync" not in fns(plan(state(journal_cursor=7, completed_prefix=100_007)))
     assert "checkpoint" not in fns(plan(state(pending_receipts=1, pending_deposits=E)))
     assert "checkpoint" not in fns(plan(state(allocation_stale=True, pending_deposits=E)))
     assert plan(state(journal_cursor=1, completed_prefix=2, **spike)) == []
-    assert plan(state(journal_cursor=1, completed_prefix=2, locked_shares=1, open_positions=1, **spike))[0][0] == "sync"
+    assert "sync" not in fns(plan(state(journal_cursor=1, completed_prefix=2, locked_shares=1, open_positions=1, **spike)))
 
     s = state(listings=[Listing(1, ALLOCATED, allocated_at=10**6 - 10)], blackout=False, pending_deposits=1, free=E)
     assert {"WAITING_SETTLEMENT", "WAITING_CHECKPOINT_WINDOW"} <= {c for c, _, _ in status(s)}

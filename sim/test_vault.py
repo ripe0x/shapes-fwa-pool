@@ -7,6 +7,43 @@ from vault import ACTIVE, ALLOCATED, OWED, BPS, E, UNIT, Vault
 
 
 class VaultAccountingTest(unittest.TestCase):
+    def test_journal_stops_before_seventeenth_own_transition(self):
+        v = Vault(seed=100 * E, balance=100 * E, reserve=0)
+        v.restock(10, 3, 10**15); v.restock(10, 3, 10**15)
+        for i in range(1, 18):
+            v.list(i, 363 * 10**14 + i * 10_000)
+        v.completed_prefix = 18
+        self.assertEqual(v.process_journal(list(range(1, 17)) + [None, 17]), 17)
+        self.assertEqual(v.acquisition_cursor, 17)
+        self.assertEqual(v.positions[17].state, ACTIVE)
+        self.assertEqual(v.process_journal([17]), 1)
+        self.assertEqual(v.acquisition_cursor, 18)
+        self.assertEqual(v.positions[17].state, ALLOCATED)
+        self.assert_book(v)
+
+    def test_distribution_tail_needs_real_gain_after_maintenance(self):
+        v = Vault(seed=E, balance=E, reserve=5 * 10**15, distribution_bps=5000)
+        v.deposit('h', E); v.checkpoint()
+        v.restock(1, 3, 10**15); v.list(1, 363 * 10**14)
+        self.assertFalse(v.distribution_tail(10**14))
+        v.balance += E
+        self.assertTrue(v.distribution_tail(10**14))
+        self.assertFalse(v.distribution_tail(2 * E))
+
+    def test_distribution_credit_cannot_skip_the_unfunded_reserve(self):
+        v = Vault(seed=10**16, balance=10**16, reserve=0, distribution_bps=5000)
+        v.deposit('h', 1_004_200_000_000_910_000); v.checkpoint()
+        v.restock(10, 3, 10**15); v.restock(4, 3, 10**15)
+        for i in range(14):
+            v.list(i, 363 * 10**14 + i * 10_000)
+        self.assertEqual(v.free(), 10**15)
+        v.reserve = 3 * 10**16
+        self.assertFalse(v.distribution_tail(23_000_000_000_000, 3 * 10**16))
+        v.receive_fees(3 * 10**16)
+        self.assertEqual(v.idle(), 10**15)
+        with self.assertRaisesRegex(RuntimeError, 'Nothing'):
+            v.checkpoint()
+
     def test_unexposed_history_preserves_seed_and_first_deposit_prices(self):
         v = Vault(seed=10**16, balance=10**16, reserve=5 * 10**15)
         v.completed_prefix = 576

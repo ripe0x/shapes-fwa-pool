@@ -52,7 +52,7 @@ contract ReviewJournalTest is ForkBase {
     }
 
     function _measure(uint256 n) private returns (uint256 gross, uint256 pay, int64 refund) {
-        bytes memory input = abi.encodeCall(PackVault.sync, (n, new uint256[](0), 0, 0));
+        bytes memory input = abi.encodeCall(PackVault.sync, (new uint256[](0), 0, 0));
         uint256 intrinsic = _intrinsic(input);
         uint256 before = keeper.balance;
         vm.cool(address(vault)); vm.cool(address(FWA)); vm.cool(address(vault.keeperPolicy()));
@@ -90,7 +90,7 @@ contract ReviewJournalTest is ForkBase {
         assertEq(pay, 0); assertEq(address(vault).balance, cash);
         assertEq(vault.acquisitionCursor(), end, "provably unexposed rebase reaches real completed prefix");
         emit log_named_uint("cash-only real historical records skipped unpaid", end - begin);
-        emit log_named_uint("complete gross unpaid rebase gas", used);
+        emit log_named_uint("unpaid rebase caller meter plus intrinsic proxy", used);
     }
 
     function test_realMixedHistoryCashOnlyExitWithZeroEssentialBudget() public {
@@ -147,9 +147,9 @@ contract ReviewJournalTest is ForkBase {
         assertGe(routineAfter, routineBefore); assertEq(essentialAfter, 0);
         emit log_named_uint("actual successful foreign backlog", successful);
         emit log_named_uint("actual refunded backlog", refunded);
-        emit log_named_uint("cash-only backlog rebase gross gas", used);
-        emit log_named_uint("rebase caller gross gas proxy wei at 0.2gwei", used * 0.2 gwei);
-        emit log_named_uint("request rebase checkpoint claim complete gross gas", holderGross);
+        emit log_named_uint("cash-only backlog rebase caller meter plus intrinsic proxy", used);
+        emit log_named_uint("rebase caller meter cost proxy wei at 0.2gwei", used * 0.2 gwei);
+        emit log_named_uint("request rebase checkpoint claim caller meter plus intrinsic proxy", holderGross);
         emit log_named_uint("full holder-call gas proxy wei at 0.2gwei", holderGross * 0.2 gwei);
         emit log_named_uint("actual claimed wei", claimed);
     }

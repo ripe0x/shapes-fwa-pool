@@ -153,7 +153,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         uint256 before = keeper.balance;
         uint256 g = gasleft();
         vm.prank(keeper);
-        uint256 pay = vault.sync(0, padded, 0, 0);
+        uint256 pay = vault.sync(padded, 0, 0);
         uint256 used = g - gasleft();
         assertEq(keeper.balance - before, pay);
         assertEq(pay, (VaultLib.Q_SYNC + VaultLib.Q_SYNCED) * 0.2 gwei + vault.getParams().workFee, "quote for one resolved position");
@@ -162,7 +162,7 @@ contract ForkVaultLifecycleTest is ForkBase {
         vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(address(PACKS));
         g = gasleft();
         vm.prank(keeper);
-        uint256 singlePay = vault.sync(0, single, 0, 0);
+        uint256 singlePay = vault.sync(single, 0, 0);
         uint256 singleUsed = g - gasleft();
         assertEq(pay, singlePay, "stale padding earns no extra payment");
         assertGt(used, singleUsed, "bounded stale reads actually cost more gas");
