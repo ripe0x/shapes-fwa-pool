@@ -321,7 +321,7 @@ def status(s, planned=None):
             and not (s.blackout and s.queue_drained):
         out.append(("WAITING_CHECKPOINT_WINDOW", "wait", "flows wait for FWA's blackout with a drained queue"))
     if s.queue_drained and not s.staging_empty and not s.winding_down:
-        out.append(("STAGING_BACKLOG", "wait", "FWA staging backlog remains; hold new listings while existing staged positions can be activated"))
+        out.append(("STAGING_BACKLOG", "action", "FWA has an old staging backlog; operator or any participant must call activateListings before we build or list"))
     if not s.backing and not s.winding_down:
         out.append(("QUOTE_UNAVAILABLE", "wait", "FWA admission or its floor quote refuses a listing: nothing new lists"))
     if s.k < 10**18 + s.min_edge_bps * 10**14 and not s.winding_down:
