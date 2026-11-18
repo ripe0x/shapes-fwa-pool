@@ -33,3 +33,18 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
       - name: Compile and verify deployed code sizes
         run: forge build --sizes
+
+  current-contract-fork:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Verify real FWA backing and restock behavior on mainnet fork
+        run: >
+          forge test --match-path test/fork/ForkBacking.t.sol
+          --rpc-url https://mainnet.gateway.tenderly.co
+          --fork-retries 30 --fork-retry-backoff 5000
+          --compute-units-per-second 100 -vv
