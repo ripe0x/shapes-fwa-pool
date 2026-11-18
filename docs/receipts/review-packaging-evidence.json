@@ -1,0 +1,136 @@
+{
+  "base_revision": "a4496adaba9048170ba39f1255783dccf891f163",
+  "scope": "Packaging and persistent storage only; no chain/RPC calls, credentials, signatures, broadcasts, service startup, cache deletion or remote write.",
+  "python": "3.11.8",
+  "source_sha256": {
+    "keeper/Dockerfile": "7845bdb55c983071f21da2ccdc3562e1535b7fc6c80178b682d6336d20042a74",
+    "keeper/entrypoint.sh": "ca352b88b678547c60b00148e9b9e656d068ceb53e614f3607165fe23aed6bab",
+    "keeper/requirements.txt": "aed414c4157dd12cba962363a8c9f561a2e5dcddbf20ee4c2ea9ff41ad4e913c",
+    "keeper/test_packaging.py": "ba913e579d563d7e2e32b1f8b6938f22d17f0f28581c3d5894dc41e3f1bb4c5e",
+    "keeper/keeper.py": "a4f017ba65715a1dcc6b942ae47ecb6cef82f95e2ab19449df50ab0f9d94a3d1",
+    "keeper/index.py": "df14148c2626e7bc58d4728ce6e66a9d3ff8466475625813d363c66cc77fa6a9",
+    "keeper/policy.py": "3eb4837f583a268b3e13d352ca142a9350517ddcce5e9e99350b1df57d648129",
+    "keeper/tx.py": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230",
+    "fly.keeper-primary.toml": "d0562149088fff773d7abedd4e643e131c07eb988c5542197d05dfe4d71bde5f",
+    "fly.keeper-backup.toml": "5ad276a78fc08c2fc8badf7b70b4794cb19e0043e3b080081323d9041a57a79b"
+  },
+  "checks": [
+    {
+      "command": [
+        "/private/tmp/packvault-review-packaging-venv/bin/python",
+        "keeper/keeper.py",
+        "--help"
+      ],
+      "exit_status": 0,
+      "output": "usage: keeper.py [-h] [--send] [--status] [--account ACCOUNT]\n                 [--keystore KEYSTORE] [--password-file PASSWORD_FILE]\n                 [--from SENDER] [--rpc RPC] [--state STATE] [--index INDEX]\n                 [--loop LOOP] [--slowdown-volume SLOWDOWN_VOLUME]\n                 [--max-steps MAX_STEPS] [--burn-tokens]\n                 [--max-total-loss-wei MAX_TOTAL_LOSS_WEI]\n                 [--max-loss-wei MAX_LOSS_WEI] [--max-fee-gwei MAX_FEE_GWEI]\n                 [--fail-rate-bps FAIL_RATE_BPS]\n                 [--min-return-bps MIN_RETURN_BPS]\n                 [--confirmations CONFIRMATIONS]\n                 [--replace-after REPLACE_AFTER]\n                 [--max-replacements MAX_REPLACEMENTS]\n                 [--pending-timeout PENDING_TIMEOUT]\n                 [--health-port HEALTH_PORT]\n                 vault\n\npositional arguments:\n  vault\n\noptions:\n  -h, --help            show this help message and exit\n  --send\n  --status              print status and keeper accounting, send nothing\n  --account ACCOUNT\n  --keystore KEYSTORE   encrypted keystore file (with --password-file)\n  --password-file PASSWORD_FILE\n  --from SENDER         sender for an unlocked local node (rehearsal)\n  --rpc RPC\n  --state STATE         keeper state file (default keeper/state-<vault>.json)\n  --index INDEX         SQLite event index path (default keyed by chain, vault\n                        and deployment block)\n  --loop LOOP           seconds between passes; 0 runs once\n  --slowdown-volume SLOWDOWN_VOLUME\n  --max-steps MAX_STEPS\n                        calls per pass, each after a fresh read\n  --burn-tokens         claim and burn FWA token rewards; unpaid, the operator\n                        pays the gas\n  --max-total-loss-wei MAX_TOTAL_LOSS_WEI\n                        stop sending once spent minus paid exceeds this\n                        (default 0.005 ETH)\n  --max-loss-wei MAX_LOSS_WEI\n                        loss this keeper accepts per call (liability work\n                        above the gas ceiling)\n  --max-fee-gwei MAX_FEE_GWEI\n                        never bid a max fee above this\n  --fail-rate-bps FAIL_RATE_BPS\n                        share of sent calls expected to lose to a competing\n                        keeper (adds to cost)\n  --min-return-bps MIN_RETURN_BPS\n                        required return over expected cost\n  --confirmations CONFIRMATIONS\n                        blocks before a receipt counts (2+ on mainnet)\n  --replace-after REPLACE_AFTER\n                        blocks pending before a same-nonce replacement\n  --max-replacements MAX_REPLACEMENTS\n  --pending-timeout PENDING_TIMEOUT\n                        seconds a pass waits for a receipt\n  --health-port HEALTH_PORT\n"
+    },
+    {
+      "command": [
+        "/private/tmp/packvault-review-packaging-venv/bin/python",
+        "-m",
+        "pip",
+        "check"
+      ],
+      "exit_status": 0,
+      "output": "No broken requirements found.\nWARNING: The directory '/Users/dd/Library/Caches/pip' or its parent directory is not owned or is not writable by the current user. The cache has been disabled. Check the permissions and owner of that directory. If executing pip with sudo, you should use sudo's -H flag.\n"
+    },
+    {
+      "command": [
+        "/private/tmp/packvault-review-packaging-venv/bin/python",
+        "keeper/test_packaging.py",
+        "--host-persistence"
+      ],
+      "exit_status": 0,
+      "output": "{\"mode\": \"seed\", \"directory\": \"/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/review-packaging-storage-07c3g0ro\", \"index_head\": 104, \"transaction_marker\": \"persisted\", \"rpc_calls\": 0, \"broadcasts\": 0}\n{\"mode\": \"verify\", \"directory\": \"/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/review-packaging-storage-07c3g0ro\", \"index_head\": 104, \"transaction_marker\": \"persisted\", \"rpc_calls\": 0, \"broadcasts\": 0}\nPASS: host process replacement only; Docker image/volume replacement remains separate\n"
+    },
+    {
+      "command": [
+        "/private/tmp/packvault-review-packaging-venv/bin/python",
+        "keeper/test_policy.py"
+      ],
+      "exit_status": 0,
+      "output": "keeper/test_policy.py: pass (economic gates, constant checkpoint charge, bounded catchup/proposals, reserve amounts)\n"
+    },
+    {
+      "command": [
+        "/private/tmp/packvault-review-packaging-venv/bin/python",
+        "keeper/test_index.py"
+      ],
+      "exit_status": 0,
+      "output": "index projection: restart, identity, exact wei/debt, rollback/replay, duplicate atomicity, identifier reuse, 10k bounded candidates: pass\n"
+    },
+    {
+      "command": [
+        "/private/tmp/packvault-review-packaging-venv/bin/python",
+        "keeper/test_inclusion.py"
+      ],
+      "exit_status": 0,
+      "output": "inclusion arithmetic: EIP1559 roundings pass; head-target drift3616096947962365wei exceeds10k tag tolerance\n"
+    },
+    {
+      "command": [
+        "sh",
+        "-n",
+        "keeper/entrypoint.sh"
+      ],
+      "exit_status": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "python3",
+        "keeper/test_packaging.py"
+      ],
+      "exit_status": 1,
+      "output": "Docker is unavailable; production image and container replacement were not tested\n"
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "py_compile",
+        "keeper/test_packaging.py"
+      ],
+      "exit_status": 0,
+      "output": ""
+    }
+  ],
+  "initial_install_failure": {
+    "exit_status": 1,
+    "reason": "Sandbox DNS could not resolve PyPI. No packages installed; retried outside sandbox into isolated temporary venv."
+  },
+  "isolated_install": {
+    "command": "/private/tmp/packvault-review-packaging-venv/bin/python -m pip install --no-cache-dir -r keeper/requirements.txt",
+    "exit_status": 0,
+    "result": "14 fully pinned packages installed; no global/site packages used."
+  },
+  "linux312_wheels": {
+    "command": "/private/tmp/packvault-review-packaging-venv/bin/python -m pip download --no-cache-dir --only-binary=:all: --platform manylinux2014_x86_64 --python-version 3.12 --implementation cp --abi cp312 --dest /private/tmp/review-packaging-linux312-wheels -r keeper/requirements.txt",
+    "exit_status": 0,
+    "wheels": {
+      "annotated_types-0.7.0-py3-none-any.whl": "1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53",
+      "cytoolz-1.1.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl": "c7a98deb11ccd8e5d9f9441ef2ff3352aab52226a2b7d04756caaa53cd612363",
+      "eth_abi-5.2.0-py3-none-any.whl": "17abe47560ad753f18054f5b3089fcb588f3e3a092136a416b6c1502cb7e8877",
+      "eth_hash-0.8.0-py3-none-any.whl": "523718a51b369ab89866b929a5c93c52978cd866ea309192ad980dd8271f9fac",
+      "eth_typing-6.0.0-py3-none-any.whl": "ee74fb641eb36dd885e1c42c2a3055314efa532b3e71480816df70a94d35cfb9",
+      "eth_utils-6.0.0-py3-none-any.whl": "63cf48ee32c45541cb5748751909a8345c470432fb6f0fed4bd7c53fd6400469",
+      "parsimonious-0.10.0-py3-none-any.whl": "982ab435fabe86519b57f6b35610aa4e4e977e9f02a14353edf4bbc75369fc0f",
+      "pycryptodome-3.23.0-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl": "c8987bd3307a39bc03df5c8e0e3d8be0c4c3518b7f044b0f4c15d1aa78f52575",
+      "pydantic-2.13.4-py3-none-any.whl": "45a282cde31d808236fd7ea9d919b128653c8b38b393d1c4ab335c62924d9aba",
+      "pydantic_core-2.46.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl": "926c9541b14b12b1681dca8a0b75feb510b06c6341b70a8e500c2fdcff837cce",
+      "regex-2026.5.9-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl": "dd2810d22146b6d838acc5ec15602cb6b47920aa4e33015df3868eedfd20bab8",
+      "toolz-1.1.0-py3-none-any.whl": "15ccc861ac51c53696de0a5d6d4607f99c210739caf987b5d2054f3efed429d8",
+      "typing_extensions-4.15.0-py3-none-any.whl": "f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548",
+      "typing_inspection-0.4.2-py3-none-any.whl": "4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7"
+    },
+    "limitation": "Wheel availability/resolution only; this is not Linux execution."
+  },
+  "container_acceptance": "UNTESTED: Docker/Podman/Colima command/apps/sockets absent; limactl reports no instance. Production Docker build embeds parser smoke and test_packaging default performs actual two-container volume proof when Docker exists.",
+  "optional_unapproved_workflow": "/private/tmp/review-packaging-branch-workflow.yml",
+  "things_that_do_not_make_sense": [
+    "A passing host rehearsal did not exercise the production image; host clean-env success still cannot substitute for the unavailable actual image/container test."
+  ],
+  "post_check_change": "Current packaging test host persistence and syntax rechecked after adding container-only image/instance identity outputs. Actual image remains untested.",
+  "historical_record_note": "This records the initial local checks and local Docker gap. Actual production-image and distinct-container volume acceptance subsequently passed in review-packaging-ci-evidence.json; original failures and limitations are retained here.",
+  "superseded_container_acceptance": "docs/receipts/review-packaging-ci-evidence.json"
+}

@@ -6,6 +6,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 RUN curl -L https://foundry.paradigm.xyz | bash && /root/.foundry/bin/foundryup --install 1.8.1
 ENV PATH="/root/.foundry/bin:${PATH}"
 WORKDIR /app
+COPY keeper/requirements.txt ./keeper/requirements.txt
+RUN python3 -m pip install --no-cache-dir -r keeper/requirements.txt
 COPY keeper/*.py ./keeper/
 COPY keeper/entrypoint.sh ./keeper/
+RUN python3 keeper/keeper.py --help > /dev/null
 CMD ["sh", "keeper/entrypoint.sh"]

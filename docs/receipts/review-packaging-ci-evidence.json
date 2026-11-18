@@ -1,0 +1,89 @@
+{
+  "run_url": "https://github.com/ripe0x/shapes-fwa-pool/actions/runs/44393965532",
+  "run_id": 44393965532,
+  "source_commit": "bc39d6392ef04a55d7faefc9725bc7c5c02f914a",
+  "event": "push",
+  "branch": "codex/keeper-image-review-20261118",
+  "status": "completed",
+  "conclusion": "success",
+  "created_at": "2026-11-18T20:43:15Z",
+  "updated_at": "2026-11-18T20:43:45Z",
+  "jobs": [
+    {
+      "name": "packaging",
+      "conclusion": "success",
+      "started_at": "2026-11-18T20:43:18Z",
+      "completed_at": "2026-11-18T20:43:45Z",
+      "runner_name": "GitHub Actions 1000037998",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build production image and verify persistent stores",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "image_and_container_result": {
+    "result": "PASS",
+    "image": "packvault-keeper-review:5e746755ef",
+    "volume": "packvault-persistence-5e746755ef",
+    "retained": true,
+    "image_id": "sha256:b6d9dc0a6336292d5ef7e21eb33c6c18b69154d6c20f64da000479b9d44d4373",
+    "containers": [
+      "033fa4980c0e1cc46350e91c88a1db9e38b1763fdbcec0ebe024c297c7ed5399",
+      "202efad61631dd15d80bef09ef34c6b9629a4cce9da6bbc8f11eecaf596167da"
+    ],
+    "scope": "actual image smoke and separate containers sharing /data; no network transactions"
+  },
+  "verification_commit": {
+    "base": "a4496adaba9048170ba39f1255783dccf891f163",
+    "commit": "bc39d6392ef04a55d7faefc9725bc7c5c02f914a",
+    "tree": "a0884463d75b31c9e6655fe57ee3f96cf1aa3e9c",
+    "branch": "codex/keeper-image-review-20261118",
+    "source_sha256": {
+      "keeper/Dockerfile": "7845bdb55c983071f21da2ccdc3562e1535b7fc6c80178b682d6336d20042a74",
+      "keeper/entrypoint.sh": "ca352b88b678547c60b00148e9b9e656d068ceb53e614f3607165fe23aed6bab",
+      "keeper/requirements.txt": "aed414c4157dd12cba962363a8c9f561a2e5dcddbf20ee4c2ea9ff41ad4e913c",
+      "keeper/test_packaging.py": "ba913e579d563d7e2e32b1f8b6938f22d17f0f28581c3d5894dc41e3f1bb4c5e",
+      ".github/workflows/review-packaging.yml": "8fdd1185bd7cdac74f97bd0b628553798f872973f1a7c47e86da8f7b370dcb1e"
+    },
+    "private_git_index": "/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/review-packaging-git-uliu5_ko/index",
+    "shared_worktree_untouched": true
+  },
+  "raw_log": "docs/receipts/review-packaging-ci-run1.log",
+  "raw_log_sha256": "f8be5b7f7a7ec995e5f71d882d9ca9118b43a8c325899ca5f55c1551e6382908",
+  "authorized_runs_used": 1,
+  "authorized_runs_max": 2,
+  "commands": [
+    {
+      "command": "git push origin bc39d6392ef04a55d7faefc9725bc7c5c02f914a:refs/heads/codex/keeper-image-review-20261118",
+      "exit_status": 0
+    },
+    {
+      "command": "gh run watch 44393965532 --repo ripe0x/shapes-fwa-pool --interval 10 --exit-status",
+      "exit_status": 0
+    }
+  ],
+  "scope": "Actual production Dockerfile build, parser smoke, Ethereum Keccak check, separate-container shared-volume tx-state/index persistence with unchanged identity guards. No RPC, wallets, signatures, broadcast, deployment, artifact/image publication or main/PR CI changes.",
+  "limitations": [
+    "Persistence inputs are local serialization fixtures, not successful chain/service replies.",
+    "No running Fly deployment was replaced; this proves the same image plus /data volume across distinct Docker containers."
+  ],
+  "things_that_do_not_make_sense": []
+}
