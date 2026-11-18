@@ -95,7 +95,6 @@ class State:
     pack_units_mask: int = 8  # PackVault packUnitsMask; this keeper builds 3-unit packs only
     essential_ceiling: int = None  # redemption and wind-down work; None = same as gas_ceiling
     processing_pool: int = 0  # request charges already held for the next checkpoint
-    staging_empty: bool = True  # independent of acquisition queue; required for immediate listing
     essential_cap: int = None  # PackVault essentialCap; 0 = exit work unpaid (withdrawers run it)
 
 
@@ -267,7 +266,7 @@ def plan(s):
     #    Wait for FWA's queue to drain: a listing made while it is busy is staged, earns nothing
     #    until then either way, and then costs an activation call (audit E7).
     if spike or s.winding_down or broken or s.listing_paused or redeeming or not s.backing \
-            or not s.queue_drained or not s.staging_empty:
+            or not s.queue_drained:
         return out
     net = cycle_net(s)
     if not net:
@@ -320,8 +319,6 @@ def status(s, planned=None):
     if (s.pending_deposits or s.locked_shares) and not s.checkpoint_done_this_interval \
             and not (s.blackout and s.queue_drained):
         out.append(("WAITING_CHECKPOINT_WINDOW", "wait", "flows wait for FWA's blackout with a drained queue"))
-    if s.queue_drained and not s.staging_empty and not s.winding_down:
-        out.append(("STAGING_BACKLOG", "action", "FWA has an old staging backlog; operator or any participant must call activateListings before we build or list"))
     if not s.backing and not s.winding_down:
         out.append(("QUOTE_UNAVAILABLE", "wait", "FWA admission or its floor quote refuses a listing: nothing new lists"))
     if s.k < 10**18 + s.min_edge_bps * 10**14 and not s.winding_down:
