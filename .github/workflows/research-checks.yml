@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -20,3 +22,14 @@ jobs:
 
 # This workflow is intentionally not a substitute for Foundry's current-block
 # mainnet fork tests, complete asset-flow reconciliation or security review.
+
+  solidity-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Compile and verify deployed code sizes
+        run: forge build --sizes
