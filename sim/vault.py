@@ -201,6 +201,7 @@ class Vault:
             raise RuntimeError("InvalidListing")
         value = self.idle_packs.pop()
         self.idle_funding -= self.idle_quotes.pop()
+        self.advance_unexposed()
         units = value // UNIT
         self.balance -= backing
         debt = self.fee_accumulator if fee_debt is None else fee_debt
@@ -233,10 +234,21 @@ class Vault:
         """Authenticated completed IDs or None for foreign/refunded entries, at most16 per call."""
         if len(entries) > 16 or self.acquisition_cursor + len(entries) > self.completed_prefix:
             raise RuntimeError("BadBatch")
+        if entries and self.advance_unexposed():
+            return 0
         for listing_id in entries:
             if listing_id is not None:
                 self.select(listing_id)
             self.acquisition_cursor += 1
+        return len(entries)
+
+    def advance_unexposed(self):
+        """Owner-approved O(1) completeness proof; no journal payment is earned."""
+        if (self.positions or self.receipts or self.active_count or self.active_backing
+                or self.allocated_value or self.acquisition_cursor == self.completed_prefix):
+            return False
+        self.acquisition_cursor = self.completed_prefix
+        return True
 
     def harvest_listing(self, listing_id, new_debt=None):
         p = self.positions[listing_id]
@@ -493,6 +505,7 @@ class Vault:
         work = self.pending_total != 0 or self.locked_shares != 0
         if not work and not self.distribution_bps:
             raise RuntimeError("Nothing")
+        self.advance_unexposed()
         if self.acquisition_cursor != self.completed_prefix:
             raise RuntimeError("CatchUpFirst")
         if self.receipts:

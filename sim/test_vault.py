@@ -7,6 +7,17 @@ from vault import ACTIVE, ALLOCATED, OWED, BPS, E, UNIT, Vault
 
 
 class VaultAccountingTest(unittest.TestCase):
+    def test_unexposed_history_preserves_seed_and_first_deposit_prices(self):
+        v = Vault(seed=10**16, balance=10**16, reserve=5 * 10**15)
+        v.completed_prefix = 576
+        v.deposit("alice", E, 100_000_000_000_000)
+        self.assertTrue(v.checkpoint())
+        self.assertEqual(v.acquisition_cursor, 576)
+        self.assertGreater(v.share_balance("alice"), 0)
+        self.assertEqual(v.keeper_paid, 0)
+        v.pay_keeper(100_000_000_000_000, cap=100_000_000_000_000)
+        self.assertEqual(v.balance, E + 10**16)
+
     def vault(self):
         return Vault(seed=E, balance=E, reserve=0)
 

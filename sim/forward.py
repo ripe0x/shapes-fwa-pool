@@ -259,6 +259,7 @@ def run(sc, n_target, seed, days=365, values=None):
     v.routine_rate, v.essential_rate = values["routineRatePerDayWei"], values["essentialRatePerDayWei"]
     journal = deque()  # (our listing ID or None, actual selection time)
     journal_paid = journal_own = journal_foreign = journal_pruned = terminal_work = 0
+    journal_rebased = 0
     self_serve_cost = skipped_funding = call_limit_days = 0
     g0 = g_of(0) if callable(g_of) else g_of
     st0 = charge_state(int(g0 * GWEI), 0)
@@ -267,6 +268,7 @@ def run(sc, n_target, seed, days=365, values=None):
     ck0, d0 = policy.request_charge(st0), policy.deploy_charge(st0)
     v.deposit("h", deposit, ck0, deposit * d0 // (policy.POSITION_VALUE + d0))
     paid_in = deposit + ck0
+    min_free = v.free()
     next_id, credit = 1, 0
     allocated_day = {}
     ask, crown = ASK, 0.001
@@ -415,7 +417,12 @@ def run(sc, n_target, seed, days=365, values=None):
                 for action in planned:
                     fn = action[0]
                     if fn == "sync":
+                        unexposed = not v.positions and not v.receipts and not v.active_count and not v.active_backing and not v.allocated_value
+                        rebase_count = len(journal) if unexposed and action[1] else 0
                         entries = list(islice(journal, action[1]))
+                        if rebase_count:
+                            assert all(i is None for i, _ in journal)
+                            entries = []
                         own_ids = [i for i, _ in entries if i is not None]
                         resolved = [i for i in action[2] if i in v.positions and
                                     (v.positions[i].status == WITHDRAWN or
@@ -429,12 +436,18 @@ def run(sc, n_target, seed, days=365, values=None):
                             if i not in resolved and (i in own_ids or (p and p.state == ALLOCATED)):
                                 break
                             pruned += 1
-                        if not entries and not resolved and not pruned:
+                        if not entries and not resolved and not pruned and not rebase_count:
                             continue
                         gas_q = Q["sync"] + len(entries) * Q["journal"] + len(own_ids) * Q["selected"] \
                             + len(resolved) * Q["synced"] + pruned * Q["pruned"]
+                        if (unexposed and not v.tracked_value) or (rebase_count and not pruned):
+                            gas_q = 0
                         if not affordable(gas_q, len(resolved), essential, liability=essential):
                             continue
+                        if rebase_count:
+                            assert v.advance_unexposed()
+                            journal.clear()
+                            journal_rebased += rebase_count
                         for i, at in entries:
                             journal.popleft()
                             if i is not None:
@@ -553,6 +566,12 @@ def run(sc, n_target, seed, days=365, values=None):
                         pay(gas_q, len(proposals))
                     else:
                         continue
+                    rebased_now = v.acquisition_cursor - journal_own - journal_foreign - journal_rebased
+                    for _ in range(rebased_now):
+                        skipped_id, _at = journal.popleft()
+                        assert skipped_id is None, "unexposed proof cannot hide an own selection"
+                    journal_rebased += rebased_now
+                    min_free = min(min_free, v.free())
                     executed = True
                     calls += 1
                     break  # The real keeper re-reads state after every successful transaction.
@@ -572,11 +591,12 @@ def run(sc, n_target, seed, days=365, values=None):
                 paid_in += ck + unwind
 
     end_nav = economic_nav(v, credit)
-    end_blocked = bool(journal or v.receipts or (v.allocation_head < len(v.allocation_queue) and
+    unexposed = not v.positions and not v.receipts and not v.active_count and not v.active_backing and not v.allocated_value
+    end_blocked = bool((journal and not unexposed) or v.receipts or (v.allocation_head < len(v.allocation_queue) and
                        v.allocation_queue[v.allocation_head] not in v.positions)
                        or v.allocated_value * 10_000 > end_nav * v.allocated_bound_bps)
     assert len(journal) == v.completed_prefix - v.acquisition_cursor
-    assert journal_own + journal_foreign == v.acquisition_cursor
+    assert journal_own + journal_foreign + journal_rebased == v.acquisition_cursor
     supply = v.total_shares
     d_ = v.pending.get("h", [0, 0])
     unpriced = d_[0] if d_[1] >= v.epoch else 0
@@ -593,7 +613,7 @@ def run(sc, n_target, seed, days=365, values=None):
                 fees=v.fees_received / deposit, lost=v.backing_lost / deposit, util=deployed / max(1, end_nav),
                 positions=len(v.positions), pos_mean=float(np.mean(open_days)), pos_max=max(open_days),
                 checkpoints=checkpoints, journal_paid=journal_paid / deposit, journal_backlog=len(journal),
-                journal_own=journal_own, journal_foreign=journal_foreign, journal_pruned=journal_pruned,
+                journal_own=journal_own, journal_foreign=journal_foreign, journal_pruned=journal_pruned, journal_rebased=journal_rebased,
                 terminal_work=terminal_work, pending_receipts=len(v.receipts), end_pricing_blocked=end_blocked,
                 skipped_unfunded=skipped_funding, call_limit_days=call_limit_days,
                 self_serve_gas_proxy=self_serve_cost / deposit,
@@ -601,6 +621,11 @@ def run(sc, n_target, seed, days=365, values=None):
                 issued_entries=v.completed_prefix, processed_entries=v.acquisition_cursor,
                 routine_budget_wei=v.routine_budget, essential_budget_wei=v.essential_budget,
                 economic_nav_wei=end_nav, free_wei=v.free(), keeper_paid_wei=v.keeper_paid,
+                principal_deposit_wei=deposit, holder_paid_in_wei=paid_in,
+                holder_end_value_before_external_gas_wei=holder + locked_val,
+                min_free_wei=min_free, fees_received_wei=v.fees_received,
+                mint_fees_wei=v.mint_fees, backing_lost_wei=v.backing_lost,
+                journal_paid_wei=journal_paid, elapsed_days=days,
                 external_exit_gas_proxy_wei=self_serve_cost,
                 vol=float(np.mean(vol_hist)))
 
@@ -622,10 +647,13 @@ def self_check():
     values = json.loads((ROOT.parent / "deploy/mainnet.json").read_text())
     values.update(routineCapWei=0, routineRatePerDayWei=0)
     rows["empty_budget"] = run(Scenario(volume=const(609), gwei=0.15), 10, 8, days=10, values=values)
-    assert rows["empty_budget"]["keeper_paid_wei"] == 0
-    assert rows["empty_budget"]["checkpoints"] == 0
-    assert rows["empty_budget"]["journal_backlog"] == rows["empty_budget"]["issued_entries"]
-    assert rows["empty_budget"]["ret"] == 0
+    assert rows["empty_budget"]["keeper_paid_wei"] == policy.checkpoint_cost(charge_state(150_000_000, 0))
+    assert rows["empty_budget"]["checkpoints"] == 1
+    # Later foreign history can wait until the next real checkpoint/admission without
+    # requiring standalone unpaid calls or blocking a cash-only vault's pricing.
+    assert rows["empty_budget"]["journal_rebased"] > 0
+    assert not rows["empty_budget"]["end_pricing_blocked"]
+    assert rows["empty_budget"]["positions"] == 0
     values.update(routineCapWei=5 * 10**15)
     rows["depleted_budget"] = run(Scenario(volume=const(100), gwei=0.15), 10, 8, days=20, values=values)
     assert rows["depleted_budget"]["checkpoints"] == 1
@@ -636,7 +664,7 @@ def self_check():
     assert rows["partial_redemption"]["checkpoints"] == 2
     assert rows["partial_redemption"]["external_exit_gas_proxy_wei"] > 0
     for row in rows.values():
-        assert row["processed_entries"] == row["journal_own"] + row["journal_foreign"]
+        assert row["processed_entries"] == row["journal_own"] + row["journal_foreign"] + row["journal_rebased"]
         assert row["issued_entries"] == row["processed_entries"] + row["journal_backlog"]
     return rows
 

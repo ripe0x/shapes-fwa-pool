@@ -66,10 +66,13 @@ def reconcile_cycle():
     sel = by["selected"]
     selected = s["selectedListing"]
     v.acquisition_cursor = s["initCursor"]
-    v.completed_prefix = sel["completedPrefix"]
+    # Admissions precede the real selection. Do not expose its future journal prefix
+    # to the legitimate unexposed advance performed by the first admission.
+    v.completed_prefix = s["initCursor"]
     v.restock(s["count"], s["units"], MINT_FEE, s["backings"])
     for live, backing in zip(sel["positions"], s["backings"], strict=True):
         v.list(live["id"], backing, fee_debt=s["activationDebt"])
+    v.completed_prefix = sel["completedPrefix"]
     v.pay_keeper(s["selectPay"])
     check("setup", "balance", v.balance, s["balance"])
 

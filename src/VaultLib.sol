@@ -169,6 +169,7 @@ library VaultLib {
     error PendingReceipts();
     error InvalidBacking();
     error BadBatch();
+    error Nothing();
 
     /// @notice One checkpoint's redemption fill. Owed rounds up and a partial fill leaves 2 wei of
     ///         headroom, so the rounded-up reserve never exceeds the ETH actually freed. `unit` is
@@ -627,6 +628,7 @@ library VaultLib {
     function admit(Book storage b, IFWAV2 f, IShapePacks packs, uint256 packId, uint256 backing)
         external returns (uint256 id)
     {
+        _rebaseUnexposed(b, f);
         uint256 active = f.activeListingCount();
         // FWA's private staging FIFO may activate foreign listings during admission.
         // Bound even a reverting attempt, and reject every incidental activation atomically.
@@ -657,12 +659,41 @@ library VaultLib {
 
     function syncChanges(Book storage b, IFWAV2 f, IShapePacks packs, uint256 maxJournal,
         uint256[] calldata ids, uint256 maxPrune)
-        external returns (Work memory work)
+        external returns (uint256 gasQ, uint256 units)
     {
         if (maxJournal + ids.length > MAX_BATCH || maxPrune > MAX_BATCH) revert BadBatch();
-        (work.processed, work.own) = _syncJournal(b, f, packs, maxJournal);
+        Work memory work;
+        // No outstanding custody, identifiers or receipts means an unseen selection cannot be ours.
+        bool unexposed = _unexposed(b);
+        bool rebased;
+        if (unexposed) {
+            if (maxJournal != 0) rebased = _rebaseUnexposed(b, f);
+        } else {
+            (work.processed, work.own) = _syncJournal(b, f, packs, maxJournal);
+        }
         for (uint256 i; i < ids.length; ++i) if (_syncTerminal(b, f, packs, ids[i])) ++work.resolved;
         work.pruned = prune(b, maxPrune);
+        if (work.processed + work.resolved + work.pruned == 0 && !rebased) revert Nothing();
+        // Rebase is unpaid. Empty-vault head cleanup also cannot consume its bootstrap cash.
+        if ((unexposed && b.trackedValue == 0) || work.processed + work.resolved + work.pruned == 0) return (0, 0);
+        gasQ = Q_SYNC + work.processed * Q_JOURNAL + work.own * Q_SELECTED
+            + work.resolved * Q_SYNCED + work.pruned * Q_PRUNED;
+        units = work.resolved;
+    }
+
+    function _unexposed(Book storage b) private view returns (bool) {
+        return b.open.length == 0 && b.reservedCount == 0 && b.activeCount == 0
+            && b.activeBacking == 0 && b.allocatedValue == 0 && b.pendingPlusOne == 1;
+    }
+
+    function _rebaseUnexposed(Book storage b, IFWAV2 f) private returns (bool advanced) {
+        if (!_unexposed(b)) return false;
+        uint64 end = f.nextSequenceToProcess();
+        if (b.acquisitionCursor < end) {
+            b.acquisitionCursor = end;
+            emit JournalProgress(end, 0, 0);
+            return true;
+        }
     }
 
     function _syncJournal(Book storage b, IFWAV2 f, IShapePacks packs, uint256 maxJournal)
@@ -779,6 +810,19 @@ library VaultLib {
 
     function accountedNav(Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
         external view returns (uint256)
+    {
+        return _accountedNav(b, f, packs, freeEth, witnessId);
+    }
+
+    function checkpointNav(Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
+        external returns (uint256)
+    {
+        _rebaseUnexposed(b, f);
+        return _accountedNav(b, f, packs, freeEth, witnessId);
+    }
+
+    function _accountedNav(Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
+        private view returns (uint256)
     {
         if (b.acquisitionCursor != f.nextSequenceToProcess()) revert CatchUpFirst();
         if (b.pendingPlusOne != 1) revert PendingReceipts();

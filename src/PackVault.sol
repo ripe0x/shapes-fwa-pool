@@ -329,12 +329,9 @@ contract PackVault is ReentrancyGuard {
     function sync(uint256 maxJournal, uint256[] calldata listingIds, uint256 maxPrune, uint256 minPay)
         external nonReentrant returns (uint256)
     {
-        VaultLib.Work memory work = VaultLib.syncChanges(book, fwa, packs, maxJournal, listingIds, maxPrune);
-        if (work.processed + work.resolved + work.pruned == 0) revert Nothing();
+        (uint256 gasQ, uint256 units) = VaultLib.syncChanges(book, fwa, packs, maxJournal, listingIds, maxPrune);
         bool essential = windingDown || lockedShares != 0;
-        uint256 gasQ = VaultLib.Q_SYNC + work.processed * VaultLib.Q_JOURNAL + work.own * VaultLib.Q_SELECTED
-            + work.resolved * VaultLib.Q_SYNCED + work.pruned * VaultLib.Q_PRUNED;
-        return _pay(OP_SYNC, gasQ, work.resolved, essential, minPay, type(uint256).max);
+        return _pay(OP_SYNC, gasQ, units, essential, minPay, type(uint256).max);
     }
 
     /// @notice Withdraw active listings: allowed in wind-down, when FWA's live fees leave no edge
@@ -557,7 +554,7 @@ contract PackVault is ReentrancyGuard {
         (uint256 oldest, uint64 allocatedAt) = VaultLib.oldestAllocation(book);
         if (oldest != 0 && block.timestamp >= uint256(allocatedAt) + f.settlementWindow()) revert SyncFirst();
         _harvest();
-        uint256 nav = VaultLib.accountedNav(book, f, packs, _free(), witnessId);
+        uint256 nav = VaultLib.checkpointNav(book, f, packs, _free(), witnessId);
         if (book.allocatedValue * BPS > nav * params.allocatedBoundBps) revert AllocatedExposure();
 
         uint256 supply = totalShares;

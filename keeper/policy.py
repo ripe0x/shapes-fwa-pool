@@ -251,7 +251,8 @@ def plan(s):
     # Above the ceiling, only when ETH is owed or a redemption checkpoint needs expired
     # allocations resolved first (the vault refuses to price them unsynced).
     catchup = s.journal_cursor < s.completed_prefix
-    if (due or catchup or s.allocation_stale) and (not spike or s.winding_down or s.locked_shares):
+    unexposed = not s.open_positions and not s.active_count and not s.pending_receipts and not s.listings
+    if (due or (catchup and not unexposed) or s.allocation_stale) and (not spike or s.winding_down or s.locked_shares):
         ids = due[:MAX_BATCH["sync"] // 2 if catchup else MAX_BATCH["sync"]]
         journal = min(s.completed_prefix - s.journal_cursor, MAX_BATCH["journal"] - len(ids)) if catchup else 0
         out.append(("sync", journal, ids, MAX_BATCH["prune"]))
@@ -291,7 +292,7 @@ def plan(s):
             out.append(("liquidate", MAX_BATCH["liquidate"]))
 
     # 4. Checkpoint in FWA's blackout with its queue drained, only when holders have flows.
-    if (s.blackout and s.queue_drained and not catchup and not s.pending_receipts and not s.allocation_stale
+    if (s.blackout and s.queue_drained and (not catchup or unexposed) and not s.pending_receipts and not s.allocation_stale
             and not due and not s.checkpoint_done_this_interval
             and (s.locked_shares or (s.pending_deposits and not spike) or (s.distribution_due and not spike))):
         out.append(("checkpoint", s.witness_id))

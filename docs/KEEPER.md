@@ -30,6 +30,12 @@ Successful acquisition events supply trailing volume; refunded requests do not c
 A large initial reconstruction may take several passes. Deleting the index does not remove any
 onchain state; it requires reconstruction before ordinary operation resumes.
 
+The production entrypoint stores transaction state at `/data/keeper-state.json` and the event index
+at `/data/keeper-index.sqlite`. Both Fly workers mount `/data`. Runtime dependencies, including the
+Ethereum Keccak backend, are pinned in `keeper/requirements.txt` and installed by the Dockerfile.
+`python3 keeper/test_packaging.py` builds that image and checks startup plus both stores across
+separate containers sharing the volume. This check does not broadcast or replace a live Fly worker.
+
 Related financial reads use one pinned block and a final canonical-hash check. New events are
 indexed once; unchanged positions are not enumerated each pass. Optional token reads rotate through
 a bounded candidate set. Complete portfolio getters are absent from the production ABI.
@@ -47,6 +53,13 @@ a bounded candidate set. Complete portfolio getters are absent from the producti
 Operation identifier 4 (old staged activation) is retired. New admission atomically requires an
 ordinary Active listing, even after a drained-queue precheck. Other operation identifiers retain
 meaning. An unconsumed old identifier is retired before its returned pack can be reused.
+
+When authoritative onchain aggregates prove no outstanding FWA exposure, checkpoint and first
+admission advance past irrelevant completed history without journal compensation (D67). The keeper
+can propose that checkpoint directly and avoids a standalone unpaid sync. Any open position,
+including OWED custody, or pending receipt keeps strict ordered processing. Idle inventory is
+allowed by the proof. The public `accountedNav` view remains strict until a state-changing operation
+advances the cursor.
 
 FWA's private staging FIFO has no public head getter, and can remain nonempty after requests drain.
 The vault caps each `listNFT` call at 1.2 million gas and requires exactly one added active listing.

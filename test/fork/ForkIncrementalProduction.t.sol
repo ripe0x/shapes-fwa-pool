@@ -117,6 +117,45 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(vault.accountedNav(0), nav);
     }
 
+    function test_mutatingCheckpointCannotSkipUnseenOwnSelectionAndReceipt() public {
+        _keep(100);
+        _drain();
+        uint256 next = block.timestamp - block.timestamp % 12 hours + 11 hours + 46 minutes;
+        if (next <= block.timestamp) next += 12 hours;
+        vm.warp(next); _environment();
+        assertTrue(FWA.isPurchaseBlackout());
+        assertEq(FWA.unsettledAcquisitionCount(), 0);
+        address holder = makeAddr("pack-vault-test-unsynced-checkpoint-holder");
+        assertEq(holder.code.length, 0); assertEq(holder.balance, 0);
+        uint256 charge = vault.requestCharge();
+        vm.deal(holder, 0.1 ether + charge);
+        vm.prank(holder); vault.deposit{value: 0.1 ether + charge}();
+        uint64 cursor = vault.acquisitionCursor();
+        uint256 open = vault.openListingCount();
+        uint256 reserved = vault.reservedCount();
+        uint256 balance = address(vault).balance;
+        uint256 interval = vault.lastCheckpointInterval();
+        assertEq(vault.pendingReceipts(), 1);
+        assertEq(vault.position(selected).state, VaultLib.ACTIVE, "own selection has not reached the book");
+        vm.expectRevert(VaultLib.CatchUpFirst.selector);
+        vault.checkpoint(0, 0);
+        assertEq(vault.acquisitionCursor(), cursor);
+        assertEq(vault.pendingReceipts(), 1);
+        assertEq(vault.openListingCount(), open);
+        assertEq(vault.reservedCount(), reserved);
+        assertEq(vault.idForBacking(B), selected);
+        assertEq(address(vault).balance, balance);
+        assertEq(vault.pendingDepositTotal(), 0.1 ether);
+        assertEq(vault.processingPool(), charge);
+        assertEq(vault.lastCheckpointInterval(), interval);
+        _catchUp(_one(selected));
+        assertEq(vault.pendingReceipts(), 0);
+        vault.checkpoint(0, 0);
+        assertGt(vault.shareBalance(holder), 0, "authenticated reconciliation opens the same checkpoint window");
+        assertEq(vault.pendingDepositTotal(), 0);
+        assertEq(vault.processingPool(), 0);
+    }
+
     function test_bidReturnPreservesFloorBeforeInventorySyncAndReusesIdentifierAfterRetirement() public {
         _select(late()); _environment();
         vault.sync(1, new uint256[](0), 0, 0);

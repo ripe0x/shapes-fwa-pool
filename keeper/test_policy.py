@@ -51,7 +51,7 @@ def main():
     assert {"unlist", "liquidate"} <= set(fns(plan(state(listings=act, winding_down=True, idle_packs=1, **spike))))
     assert plan(state(listings=act, free=E, pending_deposits=10**17, **spike)) == []
 
-    # Absolute envelope cash at0.5gwei: list8=(400k+8*825k)*0.55gwei=0.00385ETH;
+    # Absolute envelope cash at0.5gwei: list8=(280k+8*825k)*0.55gwei=0.003784ETH;
     # routine journal16+prune16=(85k+16*30k+16*45k)*0.55gwei=0.00070675ETH.
     assert reserve_need(state()) == 4_490_750_000_000_000
     s = state(essential_ceiling=2 * G, work_fee=20_000_000_000_000)
@@ -64,17 +64,19 @@ def main():
 
     # Necessary global catchup is bounded even with a huge foreign-only backlog; it runs at the
     # essential gas class for locked exits, and never pretends foreign entries are own positions.
-    s = state(journal_cursor=7, completed_prefix=100_007)
+    s = state(journal_cursor=7, completed_prefix=100_007, open_positions=1, active_count=1)
     sync = plan(s)[0]
     assert sync == ("sync", 16, [], 16), sync
     s = state(journal_cursor=7, completed_prefix=100_007, listings=settled * 20)
     sync = plan(s)[0]
     assert sync[1] + len(sync[2]) <= 16
-    assert "checkpoint" not in fns(plan(state(journal_cursor=7, completed_prefix=8, pending_deposits=E)))
+    assert "checkpoint" not in fns(plan(state(journal_cursor=7, completed_prefix=8, pending_deposits=E, open_positions=1)))
+    assert "checkpoint" in fns(plan(state(journal_cursor=7, completed_prefix=100_007, pending_deposits=E)))
+    assert "sync" not in fns(plan(state(journal_cursor=7, completed_prefix=100_007)))
     assert "checkpoint" not in fns(plan(state(pending_receipts=1, pending_deposits=E)))
     assert "checkpoint" not in fns(plan(state(allocation_stale=True, pending_deposits=E)))
     assert plan(state(journal_cursor=1, completed_prefix=2, **spike)) == []
-    assert plan(state(journal_cursor=1, completed_prefix=2, locked_shares=1, **spike))[0][0] == "sync"
+    assert plan(state(journal_cursor=1, completed_prefix=2, locked_shares=1, open_positions=1, **spike))[0][0] == "sync"
 
     s = state(listings=[Listing(1, ALLOCATED, allocated_at=10**6 - 10)], blackout=False, pending_deposits=1, free=E)
     assert {"WAITING_SETTLEMENT", "WAITING_CHECKPOINT_WINDOW"} <= {c for c, _, _ in status(s)}

@@ -1,0 +1,59 @@
+{
+  "base_revision": "a4496adaba9048170ba39f1255783dccf891f163",
+  "source_sha256": {
+    "keeper/policy.py": "0658aad4e2f07fe2acc29359c8915a9473bb681f22d65d0c03b212cb4d91d5d4",
+    "keeper/test_policy.py": "58c8eef750ff57b03fa94a7dd6f235190b2f9d3e52e0546388b1a0dcf6673575",
+    "sim/vault.py": "bc3784c2574e1b631b0971974a0913c85a2de691755cfabde1b1dfbee6c0c49a",
+    "sim/test_vault.py": "e72c308aed1328cfed557a34435d34e7d2172115ffb0b3ce0e2c98fb5feb2c5e",
+    "sim/forward.py": "d129f9cb4a644fcd011825be8b837714ab03d1b341ab2ba022e14010e046c105",
+    "sim/reconcile.py": "cbbe9121e1a1bf6c68fb6ef2b8d430a761175d31a2cc727ff2e000a5fce9eaff"
+  },
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "keeper/test_policy.py"
+      ],
+      "exit_status": 0,
+      "output": "keeper/test_policy.py: pass (economic gates, constant checkpoint charge, bounded catchup/proposals, reserve amounts)\n"
+    },
+    {
+      "command": [
+        "python3",
+        "sim/test_vault.py"
+      ],
+      "exit_status": 0,
+      "output": "...........\n----------------------------------------------------------------------\nRan 11 tests in 0.002s\n\nOK\n"
+    },
+    {
+      "command": "python3 heredoc: import forward; forward.DB=Path('/Users/dd/CascadeProjects/shapes-fwa-pool/sim/data/fwa.sqlite'); sys.argv=['sim/forward.py','--self-check']; forward.main()",
+      "exit_status": 0,
+      "output": "docs/receipts/review-python-forward.txt",
+      "result": "7 focused model scenarios pass"
+    },
+    {
+      "command": "python3 -m py_compile keeper/policy.py keeper/test_policy.py sim/forward.py sim/vault.py sim/reconcile.py sim/test_vault.py",
+      "exit_status": 0
+    },
+    {
+      "command": "git diff --check -- affected source/test/docs paths",
+      "exit_status": 0
+    }
+  ],
+  "preserved_failures": [
+    {
+      "command": "python3 sim/forward.py --help",
+      "exit_status": 1,
+      "result": "CLI initializes recorded DB before argument handling; absent default DB. Reused existing database path from archived command."
+    },
+    {
+      "command": "forward --self-check before correcting new expectation",
+      "exit_status": 1,
+      "result": "Incorrect assertion expected every new foreign record immediately rebased in empty no-flow vault. Corrected expectation: only real admission/checkpoint advances; later irrelevant history does not block pricing."
+    }
+  ],
+  "limits": [
+    "Accounting tests and forward scenarios are models. Fresh source-bound fork reconciliation evidence is separate.",
+    "No new quote, budget, outcome or external transaction is approved by these checks."
+  ]
+}

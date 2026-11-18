@@ -922,3 +922,22 @@ split at 0.2 gwei even at the maximum 10% markup. Per-listing gas and work fees 
 This is measured sample evidence, not a universal future gas guarantee. The final O2 build/list
 cost and O6 checkpoint cost exceed their historical signed amounts; those bounds and the signature
 are retained, with gate failure reported rather than changing them without owner approval.
+
+## D67. Unpaid cursor advance with no FWA exposure (owner, 2026-11-18)
+
+The owner approved refining D65's requirement to process every completed entry. The book may
+advance directly to FWA's completed prefix only when it has no open position, reserved identifier,
+active membership or backing, allocated value, or pending receipt. An OWED position still counts
+as open. Idle inventory alone is not FWA exposure. An unseen own allocation therefore cannot be
+skipped, and outstanding receipts must still be reconciled in order.
+
+This constant-work advance earns zero gas quote and zero work units. It is available during sync,
+checkpoint, and immediately before first admission. Checkpoint and admission can include it in
+their existing funded operation; the keeper need not execute a separate unpaid catchup call.
+Empty tracked inventory cannot earn keeper pay for stale allocation-head cleanup either. Positive
+`minPay` still reverts the whole operation if its payment is unavailable.
+
+The change protects the minimum seed from unrelated history and preserves first-deposit pricing.
+It does not protect exposed capital from its existing maintenance costs, change the reserve or
+budgets, fund essential exits, or approve revised O2/O6 outcomes. The strict public valuation view
+still requires an up-to-date cursor; checkpoint establishes the approved proof before pricing.

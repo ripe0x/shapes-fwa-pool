@@ -118,3 +118,10 @@ the portfolio-dependent charge is removed. No other holder liability can fund it
 not a bound on all gross ETH an owner acting as keeper can receive. The candidate's new measured
 outcomes and funding shortfall are in `docs/POSITION-INTEGRATION-ACCEPTANCE.md`; no new approval is
 recorded here.
+
+21. (2026-11-18, review repair) Owner approved: "Approve provably unexposed cursor advance".
+    This refines the requirement to inspect every global entry: a constant-work, unpaid advance
+    is allowed only when onchain state proves no outstanding FWA position/identifier, active or
+    allocated membership, or pending receipt can hide relevant work. Any exposure retains strict
+    ordered journal processing. Idle inventory held by the vault is not FWA exposure. Checkpoint
+    may apply the same proof so an empty seed vault can price its first deposit without rescue ETH.
