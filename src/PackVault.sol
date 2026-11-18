@@ -325,7 +325,9 @@ contract PackVault is ReentrancyGuard {
         _precheck(minPay, false);
         if (listingPaused) revert Paused();
         // A listing made while FWA's queue is busy is staged and earns nothing until activated.
-        if (fwa.unsettledAcquisitionCount() != 0) revert Nothing();
+        // A drained request queue does not imply that an older staging backlog is empty.
+        // Avoid paying for listings that would wait staged without earning fees.
+        if (fwa.unsettledAcquisitionCount() != 0 || fwa.stagingHead() != 0) revert Nothing();
         uint256 listed;
         while (listed < maxCount && _idlePacks.length != 0 && _open.length < params.maxPositions) {
             uint256 packId = _idlePacks[_idlePacks.length - 1];
