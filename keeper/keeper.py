@@ -392,7 +392,8 @@ def main():
             auth = ["--account", a.account]
         else:
             auth = ["--unlocked", "--from", a.sender]
-        sender = a.sender or cast("wallet", "address", *auth)
+        # `cast wallet address` takes no --rpc-url, so not through cast()
+        sender = a.sender or subprocess.check_output(["cast", "wallet", "address", *auth], text=True).strip()
         try:
             tm = txm.TxManager(a.rpc, a.state, sender, auth, a.confirmations, a.replace_after, a.max_replacements,
                                int(a.max_fee_gwei * 1e9) if a.max_fee_gwei else None)
