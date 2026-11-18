@@ -6,6 +6,7 @@ import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {FixedPointMathLib as M} from "solady/utils/FixedPointMathLib.sol";
 import {VaultLib} from "./VaultLib.sol";
 import {IKeeperPolicy} from "./KeeperPolicy.sol";
+import {FWAExposureRegistry} from "./FWAExposureRegistry.sol";
 import {
     IShapes,
     IShapePacks,
@@ -87,6 +88,7 @@ contract PackVault is ReentrancyGuard {
     IFWARewards public immutable rewards;
     IFWAToken public immutable token;
     address public immutable owner;
+    FWAExposureRegistry public immutable exposure;
 
     // ------------------------------------------------------------------ parameters
 
@@ -206,7 +208,8 @@ contract PackVault is ReentrancyGuard {
         IShapePacks packs_,
         address owner_,
         VaultLib.Params memory initial,
-        IKeeperPolicy policy_
+        IKeeperPolicy policy_,
+        FWAExposureRegistry exposure_
     ) payable {
         fwa = fwa_;
         shapes = shapes_;
@@ -214,6 +217,7 @@ contract PackVault is ReentrancyGuard {
         rewards = IFWARewards(fwa_.rewards());
         token = IFWAToken(fwa_.token());
         owner = owner_;
+        exposure = exposure_;
         params = initial;
         VaultLib.checkBounds(params);
         VaultLib.checkPolicy(address(policy_));
@@ -241,24 +245,10 @@ contract PackVault is ReentrancyGuard {
 
     /// @notice Live economics from FWA. `backing` is what a new listing would post; zero when the
     ///         gate fails for a pack of `units` x 0.01 ETH.
-    /// @dev Spare capital per open slot (listed idle packs plus packs still to build) once every
-    ///      slot to build has its Shapes, mint fee share and one mint of rounding: what each
-    ///      position's backing can be when the position cap, not capital, binds (D62).
-    function _spread(uint256 units) internal view returns (uint256) {
-        uint256 idle = _idlePacks.length;
-        uint256 used = _open.length + idle;
-        uint256 room = params.maxPositions > used ? params.maxPositions - used : 0;
-        if (idle + room == 0) return 0;
-        uint256 fee = shapes.mintFee();
-        uint256 build = room == 0 ? 0 : room * (units * UNIT + fee * units / SHAPES_PER_MINT) + 0.1 ether + fee;
-        uint256 a = _idle();
-        return a > build ? (a - build) / (idle + room) : 0;
-    }
-
     function edge(uint256 units) public view returns (uint256, uint256, bool) {
         uint256 build = VaultLib.quote(params, VaultLib.Q_PACK + VaultLib.Q_MINT * units / SHAPES_PER_MINT + VaultLib.Q_LISTED, 2, false)
             + shapes.mintFee() * units / SHAPES_PER_MINT;
-        return VaultLib.edge(params, fwa, address(packs), units, _spread(units), build);
+        return VaultLib.edge(params, fwa, address(packs), units, 0, build);
     }
 
     /// @dev Expected net of one bid-outcome cycle after the full keeper pay it causes (resolve,
@@ -291,29 +281,41 @@ contract PackVault is ReentrancyGuard {
         // and its first listing, all at the pay they cause.
         uint256 build = VaultLib.quote(params, VaultLib.Q_PACK + VaultLib.Q_MINT * units / SHAPES_PER_MINT + VaultLib.Q_LISTED, 2, false);
         if (!ok || build + fee * units / SHAPES_PER_MINT > _cycleNet(k, backing)) revert EdgeGate();
-        uint256 need = count * units;
-        uint256 have = _looseShapes.length;
-        uint256 mints = need > have ? (need - have + SHAPES_PER_MINT - 1) / SHAPES_PER_MINT : 0;
-        // Capital for the Shapes and the backing of every pack waiting to list, new ones included.
+        // Whole 0.1 ETH denominations can be minted straight into the pack.
+        // Primary Shapes mint fees are identical to mint-and-split, but no
+        // redundant split or loose-token transfers are needed.
+        bool whole = units % SHAPES_PER_MINT == 0;
+        uint256 mints;
+        if (whole) {
+            mints = count * (units / SHAPES_PER_MINT);
+        } else {
+            uint256 need = count * units;
+            uint256 have = _looseShapes.length;
+            mints = need > have ? (need - have + SHAPES_PER_MINT - 1) / SHAPES_PER_MINT : 0;
+        }
         if (_idle() < mints * (0.1 ether + fee) + (count + _idlePacks.length) * backing) revert Liquidity();
-        if (mints != 0) {
+        if (!whole && mints != 0) {
             uint8[] memory outs = new uint8[](SHAPES_PER_MINT); // index 0 = 0.01 ETH
             for (uint256 i; i < mints; ++i) {
                 uint256 big = shapes.mint{value: 0.1 ether + fee}(0.1 ether);
                 uint256[] memory ids = shapes.split(big, outs);
-                for (uint256 j; j < ids.length; ++j) {
-                    _looseShapes.push(ids[j]);
-                }
+                for (uint256 j; j < ids.length; ++j) _looseShapes.push(ids[j]);
             }
         }
-        uint32[] memory noMint = new uint32[](9);
+        uint32[] memory mintCounts = new uint32[](9);
+        uint256[] memory emptyIds = new uint256[](0);
+        if (whole) mintCounts[DENOM_0_1] = uint32(units / SHAPES_PER_MINT);
         for (uint256 c; c < count; ++c) {
-            uint256[] memory ids = new uint256[](units);
-            for (uint256 j; j < units; ++j) {
-                ids[j] = _looseShapes[_looseShapes.length - 1];
-                _looseShapes.pop();
+            if (whole) {
+                _idlePacks.push(packs.createPack{value: units * UNIT + mintCounts[DENOM_0_1] * fee}(emptyIds, mintCounts));
+            } else {
+                uint256[] memory ids = new uint256[](units);
+                for (uint256 j; j < units; ++j) {
+                    ids[j] = _looseShapes[_looseShapes.length - 1];
+                    _looseShapes.pop();
+                }
+                _idlePacks.push(packs.createPack(ids, mintCounts));
             }
-            _idlePacks.push(packs.createPack(ids, noMint));
         }
         emit Restocked(count, units);
         return _pay(OP_RESTOCK, VaultLib.Q_RESTOCK + count * VaultLib.Q_PACK + mints * VaultLib.Q_MINT, count, false, minPay, type(uint256).max);
@@ -335,6 +337,11 @@ contract PackVault is ReentrancyGuard {
             if (_idle() < backing) break;
             _idlePacks.pop();
             uint256 listingId = fwa.listNFT{value: backing}(address(packs), packId);
+            // FWA can have a staging backlog even with no pending draws.
+            // Reverting here undoes the transfer and backing atomically.
+            (,,,,,,,,,, uint8 status) = fwa.listings(listingId);
+            if (status != LISTING_ACTIVE) revert Nothing();
+            if (address(exposure) != address(0)) exposure.book(listingId);
             positions[listingId] = VaultLib.Position(uint64(packId), uint64(units), uint128(backing));
             _open.push(listingId);
             _openIndex[listingId] = _open.length;
@@ -360,7 +367,9 @@ contract PackVault is ReentrancyGuard {
     }
 
     function _sync(uint256 listingId) internal returns (bool) {
-        return VaultLib.sync(positions, _open, _openIndex, _idlePacks, fwa, packs, listingId);
+        bool resolved = VaultLib.sync(positions, _open, _openIndex, _idlePacks, fwa, packs, listingId);
+        if (resolved && address(exposure) != address(0)) exposure.release(listingId);
+        return resolved;
     }
 
 
@@ -370,6 +379,7 @@ contract PackVault is ReentrancyGuard {
 
     function _removeOpen(uint256 listingId) internal {
         VaultLib.removeOpen(positions, _open, _openIndex, listingId);
+        if (address(exposure) != address(0)) exposure.release(listingId);
     }
 
     /// @notice Activate vault listings FWA staged because its acquisition queue was busy when they
@@ -380,21 +390,7 @@ contract PackVault is ReentrancyGuard {
         nonReentrant
         returns (uint256)
     {
-        bool[] memory staged = new bool[](listingIds.length);
-        for (uint256 i; i < listingIds.length; ++i) {
-            // Strictly increasing ids: a repeated id cannot count twice toward the pay cap.
-            if (i != 0 && listingIds[i] <= listingIds[i - 1]) revert Amount();
-            if (_openIndex[listingIds[i]] == 0) continue;
-            (,,,,,,,,,, uint8 status) = fwa.listings(listingIds[i]);
-            staged[i] = status == LISTING_STAGED;
-        }
-        fwa.activateListings(maxCount);
-        uint256 moved;
-        for (uint256 i; i < listingIds.length; ++i) {
-            if (!staged[i]) continue;
-            (,,,,,,,,,, uint8 status) = fwa.listings(listingIds[i]);
-            if (status == LISTING_ACTIVE) ++moved;
-        }
+        uint256 moved = VaultLib.activate(_openIndex, fwa, listingIds, maxCount);
         if (moved == 0) revert Nothing();
         return _pay(OP_ACTIVATE, VaultLib.Q_ACTIVATE + moved * VaultLib.Q_ACTIVATED, moved, false, minPay, type(uint256).max);
     }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
+import {FWAExposureRegistry} from "../../../src/FWAExposureRegistry.sol";
 import {DeployCore} from "../../../script/DeployCore.sol";
 import {ForkBase} from "../../fork/ForkBase.sol";
 import {PackVault} from "../../../src/PackVault.sol";
@@ -19,10 +20,10 @@ contract AuditMaxPackGas is ForkBase {
         VaultLib.Params memory p = defaultParams();
         p.packUnitsMask = uint64(1) << 63;
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
+        new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1(), FWAExposureRegistry(address(0)));
         p.packUnitsMask = uint64(1) << 31;
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
+        new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1(), FWAExposureRegistry(address(0)));
 
         p.packUnitsMask = uint64(1) << 30;
         (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether);

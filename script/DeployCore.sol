@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import {PackVault} from "../src/PackVault.sol";
 import {VaultLib} from "../src/VaultLib.sol";
 import {KeeperPolicyV1} from "../src/KeeperPolicy.sol";
+import {FWAExposureRegistry} from "../src/FWAExposureRegistry.sol";
 import {IShapes, IShapePacks, IFWAV2} from "../src/interfaces/External.sol";
 
 /// @notice The one deployment path: `script/Deploy.s.sol` (mainnet, rehearsals) and every fork
@@ -21,7 +22,7 @@ library DeployCore {
         // The keeper payment policy is its own immutable contract; the owner replaces it with
         // setPolicy (D57, D58).
         policy = new KeeperPolicyV1();
-        vault = new PackVault{value: seed}(fwa, shapes, packs, owner, p, policy);
+        vault = new PackVault{value: seed}(fwa, shapes, packs, owner, p, policy, FWAExposureRegistry(address(0)));
         postflight(vault, policy, fwa, owner, p, seed);
     }
 

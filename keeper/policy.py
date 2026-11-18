@@ -39,6 +39,8 @@ class Listing:
     pending_fees: int = 0
     pack_owed: bool = False  # FWA holds this vault's pack as a pull claim
     crown_locked: bool = False  # holds FWA's crown inside its early-exit window
+    units: int = 3  # pack value in 0.01 ETH units, from vault positions()
+    backing: int = 0  # FWA backing wei; zero uses current quote in synthetic tests
 
 
 @dataclass
@@ -231,7 +233,9 @@ def plan(s):
             if not unwind and shortfall <= 0:
                 break
             ids.append(l.id)
-            shortfall = max(0, shortfall - 3 * UNIT - s.backing)  # close to each position's own
+            # Use the actual listed pack and backing, not the current quote for
+            # a new 3-unit pack: older/larger listings can differ materially.
+            shortfall = max(0, shortfall - l.units * UNIT - (l.backing or s.backing))
         for i in range(0, len(ids), MAX_BATCH["unlist"]):
             out.append(("unlist", ids[i:i + MAX_BATCH["unlist"]]))
         if ids and need_cash:
