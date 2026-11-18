@@ -105,6 +105,16 @@ def main():
                                     staging_empty=False)
     assert "unlist" in fns(plan(backlog_with_redemption)), plan(backlog_with_redemption)
 
+    # Larger listings must use their stored pack and backing values when
+    # selecting the smallest set of listings needed for redemption liquidity.
+    large = Listing(50, ACTIVE, units=20, backing=int(0.22 * E))
+    small = Listing(51, ACTIVE, units=3, backing=int(0.0363 * E))
+    mixed = state(listings=[large, small], open_positions=2,
+                  locked_shares=10**18, owed_estimate=int(0.30 * E), free=0,
+                  idle_eth=0)
+    unlists = [step for step in plan(mixed) if step[0] == "unlist"]
+    assert unlists == [("unlist", [50])], unlists
+
     # Audit E11: a mask without 3-unit packs builds nothing (this keeper builds 3-unit packs only).
     build = dict(listings=act, open_positions=10, idle_eth=E, free=E, loose_shapes=0)
     assert "restock" in fns(plan(state(**build)))
