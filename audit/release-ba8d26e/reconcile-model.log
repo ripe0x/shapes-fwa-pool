@@ -1,0 +1,3 @@
+steps: setup, selected, bid, charges, deposits, sync, harvest, relistBacking, list, checkpoint1, gas, redeemCharge, redeem, checkpoint2, claim, aliceReceived, gasActivate, activate
+ledger: fees received 749287067792040, keeper paid 3783500000000000, mint fees 9000000000000000, backing lost 36300000000000000
+reconciled: every vault number matches the fork run to the wei

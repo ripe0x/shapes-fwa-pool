@@ -1,0 +1,59 @@
+{
+ "pending": null,
+ "counted": [
+  {
+   "label": "checkpoint",
+   "to": "0x321d151f896c205ac5c747c2cff4e9a0e185a27c",
+   "hash": "0xb2b862b78fd2f549d940e0cc97d99c385aac458e03e1752a418f35a3fb51713c",
+   "block": 26418586,
+   "block_hash": "0x46eed9c75327dc7e9b7cea30fb5229c98bf3487d2bda43b0afabe17432af5286",
+   "status": 0,
+   "gas_used": 228848,
+   "price": 68697529,
+   "cost": 15721292116592,
+   "pay": 0,
+   "net": -15721292116592,
+   "est": 243173,
+   "gas_limit": 303966,
+   "expected_pay": 32846348720000
+  },
+  {
+   "label": "checkpoint",
+   "to": "0x321d151f896c205ac5c747c2cff4e9a0e185a27c",
+   "hash": "0xe61680809ee60f7b8b77312c8f6c7b11bf55ec16c49ca423744a6a8ce49b01d5",
+   "block": 26418587,
+   "block_hash": "0x87c8291636a5655a980820d247204520a5a9036c445184281b01cc40061283da",
+   "status": 0,
+   "gas_used": 228860,
+   "price": 66378167,
+   "cost": 15191307299620,
+   "pay": 0,
+   "net": -15191307299620,
+   "est": 243173,
+   "gas_limit": 303966,
+   "expected_pay": 32365555220000
+  }
+ ],
+ "errors": [
+  {
+   "t": 1794940680,
+   "msg": "checkpoint reverted on chain: 0xb2b862b78fd2f549d940e0cc97d99c385aac458e03e1752a418f35a3fb51713c"
+  },
+  {
+   "t": 1794940697,
+   "msg": "checkpoint reverted on chain: 0xe61680809ee60f7b8b77312c8f6c7b11bf55ec16c49ca423744a6a8ce49b01d5"
+  }
+ ],
+ "stats": {
+  "sent": 2,
+  "mined": 0,
+  "reverted": 2,
+  "replaced": 0,
+  "dropped": 0,
+  "reorged": 0,
+  "skipped_expected": 0,
+  "skipped_loss": 0,
+  "spent_wei": 30912599416212,
+  "paid_wei": 0
+ }
+}

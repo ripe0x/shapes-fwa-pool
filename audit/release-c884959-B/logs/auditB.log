@@ -1,0 +1,75 @@
+No files changed, compilation skipped
+
+Ran 3 tests for test/fork/AuditB.t.sol:AuditBPinned
+[PASS] test_hugeOracleAskBlocksUnlistAndWindDown() (gas: 6654944)
+Logs:
+  backing per position wei 33333333333333334
+  alice paid out of 1 ETH deposited 809398482696070038
+  positions still open, stuck value wei 3 190000000000000002
+  locked shares left 18827657637865705
+
+[PASS] test_hugeSurchargeBlocksUnlist() (gas: 5660311)
+[PASS] test_measureOps() (gas: 19390166)
+Logs:
+  checkpoint(0 pos): gas, pay 229193 65000000000000
+  restock(1, mint): gas, pay 2662600 556000000000000
+  restock(3, 1 mint): gas, pay 3128822 676000000000000
+  restock(6, 2 mints): gas, pay 4136267 856000000000000
+  list(1): gas, pay 865941 177000000000000
+  backing of first listing 33333333333333334
+  list(9): gas, pay 5248671 1185000000000000
+  backing of last listing, idle after 33333333333333334 1265216666666666661
+  redeem charge wei 3111246713536837
+  unlist(n): n 10
+  unlist: gas, pay 2076089 588000000000000
+  liquidate: gas, pay 1642017 515000000000000
+  left: open, idle packs, loose 0 0 0
+  checkpoint(redeem): gas, pay 250053 65000000000000
+  alice claim wei (deposited 1.9 + charges) 1895358689692275608 1903176246713536837
+  budgets left routine, essential 26884999999999999 8929916666666666
+  vault balance, lastNav 10134557021261230 10068557021261229
+
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 899.85ms (391.31ms CPU time)
+
+Ran 2 tests for test/fork/AuditB.t.sol:AuditBBudget
+[PASS] test_oneExitEmptiesEssentialBudget() (gas: 50315579)
+Logs:
+  built, listed 30 30
+  routine paid for the build, routine budget left 9861000000000000 20082333333333333
+  idle packs, idle ETH 0 0
+  alice's redeem charge (checkpoint + unwind) wei 11822731768227847
+  unlist pay 5940000000000000
+  liquidate #1 pay 4060000000000000
+  essential budget after unlist + liquidate 0
+  idle packs left, loose shapes left 0 0
+  essential paid in total vs unwind charge alice paid 10000000000000000 11822731768227847
+
+[PASS] test_ownerKeyFirstDay() (gas: 10868855)
+Logs:
+  t0: unlist 1 at maxima, routine pay 20550000000000000
+  t0: wind-down unlist 1, essential pay 10000000000000000
+  t+24h: liquidate 1, essential pay 5000000000000000
+  t+24h budgets routine (not reachable in wind-down?), essential 17290333333333333 0
+  owner took in ~24 h 35550000000000000
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 961.66ms (382.82ms CPU time)
+
+Ran 2 tests for test/fork/AuditB.t.sol:AuditBSelection
+[PASS] test_harvestDuplicateIdsInflatePay() (gas: 44160729)
+Logs:
+  fees harvested wei 749287067792040
+  honest: n ids, pay wei, gas 29 103000000000000 618487
+  duplicates: n ids, pay wei, gas 57 187000000000000 738159
+  duplicate caller cost wei at 0.15 gwei, 0 tip (+21k intrinsic, calldata) 118251450000000
+
+[PASS] test_stagedListPaidTwice() (gas: 44298432)
+Logs:
+  FWA unsettled count at list time 1
+  status after list (5 = staged) 5
+  staged list: pay wei, gas 177000000000000 534235
+  status after queue drained 5
+  activate: pay wei, gas 120000000000000 530098
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.23s (1.66s CPU time)
+
+Ran 3 test suites in 1.59s (3.09s CPU time): 7 tests passed, 0 failed, 0 skipped (7 total tests)

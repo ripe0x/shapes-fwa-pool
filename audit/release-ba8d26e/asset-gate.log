@@ -1,0 +1,43 @@
+ASSET FLOW GATE: INCOMPLETE   regimes init, max_load, inactive_short, inactive_long, gas_spike, oracle_change, keeper_delay, withdrawals, settled_unclaimed, distributions, wind_down, acquire_bid, acquire_keep, acquire_silent, staged_activation, tokens
+export SOURCE_HASH=91ad994fd2c1175b18fd8197b3469d04797fb33db7cfcea9d126ead7c476e1b2
+review: none recorded for the current source
+approval hash: f62d328eecbf7776f3b79f6f7f1739e42ed73ac0ee23933ad4e7e26da23453df
+owner signs it (2 commands), pastes /tmp/af.txt.sig into approval.signature:
+  printf %s f62d328eecbf7776f3b79f6f7f1739e42ed73ac0ee23933ad4e7e26da23453df > /tmp/af.txt
+  ssh-keygen -Y sign -f <your-key> -n asset-flow /tmp/af.txt
+AGENT: before asking the owner to sign, show a table: the decision, each option, its tradeoffs, the measured numbers, your recommendation and why.
+allowed_signers entry, one line: owner <public key>   (e.g. owner ssh-ed25519 AAAA...)
+
+OUTCOMES (each must hold in every regime listed for it)
+  O1: DRAFT. Where a bid ends: on a bid outcome the vault keeps the pack and the whole backing leaves (0.9 to the purchaser, 0.1 to FWA), about 0.0363 ETH per selection; the vault's edge is the fee share it keeps.  [at most 0.04 ETH; only in acquire_bid, staged_activation]
+      worst 0.0363 ETH in acquire_bid   OK
+  O2: DRAFT. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint, 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; budgets cap all pay at 0.041 ETH a day; the owner can stop pay at once.  [at most 1750000; only in max_load]
+      worst 1568103 in max_load   OK
+  O3: DRAFT. How it ends for holders: after wind-down each holder's claim equals their share of the vault's value to the wei (value priced before that checkpoint's keeper pay, which falls on the shares that stay), and no shares are left locked.  [at most 0; only in wind_down]
+      worst 0 in wind_down   OK
+  O4: DRAFT. What is left at the end: only the dead-share seed slice remains in the vault, about 0.0105 ETH (the 0.01 ETH seed plus deploy-address dust).  [at most 12000000000000000; only in wind_down]
+      worst 10117849334220057 in wind_down   OK
+  O5: DRAFT. Liabilities are never deployable (D32): escrowed deposits, redemption and distribution reserves and settled-but-unclaimed ETH never become spendable. Checked after every keeper call in every regime (the test fails otherwise) and measured here with an entitlement settled to claimable: spendable ETH above the unowed balance is 0 wei.  [at most 0; only in settled_unclaimed]
+      worst 0 in settled_unclaimed   OK
+  O6: DRAFT. Can it stall and what restarts it (gas): above the 0.5 gwei ceiling no call is refused; every call is paid at the ceiling price, not the spike (at 2 gwei a build and a checkpoint are paid as at 0.5 gwei), so the keeper waits and holders or anyone may act at their own extra cost. A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid. Work resumes when gas falls or the admin raises the ceiling (immediate, D58).  [at most 200000000000000; only in gas_spike]
+      worst 158000000000000 in gas_spike   OK
+  O7: DRAFT. FWA token rewards (D43): claimed and burned, never sold. Supply falls by exactly the claimed amount and the burn pays the caller no ETH, so holders pay no gas and get no token value.  [at most 0; only in tokens]
+      worst 0 in tokens   OK
+  O8: DRAFT. Oracle failure cannot trap assets (D34): with FWA's floor oracle repointed so no quote can be read, nothing new lists, yet the kicked pack is back in inventory and a holder redeeming everything is paid (measured 0.9975 ETH of a 1 ETH deposit).  [at least 950000000000000000; only in oracle_change]
+      worst 998976599426026177 in oracle_change   OK
+  O9: DRAFT. What a holder pays if nothing is ever bought: entering, building, unwinding and exiting with zero acquisitions costs holders at most 1.5% of deposits (measured 0.46%: Shapes mint fees and keeper gas).  [at most 150; only in wind_down]
+      worst 31 in wind_down   OK
+  O10: DRAFT. A relist staged while FWA's queue is busy earns nothing until activated; with the queue drained the vault activates it through FWA's own permissionless activation, so a relist never sits staged forever (D36).  [at least 1; only in staged_activation]
+      worst 1 in staged_activation   OK
+
+DESTINATIONS (% of inflow; largest 7 rows; only the like-for-like regimes: inactive_short, inactive_long)
+  name                                             inactive_shor inactive_long
+  held in vault free ETH (reserve + idle) (change)         61.5%         61.5%
+  held in backing held by FWA (active listings) (c         18.1%         18.1%
+  held in pack value in FWA custody (listed) (chan         15.0%         15.0%
+  held in inventory held by vault (idle packs + lo          5.0%          5.0%
+  paid to keepers (gas + premium)                           0.2%          0.2%
+  Shapes mint fees                                          0.2%          0.2%
+
+GAPS AND FAILURES
+  INCOMPLETE: approval: hash absent or does not match the approved settings

@@ -1,0 +1,13 @@
+vault 0x321d151f896c205ac5c747c2cff4e9a0e185a27c
+policy 0xe7709640478BbF1b1D7FC5bAC840ba3d657782D1
+keeper exit 1
+policy 0xe7709640478BbF1b1D7FC5bAC840ba3d657782D1 v1
+gas 0.071 gwei, 0 open, 0 idle packs, idle 0.0050 ETH, cycle net 1.185 mETH, 7d volume 96/day
+status OK [ok] operating normally
+sent checkpoint nonce 18 hash 0xb2b862b78fd2f549d940e0cc97d99c385aac458e03e1752a418f35a3fb51713c
+REVERTED checkpoint gas 228848 (est 243173) cost 15721292116592 pay 0 net -15721292116592 wei
+error: checkpoint reverted on chain: 0xb2b862b78fd2f549d940e0cc97d99c385aac458e03e1752a418f35a3fb51713c
+
+
+counted [{'label': 'checkpoint', 'to': '0x321d151f896c205ac5c747c2cff4e9a0e185a27c', 'hash': '0xb2b862b78fd2f549d940e0cc97d99c385aac458e03e1752a418f35a3fb51713c', 'block': 26418586, 'block_hash': '0x46eed9c75327dc7e9b7cea30fb5229c98bf3487d2bda43b0afabe17432af5286', 'status': 0, 'gas_used': 228848, 'price': 68697529, 'cost': 15721292116592, 'pay': 0, 'net': -15721292116592, 'est': 243173, 'gas_limit': 303966, 'expected_pay': 32846348720000}]
+unaccepted gas loss wei 15721292116592

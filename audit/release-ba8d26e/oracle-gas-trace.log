@@ -1,0 +1,721 @@
+Missing dependencies found. Installing now...
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/foundry-rs/forge-std' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' failed
+Failed to clone 'lib/forge-std'. Retry scheduled
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/solady' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/vectorized/solady' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/solady' failed
+Failed to clone 'lib/solady'. Retry scheduled
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/foundry-rs/forge-std' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' failed
+Failed to clone 'lib/forge-std' a second time, aborting
+Warning: Your project has missing dependencies that could not be installed.
+No files changed, compilation skipped
+
+Ran 1 test for test/audit/AuditOracleGas.t.sol:AuditOracleGas
+[PASS] test_oracleGasBurnBlocksWindDownExitWithinTransactionCap() (gas: 6255707)
+Traces:
+  [6762807] AuditOracleGas::test_oracleGasBurnBlocksWindDownExitWithinTransactionCap()
+    ├─ [10715] PackVault::getParams() [staticcall]
+    │   └─ ← [Return] Params({ minEdgeBps: 100, bufferBps: 0, distributionBps: 0, payMarkupBps: 1000, keeperShareBps: 2500, allocatedBoundBps: 200, packUnitsMask: 8, gasCeiling: 5000000000 [5e9], maxTip: 50000000 [5e7], workFee: 20000000000000 [2e13], routineCap: 300000000000000000 [3e17], routineRate: 10000000000000000 [1e16], essentialCap: 100000000000000000 [1e17], essentialRate: 5000000000000000 [5e15], maxPositions: 150, reserve: 50000000000000000 [5e16], tvlCap: 100000000000000000000 [1e20] })
+    ├─ [0] VM::prank(pack-vault-test-admin: [0x0EBEDeeC5411CC1b9cca23e8209d493c9a605d42])
+    │   └─ ← [Return]
+    ├─ [59515] PackVault::setParams(Params({ minEdgeBps: 100, bufferBps: 0, distributionBps: 0, payMarkupBps: 0, keeperShareBps: 2500, allocatedBoundBps: 200, packUnitsMask: 8, gasCeiling: 500000000 [5e8], maxTip: 50000000 [5e7], workFee: 20000000000000 [2e13], routineCap: 300000000000000000 [3e17], routineRate: 10000000000000000 [1e16], essentialCap: 100000000000000000 [1e17], essentialRate: 5000000000000000 [5e15], maxPositions: 30, reserve: 5000000000000000 [5e15], tvlCap: 2000000000000000000 [2e18] }))
+    │   ├─ [10087] VaultLib::syncBudget(0, 35) [delegatecall]
+    │   │   └─ ← [Return]
+    │   ├─ [2220] VaultLib::checkBounds(0) [delegatecall]
+    │   │   └─ ← [Stop]
+    │   ├─ [2087] VaultLib::syncBudget(0, 35) [delegatecall]
+    │   │   └─ ← [Return]
+    │   ├─ emit ParamsSet()
+    │   └─ ← [Return]
+    ├─ [10444] PackVault::requestCharge() [staticcall]
+    │   ├─ [4889] VaultLib::requestCharge(0, 0) [delegatecall]
+    │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000032ee841b8000
+    │   └─ ← [Return] 56000000000000 [5.6e13]
+    ├─ [0] VM::prank(pack-vault-test-alice: [0x0EFC0Ad8632873ebC1DFC5f76048Cf8a2EffE015])
+    │   └─ ← [Return]
+    ├─ [195705] PackVault::deposit{value: 1000056000000000000}()
+    │   ├─ [4889] VaultLib::requestCharge{value: 1000056000000000000}(0, 0) [delegatecall]
+    │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000032ee841b8000
+    │   ├─ [2462] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::mintFee() [staticcall]
+    │   │   └─ ← [Return] 1000000000000000 [1e15]
+    │   ├─ [2116] VaultLib::deployCharge{value: 1000056000000000000}(0, 1000000000000000 [1e15]) [delegatecall]
+    │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000232115678a000
+    │   ├─ emit Deposited(holder: pack-vault-test-alice: [0x0EFC0Ad8632873ebC1DFC5f76048Cf8a2EffE015], amount: 1000000000000000000 [1e18], epoch: 0)
+    │   └─ ← [Return]
+    ├─ [0] VM::warp(1794829560 [1.794e9])
+    │   └─ ← [Return]
+    ├─ [0] VM::roll(26424971 [2.642e7])
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(pack-vault-test-keeper: [0x8Ff50Fd788e2D91c8790844d34C4e0632549ebc3])
+    │   └─ ← [Return]
+    ├─ [224222] PackVault::checkpoint(0)
+    │   ├─ [835] 0x958C41181182e76F221331b2755b77D9e1426A98::isPurchaseBlackout() [staticcall]
+    │   │   └─ ← [Return] true
+    │   ├─ [2699] 0x958C41181182e76F221331b2755b77D9e1426A98::unsettledAcquisitionCount() [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [3758] VaultLib::061fd8d4(000000000000000000000000958c41181182e76f221331b2755b77d9e1426a98000000000000000000000000f21514b090da7df4390803497d6ae673801e5ca700000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000006) [delegatecall]
+    │   │   ├─ [2853] 0x958C41181182e76F221331b2755b77D9e1426A98::ownerSettlementFeeBps() [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   └─ ← [Return] 0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+    │   ├─ [3179] 0x958C41181182e76F221331b2755b77D9e1426A98::feeCredit(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   └─ ← [Return] 0
+    │   ├─ [2720] VaultLib::valueIdle() [delegatecall]
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000000
+    │   ├─ emit Checkpoint(epoch: 0, nav: 1010000000000000001 [1.01e18], supply: 100076481664126234 [1e17], filledShares: 0, paid: 0, distributed: 0)
+    │   ├─ [29067] VaultLib::pay(0, 35, KeeperPolicyV1: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 8, 180000 [1.8e5], 1, false, 0, 56000000000000 [5.6e13], 1010056000000000001 [1.01e18]) [delegatecall]
+    │   │   ├─ [543] KeeperPolicyV1::quote(8, 1, 180000 [1.8e5], false, 500000000 [5e8], 50000000 [5e7], 20000000000000 [2e13]) [staticcall]
+    │   │   │   └─ ← [Return] 56000000000000 [5.6e13]
+    │   │   ├─ [0] pack-vault-test-keeper::receive{value: 56000000000000}()
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ emit KeeperPaid(keeper: pack-vault-test-keeper: [0x8Ff50Fd788e2D91c8790844d34C4e0632549ebc3], amount: 56000000000000 [5.6e13])
+    │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000032ee841b8000
+    │   └─ ← [Return] 56000000000000 [5.6e13]
+    ├─ [0] VM::warp(1794859393 [1.794e9])
+    │   └─ ← [Return]
+    ├─ [0] VM::roll(26424971 [2.642e7])
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(pack-vault-test-keeper: [0x8Ff50Fd788e2D91c8790844d34C4e0632549ebc3])
+    │   └─ ← [Return]
+    ├─ [3188225] PackVault::restock(3, 3, 0)
+    │   ├─ [55303] VaultLib::edge() [delegatecall]
+    │   │   ├─ [2853] 0x958C41181182e76F221331b2755b77D9e1426A98::ownerSettlementFeeBps() [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [3403] 0x958C41181182e76F221331b2755b77D9e1426A98::totalWeight() [staticcall]
+    │   │   │   └─ ← [Return] 50412275202038642661546 [5.041e22]
+    │   │   ├─ [3957] 0x958C41181182e76F221331b2755b77D9e1426A98::weightedBackingTotal() [staticcall]
+    │   │   │   └─ ← [Return] 2589999999999999999893680387194291546493 [2.589e39]
+    │   │   ├─ [3064] 0x958C41181182e76F221331b2755b77D9e1426A98::acquisitionFee() [staticcall]
+    │   │   │   └─ ← [Return] 53945194679291622 [5.394e16]
+    │   │   ├─ [2479] 0x958C41181182e76F221331b2755b77D9e1426A98::ownerAcquisitionFeeBps() [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [3293] 0x958C41181182e76F221331b2755b77D9e1426A98::topListingShareBps() [staticcall]
+    │   │   │   └─ ← [Return] 10
+    │   │   ├─ [5217] 0x958C41181182e76F221331b2755b77D9e1426A98::canDeposit(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [4079] 0x958C41181182e76F221331b2755b77D9e1426A98::oracleExemptCollections(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] false
+    │   │   ├─ [2481] 0x958C41181182e76F221331b2755b77D9e1426A98::floorOracle() [staticcall]
+    │   │   │   └─ ← [Return] 0xaA4D9009a4664604b57644bF13e447E9036727DC
+    │   │   ├─ [3493] 0xaA4D9009a4664604b57644bF13e447E9036727DC::getFloorRange(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] 29700000000000000 [2.97e16], 33000000000000000 [3.3e16], 1794689375 [1.794e9], 281474976710655 [2.814e14]
+    │   │   ├─ [1261] 0x958C41181182e76F221331b2755b77D9e1426A98::maxOracleAge() [staticcall]
+    │   │   │   └─ ← [Return] 604800 [6.048e5]
+    │   │   ├─ [2249] 0x958C41181182e76F221331b2755b77D9e1426A98::minOracleChallengePeriod() [staticcall]
+    │   │   │   └─ ← [Return] 21600 [2.16e4]
+    │   │   ├─ [4186] 0x958C41181182e76F221331b2755b77D9e1426A98::oracleCeilingPremiumBps() [staticcall]
+    │   │   │   └─ ← [Return] 1000
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000e695a529fc648000000000000000000000000000000000000000000000000000080f6a85d58c0000000000000000000000000000000000000000000000000000000000000000001
+    │   ├─ [2462] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::mintFee() [staticcall]
+    │   │   └─ ← [Return] 1000000000000000 [1e15]
+    │   ├─ [3259] VaultLib::quote(0, 1390000 [1.39e6], 2, false) [delegatecall]
+    │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000121382509e000
+    │   ├─ [1197] VaultLib::cycleNet(0, 1038460500000000000 [1.038e18], 36300000000000000 [3.63e16]) [delegatecall]
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000004609a65715980
+    │   ├─ [137489] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::mint{value: 101000000000000000}(100000000000000000 [1e17])
+    │   │   ├─ emit MintFeeAccrued(amountWei: 1000000000000000 [1e15])
+    │   │   ├─ [506] 0x34a7a97B92288B3F804F416B3B15214FB85e4200::geneAtMint{value: 101000000000000000}(0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, 2) [delegatecall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000002
+    │   │   ├─ emit ShapeMinted(tokenId: 1049, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], amountWei: 100000000000000000 [1e17], seed: 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, originCount: 1)
+    │   │   ├─ emit InkGene(tokenId: 1049, gene: 2)
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 1049)
+    │   │   ├─ [589] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 1049, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   └─ ← [Return] 1049
+    │   ├─ [1855564] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::split(1049, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    │   │   ├─ emit Transfer(from: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: 0x0000000000000000000000000000000000000000, id: 1049)
+    │   │   ├─ [1551682] 0x94F63d2bCBcd6A3980bebbBe71de498E57f200f2::split() [delegatecall]
+    │   │   │   ├─ [20228] 0x991e1352b0f6131748f36D8d45f756d55ee930D3::effectiveModulesOf(0x, 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, 2, 2) [delegatecall]
+    │   │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000101000091924064406223347730944467600000000000000000000000000000000
+    │   │   │   ├─ [43425] 0x991e1352b0f6131748f36D8d45f756d55ee930D3::sampleSplitChildFromPool(false, 0x, 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, 2, 0, 0) [delegatecall]
+    │   │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000190629090000074744337309730709770609002906733829220000000000000000
+    │   │   │   ├─ [43425] 0x991e1352b0f6131748f36D8d45f756d55ee930D3::sampleSplitChildFromPool(false, 0x, 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, 2, 0, 1) [delegatecall]
+    │   │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000190673732206290924470000007822062900100037002207730600000000000000
+    │   │   │   ├─ [43425] 0x991e1352b0f6131748f36D8d45f756d55ee930D3::sampleSplitChildFromPool(false, 0x, 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, 2, 0, 2) [delegatecall]
+    │   │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000192909240000003310772400292244780606447647093746333300000000000000
+    │   │   │   ├─ [43425] 0x991e1352b0f6131748f36D8d45f756d55ee930D3::sampleSplitChildFromPool(false, 0x, 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, 2, 0, 3) [delegatecall]
+    │   │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000190000091076330010074733730944461937241029440000442900000000000000
+    │   │   │   ├─ [43425] 0x991e1352b0f6131748f36D8d45f756d55ee930D3::sampleSplitChildFromPool(false, 0x, 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, 2, 0, 4) [delegatecall]
+    │   │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000197622440073093744782247447729073829467677760073093300000000000000
+    │   │   │   ├─ [43425] 0x991e1352b0f6131748f36D8d45f756d55ee930D3::sampleSplitChildFromPool(false, 0x, 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, 2, 0, 5) [delegatecall]
+    │   │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000197310060047003737064600227644007606374407074644001000000000000000
+    │   │   │   ├─ [43425] 0x991e1352b0f6131748f36D8d45f756d55ee930D3::sampleSplitChildFromPool(false, 0x, 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, 2, 0, 6) [delegatecall]
+    │   │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000197838103306292400737300380006220078074747734447733300000000000000
+    │   │   │   ├─ [43425] 0x991e1352b0f6131748f36D8d45f756d55ee930D3::sampleSplitChildFromPool(false, 0x, 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, 2, 0, 7) [delegatecall]
+    │   │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000190006771929063700090978337673090644474400240629774400000000000000
+    │   │   │   ├─ [43425] 0x991e1352b0f6131748f36D8d45f756d55ee930D3::sampleSplitChildFromPool(false, 0x, 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, 2, 0, 8) [delegatecall]
+    │   │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000197700067809000638760019193833004447460047472244332400000000000000
+    │   │   │   ├─ [43425] 0x991e1352b0f6131748f36D8d45f756d55ee930D3::sampleSplitChildFromPool(false, 0x, 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, 2, 0, 9) [delegatecall]
+    │   │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000190644474624370707441006380073220973470929762429002400000000000000
+    │   │   │   ├─ emit Split(tokenId: 1049, parentSeed: 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, newIds: [1050, 1051, 1052, 1053, 1054, 1055, 1056, 1057, 1058, 1059], outDenoms: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], originCounts: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    │   │   │   ├─ emit InkGene(tokenId: 1050, gene: 2)
+    │   │   │   ├─ emit ShapeFragmentCreated(parentId: 1049, childId: 1050, parentSeed: 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, childIndex: 0)
+    │   │   │   ├─ emit ModulesSampled(tokenId: 1050, modules: 0x06290900000747443373097307097706090029067338292200)
+    │   │   │   ├─ emit InkGene(tokenId: 1051, gene: 2)
+    │   │   │   ├─ emit ShapeFragmentCreated(parentId: 1049, childId: 1051, parentSeed: 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, childIndex: 1)
+    │   │   │   ├─ emit ModulesSampled(tokenId: 1051, modules: 0x06737322062909244700000078220629001000370022077306)
+    │   │   │   ├─ emit InkGene(tokenId: 1052, gene: 2)
+    │   │   │   ├─ emit ShapeFragmentCreated(parentId: 1049, childId: 1052, parentSeed: 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, childIndex: 2)
+    │   │   │   ├─ emit ModulesSampled(tokenId: 1052, modules: 0x29092400000033107724002922447806064476470937463333)
+    │   │   │   ├─ emit InkGene(tokenId: 1053, gene: 2)
+    │   │   │   ├─ emit ShapeFragmentCreated(parentId: 1049, childId: 1053, parentSeed: 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, childIndex: 3)
+    │   │   │   ├─ emit ModulesSampled(tokenId: 1053, modules: 0x00000910763300100747337309444619372410294400004429)
+    │   │   │   ├─ emit InkGene(tokenId: 1054, gene: 2)
+    │   │   │   ├─ emit ShapeFragmentCreated(parentId: 1049, childId: 1054, parentSeed: 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, childIndex: 4)
+    │   │   │   ├─ emit ModulesSampled(tokenId: 1054, modules: 0x76224400730937447822474477290738294676777600730933)
+    │   │   │   ├─ emit InkGene(tokenId: 1055, gene: 2)
+    │   │   │   ├─ emit ShapeFragmentCreated(parentId: 1049, childId: 1055, parentSeed: 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, childIndex: 5)
+    │   │   │   ├─ emit ModulesSampled(tokenId: 1055, modules: 0x73100600470037370646002276440076063744070746440010)
+    │   │   │   ├─ emit InkGene(tokenId: 1056, gene: 2)
+    │   │   │   ├─ emit ShapeFragmentCreated(parentId: 1049, childId: 1056, parentSeed: 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, childIndex: 6)
+    │   │   │   ├─ emit ModulesSampled(tokenId: 1056, modules: 0x78381033062924007373003800062200780747477344477333)
+    │   │   │   ├─ emit InkGene(tokenId: 1057, gene: 2)
+    │   │   │   ├─ emit ShapeFragmentCreated(parentId: 1049, childId: 1057, parentSeed: 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, childIndex: 7)
+    │   │   │   ├─ emit ModulesSampled(tokenId: 1057, modules: 0x00067719290637000909783376730906444744002406297744)
+    │   │   │   ├─ emit InkGene(tokenId: 1058, gene: 2)
+    │   │   │   ├─ emit ShapeFragmentCreated(parentId: 1049, childId: 1058, parentSeed: 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, childIndex: 8)
+    │   │   │   ├─ emit ModulesSampled(tokenId: 1058, modules: 0x77000678090006387600191938330044474600474722443324)
+    │   │   │   ├─ emit InkGene(tokenId: 1059, gene: 2)
+    │   │   │   ├─ emit ShapeFragmentCreated(parentId: 1049, childId: 1059, parentSeed: 0xd7392f030e244179e33bf66665977bf8726901b1e14b96b9e62f02f196f127db, childIndex: 9)
+    │   │   │   ├─ emit ModulesSampled(tokenId: 1059, modules: 0x06444746243707074410063800732209734709297624290024)
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000041a000000000000000000000000000000000000000000000000000000000000041b000000000000000000000000000000000000000000000000000000000000041c000000000000000000000000000000000000000000000000000000000000041d000000000000000000000000000000000000000000000000000000000000041e000000000000000000000000000000000000000000000000000000000000041f0000000000000000000000000000000000000000000000000000000000000420000000000000000000000000000000000000000000000000000000000000042100000000000000000000000000000000000000000000000000000000000004220000000000000000000000000000000000000000000000000000000000000423
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 1050)
+    │   │   ├─ [589] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 1050, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 1051)
+    │   │   ├─ [589] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 1051, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 1052)
+    │   │   ├─ [589] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 1052, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 1053)
+    │   │   ├─ [589] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 1053, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 1054)
+    │   │   ├─ [589] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 1054, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 1055)
+    │   │   ├─ [589] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 1055, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 1056)
+    │   │   ├─ [589] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 1056, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 1057)
+    │   │   ├─ [589] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 1057, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 1058)
+    │   │   ├─ [589] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 1058, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 1059)
+    │   │   ├─ [589] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 1059, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   └─ ← [Return] [1050, 1051, 1052, 1053, 1054, 1055, 1056, 1057, 1058, 1059]
+    │   ├─ [343539] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::createPack([1059, 1058, 1057], [0, 0, 0, 0, 0, 0, 0, 0, 0])
+    │   │   ├─ [975] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationCount() [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000009
+    │   │   ├─ [462] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::mintFee() [staticcall]
+    │   │   │   └─ ← [Return] 1000000000000000 [1e15]
+    │   │   ├─ [1559] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(0) [staticcall]
+    │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000002386f26fc10000
+    │   │   ├─ [1581] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(1) [staticcall]
+    │   │   │   └─ ← [Return] 0x00000000000000000000000000000000000000000000000000b1a2bc2ec50000
+    │   │   ├─ [1603] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(2) [staticcall]
+    │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000016345785d8a0000
+    │   │   ├─ [1625] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(3) [staticcall]
+    │   │   │   └─ ← [Return] 0x00000000000000000000000000000000000000000000000006f05b59d3b20000
+    │   │   ├─ [1647] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(4) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000de0b6b3a7640000
+    │   │   ├─ [1669] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(5) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000004563918244f40000
+    │   │   ├─ [1691] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(6) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000008ac7230489e80000
+    │   │   ├─ [1713] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(7) [staticcall]
+    │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000002b5e3af16b1880000
+    │   │   ├─ [1735] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(8) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000056bc75e2d63100000
+    │   │   ├─ [2785] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::backingOf(1059) [staticcall]
+    │   │   │   └─ ← [Return] 10000000000000000 [1e16]
+    │   │   ├─ [13209] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::transferFrom(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0xf21514B090Da7dF4390803497d6ae673801E5cA7, 1059)
+    │   │   │   ├─ emit Transfer(from: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: 0xf21514B090Da7dF4390803497d6ae673801E5cA7, id: 1059)
+    │   │   │   └─ ← [Return]
+    │   │   ├─ [2785] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::backingOf(1058) [staticcall]
+    │   │   │   └─ ← [Return] 10000000000000000 [1e16]
+    │   │   ├─ [6409] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::transferFrom(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0xf21514B090Da7dF4390803497d6ae673801E5cA7, 1058)
+    │   │   │   ├─ emit Transfer(from: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: 0xf21514B090Da7dF4390803497d6ae673801E5cA7, id: 1058)
+    │   │   │   └─ ← [Return]
+    │   │   ├─ [2785] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::backingOf(1057) [staticcall]
+    │   │   │   └─ ← [Return] 10000000000000000 [1e16]
+    │   │   ├─ [6409] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::transferFrom(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0xf21514B090Da7dF4390803497d6ae673801E5cA7, 1057)
+    │   │   │   ├─ emit Transfer(from: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: 0xf21514B090Da7dF4390803497d6ae673801E5cA7, id: 1057)
+    │   │   │   └─ ← [Return]
+    │   │   ├─ emit PackCreated(packId: 241, creator: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], shapeIds: [1059, 1058, 1057], pulledCount: 3, valueWei: 30000000000000000 [3e16])
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 241)
+    │   │   ├─ [632] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 241, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   └─ ← [Return] 241
+    │   ├─ [303239] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::createPack([1056, 1055, 1054], [0, 0, 0, 0, 0, 0, 0, 0, 0])
+    │   │   ├─ [975] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationCount() [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000009
+    │   │   ├─ [462] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::mintFee() [staticcall]
+    │   │   │   └─ ← [Return] 1000000000000000 [1e15]
+    │   │   ├─ [1559] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(0) [staticcall]
+    │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000002386f26fc10000
+    │   │   ├─ [1581] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(1) [staticcall]
+    │   │   │   └─ ← [Return] 0x00000000000000000000000000000000000000000000000000b1a2bc2ec50000
+    │   │   ├─ [1603] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(2) [staticcall]
+    │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000016345785d8a0000
+    │   │   ├─ [1625] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(3) [staticcall]
+    │   │   │   └─ ← [Return] 0x00000000000000000000000000000000000000000000000006f05b59d3b20000
+    │   │   ├─ [1647] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(4) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000de0b6b3a7640000
+    │   │   ├─ [1669] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(5) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000004563918244f40000
+    │   │   ├─ [1691] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(6) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000008ac7230489e80000
+    │   │   ├─ [1713] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(7) [staticcall]
+    │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000002b5e3af16b1880000
+    │   │   ├─ [1735] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(8) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000056bc75e2d63100000
+    │   │   ├─ [2785] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::backingOf(1056) [staticcall]
+    │   │   │   └─ ← [Return] 10000000000000000 [1e16]
+    │   │   ├─ [6409] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::transferFrom(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0xf21514B090Da7dF4390803497d6ae673801E5cA7, 1056)
+    │   │   │   ├─ emit Transfer(from: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: 0xf21514B090Da7dF4390803497d6ae673801E5cA7, id: 1056)
+    │   │   │   └─ ← [Return]
+    │   │   ├─ [2785] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::backingOf(1055) [staticcall]
+    │   │   │   └─ ← [Return] 10000000000000000 [1e16]
+    │   │   ├─ [6409] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::transferFrom(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0xf21514B090Da7dF4390803497d6ae673801E5cA7, 1055)
+    │   │   │   ├─ emit Transfer(from: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: 0xf21514B090Da7dF4390803497d6ae673801E5cA7, id: 1055)
+    │   │   │   └─ ← [Return]
+    │   │   ├─ [2785] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::backingOf(1054) [staticcall]
+    │   │   │   └─ ← [Return] 10000000000000000 [1e16]
+    │   │   ├─ [6409] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::transferFrom(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0xf21514B090Da7dF4390803497d6ae673801E5cA7, 1054)
+    │   │   │   ├─ emit Transfer(from: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: 0xf21514B090Da7dF4390803497d6ae673801E5cA7, id: 1054)
+    │   │   │   └─ ← [Return]
+    │   │   ├─ emit PackCreated(packId: 242, creator: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], shapeIds: [1056, 1055, 1054], pulledCount: 3, valueWei: 30000000000000000 [3e16])
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 242)
+    │   │   ├─ [632] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 242, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   └─ ← [Return] 242
+    │   ├─ [303239] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::createPack([1053, 1052, 1051], [0, 0, 0, 0, 0, 0, 0, 0, 0])
+    │   │   ├─ [975] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationCount() [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000009
+    │   │   ├─ [462] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::mintFee() [staticcall]
+    │   │   │   └─ ← [Return] 1000000000000000 [1e15]
+    │   │   ├─ [1559] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(0) [staticcall]
+    │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000002386f26fc10000
+    │   │   ├─ [1581] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(1) [staticcall]
+    │   │   │   └─ ← [Return] 0x00000000000000000000000000000000000000000000000000b1a2bc2ec50000
+    │   │   ├─ [1603] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(2) [staticcall]
+    │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000016345785d8a0000
+    │   │   ├─ [1625] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(3) [staticcall]
+    │   │   │   └─ ← [Return] 0x00000000000000000000000000000000000000000000000006f05b59d3b20000
+    │   │   ├─ [1647] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(4) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000de0b6b3a7640000
+    │   │   ├─ [1669] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(5) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000004563918244f40000
+    │   │   ├─ [1691] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(6) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000008ac7230489e80000
+    │   │   ├─ [1713] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(7) [staticcall]
+    │   │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000002b5e3af16b1880000
+    │   │   ├─ [1735] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::denominationAt(8) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000056bc75e2d63100000
+    │   │   ├─ [2785] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::backingOf(1053) [staticcall]
+    │   │   │   └─ ← [Return] 10000000000000000 [1e16]
+    │   │   ├─ [6409] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::transferFrom(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0xf21514B090Da7dF4390803497d6ae673801E5cA7, 1053)
+    │   │   │   ├─ emit Transfer(from: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: 0xf21514B090Da7dF4390803497d6ae673801E5cA7, id: 1053)
+    │   │   │   └─ ← [Return]
+    │   │   ├─ [2785] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::backingOf(1052) [staticcall]
+    │   │   │   └─ ← [Return] 10000000000000000 [1e16]
+    │   │   ├─ [6409] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::transferFrom(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0xf21514B090Da7dF4390803497d6ae673801E5cA7, 1052)
+    │   │   │   ├─ emit Transfer(from: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: 0xf21514B090Da7dF4390803497d6ae673801E5cA7, id: 1052)
+    │   │   │   └─ ← [Return]
+    │   │   ├─ [2785] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::backingOf(1051) [staticcall]
+    │   │   │   └─ ← [Return] 10000000000000000 [1e16]
+    │   │   ├─ [6409] 0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0::transferFrom(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0xf21514B090Da7dF4390803497d6ae673801E5cA7, 1051)
+    │   │   │   ├─ emit Transfer(from: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: 0xf21514B090Da7dF4390803497d6ae673801E5cA7, id: 1051)
+    │   │   │   └─ ← [Return]
+    │   │   ├─ emit PackCreated(packId: 243, creator: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], shapeIds: [1053, 1052, 1051], pulledCount: 3, valueWei: 30000000000000000 [3e16])
+    │   │   ├─ emit Transfer(from: 0x0000000000000000000000000000000000000000, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 243)
+    │   │   ├─ [632] PackVault::onERC721Received(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 243, 0x)
+    │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   └─ ← [Return] 243
+    │   ├─ emit Restocked(packs: 3, units: 3)
+    │   ├─ [25067] VaultLib::pay(0, 35, KeeperPolicyV1: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 1, 3080000 [3.08e6], 3, false, 0, 115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77], 909000000000000001 [9.09e17]) [delegatecall]
+    │   │   ├─ [543] KeeperPolicyV1::quote(1, 3, 3080000 [3.08e6], false, 500000000 [5e8], 50000000 [5e7], 20000000000000 [2e13]) [staticcall]
+    │   │   │   └─ ← [Return] 676000000000000 [6.76e14]
+    │   │   ├─ [0] pack-vault-test-keeper::receive{value: 676000000000000}()
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ emit KeeperPaid(keeper: pack-vault-test-keeper: [0x8Ff50Fd788e2D91c8790844d34C4e0632549ebc3], amount: 676000000000000 [6.76e14])
+    │   │   └─ ← [Return] 0x000000000000000000000000000000000000000000000000000266d183de4000
+    │   └─ ← [Return] 676000000000000 [6.76e14]
+    ├─ [0] VM::prank(pack-vault-test-keeper: [0x8Ff50Fd788e2D91c8790844d34C4e0632549ebc3])
+    │   └─ ← [Return]
+    ├─ [1934827] PackVault::list(3, 0)
+    │   ├─ [5575] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::valueOf(243) [staticcall]
+    │   │   └─ ← [Return] 30000000000000000 [3e16]
+    │   ├─ [57303] VaultLib::edge() [delegatecall]
+    │   │   ├─ [2853] 0x958C41181182e76F221331b2755b77D9e1426A98::ownerSettlementFeeBps() [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [3403] 0x958C41181182e76F221331b2755b77D9e1426A98::totalWeight() [staticcall]
+    │   │   │   └─ ← [Return] 50412275202038642661546 [5.041e22]
+    │   │   ├─ [3957] 0x958C41181182e76F221331b2755b77D9e1426A98::weightedBackingTotal() [staticcall]
+    │   │   │   └─ ← [Return] 2589999999999999999893680387194291546493 [2.589e39]
+    │   │   ├─ [3064] 0x958C41181182e76F221331b2755b77D9e1426A98::acquisitionFee() [staticcall]
+    │   │   │   └─ ← [Return] 53945194679291622 [5.394e16]
+    │   │   ├─ [2479] 0x958C41181182e76F221331b2755b77D9e1426A98::ownerAcquisitionFeeBps() [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [3293] 0x958C41181182e76F221331b2755b77D9e1426A98::topListingShareBps() [staticcall]
+    │   │   │   └─ ← [Return] 10
+    │   │   ├─ [5217] 0x958C41181182e76F221331b2755b77D9e1426A98::canDeposit(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [4079] 0x958C41181182e76F221331b2755b77D9e1426A98::oracleExemptCollections(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] false
+    │   │   ├─ [2481] 0x958C41181182e76F221331b2755b77D9e1426A98::floorOracle() [staticcall]
+    │   │   │   └─ ← [Return] 0xaA4D9009a4664604b57644bF13e447E9036727DC
+    │   │   ├─ [3493] 0xaA4D9009a4664604b57644bF13e447E9036727DC::getFloorRange(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] 29700000000000000 [2.97e16], 33000000000000000 [3.3e16], 1794689375 [1.794e9], 281474976710655 [2.814e14]
+    │   │   ├─ [1261] 0x958C41181182e76F221331b2755b77D9e1426A98::maxOracleAge() [staticcall]
+    │   │   │   └─ ← [Return] 604800 [6.048e5]
+    │   │   ├─ [2249] 0x958C41181182e76F221331b2755b77D9e1426A98::minOracleChallengePeriod() [staticcall]
+    │   │   │   └─ ← [Return] 21600 [2.16e4]
+    │   │   ├─ [4186] 0x958C41181182e76F221331b2755b77D9e1426A98::oracleCeilingPremiumBps() [staticcall]
+    │   │   │   └─ ← [Return] 1000
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000e695a529fc648000000000000000000000000000000000000000000000000000080f6a85d58c0000000000000000000000000000000000000000000000000000000000000000001
+    │   ├─ [3197] VaultLib::cycleNet(0, 1038460500000000000 [1.038e18], 36300000000000000 [3.63e16]) [delegatecall]
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000004609a65715980
+    │   ├─ [604641] 0x958C41181182e76F221331b2755b77D9e1426A98::listNFT{value: 36300000000000000}(0xf21514B090Da7dF4390803497d6ae673801E5cA7, 243)
+    │   │   ├─ [2939] 0xD09c161c0972cbCaE8D6A68Da6a446025EB03351::isLaunch(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000000
+    │   │   ├─ [1493] 0xaA4D9009a4664604b57644bF13e447E9036727DC::getFloorRange(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] 29700000000000000 [2.97e16], 33000000000000000 [3.3e16], 1794689375 [1.794e9], 281474976710655 [2.814e14]
+    │   │   ├─ [20733] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::transferFrom(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x958C41181182e76F221331b2755b77D9e1426A98, 243)
+    │   │   │   ├─ emit Transfer(from: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: 0x958C41181182e76F221331b2755b77D9e1426A98, id: 243)
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ [990] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::ownerOf(243) [staticcall]
+    │   │   │   └─ ← [Return] 0x958C41181182e76F221331b2755b77D9e1426A98
+    │   │   ├─ [939] 0xD09c161c0972cbCaE8D6A68Da6a446025EB03351::isLaunch(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000000
+    │   │   ├─ [1493] 0xaA4D9009a4664604b57644bF13e447E9036727DC::getFloorRange(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] 29700000000000000 [2.97e16], 33000000000000000 [3.3e16], 1794689375 [1.794e9], 281474976710655 [2.814e14]
+    │   │   ├─ [78923] 0xA54b44C7a894AA19C49734A753D01f9B8C5f6516::onListingActivated(100893 [1.008e5], PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 36300000000000000 [3.63e16])
+    │   │   │   ├─  emit topic 0: 0xc19c446b4ee563fe45da68d79680e6700e757d2ebb1bd7f2f48564e24313fcfb
+    │   │   │   │        topic 1: 0x0000000000000000000000000000000000000000000000000000000000018a1d
+    │   │   │   │        topic 2: 0x0000000000000000000000002e234dae75c793f67a35089c9d99245e1c58470b
+    │   │   │   │           data: 0x0000000000000000000000000000000000000000000000000080f6a85d58c000000000000000000000000000000000000000000000000000000000000b5b3094
+    │   │   │   └─ ← [Return]
+    │   │   ├─ emit NFTListed(listingId: 100893 [1.008e5], slot: 3615, depositor: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], collection: 0xf21514B090Da7dF4390803497d6ae673801E5cA7, tokenId: 243, weight: 27548209366391184573 [2.754e19], price: 36300000000000000 [3.63e16])
+    │   │   └─ ← [Return] 100893 [1.008e5]
+    │   ├─ emit Listed(listingId: 100893 [1.008e5], packId: 243, backing: 36300000000000000 [3.63e16])
+    │   ├─ [5575] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::valueOf(242) [staticcall]
+    │   │   └─ ← [Return] 30000000000000000 [3e16]
+    │   ├─ [26303] VaultLib::edge() [delegatecall]
+    │   │   ├─ [853] 0x958C41181182e76F221331b2755b77D9e1426A98::ownerSettlementFeeBps() [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [1403] 0x958C41181182e76F221331b2755b77D9e1426A98::totalWeight() [staticcall]
+    │   │   │   └─ ← [Return] 50439823411405033846119 [5.043e22]
+    │   │   ├─ [1957] 0x958C41181182e76F221331b2755b77D9e1426A98::weightedBackingTotal() [staticcall]
+    │   │   │   └─ ← [Return] 2590999999999999999893680287194291546493 [2.59e39]
+    │   │   ├─ [1064] 0x958C41181182e76F221331b2755b77D9e1426A98::acquisitionFee() [staticcall]
+    │   │   │   └─ ← [Return] 53936548861605487 [5.393e16]
+    │   │   ├─ [479] 0x958C41181182e76F221331b2755b77D9e1426A98::ownerAcquisitionFeeBps() [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [1293] 0x958C41181182e76F221331b2755b77D9e1426A98::topListingShareBps() [staticcall]
+    │   │   │   └─ ← [Return] 10
+    │   │   ├─ [1217] 0x958C41181182e76F221331b2755b77D9e1426A98::canDeposit(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [2079] 0x958C41181182e76F221331b2755b77D9e1426A98::oracleExemptCollections(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] false
+    │   │   ├─ [481] 0x958C41181182e76F221331b2755b77D9e1426A98::floorOracle() [staticcall]
+    │   │   │   └─ ← [Return] 0xaA4D9009a4664604b57644bF13e447E9036727DC
+    │   │   ├─ [1493] 0xaA4D9009a4664604b57644bF13e447E9036727DC::getFloorRange(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] 29700000000000000 [2.97e16], 33000000000000000 [3.3e16], 1794689375 [1.794e9], 281474976710655 [2.814e14]
+    │   │   ├─ [1261] 0x958C41181182e76F221331b2755b77D9e1426A98::maxOracleAge() [staticcall]
+    │   │   │   └─ ← [Return] 604800 [6.048e5]
+    │   │   ├─ [2249] 0x958C41181182e76F221331b2755b77D9e1426A98::minOracleChallengePeriod() [staticcall]
+    │   │   │   └─ ← [Return] 21600 [2.16e4]
+    │   │   ├─ [2186] 0x958C41181182e76F221331b2755b77D9e1426A98::oracleCeilingPremiumBps() [staticcall]
+    │   │   │   └─ ← [Return] 1000
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000e695a529fc647f90000000000000000000000000000000000000000000000000080f6a85d58c0000000000000000000000000000000000000000000000000000000000000000001
+    │   ├─ [1197] VaultLib::cycleNet(0, 1038460499999999993 [1.038e18], 36300000000000000 [3.63e16]) [delegatecall]
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000004609a6571597f
+    │   ├─ [458341] 0x958C41181182e76F221331b2755b77D9e1426A98::listNFT{value: 36300000000000000}(0xf21514B090Da7dF4390803497d6ae673801E5cA7, 242)
+    │   │   ├─ [939] 0xD09c161c0972cbCaE8D6A68Da6a446025EB03351::isLaunch(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000000
+    │   │   ├─ [1493] 0xaA4D9009a4664604b57644bF13e447E9036727DC::getFloorRange(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] 29700000000000000 [2.97e16], 33000000000000000 [3.3e16], 1794689375 [1.794e9], 281474976710655 [2.814e14]
+    │   │   ├─ [9133] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::transferFrom(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x958C41181182e76F221331b2755b77D9e1426A98, 242)
+    │   │   │   ├─ emit Transfer(from: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: 0x958C41181182e76F221331b2755b77D9e1426A98, id: 242)
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ [990] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::ownerOf(242) [staticcall]
+    │   │   │   └─ ← [Return] 0x958C41181182e76F221331b2755b77D9e1426A98
+    │   │   ├─ [939] 0xD09c161c0972cbCaE8D6A68Da6a446025EB03351::isLaunch(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000000
+    │   │   ├─ [1493] 0xaA4D9009a4664604b57644bF13e447E9036727DC::getFloorRange(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] 29700000000000000 [2.97e16], 33000000000000000 [3.3e16], 1794689375 [1.794e9], 281474976710655 [2.814e14]
+    │   │   ├─ [70123] 0xA54b44C7a894AA19C49734A753D01f9B8C5f6516::onListingActivated(100894 [1.008e5], PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 36300000000000000 [3.63e16])
+    │   │   │   ├─  emit topic 0: 0xc19c446b4ee563fe45da68d79680e6700e757d2ebb1bd7f2f48564e24313fcfb
+    │   │   │   │        topic 1: 0x0000000000000000000000000000000000000000000000000000000000018a1e
+    │   │   │   │        topic 2: 0x0000000000000000000000002e234dae75c793f67a35089c9d99245e1c58470b
+    │   │   │   │           data: 0x0000000000000000000000000000000000000000000000000080f6a85d58c000000000000000000000000000000000000000000000000000000000000b5b3094
+    │   │   │   └─ ← [Return]
+    │   │   ├─ emit NFTListed(listingId: 100894 [1.008e5], slot: 5531, depositor: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], collection: 0xf21514B090Da7dF4390803497d6ae673801E5cA7, tokenId: 242, weight: 27548209366391184573 [2.754e19], price: 36300000000000000 [3.63e16])
+    │   │   └─ ← [Return] 100894 [1.008e5]
+    │   ├─ emit Listed(listingId: 100894 [1.008e5], packId: 242, backing: 36300000000000000 [3.63e16])
+    │   ├─ [5575] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::valueOf(241) [staticcall]
+    │   │   └─ ← [Return] 30000000000000000 [3e16]
+    │   ├─ [26303] VaultLib::edge() [delegatecall]
+    │   │   ├─ [853] 0x958C41181182e76F221331b2755b77D9e1426A98::ownerSettlementFeeBps() [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [1403] 0x958C41181182e76F221331b2755b77D9e1426A98::totalWeight() [staticcall]
+    │   │   │   └─ ← [Return] 50467371620771425030692 [5.046e22]
+    │   │   ├─ [1957] 0x958C41181182e76F221331b2755b77D9e1426A98::weightedBackingTotal() [staticcall]
+    │   │   │   └─ ← [Return] 2591999999999999999893680187194291546493 [2.591e39]
+    │   │   ├─ [1064] 0x958C41181182e76F221331b2755b77D9e1426A98::acquisitionFee() [staticcall]
+    │   │   │   └─ ← [Return] 53927912482762236 [5.392e16]
+    │   │   ├─ [479] 0x958C41181182e76F221331b2755b77D9e1426A98::ownerAcquisitionFeeBps() [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [1293] 0x958C41181182e76F221331b2755b77D9e1426A98::topListingShareBps() [staticcall]
+    │   │   │   └─ ← [Return] 10
+    │   │   ├─ [1217] 0x958C41181182e76F221331b2755b77D9e1426A98::canDeposit(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [2079] 0x958C41181182e76F221331b2755b77D9e1426A98::oracleExemptCollections(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] false
+    │   │   ├─ [481] 0x958C41181182e76F221331b2755b77D9e1426A98::floorOracle() [staticcall]
+    │   │   │   └─ ← [Return] 0xaA4D9009a4664604b57644bF13e447E9036727DC
+    │   │   ├─ [1493] 0xaA4D9009a4664604b57644bF13e447E9036727DC::getFloorRange(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] 29700000000000000 [2.97e16], 33000000000000000 [3.3e16], 1794689375 [1.794e9], 281474976710655 [2.814e14]
+    │   │   ├─ [1261] 0x958C41181182e76F221331b2755b77D9e1426A98::maxOracleAge() [staticcall]
+    │   │   │   └─ ← [Return] 604800 [6.048e5]
+    │   │   ├─ [2249] 0x958C41181182e76F221331b2755b77D9e1426A98::minOracleChallengePeriod() [staticcall]
+    │   │   │   └─ ← [Return] 21600 [2.16e4]
+    │   │   ├─ [2186] 0x958C41181182e76F221331b2755b77D9e1426A98::oracleCeilingPremiumBps() [staticcall]
+    │   │   │   └─ ← [Return] 1000
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000e695a529fc647f70000000000000000000000000000000000000000000000000080f6a85d58c0000000000000000000000000000000000000000000000000000000000000000001
+    │   ├─ [1197] VaultLib::cycleNet(0, 1038460499999999991 [1.038e18], 36300000000000000 [3.63e16]) [delegatecall]
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000004609a6571597f
+    │   ├─ [431641] 0x958C41181182e76F221331b2755b77D9e1426A98::listNFT{value: 36300000000000000}(0xf21514B090Da7dF4390803497d6ae673801E5cA7, 241)
+    │   │   ├─ [939] 0xD09c161c0972cbCaE8D6A68Da6a446025EB03351::isLaunch(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000000
+    │   │   ├─ [1493] 0xaA4D9009a4664604b57644bF13e447E9036727DC::getFloorRange(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] 29700000000000000 [2.97e16], 33000000000000000 [3.3e16], 1794689375 [1.794e9], 281474976710655 [2.814e14]
+    │   │   ├─ [9133] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::transferFrom(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x958C41181182e76F221331b2755b77D9e1426A98, 241)
+    │   │   │   ├─ emit Transfer(from: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], to: 0x958C41181182e76F221331b2755b77D9e1426A98, id: 241)
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ [990] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::ownerOf(241) [staticcall]
+    │   │   │   └─ ← [Return] 0x958C41181182e76F221331b2755b77D9e1426A98
+    │   │   ├─ [939] 0xD09c161c0972cbCaE8D6A68Da6a446025EB03351::isLaunch(PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000000
+    │   │   ├─ [1493] 0xaA4D9009a4664604b57644bF13e447E9036727DC::getFloorRange(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] 29700000000000000 [2.97e16], 33000000000000000 [3.3e16], 1794689375 [1.794e9], 281474976710655 [2.814e14]
+    │   │   ├─ [70123] 0xA54b44C7a894AA19C49734A753D01f9B8C5f6516::onListingActivated(100895 [1.008e5], PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 36300000000000000 [3.63e16])
+    │   │   │   ├─  emit topic 0: 0xc19c446b4ee563fe45da68d79680e6700e757d2ebb1bd7f2f48564e24313fcfb
+    │   │   │   │        topic 1: 0x0000000000000000000000000000000000000000000000000000000000018a1f
+    │   │   │   │        topic 2: 0x0000000000000000000000002e234dae75c793f67a35089c9d99245e1c58470b
+    │   │   │   │           data: 0x0000000000000000000000000000000000000000000000000080f6a85d58c000000000000000000000000000000000000000000000000000000000000b5b3094
+    │   │   │   └─ ← [Return]
+    │   │   ├─ emit NFTListed(listingId: 100895 [1.008e5], slot: 2668, depositor: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], collection: 0xf21514B090Da7dF4390803497d6ae673801E5cA7, tokenId: 241, weight: 27548209366391184573 [2.754e19], price: 36300000000000000 [3.63e16])
+    │   │   └─ ← [Return] 100895 [1.008e5]
+    │   ├─ emit Listed(listingId: 100895 [1.008e5], packId: 241, backing: 36300000000000000 [3.63e16])
+    │   ├─ [22267] VaultLib::pay(0, 35, KeeperPolicyV1: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 2, 1845000 [1.845e6], 3, false, 0, 115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77], 799424000000000001 [7.994e17]) [delegatecall]
+    │   │   ├─ [543] KeeperPolicyV1::quote(2, 3, 1845000 [1.845e6], false, 500000000 [5e8], 50000000 [5e7], 20000000000000 [2e13]) [staticcall]
+    │   │   │   └─ ← [Return] 429000000000000 [4.29e14]
+    │   │   ├─ [0] pack-vault-test-keeper::receive{value: 429000000000000}()
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ emit KeeperPaid(keeper: pack-vault-test-keeper: [0x8Ff50Fd788e2D91c8790844d34C4e0632549ebc3], amount: 429000000000000 [4.29e14])
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000001862c589bd000
+    │   └─ ← [Return] 429000000000000 [4.29e14]
+    ├─ [9353] PackVault::openListings() [staticcall]
+    │   └─ ← [Return] [100893 [1.008e5], 100894 [1.008e5], 100895 [1.008e5]]
+    ├─ [2481] 0x958C41181182e76F221331b2755b77D9e1426A98::floorOracle() [staticcall]
+    │   └─ ← [Return] 0xaA4D9009a4664604b57644bF13e447E9036727DC
+    ├─ [56043] → new GasBurningOracle@0xF62849F9A0B5Bf2913b396098F7c7019b51A820a
+    │   └─ ← [Return] 12 bytes of code
+    ├─ [3386] 0x958C41181182e76F221331b2755b77D9e1426A98::owner() [staticcall]
+    │   └─ ← [Return] 0x019817aD02a31B990433542097bE29D97613E8Cb
+    ├─ [0] VM::prank(0x019817aD02a31B990433542097bE29D97613E8Cb)
+    │   └─ ← [Return]
+    ├─ [37216] 0x958C41181182e76F221331b2755b77D9e1426A98::setAddr(64, GasBurningOracle: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a])
+    │   ├─  emit topic 0: 0x150110afd46e9924086bf85c855aae25722518b293155bf0ae689dd99a2e88cc
+    │   │        topic 1: 0x0000000000000000000000000000000000000000000000000000000000000040
+    │   │           data: 0x000000000000000000000000f62849f9a0b5bf2913b396098f7c7019b51a820a
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(pack-vault-test-admin: [0x0EBEDeeC5411CC1b9cca23e8209d493c9a605d42])
+    │   └─ ← [Return]
+    ├─ [28050] PackVault::startWindDown()
+    │   ├─ emit WindDownStarted()
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(pack-vault-test-keeper: [0x8Ff50Fd788e2D91c8790844d34C4e0632549ebc3])
+    │   └─ ← [Return]
+    ├─ [0] PackVault::unlist([100893 [1.008e5], 100894 [1.008e5], 100895 [1.008e5]], 0)
+    │   ├─ [15498067] VaultLib::edge() [delegatecall]
+    │   │   ├─ [2853] 0x958C41181182e76F221331b2755b77D9e1426A98::ownerSettlementFeeBps() [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [3403] 0x958C41181182e76F221331b2755b77D9e1426A98::totalWeight() [staticcall]
+    │   │   │   └─ ← [Return] 50494919830137816215265 [5.049e22]
+    │   │   ├─ [3957] 0x958C41181182e76F221331b2755b77D9e1426A98::weightedBackingTotal() [staticcall]
+    │   │   │   └─ ← [Return] 2592999999999999999893680087194291546493 [2.592e39]
+    │   │   ├─ [3064] 0x958C41181182e76F221331b2755b77D9e1426A98::acquisitionFee() [staticcall]
+    │   │   │   └─ ← [Return] 53919285527313392 [5.391e16]
+    │   │   ├─ [2479] 0x958C41181182e76F221331b2755b77D9e1426A98::ownerAcquisitionFeeBps() [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [3293] 0x958C41181182e76F221331b2755b77D9e1426A98::topListingShareBps() [staticcall]
+    │   │   │   └─ ← [Return] 10
+    │   │   ├─ [5217] 0x958C41181182e76F221331b2755b77D9e1426A98::canDeposit(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [4079] 0x958C41181182e76F221331b2755b77D9e1426A98::oracleExemptCollections(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] false
+    │   │   ├─ [2481] 0x958C41181182e76F221331b2755b77D9e1426A98::floorOracle() [staticcall]
+    │   │   │   └─ ← [Return] GasBurningOracle: [0xF62849F9A0B5Bf2913b396098F7c7019b51A820a]
+    │   │   ├─ [15454595] GasBurningOracle::fallback(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [OutOfGas] EvmError: OutOfGas
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000e695a529fc647f500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+    │   ├─ [2720] VaultLib::valueIdle() [delegatecall]
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000000
+    │   ├─ [4199] 0x958C41181182e76F221331b2755b77D9e1426A98::topListingId() [staticcall]
+    │   │   └─ ← [Return] 88207 [8.82e4]
+    │   ├─ [23359] 0x958C41181182e76F221331b2755b77D9e1426A98::listings(100893 [1.008e5]) [staticcall]
+    │   │   └─ ← [Return] 0xf21514B090Da7dF4390803497d6ae673801E5cA7, PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 243, 27548209366391184573 [2.754e19], 36300000000000000 [3.63e16], 1, 6329908314339317575 [6.329e18], 3615, 0, 1
+    │   ├─ [316816] 0x958C41181182e76F221331b2755b77D9e1426A98::withdrawListing(100893 [1.008e5])
+    │   │   ├─ [27372] 0xA54b44C7a894AA19C49734A753D01f9B8C5f6516::onListingRemoved(100893 [1.008e5])
+    │   │   │   ├─ emit ListingRewardRemoved(param0: 100893 [1.008e5], param1: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b])
+    │   │   │   └─ ← [Return]
+    │   │   ├─ [67] PackVault::receive{value: 36300000000000000}()
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ [39367] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::safeTransferFrom(0x958C41181182e76F221331b2755b77D9e1426A98, PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 243)
+    │   │   │   ├─ emit Transfer(from: 0x958C41181182e76F221331b2755b77D9e1426A98, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 243)
+    │   │   │   ├─ [632] PackVault::onERC721Received(0x958C41181182e76F221331b2755b77D9e1426A98, 0x958C41181182e76F221331b2755b77D9e1426A98, 243, 0x)
+    │   │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ emit ListingWithdrawn(listingId: 100893 [1.008e5], depositor: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], price: 36300000000000000 [3.63e16])
+    │   │   └─ ← [Return]
+    │   ├─ [27620] VaultLib::759fd67d(0000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000018a1d) [delegatecall]
+    │   │   └─ ← [Stop]
+    │   ├─ emit Unlisted(listingId: 100893 [1.008e5])
+    │   ├─ [2199] 0x958C41181182e76F221331b2755b77D9e1426A98::topListingId() [staticcall]
+    │   │   └─ ← [Return] 88207 [8.82e4]
+    │   ├─ [23359] 0x958C41181182e76F221331b2755b77D9e1426A98::listings(100894 [1.008e5]) [staticcall]
+    │   │   └─ ← [Return] 0xf21514B090Da7dF4390803497d6ae673801E5cA7, PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 242, 27548209366391184573 [2.754e19], 36300000000000000 [3.63e16], 1, 6329908314339317575 [6.329e18], 5531, 0, 1
+    │   ├─ [15709] 0x958C41181182e76F221331b2755b77D9e1426A98::withdrawListing(100894 [1.008e5])
+    │   │   ├─ [8167] 0xA54b44C7a894AA19C49734A753D01f9B8C5f6516::onListingRemoved(100894 [1.008e5])
+    │   │   │   └─ ← [ReentrancySentryOOG] EvmError: ReentrancySentryOOG
+    │   │   └─ ← [Revert] EvmError: Revert
+    │   └─ ← [Revert] EvmError: Revert
+    ├─ [9353] PackVault::openListings() [staticcall]
+    │   └─ ← [Return] [100893 [1.008e5], 100894 [1.008e5], 100895 [1.008e5]]
+    ├─ [3386] 0x958C41181182e76F221331b2755b77D9e1426A98::owner() [staticcall]
+    │   └─ ← [Return] 0x019817aD02a31B990433542097bE29D97613E8Cb
+    ├─ [0] VM::prank(0x019817aD02a31B990433542097bE29D97613E8Cb)
+    │   └─ ← [Return]
+    ├─ [37216] 0x958C41181182e76F221331b2755b77D9e1426A98::setAddr(64, 0xaA4D9009a4664604b57644bF13e447E9036727DC)
+    │   ├─  emit topic 0: 0x150110afd46e9924086bf85c855aae25722518b293155bf0ae689dd99a2e88cc
+    │   │        topic 1: 0x0000000000000000000000000000000000000000000000000000000000000040
+    │   │           data: 0x000000000000000000000000aa4d9009a4664604b57644bf13e447e9036727dc
+    │   └─ ← [Return]
+    ├─ [0] VM::prank(pack-vault-test-keeper: [0x8Ff50Fd788e2D91c8790844d34C4e0632549ebc3])
+    │   └─ ← [Return]
+    ├─ [830464] PackVault::unlist([100893 [1.008e5], 100894 [1.008e5], 100895 [1.008e5]], 0)
+    │   ├─ [57303] VaultLib::edge() [delegatecall]
+    │   │   ├─ [2853] 0x958C41181182e76F221331b2755b77D9e1426A98::ownerSettlementFeeBps() [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [3403] 0x958C41181182e76F221331b2755b77D9e1426A98::totalWeight() [staticcall]
+    │   │   │   └─ ← [Return] 50494919830137816215265 [5.049e22]
+    │   │   ├─ [3957] 0x958C41181182e76F221331b2755b77D9e1426A98::weightedBackingTotal() [staticcall]
+    │   │   │   └─ ← [Return] 2592999999999999999893680087194291546493 [2.592e39]
+    │   │   ├─ [3064] 0x958C41181182e76F221331b2755b77D9e1426A98::acquisitionFee() [staticcall]
+    │   │   │   └─ ← [Return] 53919285527313392 [5.391e16]
+    │   │   ├─ [2479] 0x958C41181182e76F221331b2755b77D9e1426A98::ownerAcquisitionFeeBps() [staticcall]
+    │   │   │   └─ ← [Return] 100
+    │   │   ├─ [3293] 0x958C41181182e76F221331b2755b77D9e1426A98::topListingShareBps() [staticcall]
+    │   │   │   └─ ← [Return] 10
+    │   │   ├─ [5217] 0x958C41181182e76F221331b2755b77D9e1426A98::canDeposit(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] true
+    │   │   ├─ [4079] 0x958C41181182e76F221331b2755b77D9e1426A98::oracleExemptCollections(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] false
+    │   │   ├─ [2481] 0x958C41181182e76F221331b2755b77D9e1426A98::floorOracle() [staticcall]
+    │   │   │   └─ ← [Return] 0xaA4D9009a4664604b57644bF13e447E9036727DC
+    │   │   ├─ [3493] 0xaA4D9009a4664604b57644bF13e447E9036727DC::getFloorRange(0xf21514B090Da7dF4390803497d6ae673801E5cA7) [staticcall]
+    │   │   │   └─ ← [Return] 29700000000000000 [2.97e16], 33000000000000000 [3.3e16], 1794689375 [1.794e9], 281474976710655 [2.814e14]
+    │   │   ├─ [1261] 0x958C41181182e76F221331b2755b77D9e1426A98::maxOracleAge() [staticcall]
+    │   │   │   └─ ← [Return] 604800 [6.048e5]
+    │   │   ├─ [2249] 0x958C41181182e76F221331b2755b77D9e1426A98::minOracleChallengePeriod() [staticcall]
+    │   │   │   └─ ← [Return] 21600 [2.16e4]
+    │   │   ├─ [4186] 0x958C41181182e76F221331b2755b77D9e1426A98::oracleCeilingPremiumBps() [staticcall]
+    │   │   │   └─ ← [Return] 1000
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000e695a529fc647f50000000000000000000000000000000000000000000000000080f6a85d58c0000000000000000000000000000000000000000000000000000000000000000001
+    │   ├─ [2720] VaultLib::valueIdle() [delegatecall]
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000000
+    │   ├─ [4199] 0x958C41181182e76F221331b2755b77D9e1426A98::topListingId() [staticcall]
+    │   │   └─ ← [Return] 88207 [8.82e4]
+    │   ├─ [23359] 0x958C41181182e76F221331b2755b77D9e1426A98::listings(100893 [1.008e5]) [staticcall]
+    │   │   └─ ← [Return] 0xf21514B090Da7dF4390803497d6ae673801E5cA7, PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 243, 27548209366391184573 [2.754e19], 36300000000000000 [3.63e16], 1, 6329908314339317575 [6.329e18], 3615, 0, 1
+    │   ├─ [316816] 0x958C41181182e76F221331b2755b77D9e1426A98::withdrawListing(100893 [1.008e5])
+    │   │   ├─ [27372] 0xA54b44C7a894AA19C49734A753D01f9B8C5f6516::onListingRemoved(100893 [1.008e5])
+    │   │   │   ├─ emit ListingRewardRemoved(param0: 100893 [1.008e5], param1: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b])
+    │   │   │   └─ ← [Return]
+    │   │   ├─ [67] PackVault::receive{value: 36300000000000000}()
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ [39367] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::safeTransferFrom(0x958C41181182e76F221331b2755b77D9e1426A98, PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 243)
+    │   │   │   ├─ emit Transfer(from: 0x958C41181182e76F221331b2755b77D9e1426A98, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 243)
+    │   │   │   ├─ [632] PackVault::onERC721Received(0x958C41181182e76F221331b2755b77D9e1426A98, 0x958C41181182e76F221331b2755b77D9e1426A98, 243, 0x)
+    │   │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ emit ListingWithdrawn(listingId: 100893 [1.008e5], depositor: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], price: 36300000000000000 [3.63e16])
+    │   │   └─ ← [Return]
+    │   ├─ [27620] VaultLib::759fd67d(0000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000018a1d) [delegatecall]
+    │   │   └─ ← [Stop]
+    │   ├─ emit Unlisted(listingId: 100893 [1.008e5])
+    │   ├─ [2199] 0x958C41181182e76F221331b2755b77D9e1426A98::topListingId() [staticcall]
+    │   │   └─ ← [Return] 88207 [8.82e4]
+    │   ├─ [23359] 0x958C41181182e76F221331b2755b77D9e1426A98::listings(100894 [1.008e5]) [staticcall]
+    │   │   └─ ← [Return] 0xf21514B090Da7dF4390803497d6ae673801E5cA7, PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 242, 27548209366391184573 [2.754e19], 36300000000000000 [3.63e16], 1, 6329908314339317575 [6.329e18], 5531, 0, 1
+    │   ├─ [157116] 0x958C41181182e76F221331b2755b77D9e1426A98::withdrawListing(100894 [1.008e5])
+    │   │   ├─ [18572] 0xA54b44C7a894AA19C49734A753D01f9B8C5f6516::onListingRemoved(100894 [1.008e5])
+    │   │   │   ├─ emit ListingRewardRemoved(param0: 100894 [1.008e5], param1: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b])
+    │   │   │   └─ ← [Return]
+    │   │   ├─ [67] PackVault::receive{value: 36300000000000000}()
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ [12667] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::safeTransferFrom(0x958C41181182e76F221331b2755b77D9e1426A98, PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 242)
+    │   │   │   ├─ emit Transfer(from: 0x958C41181182e76F221331b2755b77D9e1426A98, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 242)
+    │   │   │   ├─ [632] PackVault::onERC721Received(0x958C41181182e76F221331b2755b77D9e1426A98, 0x958C41181182e76F221331b2755b77D9e1426A98, 242, 0x)
+    │   │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ emit ListingWithdrawn(listingId: 100894 [1.008e5], depositor: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], price: 36300000000000000 [3.63e16])
+    │   │   └─ ← [Return]
+    │   ├─ [13120] VaultLib::759fd67d(0000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000018a1e) [delegatecall]
+    │   │   └─ ← [Stop]
+    │   ├─ emit Unlisted(listingId: 100894 [1.008e5])
+    │   ├─ [2199] 0x958C41181182e76F221331b2755b77D9e1426A98::topListingId() [staticcall]
+    │   │   └─ ← [Return] 88207 [8.82e4]
+    │   ├─ [23359] 0x958C41181182e76F221331b2755b77D9e1426A98::listings(100895 [1.008e5]) [staticcall]
+    │   │   └─ ← [Return] 0xf21514B090Da7dF4390803497d6ae673801E5cA7, PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 0x0000000000000000000000000000000000000000, 241, 27548209366391184573 [2.754e19], 36300000000000000 [3.63e16], 1, 6329908314339317575 [6.329e18], 2668, 0, 1
+    │   ├─ [147516] 0x958C41181182e76F221331b2755b77D9e1426A98::withdrawListing(100895 [1.008e5])
+    │   │   ├─ [18572] 0xA54b44C7a894AA19C49734A753D01f9B8C5f6516::onListingRemoved(100895 [1.008e5])
+    │   │   │   ├─ emit ListingRewardRemoved(param0: 100895 [1.008e5], param1: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b])
+    │   │   │   └─ ← [Return]
+    │   │   ├─ [67] PackVault::receive{value: 36300000000000000}()
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ [12667] 0xf21514B090Da7dF4390803497d6ae673801E5cA7::safeTransferFrom(0x958C41181182e76F221331b2755b77D9e1426A98, PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 241)
+    │   │   │   ├─ emit Transfer(from: 0x958C41181182e76F221331b2755b77D9e1426A98, to: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], id: 241)
+    │   │   │   ├─ [632] PackVault::onERC721Received(0x958C41181182e76F221331b2755b77D9e1426A98, 0x958C41181182e76F221331b2755b77D9e1426A98, 241, 0x)
+    │   │   │   │   └─ ← [Return] 0x150b7a02
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ emit ListingWithdrawn(listingId: 100895 [1.008e5], depositor: PackVault: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], price: 36300000000000000 [3.63e16])
+    │   │   └─ ← [Return]
+    │   ├─ [5520] VaultLib::759fd67d(0000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000018a1f) [delegatecall]
+    │   │   └─ ← [Stop]
+    │   ├─ emit Unlisted(listingId: 100895 [1.008e5])
+    │   ├─ [26035] VaultLib::pay(0, 35, KeeperPolicyV1: [0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f], 5, 750000 [7.5e5], 3, true, 0, 115792089237316195423570985008687907853269984665640564039457584007913129639935 [1.157e77], 907895000000000001 [9.078e17]) [delegatecall]
+    │   │   ├─ [543] KeeperPolicyV1::quote(5, 3, 750000 [7.5e5], true, 500000000 [5e8], 50000000 [5e7], 20000000000000 [2e13]) [staticcall]
+    │   │   │   └─ ← [Return] 210000000000000 [2.1e14]
+    │   │   ├─ [0] pack-vault-test-keeper::receive{value: 210000000000000}()
+    │   │   │   └─ ← [Stop]
+    │   │   ├─ emit KeeperPaid(keeper: pack-vault-test-keeper: [0x8Ff50Fd788e2D91c8790844d34C4e0632549ebc3], amount: 210000000000000 [2.1e14])
+    │   │   └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000befe6f672000
+    │   └─ ← [Return] 210000000000000 [2.1e14]
+    ├─ [2564] PackVault::openListings() [staticcall]
+    │   └─ ← [Return] []
+    └─ ← [Return]
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 964.43ms (257.50ms CPU time)
+
+Ran 1 test suite in 3.44s (964.43ms CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)

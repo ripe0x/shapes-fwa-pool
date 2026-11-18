@@ -1,0 +1,80 @@
+Missing dependencies found. Installing now...
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/foundry-rs/forge-std' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' failed
+Failed to clone 'lib/forge-std'. Retry scheduled
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/solady' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/vectorized/solady' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/solady' failed
+Failed to clone 'lib/solady'. Retry scheduled
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/foundry-rs/forge-std' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' failed
+Failed to clone 'lib/forge-std' a second time, aborting
+Warning: Your project has missing dependencies that could not be installed.
+No files changed, compilation skipped
+{"timestamp":1794943921,"event":"failure","invariant":"invariant_valueConserved","target":"test/fork/ForkVaultInvariant.t.sol:ForkVaultInvariantTest","reason":"panic: arithmetic underflow or overflow (0x11)"}
+
+Ran 1 test for test/fork/ForkVaultInvariant.t.sol:ForkVaultInvariantTest
+[FAIL: panic: arithmetic underflow or overflow (0x11)] invariant_valueConserved
+	[Sequence] (original: 45, shrunk: 6)
+		sender=0xcc00081394a08dc851f174568ce4020237826722 addr=[test/fork/ForkVaultInvariant.t.sol:VaultHandler]0xF62849F9A0B5Bf2913b396098F7c7019b51A820a calldata=deposit(uint256,uint256) args=[18259 [1.825e4], 302670617844359091376964676650115350442434415365576842936906436 [3.026e62]]
+		sender=0x000000000000000000000000000000000000dEaD addr=[test/fork/ForkVaultInvariant.t.sol:VaultHandler]0xF62849F9A0B5Bf2913b396098F7c7019b51A820a calldata=checkpoint() args=[]
+		sender=0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0 addr=[test/fork/ForkVaultInvariant.t.sol:VaultHandler]0xF62849F9A0B5Bf2913b396098F7c7019b51A820a calldata=requestRedeem(uint256,uint256) args=[10419919421800306423153141702343086331125963216430491728516206165628714745906 [1.041e76], 75000 [7.5e4]]
+		sender=0x1BDb226ddf080F0876EA299773E0664Fd43f49Ae addr=[test/fork/ForkVaultInvariant.t.sol:VaultHandler]0xF62849F9A0B5Bf2913b396098F7c7019b51A820a calldata=donate(uint256) args=[2175224650169831292207136336028208043352223168341975506260987555 [2.175e63]]
+		sender=0x0000000000000000000000000000000000005988 addr=[test/fork/ForkVaultInvariant.t.sol:VaultHandler]0xF62849F9A0B5Bf2913b396098F7c7019b51A820a calldata=checkpoint() args=[]
+		sender=0x00000000000000000000000000000000000019FE addr=[test/fork/ForkVaultInvariant.t.sol:VaultHandler]0xF62849F9A0B5Bf2913b396098F7c7019b51A820a calldata=claim(uint256) args=[1000]
+
+ForkVaultInvariantTest invariants: 1/4 invariants broken
+[PASS] invariant_claimsWithinReserves
+[PASS] invariant_reservesCovered
+[PASS] invariant_sharesConserved
+[FAIL: panic: arithmetic underflow or overflow (0x11)] invariant_valueConserved
+ ForkVaultInvariantTest invariants (block: 26424971) (runs: 64, calls: 4096, reverts: 0)
+
+╭--------------+----------------+-------+---------+----------╮
+| Contract     | Selector       | Calls | Reverts | Discards |
++============================================================+
+| VaultHandler | cancel         | 460   | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | checkpoint     | 452   | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | claim          | 463   | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | deposit        | 450   | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | donate         | 427   | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | liquidate      | 476   | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | requestRedeem  | 464   | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | restockAndList | 468   | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | unlist         | 436   | 0       | 0        |
+╰--------------+----------------+-------+---------+----------╯
+
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 190.84s (190.01s CPU time)
+
+Ran 1 test suite in 191.12s (190.84s CPU time): 0 tests passed, 1 failed, 0 skipped (1 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/fork/ForkVaultInvariant.t.sol:ForkVaultInvariantTest
+[FAIL: panic: arithmetic underflow or overflow (0x11)] invariant_valueConserved
+	[Sequence] (original: 45, shrunk: 6)
+		sender=0xcc00081394a08dc851f174568ce4020237826722 addr=[test/fork/ForkVaultInvariant.t.sol:VaultHandler]0xF62849F9A0B5Bf2913b396098F7c7019b51A820a calldata=deposit(uint256,uint256) args=[18259 [1.825e4], 302670617844359091376964676650115350442434415365576842936906436 [3.026e62]]
+		sender=0x000000000000000000000000000000000000dEaD addr=[test/fork/ForkVaultInvariant.t.sol:VaultHandler]0xF62849F9A0B5Bf2913b396098F7c7019b51A820a calldata=checkpoint() args=[]
+		sender=0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0 addr=[test/fork/ForkVaultInvariant.t.sol:VaultHandler]0xF62849F9A0B5Bf2913b396098F7c7019b51A820a calldata=requestRedeem(uint256,uint256) args=[10419919421800306423153141702343086331125963216430491728516206165628714745906 [1.041e76], 75000 [7.5e4]]
+		sender=0x1BDb226ddf080F0876EA299773E0664Fd43f49Ae addr=[test/fork/ForkVaultInvariant.t.sol:VaultHandler]0xF62849F9A0B5Bf2913b396098F7c7019b51A820a calldata=donate(uint256) args=[2175224650169831292207136336028208043352223168341975506260987555 [2.175e63]]
+		sender=0x0000000000000000000000000000000000005988 addr=[test/fork/ForkVaultInvariant.t.sol:VaultHandler]0xF62849F9A0B5Bf2913b396098F7c7019b51A820a calldata=checkpoint() args=[]
+		sender=0x00000000000000000000000000000000000019FE addr=[test/fork/ForkVaultInvariant.t.sol:VaultHandler]0xF62849F9A0B5Bf2913b396098F7c7019b51A820a calldata=claim(uint256) args=[1000]
+
+ForkVaultInvariantTest invariants: 1/4 invariants broken
+[PASS] invariant_claimsWithinReserves
+[PASS] invariant_reservesCovered
+[PASS] invariant_sharesConserved
+[FAIL: panic: arithmetic underflow or overflow (0x11)] invariant_valueConserved
+ ForkVaultInvariantTest invariants (block: 26424971) (runs: 64, calls: 4096, reverts: 0)
+
+Encountered a total of 1 failing tests, 0 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 1 failed test
+
+Fuzz seed: 0xf4b69eb50a2d101f98116a44f6b88b06c31b0d2e228cceefd074835f8b57761c (use `--fuzz-seed` to reproduce)

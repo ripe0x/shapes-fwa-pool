@@ -1,0 +1,83 @@
+{
+  "rpc": "https://mainnet.gateway.tenderly.co",
+  "contracts": [
+    {
+      "name": "FWA V2",
+      "chain_id": 1,
+      "block": 26424971,
+      "address": "0x958C41181182e76F221331b2755b77D9e1426A98",
+      "sourcify_url": "https://sourcify.dev/server/v2/contract/1/0x958C41181182e76F221331b2755b77D9e1426A98?fields=sources,runtimeBytecode",
+      "runtime_match": "match",
+      "deployed_equals_sourcify_onchain_bytecode": true,
+      "runtime_sha256": "20d0ec8fcea735357da6487d821e678a93232f4e867161682e21fadd36c2ba8e",
+      "runtime_bytes": 24390,
+      "source_path": "src/FWAV2/FWAV2.sol",
+      "source_sha256": "1b5dbbe6a2c1d15e8df38c075da85036659aacb38936ccd94619b86a8240a425"
+    },
+    {
+      "name": "Shapes",
+      "chain_id": 1,
+      "block": 26424971,
+      "address": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+      "sourcify_url": "https://sourcify.dev/server/v2/contract/1/0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0?fields=sources,runtimeBytecode",
+      "runtime_match": "match",
+      "deployed_equals_sourcify_onchain_bytecode": true,
+      "runtime_sha256": "3e666d62f32c901aee8b15a9fea1682eba7278b671e608935cd34ec8a81d6539",
+      "runtime_bytes": 22460,
+      "source_path": "src/Shapes.sol",
+      "source_sha256": "f008bf5ddcba042f6a286d4279e34c5b3c1759ec8e21ec6df6826d6aa831ec79"
+    },
+    {
+      "name": "ShapePacks",
+      "chain_id": 1,
+      "block": 26424971,
+      "address": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+      "sourcify_url": "https://sourcify.dev/server/v2/contract/1/0xf21514B090Da7dF4390803497d6ae673801E5cA7?fields=sources,runtimeBytecode",
+      "runtime_match": "match",
+      "deployed_equals_sourcify_onchain_bytecode": true,
+      "runtime_sha256": "ebfaebd182f0366d571ea7bbfe0ac526b169c2a8e45112a9a97a5e7b590f214b",
+      "runtime_bytes": 17715,
+      "source_path": "src/ShapePacks.sol",
+      "source_sha256": "1425fabf99163f2c6a43132d42060a8ca70c88012f243aa3180ece94045a11e9"
+    },
+    {
+      "name": "FWA rewards",
+      "chain_id": 1,
+      "block": 26424971,
+      "address": "0xA54b44C7a894AA19C49734A753D01f9B8C5f6516",
+      "sourcify_url": "https://sourcify.dev/server/v2/contract/1/0xA54b44C7a894AA19C49734A753D01f9B8C5f6516?fields=sources,runtimeBytecode",
+      "runtime_match": "match",
+      "deployed_equals_sourcify_onchain_bytecode": true,
+      "runtime_sha256": "edc49e1b8cb11efa4d3333f07e53ecbd9620c3e68cfd92ad947be800237bb71d",
+      "runtime_bytes": 11751,
+      "source_path": "src/FWAV2/FWAV2Rewards.sol",
+      "source_sha256": "a5ffd71544f89699302af84ef374984ccfac222bd7af7b3e82f01e424745efec"
+    },
+    {
+      "name": "FWA token",
+      "chain_id": 1,
+      "block": 26424971,
+      "address": "0xa0Df17B5aC76ABaBA36E1450E2cbCd18A620C845",
+      "sourcify_url": "https://sourcify.dev/server/v2/contract/1/0xa0Df17B5aC76ABaBA36E1450E2cbCd18A620C845?fields=sources,runtimeBytecode",
+      "runtime_match": "match",
+      "deployed_equals_sourcify_onchain_bytecode": true,
+      "runtime_sha256": "e5e1917e90ed88e22f1df709e4887e0fcbfbc194ba75beb73cddc4bc8172b1d9",
+      "runtime_bytes": 11394,
+      "source_path": "src/FWAToken.sol",
+      "source_sha256": "8a918815a8a1e4e66abc52d9018e6995ea5c310187c7372ee8d606d2587d5532"
+    },
+    {
+      "name": "FWA floor oracle",
+      "chain_id": 1,
+      "block": 26424971,
+      "address": "0xaA4D9009a4664604b57644bF13e447E9036727DC",
+      "sourcify_url": "https://sourcify.dev/server/v2/contract/1/0xaA4D9009a4664604b57644bF13e447E9036727DC?fields=sources,runtimeBytecode",
+      "runtime_match": "match",
+      "deployed_equals_sourcify_onchain_bytecode": true,
+      "runtime_sha256": "bcf3c92fe35cdf6035e812768b60af48c4ede398c9e5bad73521ce47af27c879",
+      "runtime_bytes": 8869,
+      "source_path": "src/FWAV2/CollectionFloorOracle.sol",
+      "source_sha256": "8d46f5ebd6245dd1102d43bfd6706eab24faf18ad2b20d3b9381f6de0e9e24b5"
+    }
+  ]
+}

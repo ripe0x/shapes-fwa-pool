@@ -1,0 +1,23 @@
+Missing dependencies found. Installing now...
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/foundry-rs/forge-std' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' failed
+Failed to clone 'lib/forge-std'. Retry scheduled
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/solady' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/vectorized/solady' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/solady' failed
+Failed to clone 'lib/solady'. Retry scheduled
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/foundry-rs/forge-std' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' failed
+Failed to clone 'lib/forge-std' a second time, aborting
+Warning: Your project has missing dependencies that could not be installed.
+No files changed, compilation skipped
+
+Ran 1 test for test/audit/IndependentChallenge.t.sol:IndependentChallenge
+[PASS] test_emptyDistributionCheckpointDelaysRedemption() (gas: 1097524)
+Logs:
+  request charge wei: 56000000000000
+  unwind charge wei: 1568349546495007
+  exact redemption charge wei: 1624349546495007
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 886.88ms (61.22ms CPU time)
+
+Ran 1 test suite in 1.21s (886.88ms CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)

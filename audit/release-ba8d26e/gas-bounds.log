@@ -1,0 +1,40 @@
+Missing dependencies found. Installing now...
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/foundry-rs/forge-std' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' failed
+Failed to clone 'lib/forge-std'. Retry scheduled
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/solady' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/vectorized/solady' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/solady' failed
+Failed to clone 'lib/solady'. Retry scheduled
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/foundry-rs/forge-std' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' failed
+Failed to clone 'lib/forge-std' a second time, aborting
+Warning: Your project has missing dependencies that could not be installed.
+Compiling 2 files with Solc 0.8.30
+Solc 0.8.30 finished in 2.28s
+Compiler run successful with warnings:
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:13:9:
+   |
+13 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+
+Ran 3 tests for test/fork/ForkVaultAdversarial.t.sol:ForkVaultAdversarialTest
+[PASS] test_checkpointGasAllPositionsKickedUnsynced() (gas: 511837726)
+Logs:
+  checkpoint gas, 300 kicked unsynced: 10161267
+
+[PASS] test_checkpointGasAtMaxPositions() (gas: 424746501)
+Logs:
+  checkpoint gas at MAX_POSITIONS: 9812167
+
+[PASS] test_keeperBatchesFitTxCap() (gas: 16660843)
+Logs:
+  restock 10 packs: 9190404
+  list 10: 5681012
+  unlist 10: 2004640
+  liquidate 10 packs + loose: 1625990
+
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 2.35s (2.93s CPU time)
+
+Ran 1 test suite in 2.66s (2.35s CPU time): 3 tests passed, 0 failed, 0 skipped (3 total tests)

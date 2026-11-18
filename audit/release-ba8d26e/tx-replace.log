@@ -1,0 +1,36 @@
+sent checkpoint nonce 20 hash 0xd3d0946c0b774f137426072deba58776b83ac1d360cad6f71b437309e930ae34
+replaced checkpoint nonce 20 max fee 447331197 prio 62500001
+mined checkpoint gas 155812 (est 186273) cost 35971327033800 pay 0 net -35971327033800 wei
+{
+  "nonce": 20,
+  "original": "0xd3d0946c0b774f137426072deba58776b83ac1d360cad6f71b437309e930ae34",
+  "replacement": "0xf7a6eea8ce90b0bbe47185ada3d630d3474e0ab105eae08c42eb4f318d1e2d34",
+  "receipt": {
+    "label": "checkpoint",
+    "to": "0x321d151f896c205ac5c747c2cff4e9a0e185a27c",
+    "hash": "0xf7a6eea8ce90b0bbe47185ada3d630d3474e0ab105eae08c42eb4f318d1e2d34",
+    "block": 26418592,
+    "block_hash": "0x380a0c5a0bd3be1b555cda868212f0d5ae53b8f36ce293dff691074f36710e49",
+    "status": 1,
+    "gas_used": 155812,
+    "price": 230863650,
+    "cost": 35971327033800,
+    "pay": 0,
+    "net": -35971327033800,
+    "est": 186273,
+    "gas_limit": 232841,
+    "expected_pay": 0
+  },
+  "stats": {
+    "sent": 1,
+    "mined": 1,
+    "reverted": 0,
+    "replaced": 1,
+    "dropped": 0,
+    "reorged": 0,
+    "skipped_expected": 0,
+    "skipped_loss": 0,
+    "spent_wei": 35971327033800,
+    "paid_wei": 0
+  }
+}

@@ -1,0 +1,44 @@
+{
+ "pending": null,
+ "counted": [
+  {
+   "label": "checkpoint",
+   "to": "0x321d151f896c205ac5c747c2cff4e9a0e185a27c",
+   "hash": "0x10e9981cd5280c57afce40f98242a0a83bc902724818245283671fc21b5a356d",
+   "block": 26418588,
+   "block_hash": "0x13967a864c1a5540ffab414e25afd2e5da846f563fafbba98541f96214d4866a",
+   "status": 1,
+   "gas_used": 212712,
+   "price": 64346515,
+   "cost": 13687275898680,
+   "pay": 0,
+   "net": -13687275898680,
+   "est": 243173,
+   "gas_limit": 303966,
+   "expected_pay": 0,
+   "reorged": true
+  }
+ ],
+ "errors": [
+  {
+   "t": 1794940767,
+   "msg": "broadcast of checkpoint uncertain (nonce 20 kept pending): simulated lost response"
+  },
+  {
+   "t": 1794940798,
+   "msg": "reorg: checkpoint 0x10e9981cd5280c57afce40f98242a0a83bc902724818245283671fc21b5a356d no longer in block 26418588; chain state is re-read"
+  }
+ ],
+ "stats": {
+  "sent": 0,
+  "mined": 0,
+  "reverted": 0,
+  "replaced": 0,
+  "dropped": 0,
+  "reorged": 1,
+  "skipped_expected": 0,
+  "skipped_loss": 0,
+  "spent_wei": 0,
+  "paid_wei": 0
+ }
+}

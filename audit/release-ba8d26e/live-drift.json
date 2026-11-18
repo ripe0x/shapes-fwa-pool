@@ -1,0 +1,33 @@
+{
+  "rpc": "https://mainnet.gateway.tenderly.co",
+  "pinned_block": 26424971,
+  "latest_block": 26436710,
+  "states": {
+    "26424971": {
+      "floor_oracle": "0xaA4D9009a4664604b57644bF13e447E9036727DC",
+      "rewards": "0xA54b44C7a894AA19C49734A753D01f9B8C5f6516",
+      "token": "0xa0Df17B5aC76ABaBA36E1450E2cbCd18A620C845",
+      "owner_acquisition_fee_bps": "100",
+      "owner_settlement_fee_bps": "100",
+      "top_listing_share_bps": "10",
+      "unsettled_acquisitions": "0",
+      "weighted_backing_total": "2589999999999999999893680387194291546493 [2.589e39]",
+      "total_weight": "50412275202038642661546 [5.041e22]",
+      "acquisition_fee_wei": "53945194679291622 [5.394e16]",
+      "packs_can_deposit": "true"
+    },
+    "26436710": {
+      "floor_oracle": "0xaA4D9009a4664604b57644bF13e447E9036727DC",
+      "rewards": "0xA54b44C7a894AA19C49734A753D01f9B8C5f6516",
+      "token": "0xa0Df17B5aC76ABaBA36E1450E2cbCd18A620C845",
+      "owner_acquisition_fee_bps": "100",
+      "owner_settlement_fee_bps": "100",
+      "top_listing_share_bps": "10",
+      "unsettled_acquisitions": "0",
+      "weighted_backing_total": "2518999999999999999897076730178060602386 [2.518e39]",
+      "total_weight": "49494255190371307297957 [4.949e22]",
+      "acquisition_fee_wei": "53439535352671654 [5.343e16]",
+      "packs_can_deposit": "true"
+    }
+  }
+}

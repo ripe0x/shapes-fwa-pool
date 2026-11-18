@@ -1,0 +1,154 @@
+vault 0x2113cd2d86788331e4ef44e4e428da0a112f68d6
+[deployed] balance 0.010000 open 0 idle 0 loose 0 tokens 0 lastNav 0.000000
+  policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1
+  gas 0.169 gwei, 0 open, 0 idle packs, idle 0.0050 ETH, cycle net 1.251 mETH, 7d volume 96/day
+  status OK [ok] operating normally
+  sent checkpoint nonce 0 hash 0x7cc9b3a8760da02e4a0f98088dc867f830ece765b9847983956a1aa78227133e
+  mined checkpoint gas 226967 (est 243491) cost 34972758320305 pay 47735734700000 net 12762976379695 wei
+  sent restock nonce 1 hash 0xe326fb5fe8dde28d484d7ca4612b73c6fa5416f18bcb2c1970f460e4c6c1045f
+  mined restock gas 9159585 (est 10043369) cost 1293103716246540 pay 1453633325120000 net 160529608873460 wei
+  sent list nonce 2 hash 0x49897dc789a5840abd8d6252225cde70c3409db9f89fbc43e54780698dd8c263
+  mined list gas 5813231 (est 5946144) cost 774658048410864 pay 940246767920000 net 165588719509136 wei
+  sent restock nonce 3 hash 0xd2564da3832300ce1c43b1661e5cd1ba47dd81f9efa6fc63859cc283e315e975
+  mined restock gas 9170054 (est 10037532) cost 1145038774257666 pay 1308820549520000 net 163781775262334 wei
+  sent list nonce 4 hash 0x98dbcb609f6dae556647ed738dc1b1851c79d0e1556e0dc32f30ca7b3ff69c2e
+  mined list gas 5732531 (est 5865444) cost 678555962592319 pay 857541733695000 net 178985771102681 wei
+  sent restock nonce 5 hash 0x49ce353b8c99689efa4fc82524d5f3bc3b716198a4891583a911a275667c0c08
+  mined restock gas 8931142 (est 9705293) cost 995431327603240 pay 1147439989600000 net 152008661996760 wei
+  sent list nonce 6 hash 0xcdafe4944730a491392ddc5268be8649bcb9e697b4a7dcf4c751bee075ee84f0
+  mined list gas 5168011 (est 5288524) cost 548125288064859 pay 712957374225000 net 164832086160141 wei
+  done: 7 sent, 0 failed
+[priced] balance 0.031888 open 29 idle 0 loose 3 tokens 0 lastNav 2.000003
+  policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1
+  gas 0.100 gwei, 29 open, 0 idle packs, idle 0.0269 ETH, cycle net 1.294 mETH, 7d volume 96/day
+  status OK [ok] operating normally
+  nothing to do
+[deployed capital] balance 0.031888 open 29 idle 0 loose 3 tokens 0 lastNav 2.000003
+  FWA staged 0 of 29 listings (its queue was busy)
+  staged after the keeper's activation: 0
+  buyback contract holds 0.009587 ETH
+  real buyback accrued 5039168559195973351 token wei to 29 listings
+  policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1
+  gas 0.088 gwei, 29 open, 0 idle packs, idle 0.0269 ETH, cycle net 1.301 mETH, 7d volume 96/day
+  status TOKENS_UNBURNED [info] 5.0392 FWA tokens; anyone may call burnTokens
+  note: tokens 5.0392 unburned (run with --burn-tokens; operator pays the gas)
+  note: tokens 5.0392 unburned (run with --burn-tokens; operator pays the gas)
+  nothing to do
+  policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1
+  gas 0.088 gwei, 29 open, 0 idle packs, idle 0.0269 ETH, cycle net 1.301 mETH, 7d volume 96/day
+  status OK [ok] operating normally
+  sent burnTokens nonce 7 hash 0x67cd33c1044e3dbde9d2de55f4fd356f2a8d84142d641ab4e34eb2ca72b60a87
+  mined burnTokens gas 415900 (est 443598) cost 34819132195800 pay 0 net -34819132195800 wei
+  done: 1 sent, 0 failed
+[after token burn] balance 0.031888 open 29 idle 0 loose 3 tokens 0 lastNav 2.000003
+  burned 5039168559195973351 token wei (supply fell by exactly the pending amount); keeper paid 34819132195800 wei gas
+  policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1
+  gas 0.070 gwei, 29 open, 0 idle packs, idle 0.0632 ETH, cycle net 1.186 mETH, 7d volume 96/day
+  status OK [ok] operating normally
+  sent sync nonce 8 hash 0xf979e655dde60d3550d5372de06f2580cb242aa095e87f4944ab7e50ad308097
+  mined sync gas 177767 (est 197087) cost 11974517734182 pay 30104111900000 net 18129594165818 wei
+  sent list nonce 9 hash 0x6fce0e0b361c8117dbce8670e8e0595cb2a14d4a92010cbd7e1b6dbacca3640f
+  mined list gas 838146 (est 859471) cost 54650062768752 pay 71184756920000 net 16534694151248 wei
+  done: 2 sent, 0 failed
+[after kick, sync, relist] balance 0.035086 open 29 idle 0 loose 3 tokens 0 lastNav 2.000003
+[before policy swap] balance 0.035086 open 29 idle 0 loose 3 tokens 0 lastNav 2.000003
+[policy V2 active] balance 0.035086 open 29 idle 0 loose 3 tokens 0 lastNav 2.000003
+  policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2
+  gas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day
+  status GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only
+  status WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue
+  status REDEMPTION_LIQUIDITY_SHORT [wait] 0.9589 ETH owed to redeemers beyond free ETH
+  skip liquidate: pay 180000000000000 wei < cost ~221730600000000 wei beyond --max-loss-wei 0
+  policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2
+  gas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day
+  status GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only
+  status WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue
+  status REDEMPTION_LIQUIDITY_SHORT [wait] 0.9589 ETH owed to redeemers beyond free ETH
+  skip unlist: pay 900000000000000 wei < cost ~3064784100000000 wei beyond --max-loss-wei 0
+  policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2
+  gas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day
+  status GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only
+  status WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue
+  status REDEMPTION_LIQUIDITY_SHORT [wait] 0.9589 ETH owed to redeemers beyond free ETH
+  nothing to do
+  policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2
+  gas 1.050 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day
+  status GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only
+  status WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue
+  status REDEMPTION_LIQUIDITY_SHORT [wait] 0.9589 ETH owed to redeemers beyond free ETH
+  sent liquidate nonce 10 hash 0xbc886addb1fddcd641f479bab475fb675434579884656e4df0f7b570b31c4cfd
+  mined liquidate gas 209429 (est 263966) cost 193721825000000 pay 180000000000000 net -13721825000000 wei
+  policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2
+  gas 0.925 gwei, 29 open, 0 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day
+  status GAS_ABOVE_CEILING [wait] bid 0.925 gwei > ceiling 0.500; liability work only
+  status WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue
+  status REDEMPTION_LIQUIDITY_SHORT [wait] 0.9291 ETH owed to redeemers beyond free ETH
+  sent unlist nonce 11 hash 0xa1f9410902ac573783034818ad1cb1b399618b907ef5e39301827a1b44534d57
+  mined unlist gas 2917099 (est 3645753) cost 2381486205313856 pay 900000000000000 net -1481486205313856 wei
+  sent liquidate nonce 12 hash 0xaa7116d8ba04aebd61f2eb9daa0e84d1c02597c082de4b151d6ceb478abfb20e
+  mined liquidate gas 2105472 (est 2631219) cost 1536794765445504 pay 780000000000000 net -756794765445504 wei
+  done: 2 sent, 0 failed
+  policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2
+  gas 1.050 gwei, 14 open, 2 idle packs, idle 0.0000 ETH, cycle net 0.919 mETH, 7d volume 96/day
+  status GAS_ABOVE_CEILING [wait] bid 1.050 gwei > ceiling 0.500; liability work only
+  sent checkpoint nonce 13 hash 0x6ecbf590eda7c4e7c62df560f79d07d0719142bdf0b7c1eed4393da164f289c5
+  mined checkpoint gas 707761 (est 742247) cost 654678925000000 pay 60000000000000 net -594678925000000 wei
+  done: 1 sent, 0 failed
+[partial withdrawal] balance 0.011888 open 14 idle 2 loose 0 tokens 0 lastNav 0.996761
+  policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2
+  gas 0.138 gwei, 14 open, 2 idle packs, idle 0.0000 ETH, cycle net 1.144 mETH, 7d volume 96/day
+  status WINDING_DOWN [info] 14 positions, 2 idle packs left to unwind
+  status WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue
+  status REDEMPTION_LIQUIDITY_SHORT [wait] 0.9734 ETH owed to redeemers beyond free ETH
+  sent liquidate nonce 14 hash 0x481671de9f8d2273e1404a1a4f869a64586ec9beabaf8ae142a82f6d4f864de0
+  mined liquidate gas 403448 (est 503601) cost 51247170059176 pay 87633620125000 net 36386450065824 wei
+  sent unlist nonce 15 hash 0xe307823d52653a4c4c2aebfb4b61aad13a825103c906f9d86ab5e3ccb3301a5f
+  mined unlist gas 2655638 (est 3316068) cost 312102772449696 pay 587914431040000 net 275811658590304 wei
+  sent liquidate nonce 16 hash 0x0968277b1cfc3ccf1fef1d71a5ab17f2651b5d93893acc3ab84f2575e394bb33
+  mined liquidate gas 2239871 (est 2796329) cost 246007695136619 pay 518882836075000 net 272875140938381 wei
+  done: 3 sent, 0 failed
+  policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v2
+  gas 0.103 gwei, 0 open, 0 idle packs, idle 0.0052 ETH, cycle net 1.165 mETH, 7d volume 96/day
+  status WINDING_DOWN [info] 0 positions, 0 idle packs left to unwind
+  sent checkpoint nonce 17 hash 0x2e0d381e78b9f212f2f708a9e62e1a154a2118668ff7bc67e4e3788db7e8095d
+  mined checkpoint gas 209240 (est 240879) cost 20149152475520 pay 37333432640000 net 17184280164480 wei
+  done: 1 sent, 0 failed
+[wound down] balance 0.010085 open 0 idle 0 loose 0 tokens 0 lastNav 0.010008
+{
+ "positions_built": 29,
+ "positions_listed": 29,
+ "capital_idle_after_build": 31887624525220000,
+ "deposited": 1992459043316648049,
+ "claimed": 1973652351079168845,
+ "holder_result": -18806692237479204,
+ "keeper_pay": 9721428663480000,
+ "keeper_net": -1246089435594898,
+ "keeper_gas_spent": 10967518099074898,
+ "mints": 9,
+ "mint_fees": 9000000000000000,
+ "staged_before_activation": 0,
+ "staged_after_activation": 0,
+ "token_burned": 5039168559195973351,
+ "token_burn_keeper_cost": 34819132195800,
+ "end_balance": 10085263573999204,
+ "end_lastNav": 10008063171887202,
+ "ledger_in": 2002459043316648049,
+ "ledger_out": 2002459043316648049,
+ "ledger_gap": 0,
+ "keeper_tx": {
+  "sent": 18,
+  "mined": 18,
+  "reverted": 0,
+  "replaced": 0,
+  "dropped": 0,
+  "reorged": 0,
+  "skipped_expected": 0,
+  "skipped_loss": 2,
+  "spent_wei": 10967518099074898,
+  "paid_wei": 9721428663480000
+ }
+}
+after the V2 swap: V2 formula [('liquidate', 180000000000000), ('unlist', 900000000000000), ('liquidate', 780000000000000)]; capped by the vault [('checkpoint', 60000000000000), ('liquidate', 87633620125000), ('unlist', 587914431040000), ('liquidate', 518882836075000), ('checkpoint', 37333432640000)]
+quoted pay equals paid in 4 receipts; differed (basefee moved): [('checkpoint', 50412268100000, 47735734700000), ('restock', 1568296245200000, 1453633325120000), ('list', 984226702820000, 940246767920000), ('restock', 1383328766720000, 1308820549520000), ('list', 893637179345000, 857541733695000), ('restock', 1207445949320000, 1147439989600000), ('list', 740067505500000, 712957374225000), ('sync', 30476127800000, 30104111900000), ('list', 72878185610000, 71184756920000), ('liquidate', 91755442750000, 87633620125000), ('unlist', 612800225940000, 587914431040000), ('liquidate', 535615987600000, 518882836075000), ('checkpoint', 38523922940000, 37333432640000)]
+keeper state file matches the chain: pay and gas spent to the wei
+ledger closes to the wei: seed + deposits = claims + keeper pay + mint fees + balance

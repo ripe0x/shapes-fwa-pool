@@ -1,0 +1,6 @@
+policy 0xe7709640478BbF1b1D7FC5bAC840ba3d657782D1 v1
+gas 0.069 gwei, 0 open, 0 idle packs, idle 0.0050 ETH, cycle net 1.187 mETH, 7d volume 96/day
+status OK [ok] operating normally
+sent checkpoint nonce 19 hash 0xe61680809ee60f7b8b77312c8f6c7b11bf55ec16c49ca423744a6a8ce49b01d5
+REVERTED checkpoint gas 228860 (est 243173) cost 15191307299620 pay 0 net -15191307299620 wei
+error: checkpoint reverted on chain: 0xe61680809ee60f7b8b77312c8f6c7b11bf55ec16c49ca423744a6a8ce49b01d5

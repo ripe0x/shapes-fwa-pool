@@ -1,0 +1,26 @@
+Missing dependencies found. Installing now...
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/foundry-rs/forge-std' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' failed
+Failed to clone 'lib/forge-std'. Retry scheduled
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/solady' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/vectorized/solady' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/solady' failed
+Failed to clone 'lib/solady'. Retry scheduled
+fatal: destination path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' already exists and is not an empty directory.
+fatal: clone of 'https://github.com/foundry-rs/forge-std' into submodule path '/Users/dd/CascadeProjects/pv-audit/lib/forge-std' failed
+Failed to clone 'lib/forge-std' a second time, aborting
+Warning: Your project has missing dependencies that could not be installed.
+Compiling 1 files with Solc 0.8.30
+Solc 0.8.30 finished in 928.31ms
+Compiler run successful with warnings:
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:13:9:
+   |
+13 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+
+Ran 1 test for test/audit/AuditDistribution.t.sol:AuditDistribution
+[PASS] test_distributionDueWithoutFlowsNeedsKeeperCheckpoint() (gas: 843563)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.57s (42.49ms CPU time)
+
+Ran 1 test suite in 2.07s (1.57s CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)

@@ -1,0 +1,295 @@
+'forge clean' running (wd: /Users/dd/CascadeProjects/pv-audit)
+'forge config --json' running
+'forge build --build-info --skip ./test/** ./script/** --force' running (wd: /Users/dd/CascadeProjects/pv-audit)
+
+Detector: arbitrary-send-eth
+VaultLib.pay(VaultLib.Params,VaultLib.Budget,address,uint256,uint256,uint256,bool,uint256,uint256,uint256) (src/VaultLib.sol#215-237) sends eth to arbitrary user
+	Dangerous calls:
+	- (ok,None) = msg.sender.call{value: amount}() (src/VaultLib.sol#234)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#functions-that-send-ether-to-arbitrary-destinations
+
+Detector: reentrancy-eth
+Reentrancy in PackVault.list(uint256,uint256) (src/PackVault.sol#305-326):
+	External calls:
+	- listingId = fwa.listNFT{value: backing}(address(packs),packId) (src/PackVault.sol#317)
+	State variables written after the call(s):
+	- _idlePacks.pop() (src/PackVault.sol#316)
+	PackVault._idlePacks (src/PackVault.sol#110) can be used in cross function reentrancies:
+	- PackVault.idlePacks() (src/PackVault.sol#833-835)
+	- _open.push(listingId) (src/PackVault.sol#319)
+	PackVault._open (src/PackVault.sol#108) can be used in cross function reentrancies:
+	- PackVault.openListings() (src/PackVault.sol#829-831)
+	- PackVault.requestCharge() (src/PackVault.sol#736-738)
+Reentrancy in PackVault.restock(uint256,uint256,uint256) (src/PackVault.sol#264-302):
+	External calls:
+	- big = shapes.mint{value: 100000000000000000 + fee}(100000000000000000) (src/PackVault.sol#284)
+	- ids = shapes.split(big,outs) (src/PackVault.sol#285)
+	External calls sending eth:
+	- big = shapes.mint{value: 100000000000000000 + fee}(100000000000000000) (src/PackVault.sol#284)
+	State variables written after the call(s):
+	- _looseShapes.push(ids[j]) (src/PackVault.sol#287)
+	PackVault._looseShapes (src/PackVault.sol#111) can be used in cross function reentrancies:
+	- PackVault.looseShapeCount() (src/PackVault.sol#837-839)
+Reentrancy in PackVault.restock(uint256,uint256,uint256) (src/PackVault.sol#264-302):
+	External calls:
+	- big = shapes.mint{value: 100000000000000000 + fee}(100000000000000000) (src/PackVault.sol#284)
+	- ids = shapes.split(big,outs) (src/PackVault.sol#285)
+	- _idlePacks.push(packs.createPack(ids_scope_0,noMint)) (src/PackVault.sol#298)
+	External calls sending eth:
+	- big = shapes.mint{value: 100000000000000000 + fee}(100000000000000000) (src/PackVault.sol#284)
+	State variables written after the call(s):
+	- _idlePacks.push(packs.createPack(ids_scope_0,noMint)) (src/PackVault.sol#298)
+	PackVault._idlePacks (src/PackVault.sol#110) can be used in cross function reentrancies:
+	- PackVault.idlePacks() (src/PackVault.sol#833-835)
+	- _looseShapes.pop() (src/PackVault.sol#296)
+	PackVault._looseShapes (src/PackVault.sol#111) can be used in cross function reentrancies:
+	- PackVault.looseShapeCount() (src/PackVault.sol#837-839)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-1
+
+Detector: divide-before-multiply
+PackVault._settleHolder(address) (src/PackVault.sol#529-563) performs a multiplication on the result of a division:
+	- minted = uint256(d.amount - d.charge) * epochSupply[d.epoch] / epochNav[d.epoch] (src/PackVault.sol#533)
+	- distDebt[h] += minted * epochDistPerShare[d.epoch] / 1e18 (src/PackVault.sol#536)
+VaultLib.edge(VaultLib.Params,IFWAV2,address,uint256) (src/VaultLib.sol#284-298) performs a multiplication on the result of a division:
+	- backing = cap * (BPS - p.bufferBps) / BPS (src/VaultLib.sol#292)
+	- ok = cap != 0 && k1e18 >= 1e18 + uint256(p.minEdgeBps) * 1e14 && k1e18 > s * 1e14 && backing * (k1e18 - s * 1e14) >= units * UNIT * 1e18 (src/VaultLib.sol#295-296)
+VaultLib.economics(IFWAV2,address) (src/VaultLib.sol#385-407) performs a multiplication on the result of a division:
+	- k1e18 = oneSur * (BPS - f.ownerAcquisitionFeeBps()) / BPS * (BPS - f.topListingShareBps()) / BPS (src/VaultLib.sol#392)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#divide-before-multiply
+
+Detector: incorrect-equality
+PackVault._owedEstimate() (src/PackVault.sol#703-706) uses a dangerous strict equality:
+	- lockedShares == 0 (src/PackVault.sol#704)
+PackVault.burnTokens(uint256[]) (src/PackVault.sol#444-453) uses a dangerous strict equality:
+	- amount == 0 (src/PackVault.sol#450)
+PackVault.checkpoint(uint256) (src/PackVault.sol#582-673) uses a dangerous strict equality:
+	- interval == lastCheckpointInterval (src/PackVault.sol#586)
+PackVault.checkpoint(uint256) (src/PackVault.sol#582-673) uses a dangerous strict equality:
+	- frac == SCALE (src/PackVault.sol#614)
+PackVault.checkpoint(uint256) (src/PackVault.sol#582-673) uses a dangerous strict equality:
+	- lockedShares == 0 && supply > DEAD_SHARES && perShare > highWaterMark && params.distributionBps != 0 (src/PackVault.sol#633)
+PackVault.claim() (src/PackVault.sol#517-526) uses a dangerous strict equality:
+	- amount == 0 (src/PackVault.sol#521)
+PackVault.harvest(uint256[],uint256) (src/PackVault.sol#418-432) uses a dangerous strict equality:
+	- amount == 0 (src/PackVault.sol#428)
+PackVault.unlist(uint256[],uint256) (src/PackVault.sol#385-413) uses a dangerous strict equality:
+	- ! windingDown && ok && shortfall == 0 (src/PackVault.sol#389)
+VaultLib.pay(VaultLib.Params,VaultLib.Budget,address,uint256,uint256,uint256,bool,uint256,uint256,uint256) (src/VaultLib.sol#215-237) uses a dangerous strict equality:
+	- amount == 0 (src/VaultLib.sol#233)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#dangerous-strict-equalities
+
+Detector: reentrancy-no-eth
+Reentrancy in PackVault.checkpoint(uint256) (src/PackVault.sol#582-673):
+	External calls:
+	- _harvest() (src/PackVault.sol#599)
+		- fwa.withdrawEarnings() (src/PackVault.sol#435)
+	State variables written after the call(s):
+	- distributionReserve += distributed (src/PackVault.sol#639)
+	PackVault.distributionReserve (src/PackVault.sol#159) can be used in cross function reentrancies:
+	- PackVault._free() (src/PackVault.sol#718-722)
+	- PackVault.distributionReserve (src/PackVault.sol#159)
+	- lockedShares = 0 (src/PackVault.sol#619)
+	PackVault.lockedShares (src/PackVault.sol#147) can be used in cross function reentrancies:
+	- PackVault._owedEstimate() (src/PackVault.sol#703-706)
+	- PackVault.lockedShares (src/PackVault.sol#147)
+	- lockedShares -= filled (src/PackVault.sol#622)
+	PackVault.lockedShares (src/PackVault.sol#147) can be used in cross function reentrancies:
+	- PackVault._owedEstimate() (src/PackVault.sol#703-706)
+	- PackVault.lockedShares (src/PackVault.sol#147)
+	- pendingDepositTotal = 0 (src/PackVault.sol#655)
+	PackVault.pendingDepositTotal (src/PackVault.sol#131) can be used in cross function reentrancies:
+	- PackVault._free() (src/PackVault.sol#718-722)
+	- PackVault.pendingDepositTotal (src/PackVault.sol#131)
+	- processingPool = 0 (src/PackVault.sol#667)
+	PackVault.processingPool (src/PackVault.sol#162) can be used in cross function reentrancies:
+	- PackVault._free() (src/PackVault.sol#718-722)
+	- PackVault.processingPool (src/PackVault.sol#162)
+	- redemptionReserve += paid (src/PackVault.sol#624)
+	PackVault.redemptionReserve (src/PackVault.sol#152) can be used in cross function reentrancies:
+	- PackVault._free() (src/PackVault.sol#718-722)
+	- PackVault.redemptionReserve (src/PackVault.sol#152)
+Reentrancy in PackVault.liquidate(uint256,uint256) (src/PackVault.sol#677-700):
+	External calls:
+	- packs.redeem(_idlePacks[_idlePacks.length - 1]) (src/PackVault.sol#686)
+	- shapes.redeem(_looseShapes[_looseShapes.length - 1]) (src/PackVault.sol#690)
+	State variables written after the call(s):
+	- _idlePacks.pop() (src/PackVault.sol#687)
+	PackVault._idlePacks (src/PackVault.sol#110) can be used in cross function reentrancies:
+	- PackVault.idlePacks() (src/PackVault.sol#833-835)
+	- _looseShapes.pop() (src/PackVault.sol#691)
+	PackVault._looseShapes (src/PackVault.sol#111) can be used in cross function reentrancies:
+	- PackVault.looseShapeCount() (src/PackVault.sol#837-839)
+Reentrancy in PackVault.unlist(uint256[],uint256) (src/PackVault.sol#385-413):
+	External calls:
+	- fwa.withdrawListing(id) (src/PackVault.sol#403)
+	State variables written after the call(s):
+	- _idlePacks.push(pos.packId) (src/PackVault.sol#404)
+	PackVault._idlePacks (src/PackVault.sol#110) can be used in cross function reentrancies:
+	- PackVault.idlePacks() (src/PackVault.sol#833-835)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-2
+
+Detector: uninitialized-local
+PackVault.unlist(uint256[],uint256).realized (src/PackVault.sol#393) is a local variable never initialized
+PackVault.unlist(uint256[],uint256).moved (src/PackVault.sol#394) is a local variable never initialized
+PackVault._settleHolder(address).remaining (src/PackVault.sol#547) is a local variable never initialized
+PackVault.activate(uint256[],uint256,uint256).moved (src/PackVault.sol#372) is a local variable never initialized
+PackVault.checkpoint(uint256).distributed (src/PackVault.sol#631) is a local variable never initialized
+PackVault.harvest(uint256[],uint256).n (src/PackVault.sol#420) is a local variable never initialized
+PackVault.sync(uint256[],uint256).resolved (src/PackVault.sol#333) is a local variable never initialized
+PackVault.checkpoint(uint256).filled (src/PackVault.sol#607) is a local variable never initialized
+PackVault.checkpoint(uint256).paid (src/PackVault.sol#608) is a local variable never initialized
+PackVault.liquidate(uint256,uint256).n (src/PackVault.sol#682) is a local variable never initialized
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uninitialized-local-variables
+
+Detector: unused-return
+PackVault.edge(uint256) (src/PackVault.sol#242-244) ignores return value by VaultLib.edge(params,fwa,address(packs),units) (src/PackVault.sol#243)
+PackVault.activate(uint256[],uint256,uint256) (src/PackVault.sol#358-380) ignores return value by (None,None,None,None,None,None,None,None,None,None,status) = fwa.listings(listingIds[i]) (src/PackVault.sol#368)
+PackVault.activate(uint256[],uint256,uint256) (src/PackVault.sol#358-380) ignores return value by (None,None,None,None,None,None,None,None,None,None,status_scope_1) = fwa.listings(listingIds[i_scope_0]) (src/PackVault.sol#375)
+PackVault.unlist(uint256[],uint256) (src/PackVault.sol#385-413) ignores return value by (None,None,None,None,None,None,None,None,None,None,status) = fwa.listings(id) (src/PackVault.sol#400)
+PackVault.harvest(uint256[],uint256) (src/PackVault.sol#418-432) ignores return value by fwa.claimListingFees(activeIds) (src/PackVault.sol#425)
+PackVault._harvest() (src/PackVault.sol#434-436) ignores return value by fwa.withdrawEarnings() (src/PackVault.sol#435)
+PackVault.burnTokens(uint256[]) (src/PackVault.sol#444-453) ignores return value by rewards.claimDepositorTokens(activeIds) (src/PackVault.sol#447)
+PackVault.burnTokens(uint256[]) (src/PackVault.sol#444-453) ignores return value by rewards.withdrawTokens() (src/PackVault.sol#448)
+PackVault._budgetNow() (src/PackVault.sol#771-773) ignores return value by VaultLib.budgetNow(params,_budget) (src/PackVault.sol#772)
+VaultLib.valueOpen(IFWAV2,IShapePacks,mapping(uint256 => VaultLib.Position),uint256[]) (src/VaultLib.sol#102-125) ignores return value by (None,None,None,None,None,None,None,None,None,None,status) = f.listings(id) (src/VaultLib.sol#111)
+VaultLib.sync(mapping(uint256 => VaultLib.Position),uint256[],mapping(uint256 => uint256),uint256[],IFWAV2,IShapePacks,uint256) (src/VaultLib.sol#317-351) ignores return value by (None,None,None,None,None,None,None,None,None,allocatedAt,status) = f.listings(listingId) (src/VaultLib.sol#328)
+VaultLib.sync(mapping(uint256 => VaultLib.Position),uint256[],mapping(uint256 => uint256),uint256[],IFWAV2,IShapePacks,uint256) (src/VaultLib.sol#317-351) ignores return value by (None,None,None,None,None,None,None,None,None,None,status) = f.listings(listingId) (src/VaultLib.sol#335)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return
+
+Detector: missing-zero-check
+PackVault.constructor(IFWAV2,IShapes,IShapePacks,address,VaultLib.Params,IKeeperPolicy).owner_ (src/PackVault.sol#205) lacks a zero-check on :
+		- owner = owner_ (src/PackVault.sol#214)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#missing-zero-address-validation
+
+Detector: calls-loop
+PackVault.restock(uint256,uint256,uint256) (src/PackVault.sol#264-302) has external calls inside a loop: big = shapes.mint{value: 100000000000000000 + fee}(100000000000000000) (src/PackVault.sol#284)
+PackVault.restock(uint256,uint256,uint256) (src/PackVault.sol#264-302) has external calls inside a loop: ids = shapes.split(big,outs) (src/PackVault.sol#285)
+PackVault.restock(uint256,uint256,uint256) (src/PackVault.sol#264-302) has external calls inside a loop: _idlePacks.push(packs.createPack(ids_scope_0,noMint)) (src/PackVault.sol#298)
+PackVault.list(uint256,uint256) (src/PackVault.sol#305-326) has external calls inside a loop: units = packs.valueOf(packId) / UNIT (src/PackVault.sol#312)
+PackVault.list(uint256,uint256) (src/PackVault.sol#305-326) has external calls inside a loop: listingId = fwa.listNFT{value: backing}(address(packs),packId) (src/PackVault.sol#317)
+PackVault.activate(uint256[],uint256,uint256) (src/PackVault.sol#358-380) has external calls inside a loop: (None,None,None,None,None,None,None,None,None,None,status) = fwa.listings(listingIds[i]) (src/PackVault.sol#368)
+PackVault.activate(uint256[],uint256,uint256) (src/PackVault.sol#358-380) has external calls inside a loop: (None,None,None,None,None,None,None,None,None,None,status_scope_1) = fwa.listings(listingIds[i_scope_0]) (src/PackVault.sol#375)
+PackVault.unlist(uint256[],uint256) (src/PackVault.sol#385-413) has external calls inside a loop: fwa.topListingId() == id && block.timestamp < fwa.topListingSince() + CROWN_EXIT_WINDOW (src/PackVault.sol#399)
+PackVault.unlist(uint256[],uint256) (src/PackVault.sol#385-413) has external calls inside a loop: (None,None,None,None,None,None,None,None,None,None,status) = fwa.listings(id) (src/PackVault.sol#400)
+PackVault.unlist(uint256[],uint256) (src/PackVault.sol#385-413) has external calls inside a loop: fwa.withdrawListing(id) (src/PackVault.sol#403)
+PackVault.harvest(uint256[],uint256) (src/PackVault.sol#418-432) has external calls inside a loop: _openIndex[activeIds[i]] != 0 && fwa.pendingFees(activeIds[i]) != 0 (src/PackVault.sol#422)
+PackVault.liquidate(uint256,uint256) (src/PackVault.sol#677-700) has external calls inside a loop: packs.redeem(_idlePacks[_idlePacks.length - 1]) (src/PackVault.sol#686)
+PackVault.liquidate(uint256,uint256) (src/PackVault.sol#677-700) has external calls inside a loop: shapes.redeem(_looseShapes[_looseShapes.length - 1]) (src/PackVault.sol#690)
+VaultLib.valueOpen(IFWAV2,IShapePacks,mapping(uint256 => VaultLib.Position),uint256[]) (src/VaultLib.sol#102-125) has external calls inside a loop: (None,None,None,None,None,None,None,None,None,None,status) = f.listings(id) (src/VaultLib.sol#111)
+VaultLib.valueOpen(IFWAV2,IShapePacks,mapping(uint256 => VaultLib.Position),uint256[]) (src/VaultLib.sol#102-125) has external calls inside a loop: nav += value + pos.backing + f.pendingFees(id) (src/VaultLib.sol#114)
+VaultLib.owns(IShapePacks,uint256) (src/VaultLib.sol#375-381) has external calls inside a loop: o = packs.ownerOf(packId) (src/VaultLib.sol#376-380)
+	Calls stack containing the loop:
+		VaultLib.valueOpen(IFWAV2,IShapePacks,mapping(uint256 => VaultLib.Position),uint256[])
+VaultLib.valueOpen(IFWAV2,IShapePacks,mapping(uint256 => VaultLib.Position),uint256[]) (src/VaultLib.sol#102-125) has external calls inside a loop: owns(packs,pos.packId) || f.stuckNFTRecipient(id) == address(this) (src/VaultLib.sol#121)
+VaultLib.valueIdle(IShapePacks,uint256[]) (src/VaultLib.sol#369-373) has external calls inside a loop: v += packs.valueOf(idle[i]) (src/VaultLib.sol#371)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation/#calls-inside-a-loop
+
+Detector: reentrancy-benign
+Reentrancy in PackVault.checkpoint(uint256) (src/PackVault.sol#582-673):
+	External calls:
+	- _harvest() (src/PackVault.sol#599)
+		- fwa.withdrawEarnings() (src/PackVault.sol#435)
+	State variables written after the call(s):
+	- distPerShare += distributed * 1e18 / (supply - DEAD_SHARES) (src/PackVault.sol#638)
+	- ++ epoch (src/PackVault.sol#663)
+	- epochDistPerShare[epoch] = distPerShare (src/PackVault.sol#651)
+	- epochNav[epoch] = nav (src/PackVault.sol#649)
+	- epochSupply[epoch] = supply (src/PackVault.sol#650)
+	- eraFinalQ[redeemEra] = redeemQ (src/PackVault.sol#615)
+	- highWaterMark = perShare (src/PackVault.sol#646)
+	- highWaterMark = perShare (src/PackVault.sol#659)
+	- lastNav = nav (src/PackVault.sol#661)
+	- pendingChargeTotal = 0 (src/PackVault.sol#656)
+	- ++ redeemEra (src/PackVault.sol#616)
+	- redeemG = SCALE (src/PackVault.sol#617)
+	- redeemG = FixedPointMathLib.mulDiv(redeemG,SCALE - frac,SCALE) (src/PackVault.sol#621)
+	- redeemQ += FixedPointMathLib.mulDiv(redeemG,unit,SCALE) (src/PackVault.sol#613)
+	- redeemQ = 0 (src/PackVault.sol#618)
+	- totalShares = supply - filled (src/PackVault.sol#625)
+	- totalShares += (pendingDepositTotal - pendingChargeTotal) * supply / nav (src/PackVault.sol#653)
+Reentrancy in PackVault.list(uint256,uint256) (src/PackVault.sol#305-326):
+	External calls:
+	- listingId = fwa.listNFT{value: backing}(address(packs),packId) (src/PackVault.sol#317)
+	State variables written after the call(s):
+	- _openIndex[listingId] = _open.length (src/PackVault.sol#320)
+	- positions[listingId] = VaultLib.Position(uint64(packId),uint64(units),uint128(backing)) (src/PackVault.sol#318)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-3
+
+Detector: reentrancy-events
+Reentrancy in VaultLib.pay(VaultLib.Params,VaultLib.Budget,address,uint256,uint256,uint256,bool,uint256,uint256,uint256) (src/VaultLib.sol#215-237):
+	External calls:
+	- (ok,None) = msg.sender.call{value: amount}() (src/VaultLib.sol#234)
+	Event emitted after the call(s):
+	- KeeperPaid(msg.sender,amount) (src/VaultLib.sol#236)
+Reentrancy in VaultLib.sync(mapping(uint256 => VaultLib.Position),uint256[],mapping(uint256 => uint256),uint256[],IFWAV2,IShapePacks,uint256) (src/VaultLib.sol#317-351):
+	External calls:
+	- f.depositorReclaimBacking(listingId) (src/VaultLib.sol#333)
+	- f.depositorReclaimNFT(listingId) (src/VaultLib.sol#334)
+	- (ok,None) = address(f).call(abi.encodeCall(IFWAV2.recoverStuckNFT,(listingId))) (src/VaultLib.sol#340)
+	Event emitted after the call(s):
+	- PackOwed(listingId) (src/VaultLib.sol#342)
+	- Resolved(listingId,status,packBack) (src/VaultLib.sol#349)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-4
+
+Detector: timestamp
+PackVault.unlist(uint256[],uint256) (src/PackVault.sol#385-413) uses timestamp for comparisons
+	Dangerous comparisons:
+	- fwa.topListingId() == id && block.timestamp < fwa.topListingSince() + CROWN_EXIT_WINDOW (src/PackVault.sol#399)
+PackVault.checkpoint(uint256) (src/PackVault.sol#582-673) uses timestamp for comparisons
+	Dangerous comparisons:
+	- interval == lastCheckpointInterval (src/PackVault.sol#586)
+VaultLib.pay(VaultLib.Params,VaultLib.Budget,address,uint256,uint256,uint256,bool,uint256,uint256,uint256) (src/VaultLib.sol#215-237) uses timestamp for comparisons
+	Dangerous comparisons:
+	- amount < minPay (src/VaultLib.sol#230)
+	- amount == 0 (src/VaultLib.sol#233)
+VaultLib.precheck(VaultLib.Params,VaultLib.Budget,uint256,bool,uint256) (src/VaultLib.sol#301-307) uses timestamp for comparisons
+	Dangerous comparisons:
+	- minPay > FixedPointMathLib.min(free,e) (src/VaultLib.sol#306)
+	- minPay > FixedPointMathLib.min(free,r) (src/VaultLib.sol#306)
+VaultLib.sync(mapping(uint256 => VaultLib.Position),uint256[],mapping(uint256 => uint256),uint256[],IFWAV2,IShapePacks,uint256) (src/VaultLib.sol#317-351) uses timestamp for comparisons
+	Dangerous comparisons:
+	- block.timestamp < allocatedAt + f.settlementWindow() (src/VaultLib.sol#330)
+VaultLib.economics(IFWAV2,address) (src/VaultLib.sol#385-407) uses timestamp for comparisons
+	Dangerous comparisons:
+	- bid == 0 || bid >= ask || observedAt == 0 || observedAt > block.timestamp (src/VaultLib.sol#403)
+	- block.timestamp - observedAt > f.maxOracleAge() (src/VaultLib.sol#404)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+
+Detector: assembly
+VaultLib.offer(address,uint256,uint256,uint256,bool,uint256,uint256,uint256) (src/VaultLib.sol#151-167) uses assembly
+	- INLINE ASM (src/VaultLib.sol#162-166)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#assembly-usage
+
+Detector: costly-loop
+PackVault.restock(uint256,uint256,uint256) (src/PackVault.sol#264-302) has costly operations inside a loop:
+	- _looseShapes.pop() (src/PackVault.sol#296)
+PackVault.list(uint256,uint256) (src/PackVault.sol#305-326) has costly operations inside a loop:
+	- _idlePacks.pop() (src/PackVault.sol#316)
+PackVault.liquidate(uint256,uint256) (src/PackVault.sol#677-700) has costly operations inside a loop:
+	- _idlePacks.pop() (src/PackVault.sol#687)
+PackVault.liquidate(uint256,uint256) (src/PackVault.sol#677-700) has costly operations inside a loop:
+	- _looseShapes.pop() (src/PackVault.sol#691)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#costly-operations-inside-a-loop
+
+Detector: cyclomatic-complexity
+PackVault.restock(uint256,uint256,uint256) (src/PackVault.sol#264-302) has a high cyclomatic complexity (12).
+PackVault.checkpoint(uint256) (src/PackVault.sol#582-673) has a high cyclomatic complexity (13).
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#cyclomatic-complexity
+
+Detector: dead-code
+PackVault._owns(uint256) (src/PackVault.sol#347-349) is never used and should be removed
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#dead-code
+
+Detector: low-level-calls
+Low level call in VaultLib.pay(VaultLib.Params,VaultLib.Budget,address,uint256,uint256,uint256,bool,uint256,uint256,uint256) (src/VaultLib.sol#215-237):
+	- (ok,None) = msg.sender.call{value: amount}() (src/VaultLib.sol#234)
+Low level call in VaultLib.sync(mapping(uint256 => VaultLib.Position),uint256[],mapping(uint256 => uint256),uint256[],IFWAV2,IShapePacks,uint256) (src/VaultLib.sol#317-351):
+	- (ok,None) = address(f).call(abi.encodeCall(IFWAV2.recoverStuckNFT,(listingId))) (src/VaultLib.sol#340)
+Low level call in VaultLib.economics(IFWAV2,address) (src/VaultLib.sol#385-407):
+	- (ok,ret) = f.floorOracle().staticcall(abi.encodeCall(IFloorOracle.getFloorRange,(packs))) (src/VaultLib.sol#398-399)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#low-level-calls
+
+Detector: unused-state
+PackVault.DENOM_0_1 (src/PackVault.sol#55) is never used in PackVault (src/PackVault.sol#48-856)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-state-variable
+. analyzed (16 contracts with 101 detectors), 82 result(s) found

@@ -1,0 +1,26 @@
+No files changed, compilation skipped
+
+Ran 11 tests for test/scenario/VaultFlow.t.sol:VaultFlowPinnedTest
+[PASS] test_flow_distributions() (gas: 3524919)
+[PASS] test_flow_gas_spike() (gas: 11697252)
+[PASS] test_flow_inactive_long() (gas: 11942222)
+[PASS] test_flow_inactive_short() (gas: 11921634)
+[PASS] test_flow_init() (gas: 2954163)
+[PASS] test_flow_keeper_delay() (gas: 11234951)
+[PASS] test_flow_max_load() (gas: 48468064)
+[PASS] test_flow_oracle_change() (gas: 10719831)
+[PASS] test_flow_settled_unclaimed() (gas: 18931959)
+[PASS] test_flow_wind_down() (gas: 19524758)
+[PASS] test_flow_withdrawals() (gas: 20725571)
+Suite result: ok. 11 passed; 0 failed; 0 skipped; finished in 8.21s (76.66s CPU time)
+
+Ran 5 tests for test/scenario/VaultFlow.t.sol:VaultFlowSelectionTest
+[PASS] test_flow_acquire_bid() (gas: 50720768)
+[PASS] test_flow_acquire_keep() (gas: 50704806)
+[PASS] test_flow_acquire_silent() (gas: 50586070)
+[PASS] test_flow_staged_activation() (gas: 52357964)
+[PASS] test_flow_tokens() (gas: 37394684)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 9.46s (37.87s CPU time)
+
+Ran 2 test suites in 9.94s (17.67s CPU time): 16 tests passed, 0 failed, 0 skipped (16 total tests)
+exit=0
