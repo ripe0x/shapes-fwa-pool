@@ -78,8 +78,8 @@ block 26,424,971 unless stated; P = 0.03 ETH pack, B = 0.0363 ETH backing, k = 1
 
 Admin changes apply at once (D58) and one owner holds every role (D59). A compromised owner key
 can raise keeper pay to the bytecode maxima and run the keeper itself: at most the budgets'
-balance plus refill at the maximum rates, about **0.055 ETH in the first 24 h and 0.015 ETH a day
-after** at canary budgets (measured on a fork: 0.038895 ETH taken at once from three positions,
+balance plus refill at the maximum rates, about **0.045 ETH in the first 24 h and 0.015 ETH a day
+after** at canary budgets (routine 0.03 ETH; no essential budget, D64) (measured on a fork: 0.038895 ETH taken at once from three positions,
 `test/audit/release/AuditOwnerExtraction.t.sol`). Raising `tvlCap` exposes more holders to bad
 settings but does not raise that rate. Mitigation: the owner key is a multisig or hardware wallet.
 

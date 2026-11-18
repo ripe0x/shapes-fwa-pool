@@ -1,12 +1,12 @@
 {
- "block": 26438183,
+ "block": 26438587,
  "positions_listed": 30,
  "staged_after_listing": 0,
- "deposited": 1992139882240134377,
- "claimed": 1975281831327019640,
- "holder_result": -16858050913114737,
- "keeper_pay": 7818087383534000,
- "keeper_net": 2334549993097141,
+ "deposited": 1990244968000000000,
+ "claimed": 1975179777127623733,
+ "holder_result": -15065190872376267,
+ "keeper_pay": 6024627863797000,
+ "keeper_net": 415339663048311,
  "mints": 9,
  "ledger_gap": 0,
  "reverted": 0,
@@ -26,51 +26,51 @@
   },
   {
    "tag": "priced",
-   "balance": 4287349847920000,
-   "lastNav": 2000002345000000000,
-   "totalShares": 198356969989213387,
+   "balance": 4276175759885000,
+   "lastNav": 2000002454000000000,
+   "totalShares": 198337105225440896,
    "open": 30,
    "idle": 0,
    "loose": 0,
    "tokens": 0,
-   "keeper": 10001114232907437897,
-   "holder": 8009923094763893376
+   "keeper": 10001111500739900167,
+   "holder": 8009920835429201476
   },
   {
    "tag": "deployed capital",
-   "balance": 4287349847920000,
-   "lastNav": 2000002345000000000,
-   "totalShares": 198356969989213387,
+   "balance": 4276175759885000,
+   "lastNav": 2000002454000000000,
+   "totalShares": 198337105225440896,
    "open": 30,
    "idle": 0,
    "loose": 0,
    "tokens": 0,
-   "keeper": 10001114232907437897,
-   "holder": 8009923094763893376
+   "keeper": 10001111500739900167,
+   "holder": 8009920835429201476
   },
   {
    "tag": "partial withdrawal",
-   "balance": 30022803124905121,
-   "lastNav": 997597223602550776,
-   "totalShares": 99678484994606694,
+   "balance": 30100792321757521,
+   "lastNav": 997571906165541176,
+   "totalShares": 99668552612720448,
    "open": 14,
    "idle": 0,
    "loose": 0,
    "tokens": 0,
-   "keeper": 10001758888199397479,
-   "holder": 8996371196831089583
+   "keeper": 10000687060603280333,
+   "holder": 8997340570880125771
   },
   {
    "tag": "wound down",
-   "balance": 10039963529580737,
-   "lastNav": 10009200665355735,
+   "balance": 10040563008579267,
+   "lastNav": 10009438043704265,
    "totalShares": 1000000000000000,
    "open": 0,
    "idle": 0,
    "loose": 0,
    "tokens": 0,
-   "keeper": 10002334549993097141,
-   "holder": 9983089519138338038
+   "keeper": 10000415339663048311,
+   "holder": 9984880625976804053
   }
  ]
 }

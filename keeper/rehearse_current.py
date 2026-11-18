@@ -20,6 +20,7 @@ from rehearse_canary import FWA, ROOT, call, cast, ids, impersonate, num, send, 
 
 OWNER = "0x" + sh("cast", "keccak", "pack-vault-rehearsal-owner")[-40:]
 VALUES_FILE = ROOT / "deploy/rehearse-current.json"
+SELF = ["--max-loss-wei", str(10**16)]  # whoever runs unpaid exit work accepts its gas
 
 
 def drain_queue():
@@ -84,11 +85,12 @@ def main():
     b0 = num(cast("balance", vault))
     send(rc.HOLDER, vault, "requestRedeem(uint256)", shares // 2, value=charge)
     deposited += num(cast("balance", vault)) - b0
+    # Exit work is unpaid (no essential budget, D64): the withdrawer runs it at its own gas.
     drain_queue()
-    rc.keeper()
+    rc.keeper(*SELF)
     warp_to(42360)
     drain_queue()
-    rc.keeper()
+    rc.keeper(*SELF)
     send(rc.HOLDER, vault, "claim()")
     state("partial withdrawal")
 
@@ -101,10 +103,10 @@ def main():
     deposited += num(cast("balance", vault)) - b0
     send(OWNER, vault, "startWindDown()")
     drain_queue()
-    rc.keeper()
+    rc.keeper(*SELF)
     warp_to(42360)
     drain_queue()
-    rc.keeper()
+    rc.keeper(*SELF)
     send(rc.HOLDER, vault, "claim()")
     end = state("wound down")
 

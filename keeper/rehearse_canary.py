@@ -278,9 +278,10 @@ def main():
     send(HOLDER, VAULT, "requestRedeem(uint256)", shares, value=rc)
     deposited += num(cast("balance", VAULT)) - b0  # charge kept; any excess (basefee moved) is refunded
     send(VALUES["owner"], VAULT, "startWindDown()")
-    keeper()
+    # Exit work is unpaid (no essential budget, D64): the owner runs the wind-down at its own gas.
+    keeper(*loss)
     warp_to(42360)
-    keeper()
+    keeper(*loss)
     send(HOLDER, VAULT, "claim()", expect=True)
     end = state("wound down")
 

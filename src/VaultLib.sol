@@ -289,6 +289,8 @@ library VaultLib {
 
     /// @notice Unwind charge per POSITION_VALUE redeemed: unlisting and liquidating one position.
     function unwindCharge(Params storage p) external view returns (uint256) {
+        // No essential budget means exit work is unpaid (withdrawers run it): nothing to charge.
+        if (p.essentialCap == 0) return 0;
         return quote(p, Q_UNLISTED + Q_LIQ_PACK, 2, true);
     }
 

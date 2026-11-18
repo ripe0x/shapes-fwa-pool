@@ -130,7 +130,7 @@ def read_state(vault, slowdown, burn=False):
         loose_shapes=num(call(vault, "looseShapeCount()(uint256)")),
         free=max(0, balance - reserves), idle_eth=num(call(vault, "idleEth()(uint256)")), owed_estimate=owed,
         pending_deposits=pending, locked_shares=locked, distribution_due=due, pack_units_mask=mask,
-        essential_ceiling=ess_ceiling, processing_pool=num(call(vault, "processingPool()(uint256)")),
+        essential_ceiling=ess_ceiling, essential_cap=_ec, processing_pool=num(call(vault, "processingPool()(uint256)")),
         fee_credit=num(call(FWA, "feeCredit(address)(uint256)", vault)),
         open_positions=len(listings), max_positions=max_pos,
         winding_down=call(vault, "windingDown()(bool)") == "true",

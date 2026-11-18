@@ -36,9 +36,9 @@ Stage 1 sets `tvlCap` 0.5 ETH and `maxPositions` 10 in the deploy values; stage 
 | Outcome | Live check | Band |
 |---|---|---|
 | Liabilities never spent (O5) | `address(vault).balance >= pendingDepositTotal + redemptionReserve + distributionReserve + claimableTotal + processingPool` | always |
-| Keeper pay bounded (O2) | sum of `KeeperPaid` per day | <= 0.041 ETH in any 24 h |
+| Keeper pay bounded (O2) | sum of `KeeperPaid` per day | <= 0.031 ETH in any 24 h (routine only; exits unpaid, D64) |
 | Backing rule (D62) | backing of each new listing | 0.0333 to 0.0363 ETH at canary gas |
-| Exits work (O3, O6) | each redemption request priced within 2 blackouts with a drained queue | always |
+| Exits work (O3, O6) | each redemption priced within 2 blackouts after the withdrawer (or owner, in wind-down) runs the unpaid unlist and liquidate steps | always |
 | No staging by the keeper (O10) | keeper listings with FWA status Staged | 0 |
 | Holder cost (O9) | holder result after a round trip with no selections | > -1.5% |
 | Keeper P&L | keeper state file: spent vs paid | no unaccepted loss |
@@ -55,7 +55,7 @@ Wind-down is one way; holders redeem and claim as usual (they keep their shares 
 
 - FWA's owner can change fees, the oracle, the exemption and settlement rates at any time; the vault
   reads them live. The worst observed effect in testing is listing pausing, not loss of holder ETH.
-- A compromised owner key: at most the budgets' balance plus refill (about 0.055 ETH the first day,
+- A compromised owner key: at most the budgets' balance plus refill (about 0.045 ETH the first day,
   0.015 ETH a day after) until wind-down (B3).
 - Real VRF timing, transaction ordering and the gas market: covered only by running the canary.
 

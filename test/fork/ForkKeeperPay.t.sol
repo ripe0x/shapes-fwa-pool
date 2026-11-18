@@ -426,4 +426,33 @@ contract ForkKeeperPayTest is ForkBase {
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
     }
+
+    /// D64: without an essential budget exit work is unpaid and redeemers pay no unwind charge; the
+    /// withdrawer unlists and liquidates herself and the redemption completes.
+    function test_selfServeExitWithoutEssentialBudget() public {
+        _priced(alice, 1 ether);
+        _restock(3);
+        vm.prank(keeper);
+        vault.list(3, 0);
+        setCaps(vault.getParams().routineCap, 0);
+        assertEq(vault.unwindCharge(), 0, "no unwind charge");
+        uint256 shares = vault.shareBalance(alice);
+        uint256 rc = Charges.redeemCharge(vault, shares);
+        assertEq(rc, vault.requestCharge(), "only the shared checkpoint charge");
+        vm.prank(alice);
+        vault.requestRedeem{value: rc}(shares);
+        uint256[] memory ids = vault.openListings();
+        vm.startPrank(alice);
+        assertEq(vault.unlist(ids, 0), 0, "unpaid");
+        assertEq(vault.liquidate(40, 0), 0, "unpaid");
+        vm.stopPrank();
+        toBlackout();
+        vm.prank(alice);
+        vault.checkpoint(0);
+        assertEq(vault.lockedShares(), 0, "redemption filled");
+        uint256 b = alice.balance;
+        vm.prank(alice);
+        vault.claim();
+        assertGt(alice.balance - b, 0.97 ether);
+    }
 }

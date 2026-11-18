@@ -111,8 +111,8 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         p.tvlCap = 2 ether;
         p.routineCap = 0.03 ether; // canary budgets (deploy/canary.example.json)
         p.routineRate = 0.0008 ether;
-        p.essentialCap = 0.01 ether;
-        p.essentialRate = 0.0002 ether;
+        p.essentialCap = 0; // canary: exit work unpaid, withdrawers run it (D64)
+        p.essentialRate = 0;
     }
 
     function _deploy(uint256 seed, VaultLib.Params memory p) internal {

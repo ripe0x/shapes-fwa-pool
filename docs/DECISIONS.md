@@ -831,3 +831,17 @@ highest basefee and past a cumulative loss limit (`--max-total-loss-wei`, defaul
 Table in `audit/release-c884959-B/REPAIRS.md`.
 **Open, owner's call:** the canary essential budget (cap 0.01 ETH, refill 0.0002 ETH a day) is
 emptied by one full exit at about 1 gwei; holders can still exit unpaid.
+
+## D64. Exit work unpaid at canary values (owner, 2026-11-17)
+
+**Owner:** "i don't think it's crazy to make withdrawers pay their gas/execute the txs" ... "don't
+over complicate this".
+**Chose:** canary essential budget 0 (cap and refill), so unlisting and liquidating for
+redemptions or wind-down pay no keeper; withdrawers (or the owner in a wind-down) run those calls at
+their own gas. With no essential budget `unwindCharge()` is 0, so redeemers are not charged for
+work nobody is paid to do. Checkpoints stay paid from the request charges. Paid exits return by
+setting an essential budget with `setParams` (instant). Owner-compromise first-day bound falls
+from about 0.055 to 0.045 ETH. Supersedes the essential-budget sizing question in D63.
+**Evidence:** `test_selfServeExitWithoutEssentialBudget`; 106 fork, audit and scenario tests;
+rehearsals at the pinned and current block, where the withdrawer and owner run the exit steps
+(ledgers exact; current-block holder round trip -0.0151 ETH, was -0.0169).

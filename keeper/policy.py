@@ -93,6 +93,7 @@ class State:
     pack_units_mask: int = 8  # PackVault packUnitsMask; this keeper builds 3-unit packs only
     essential_ceiling: int = None  # redemption and wind-down work; None = same as gas_ceiling
     processing_pool: int = 0  # request charges already held for the next checkpoint
+    essential_cap: int = None  # PackVault essentialCap; 0 = exit work unpaid (withdrawers run it)
 
 
 def price(s, essential=False):
@@ -176,7 +177,9 @@ def deploy_charge(s):
 
 
 def unwind_charge(s):
-    """PackVault.unwindCharge, per POSITION_VALUE redeemed."""
+    """PackVault.unwindCharge, per POSITION_VALUE redeemed; 0 without an essential budget."""
+    if s.essential_cap == 0:
+        return 0
     return quote(s, Q["unlisted"] + Q["liq_pack"], 2, True)
 
 

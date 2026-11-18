@@ -87,7 +87,7 @@
   },
   {
    "id": "O6",
-   "text": "DRAFT. Can it stall and what restarts it (gas): no call is refused for gas price. Routine work is paid up to the 0.5 gwei ceiling and redemption and wind-down work up to 2 gwei (D61), from the essential budget; above those the keeper waits and holders or anyone may act at their own extra cost (a deposit-pricing checkpoint at 2 gwei is paid as at 0.5 gwei). A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid. Work resumes when gas falls or the owner raises a ceiling (immediate, D58).",
+   "text": "DRAFT. Can it stall and what restarts it (gas): no call is refused for gas price. Routine work is paid up to the 0.5 gwei ceiling; above it the keeper waits. Exit work (unlisting and liquidating for redemptions or wind-down) is unpaid at canary values (D64): withdrawers, or the owner in a wind-down, run it at their own gas, and redeemers pay no unwind charge. Checkpoints are paid from the request charges. A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid.",
    "metric": "facts.checkpoint_pay_wei",
    "max": 200000000000000,
    "regimes": [
