@@ -352,6 +352,8 @@ def main():
     ap.add_argument("--send", action="store_true")
     ap.add_argument("--status", action="store_true", help="print status and keeper accounting, send nothing")
     ap.add_argument("--account")
+    ap.add_argument("--keystore", help="encrypted keystore file (with --password-file)")
+    ap.add_argument("--password-file")
     ap.add_argument("--from", dest="sender", help="sender for an unlocked local node (rehearsal)")
     ap.add_argument("--rpc", default=RPC)
     ap.add_argument("--state", help="keeper state file (default keeper/state-<vault>.json)")
@@ -379,12 +381,18 @@ def main():
     if a.status:
         print_status(a)
         return
-    if a.send and not (a.account or a.sender):
-        sys.exit("--send needs --account (a cast keystore name) or --from on an unlocked local node")
+    if a.send and not (a.account or a.keystore or a.sender):
+        sys.exit("--send needs --account (a cast keystore name), --keystore with --password-file, "
+                 "or --from on an unlocked local node")
     tm = None
     if a.send:
-        sender = a.sender or cast("wallet", "address", "--account", a.account)
-        auth = ["--account", a.account] if a.account else ["--unlocked", "--from", a.sender]
+        if a.keystore:  # an encrypted keystore file and its password file (containers); never a raw key
+            auth = ["--keystore", a.keystore, "--password-file", a.password_file]
+        elif a.account:
+            auth = ["--account", a.account]
+        else:
+            auth = ["--unlocked", "--from", a.sender]
+        sender = a.sender or cast("wallet", "address", *auth)
         try:
             tm = txm.TxManager(a.rpc, a.state, sender, auth, a.confirmations, a.replace_after, a.max_replacements,
                                int(a.max_fee_gwei * 1e9) if a.max_fee_gwei else None)

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
+import {DeployCore} from "../../../script/DeployCore.sol";
 import {ForkBase} from "../../fork/ForkBase.sol";
 import {PackVault} from "../../../src/PackVault.sol";
 import {KeeperPolicyV1} from "../../../src/KeeperPolicy.sol";
@@ -24,7 +25,7 @@ contract AuditMaxPackGas is ForkBase {
         new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
 
         p.packUnitsMask = uint64(1) << 30;
-        vault = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether);
         vm.prank(alice);
         vault.deposit{value: Charges.grossFor(vault, 5 ether)}();
         toBlackout();

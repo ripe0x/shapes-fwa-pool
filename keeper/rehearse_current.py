@@ -47,9 +47,10 @@ def main():
     values = dict(rc.VALUES, owner=OWNER)
     VALUES_FILE.write_text(json.dumps(values, indent=1))
     try:
-        r = subprocess.run(["forge", "script", "script/Deploy.s.sol", "--rpc-url", rc.RPC, "--broadcast", "--unlocked",
-                            "--sender", rc.DEPLOYER], capture_output=True, text=True, cwd=ROOT,
-                           env={**os.environ, "DEPLOY_VALUES": "deploy/rehearse-current.json"})
+        # The mainnet command itself (script/deploy.sh), against the local fork.
+        r = subprocess.run(["script/deploy.sh", "deploy/rehearse-current.json", "--broadcast"], capture_output=True,
+                           text=True, cwd=ROOT, env={**os.environ, "RPC_URL": rc.RPC, "I_AM_THE_OWNER": "yes",
+                                                     "FORGE_WALLET_ARGS": f"--unlocked --sender {rc.DEPLOYER}"})
     finally:
         VALUES_FILE.unlink()
     if r.returncode:

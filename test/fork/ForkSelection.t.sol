@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {DeployCore} from "../../script/DeployCore.sol";
 import {Test} from "forge-std/Test.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
@@ -113,9 +114,7 @@ abstract contract SelectionBase is Test {
         p.essentialCap = 0.1 ether;
         p.essentialRate = 0.005 ether;
         vm.deal(address(this), 10 ether);
-        vault = new PackVault{value: 3 ether}(
-            FWA, SHAPES, PACKS, makeAddr("sel-admin"), p, new KeeperPolicyV1()
-        );
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, makeAddr("sel-admin"), p, 3 ether);
         deployBalance = address(vault).balance;
         uint256 b0 = address(this).balance;
         vault.restock(COUNT, 3, 0);

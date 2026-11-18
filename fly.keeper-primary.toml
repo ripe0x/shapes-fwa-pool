@@ -1,0 +1,26 @@
+# The PackVault primary keeper on Fly.io (as apeball's keepers). A worker: no public HTTP service.
+# From the repository root, after the vault is deployed and VAULT below is set:
+#   fly volumes create keeper_state --config fly.keeper-primary.toml --size 1
+#   fly deploy --config fly.keeper-primary.toml
+# Secrets (never in this file or shell history): an encrypted keystore (cast wallet new) and its password:
+#   fly secrets set --config fly.keeper-primary.toml KEEPER_KEYSTORE_JSON="$(cat ~/.foundry/keystores/<name>)"
+#   read -rs "p?password: " && printf 'KEEPER_KEYSTORE_PASSWORD=%s\n' "$p" | fly secrets import --config fly.keeper-primary.toml; unset p
+app = "packvault-keeper"
+primary_region = "iad"
+
+[build]
+  dockerfile = "keeper/Dockerfile"
+
+[env]
+  VAULT = "0x0000000000000000000000000000000000000000"  # set to the deployed PackVault before deploying
+  RPC_URL = "https://mainnet.gateway.tenderly.co"
+  POLL_SECONDS = "60"  # primary
+  KEEPER_ARGS = ""        # e.g. "--burn-tokens"; exit work is unpaid (D64), so neither keeper does it
+
+[mounts]
+  source = "keeper_state"
+  destination = "/data"  # the transaction manager's state survives restarts
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

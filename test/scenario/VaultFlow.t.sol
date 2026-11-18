@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {DeployCore} from "../../script/DeployCore.sol";
 import {FlowBreakdown} from "../utils/FlowBreakdown.sol";
 import {SelectionBase, IFwaSettle} from "../fork/ForkSelection.t.sol";
 import {ForceSender, IOwnable, IOracleAdmin, IFwaAdmin} from "../fork/ForkBase.sol";
@@ -119,7 +120,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         vm.fee(BASE_FEE);
         vm.txGasPrice(GAS_PRICE);
         vm.deal(address(this), seed + 1 ether);
-        vault = new PackVault{value: seed}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, seed);
         preexisting = address(vault).balance - seed; // mainnet dust at the deploy address
         depositedCum = address(vault).balance; // seed and dust are capitalization inflow
     }
@@ -906,7 +907,7 @@ contract VaultFlowSelectionTest is VaultFlowBase {
 
         VaultLib.Params memory p = _canary();
         vm.deal(address(this), 5 ether);
-        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 2 ether);
         depositedCum = address(vault).balance;
         uint256 need = 20 * 3;
         uint256 mints = (need + 9) / 10; // 20 packs x 3 units -> 6 mints of 0.1 ETH

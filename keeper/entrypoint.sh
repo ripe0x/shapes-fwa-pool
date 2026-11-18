@@ -1,0 +1,13 @@
+#!/bin/sh
+# Writes the keeper's encrypted keystore and its password from Fly secrets into files only this
+# container can read, then runs the keeper. The key itself is never in argv, env or a log.
+set -eu
+umask 077
+: "${VAULT:?VAULT address}" "${KEEPER_KEYSTORE_JSON:?secret}" "${KEEPER_KEYSTORE_PASSWORD:?secret}"
+printf '%s' "$KEEPER_KEYSTORE_JSON" > /tmp/keystore.json
+printf '%s' "$KEEPER_KEYSTORE_PASSWORD" > /tmp/keystore.pw
+unset KEEPER_KEYSTORE_JSON KEEPER_KEYSTORE_PASSWORD
+# shellcheck disable=SC2086
+exec python3 keeper/keeper.py "$VAULT" --send --keystore /tmp/keystore.json --password-file /tmp/keystore.pw \
+  --rpc "${RPC_URL:-https://mainnet.gateway.tenderly.co}" --state /data/keeper-state.json \
+  --loop "${POLL_SECONDS:-60}" --confirmations 2 --health-port 8788 ${KEEPER_ARGS:-}

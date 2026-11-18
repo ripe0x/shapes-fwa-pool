@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {DeployCore} from "../../script/DeployCore.sol";
 import {Test} from "forge-std/Test.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
@@ -59,7 +60,7 @@ abstract contract ForkBase is Test {
         // Real fee environment, so every ETH flow carries its real gas price.
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
-        vault = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, defaultParams(), new KeeperPolicyV1());
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, defaultParams(), 0.01 ether);
         preexisting = address(vault).balance - 0.01 ether; // ETH already at the deploy address
         vm.deal(alice, 50 ether);
         vm.deal(bob, 50 ether);

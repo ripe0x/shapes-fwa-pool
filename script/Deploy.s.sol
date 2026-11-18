@@ -4,10 +4,12 @@ pragma solidity 0.8.30;
 import {Script} from "forge-std/Script.sol";
 import {PackVault} from "../src/PackVault.sol";
 import {VaultLib} from "../src/VaultLib.sol";
-import {KeeperPolicyV1} from "../src/KeeperPolicy.sol";
+import {DeployCore} from "./DeployCore.sol";
+import {console2} from "forge-std/console2.sol";
 import {IShapes, IShapePacks, IFWAV2} from "../src/interfaces/External.sol";
 
-/// @notice The one deployment path. Every value comes from a JSON values file (DEPLOY_VALUES);
+/// @notice Mainnet and rehearsal entry to the one deployment path (DeployCore, also used by every
+///         fork and scenario test). Every value comes from a JSON values file (DEPLOY_VALUES);
 ///         the signer comes from the forge command line (keystore account, or an unlocked
 ///         local node for rehearsal). Never from this file.
 contract Deploy is Script {
@@ -41,17 +43,17 @@ contract Deploy is Script {
         address owner_ = vm.parseJsonAddress(v, ".owner");
         require(uint160(owner_) > 0xffff, "owner must be a real account, not a placeholder or precompile");
         vm.startBroadcast();
-        // The keeper payment policy is its own immutable contract; the owner replaces it with
-        // setPolicy (D57, D58).
-        KeeperPolicyV1 policy = new KeeperPolicyV1();
-        vault = new PackVault{value: vm.parseJsonUint(v, ".seedWei")}(
+        (vault,) = DeployCore.deploy(
             IFWAV2(vm.parseJsonAddress(v, ".fwa")),
             IShapes(vm.parseJsonAddress(v, ".shapes")),
             IShapePacks(vm.parseJsonAddress(v, ".packs")),
-            vm.parseJsonAddress(v, ".owner"),
+            owner_,
             p,
-            policy
+            vm.parseJsonUint(v, ".seedWei")
         );
         vm.stopBroadcast();
+        console2.log("PackVault", address(vault));
+        console2.log("KeeperPolicy", address(vault.keeperPolicy()));
+        console2.log("postflight passed");
     }
 }

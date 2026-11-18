@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {DeployCore} from "../../script/DeployCore.sol";
 import {Test} from "forge-std/Test.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
@@ -53,7 +54,7 @@ contract ForkTokensTest is Test {
         p.essentialCap = 0.1 ether;
         p.essentialRate = 0.005 ether;
         vm.deal(address(this), 5 ether);
-        vault = new PackVault{value: 2 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 2 ether);
         vault.restock(20, 3, 0);
         vault.list(20, 0);
 

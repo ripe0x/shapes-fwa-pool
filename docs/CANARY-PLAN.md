@@ -11,15 +11,32 @@ consequence (chain operations rule 2).
 2. The owner has signed the current asset-flow outcomes (`asset_gate.py` reports PASS).
 3. `keeper/rehearse_current.py` passes on a fork of the block the deployment will use: positions
    listed, ledger closes to the wei, zero reverted keeper transactions.
-4. Owner key: a multisig or hardware wallet (accepted risk B3). Its address goes in the values file.
+4. Owner key: `0xCB43…17F9`, a Calibur (Uniswap wallet) EIP-7702 account. Accepted risk B3 assumed a
+   multisig or hardware wallet; this is a single hot key, so the owner-compromise bound depends on it.
 5. Keeper key: a fresh hot wallet funded with at most 0.05 ETH, used only by `keeper/keeper.py`.
 
-## Deployment (broadcasts 1 and 2)
+## Deployment (one command, three transactions)
 
-- Values: `deploy/canary.example.json` with the real `owner`; seed 0.01 ETH. Same script as every
-  rehearsal (`script/Deploy.s.sol`), signed with the existing keystore (`--account`), never a raw key.
-- Readback after the receipt: bytecode hash equals the frozen build; `owner`, `keeperPolicy`, every
-  `getParams()` field and `budget()` equal the values file; `edge(3)` returns ok and a backing.
+- Values: `deploy/canary.json` (owner `0xCB43078C32423F5348Cab5885911C3B5faE217F9`, a Calibur
+  EIP-7702 smart-wallet EOA; seed 0.01 ETH; stage 1 caps 0.5 ETH and 10 positions).
+- The one deploy path: `script/deploy.sh` runs `script/Deploy.s.sol`, which deploys through
+  `DeployCore` (the same code every fork and scenario test and both rehearsals deploy with) and
+  runs its postflight (owner, policy, every parameter, budgets, seed shares, flags).
+- Simulate first (sends nothing; prints the gas estimate):
+  `FORGE_WALLET_ARGS="--sender <deployer>" script/deploy.sh deploy/canary.json`
+  Dry run on 2026-11-17: postflight passed, 10,410,290 gas, about 0.0024 ETH at 0.116 gwei, plus
+  the 0.01 ETH seed (VaultLib, KeeperPolicyV1, PackVault).
+- Broadcast, signed with a keystore or hardware wallet, never a raw key:
+  `I_AM_THE_OWNER=yes FORGE_WALLET_ARGS="--account <name> --sender <deployer>" script/deploy.sh deploy/canary.json --broadcast`
+
+## Keepers (apeball's setup)
+
+The apeball bot itself is game-specific; this vault reuses its infrastructure: a primary
+(`fly.keeper-primary.toml`, iad, every 60 s) and a backup (`fly.keeper-backup.toml`, ams, hourly)
+built from `keeper/Dockerfile`, separate keys, a volume for the transaction manager's state.
+Keys are encrypted keystores plus a password, as Fly secrets (never a raw key). Before mainnet, run
+the keeper once against a local fork with the real keystore (`--keystore`, `--password-file`): the
+container's keystore path is not exercised by the tests.
 
 ## Stages
 

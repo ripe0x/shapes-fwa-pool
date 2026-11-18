@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {DeployCore} from "../../script/DeployCore.sol";
 import {ForkBase, ForceSender, IFwaAdmin} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
@@ -174,7 +175,7 @@ contract ForkVaultAdversarialTest is ForkBase {
     function test_distributionPaysGainsOnce() public {
         VaultLib.Params memory p = defaultParams();
         p.distributionBps = 2_000;
-        vault = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether);
         assertGe(address(vault).balance, 0.01 ether); // deploy addresses can hold mainnet dust
         {
             uint256 gross_ = Charges.grossFor(vault, 4 ether);
@@ -215,7 +216,7 @@ contract ForkVaultAdversarialTest is ForkBase {
     function test_checkpointAfterAllHoldersExitAndGain() public {
         VaultLib.Params memory p = defaultParams();
         p.distributionBps = 2_000;
-        vault = new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether);
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
             vm.prank(alice);
@@ -256,7 +257,7 @@ contract ForkVaultAdversarialTest is ForkBase {
         p.maxPositions = uint96(n);
         p.reserve = 0;
         vm.deal(address(this), 100 ether);
-        vault = new PackVault{value: 25 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 25 ether);
         for (uint256 i; i < n; i += 10) {
             vault.restock(10, 3, 0);
             vault.list(10, 0);
@@ -284,7 +285,7 @@ contract ForkVaultAdversarialTest is ForkBase {
         p.maxPositions = uint96(n);
         p.reserve = 0;
         vm.deal(address(this), 100 ether);
-        vault = new PackVault{value: 25 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 25 ether);
         uint256 seed = address(vault).balance;
         uint256 b0 = address(this).balance;
         for (uint256 i; i < n; i += 10) {
@@ -318,7 +319,7 @@ contract ForkVaultAdversarialTest is ForkBase {
         VaultLib.Params memory p = defaultParams();
         p.reserve = 0;
         vm.deal(address(this), 100 ether);
-        vault = new PackVault{value: 10 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 10 ether);
         uint256 g = gasleft();
         vault.restock{gas: TX_GAS_CAP}(10, 3, 0);
         emit log_named_uint("restock 10 packs", g - gasleft());
