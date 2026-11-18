@@ -1,4 +1,37 @@
-# Current position-accounting integration
+# Current review repair
+
+2026-11-18. Empty-vault bootstrap capital is protected by the owner-approved unexposed cursor
+advance (D67). The keeper image installs pinned dependencies and persists both stores under
+`/data`; actual image startup and two-container persistence passed. Packaging commit: `2f3ca40`.
+Verified vault/keeper/model repair and focused evidence commit: `6319d5e`.
+Checkpoint calibration and final affected verification commit: `e948b1e`.
+
+Three bootstrap and five real exposure/admission tests pass. The new mutating checkpoint gate
+rejects an unseen own selection/receipt, then succeeds after reconciliation. Four exact receiver
+checks and both fork/model reconciliations pass. Current runtime is 24,322 bytes, 254 below EIP-170.
+
+**Acceptance remains blocked.** O2 is still 1,919,655 quoted gas versus 1,750,000. Checkpoint's gas
+component is now 360,000, meeting O6's existing 0.0002 ETH limit, with fresh affected fork checks.
+Exposed global maintenance funding remains insufficient in the recorded window. No journal quote,
+cap, refill, accepted outcome or signature changed. Actual billed full-holder checkpoint evidence
+remains a release gap; the calibration uses bounded executed-fork refund measurements.
+
+The owner-approved replacement local batch passed: 77/80 transactions, 1.755867382438961584/3 ETH
+aggregate transaction value, exactly 3 simulated ETH initial funding and no topups. Real refunded
+prefixes/tails and an exposed zero-essential-budget exit are recorded on the preceding Q400 source.
+The exit's six calls cost 0.0003838206 ETH gas at 0.2 gwei and paid only 0.0001 ETH checkpoint pay.
+Its entry snapshot is restored; owned PID 98279 remains at port 8557 with an empty pool. The
+earlier PID 10583 observation below is historical.
+
+Current evidence and exact limits: `POSITION-INTEGRATION-ACCEPTANCE.md` review repair section.
+Funding and return options: `REVIEW-FUNDING-PROPOSAL.md`.
+
+Things that don't make sense: global costs scale with all FWA activity while small-vault income
+does not; zero-funded essential exits include foreign history; larger allowances supply no cash.
+
+---
+
+# Earlier position-accounting integration
 
 2026-11-18. **Implemented and locally verified; milestone acceptance is blocked by maintenance
 funding and changed economic outcomes.** Branch `codex/incremental-position-integration` starts at

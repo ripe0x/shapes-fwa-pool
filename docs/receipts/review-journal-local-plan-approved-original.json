@@ -1,0 +1,105 @@
+{
+  "name": "review-journal-2026-11-18",
+  "status": "PREPARED ONLY: requires new explicit owner approval; no transaction sent",
+  "endpoint": "http://127.0.0.1:8557",
+  "expected_node_pid": 10583,
+  "chain_id": 1,
+  "fork_rpc": "https://mainnet.gateway.tenderly.co",
+  "fork_block": 26418539,
+  "preconditions": [
+    "Verify exclusive endpoint PID, Anvil client, chain1, unchanged original fork URL/block/hash and existing six-actor funding manifest.",
+    "Capture current canonical head/hash, all six balances/nonces/code and empty pending/queued pool before snapshot.",
+    "All six are previously funded label-derived test actors. No added funding, new signer, private key, oracle owner impersonation or node reset.",
+    "Bind exact final source/compiled runtime/client hashes before deployment; stop if they change during batch.",
+    "Stop before any action exceeding any aggregate/per-call bound; preflight exact calldata/value/from/fees and assert receipt status."
+  ],
+  "signers": {
+    "deployer": "0xe0980b9f7F5fB4a98813552894f4E980836cDa7c",
+    "holder": "0xDd4B0D7470953fb19b97fa130A15Af59537Bc523",
+    "holder2": "0xb9A3188644D5A55A98C68B056A2685Cd6C915725",
+    "keeper": "0x6B401c3364dFb17fe7D54237fC04aba3f7739dd0",
+    "kicker": "0x2C42b18832Cef2Eb8C8C0f83250700176694E341",
+    "owner": "0x37Dcd875c4E367e080f1e05F18F10dB0D45a65B5"
+  },
+  "added_funding_wei": 0,
+  "aggregate_external_transaction_value_limit_wei": 3000000000000000000,
+  "external_value_definition": "Sum of msg.value on broadcast transactions across all snapshot branches, counted even if later reverted. Internal transfers do not create new capital and are recorded separately.",
+  "maximum_simultaneous_acquisition_escrow_wei": 1500000000000000000,
+  "maximum_broadcast_transactions": 80,
+  "per_transaction_gas_limit": 16777216,
+  "runtime_code_size_limit": 24576,
+  "configuration": {
+    "values": "deploy/canary.example.json",
+    "owner": "0x37Dcd875c4E367e080f1e05F18F10dB0D45a65B5",
+    "tvl_cap_wei": 2000000000000000000,
+    "seed_wei": 10000000000000000,
+    "pack_units_mask": 8,
+    "routine_cap_wei": 30000000000000000,
+    "routine_refill_wei_per_day": 800000000000000,
+    "essential_cap_wei": 0,
+    "essential_refill_wei_per_day": 0,
+    "holder_deposit_principal_ceiling_wei": 800000000000000000,
+    "reserve_wei": 5000000000000000
+  },
+  "fee_contexts": [
+    {
+      "basefee_wei": 150000000,
+      "effective_price_wei": 200000000
+    },
+    {
+      "basefee_wei": 450000000,
+      "effective_price_wei": 500000000
+    }
+  ],
+  "phases": [
+    {
+      "phase": "fresh linked-script deployment and priced capital",
+      "maximum_transactions": 9,
+      "actions": [
+        "Use script/deploy.sh normal linked library/policy/vault path, record real CREATE/CREATE2 provenance and all runtime sizes.",
+        "Existing holder deposits at most0.8ETH principal plus live request charge. Price via real blackout and drained-request path.",
+        "Real paid restock of one three-unit pack and ordinary Active listing, preserving real FWA exposure during calibration. No oracle/config changes."
+      ]
+    },
+    {
+      "phase": "genuine refunded journal prefix",
+      "maximum_transactions": 19,
+      "actions": [
+        "Existing kicker calls real FWA acquire(address,uint256,uint256,uint256,uint256) once per request, up to16 requests.",
+        "Quote total actual acquisition prices first; refuse if simultaneous escrow exceeds1.5ETH or remaining external-value allowance.",
+        "Advance to actual snapshotted word deadlines and call real processAcquisitions, then withdraw actual acquisition refunds.",
+        "Assert16 terminal refunded/expired records, unchanged vault listing still Active, actual refund accounting and completed-prefix delta. No fabricated VRF success."
+      ]
+    },
+    {
+      "phase": "small/full/tail calibration",
+      "maximum_transactions": 46,
+      "actions": [
+        "Capture a reusable snapshot with funded routine budget, one real Active vault listing and16 genuine new refunded journal records.",
+        "Measure actual eth_estimateGas at explicit fee fields, signed gas limit, receipt billed gas/refund-sensitive cost and KeeperPaid for n=1..16 from identical branch state.",
+        "For tail n=1..15, process16-n in one bounded call, then measure the final n entries reaching completed prefix. Record both call costs.",
+        "Snapshot/revert branches reuse existing funds. Every broadcast remains in aggregate80tx/3ETH value accounting even if its state is reverted.",
+        "Primary matrix uses0.15basefee+0.05tip; if transaction budget permits, substitute one repeated control with0.45+0.05. No extra transaction beyond bound."
+      ]
+    },
+    {
+      "phase": "caller-funded backlog exit",
+      "maximum_transactions": 6,
+      "actions": [
+        "Restore the unprocessed16-record snapshot; holder requests all its shares with the live request charge.",
+        "Assert locked shares, essential budget zero and routine budget still positive. Holder calls bounded sync: actual pay must be zero.",
+        "Holder unlists the actual Active position subject to crown window, liquidates real pack/loose inventory, checkpoints and claims.",
+        "Assert no remaining holder shares/locked entitlement/claimable; reconcile principal, exact keeper pay, mint fees, remaining seed and every protected bucket. Record caller receipt gas separately from vault expenses."
+      ]
+    }
+  ],
+  "after": [
+    "Restore entry snapshot only if all branch evidence and receipts were captured; preserve node, processes, existing forks and funding manifest.",
+    "Assert automine restored, empty pending/queued pool, correct nonces and canonical receipt/index/P&L handling after snapshot changes."
+  ],
+  "limitations": [
+    "This plan measures actual REFUNDED journal records; successful historical foreign selections use separate authentic Forge history.",
+    "Possible successful-foreign actual receipt path: a separate fork after original request but before its real fulfillment, preserving historical request blockhash. That requires a different fork/node and named original VRF caller, so is outside this plan and requires separate owner authority.",
+    "No real mainnet/testnet transaction, merge, owner signature, new funding, fee/budget/outcome revision or destructive process/cache action."
+  ]
+}

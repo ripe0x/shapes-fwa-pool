@@ -1,0 +1,448 @@
+{
+  "status": "passed",
+  "source_context": "Q_CHECKPOINT400000, Q_SYNC85000, Q_JOURNAL30000; before separateQ360 change; do not relabel as Q360 evidence",
+  "source_sha256": {
+    "src/PackVault.sol": "1dc1ddb5d4c09057f34797efdff5d87929898c51bda671423de23625e7687af2",
+    "src/VaultLib.sol": "259d85003ff2392be404ead8d067edc92b1277044ee905e4f3640235bc760aae"
+  },
+  "deployment": {
+    "vault": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6",
+    "source_sha256": {
+      "src/PackVault.sol": "1dc1ddb5d4c09057f34797efdff5d87929898c51bda671423de23625e7687af2",
+      "src/VaultLib.sol": "259d85003ff2392be404ead8d067edc92b1277044ee905e4f3640235bc760aae",
+      "src/interfaces/External.sol": "d50229cf80a4a036c9ba3f4f8bb60452129ee51dc7ca0263ad612b2ea76e499d",
+      "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a"
+    },
+    "source_unchanged_during_deploy": true,
+    "runtimes": [
+      {
+        "name": "VaultLib",
+        "address": "0xa923a0b493533b19a13608aac2997020fc0cf090",
+        "runtime_bytes": 21313,
+        "runtime_sha256": "6568f2e65395515581eb1814fee1607964b83a37867d600f2db0bfbbba56513d"
+      },
+      {
+        "name": "KeeperPolicyV1",
+        "address": "0x2d478b38a5eeadb8f2e5962d5ad36a15119d7db6",
+        "runtime_bytes": 216,
+        "runtime_sha256": "d8f3f70dfb224ca9923e6e2b0be70ba2cd35c27255b590427af3c7b95dc54410"
+      },
+      {
+        "name": "PackVault",
+        "address": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6",
+        "runtime_bytes": 24322,
+        "runtime_sha256": "769e14b56fb2f2ee018c05ad42263dada44fc9137646211f0408cc27f5ae6645"
+      }
+    ]
+  },
+  "input_files_sha256": {
+    "keeper/review_journal_calibration.py": "345f9d4ec6d2d70ebbb6a6fcaa7a48f91f423b2425a39068135776dfc68498c0",
+    "docs/receipts/review-journal-local-results.json": "0abff71f623e5561045ccc05af520a6e068fd0431bd610b9536f3542dc95295b",
+    "docs/receipts/review-journal-replacement-actions.jsonl": "e75cd165a094c229b55c3a429f00253b9c5fb87a039e1270f1c710d8a73f389b",
+    "docs/receipts/review-journal-replacement-startup.json": "37636238fbd8201f00599cb4bec5e9cab0014838a1eaaed333c41ba51b98591b",
+    "docs/receipts/review-journal-replacement-postflight.json": "d91ff11c172637b3aad973608cfe53bd07a8e81fa70b76c7dd5f40eacdc182ae"
+  },
+  "bounds": {
+    "initial_funding_wei": 3000000000000000000,
+    "initial_funding_once": true,
+    "broadcasts": 77,
+    "max_broadcasts": 80,
+    "external_value_wei": 1755867382438961584,
+    "external_value_max_wei": 3000000000000000000,
+    "max_gas": 16777216,
+    "max_code": 24576,
+    "simultaneous_acquisition_input_wei": 945679683438961584,
+    "max_simultaneous_acquisition_wei": 1500000000000000000
+  },
+  "fee_context": {
+    "basefee_wei": 150000000,
+    "effective_price_wei": 200000000,
+    "applies_to": "Every measured prefix/tail/exit row; setup acquisition/deployment fees have their individual recorded receipts."
+  },
+  "matrix": [
+    {
+      "entries": 1,
+      "prefix_estimate": 117495,
+      "prefix_billed": 112515,
+      "tail_estimate": 117469,
+      "tail_billed": 112489,
+      "paid_wei": 23000000000000,
+      "prefix_profit_wei": 497000000000
+    },
+    {
+      "entries": 2,
+      "prefix_estimate": 134101,
+      "prefix_billed": 129121,
+      "tail_estimate": 131275,
+      "tail_billed": 129095,
+      "paid_wei": 29000000000000,
+      "prefix_profit_wei": 3175800000000
+    },
+    {
+      "entries": 3,
+      "prefix_estimate": 150708,
+      "prefix_billed": 145728,
+      "tail_estimate": 150682,
+      "tail_billed": 145702,
+      "paid_wei": 35000000000000,
+      "prefix_profit_wei": 5854400000000
+    },
+    {
+      "entries": 4,
+      "prefix_estimate": 167315,
+      "prefix_billed": 162335,
+      "tail_estimate": 167289,
+      "tail_billed": 162309,
+      "paid_wei": 41000000000000,
+      "prefix_profit_wei": 8533000000000
+    },
+    {
+      "entries": 5,
+      "prefix_estimate": 183923,
+      "prefix_billed": 178943,
+      "tail_estimate": 183897,
+      "tail_billed": 178917,
+      "paid_wei": 47000000000000,
+      "prefix_profit_wei": 11211400000000
+    },
+    {
+      "entries": 6,
+      "prefix_estimate": 200531,
+      "prefix_billed": 195551,
+      "tail_estimate": 200505,
+      "tail_billed": 195525,
+      "paid_wei": 53000000000000,
+      "prefix_profit_wei": 13889800000000
+    },
+    {
+      "entries": 7,
+      "prefix_estimate": 217139,
+      "prefix_billed": 212159,
+      "tail_estimate": 217113,
+      "tail_billed": 212133,
+      "paid_wei": 59000000000000,
+      "prefix_profit_wei": 16568200000000
+    },
+    {
+      "entries": 8,
+      "prefix_estimate": 233748,
+      "prefix_billed": 228768,
+      "tail_estimate": 233722,
+      "tail_billed": 228742,
+      "paid_wei": 65000000000000,
+      "prefix_profit_wei": 19246400000000
+    },
+    {
+      "entries": 9,
+      "prefix_estimate": 250358,
+      "prefix_billed": 245378,
+      "tail_estimate": 247532,
+      "tail_billed": 245352,
+      "paid_wei": 71000000000000,
+      "prefix_profit_wei": 21924400000000
+    },
+    {
+      "entries": 10,
+      "prefix_estimate": 266968,
+      "prefix_billed": 261988,
+      "tail_estimate": 264142,
+      "tail_billed": 261962,
+      "paid_wei": 77000000000000,
+      "prefix_profit_wei": 24602400000000
+    },
+    {
+      "entries": 11,
+      "prefix_estimate": 283579,
+      "prefix_billed": 278599,
+      "tail_estimate": 280753,
+      "tail_billed": 278573,
+      "paid_wei": 83000000000000,
+      "prefix_profit_wei": 27280200000000
+    },
+    {
+      "entries": 12,
+      "prefix_estimate": 300190,
+      "prefix_billed": 295210,
+      "tail_estimate": 300164,
+      "tail_billed": 295184,
+      "paid_wei": 89000000000000,
+      "prefix_profit_wei": 29958000000000
+    },
+    {
+      "entries": 13,
+      "prefix_estimate": 316801,
+      "prefix_billed": 311821,
+      "tail_estimate": 316775,
+      "tail_billed": 311795,
+      "paid_wei": 95000000000000,
+      "prefix_profit_wei": 32635800000000
+    },
+    {
+      "entries": 14,
+      "prefix_estimate": 333413,
+      "prefix_billed": 328433,
+      "tail_estimate": 333387,
+      "tail_billed": 328407,
+      "paid_wei": 101000000000000,
+      "prefix_profit_wei": 35313400000000
+    },
+    {
+      "entries": 15,
+      "prefix_estimate": 350025,
+      "prefix_billed": 345045,
+      "tail_estimate": 347199,
+      "tail_billed": 345019,
+      "paid_wei": 107000000000000,
+      "prefix_profit_wei": 37991000000000
+    },
+    {
+      "entries": 16,
+      "prefix_estimate": 366612,
+      "prefix_billed": 361632,
+      "tail_estimate": null,
+      "tail_billed": null,
+      "paid_wei": 113000000000000,
+      "prefix_profit_wei": 40673600000000
+    }
+  ],
+  "split_comparisons": [
+    {
+      "tail_entries": 1,
+      "extra_billed_gas": 95902,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9098
+    },
+    {
+      "tail_entries": 2,
+      "extra_billed_gas": 95896,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9104
+    },
+    {
+      "tail_entries": 3,
+      "extra_billed_gas": 95891,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9109
+    },
+    {
+      "tail_entries": 4,
+      "extra_billed_gas": 95887,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9113
+    },
+    {
+      "tail_entries": 5,
+      "extra_billed_gas": 95884,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9116
+    },
+    {
+      "tail_entries": 6,
+      "extra_billed_gas": 95881,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9119
+    },
+    {
+      "tail_entries": 7,
+      "extra_billed_gas": 95879,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9121
+    },
+    {
+      "tail_entries": 8,
+      "extra_billed_gas": 95878,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9122
+    },
+    {
+      "tail_entries": 9,
+      "extra_billed_gas": 95879,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9121
+    },
+    {
+      "tail_entries": 10,
+      "extra_billed_gas": 95881,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9119
+    },
+    {
+      "tail_entries": 11,
+      "extra_billed_gas": 95884,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9116
+    },
+    {
+      "tail_entries": 12,
+      "extra_billed_gas": 95887,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9113
+    },
+    {
+      "tail_entries": 13,
+      "extra_billed_gas": 95891,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9109
+    },
+    {
+      "tail_entries": 14,
+      "extra_billed_gas": 95896,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9104
+    },
+    {
+      "tail_entries": 15,
+      "extra_billed_gas": 95902,
+      "existing_base_85000_max10percent_extra_quote": 93500,
+      "candidate_base105000_zero_markup_extra_quote": 105000,
+      "candidate_base105000_max10percent_extra_quote": 115500,
+      "candidate_zero_markup_split_profit_gas_equivalent": 9098
+    }
+  ],
+  "exit": {
+    "essential_budget": 0,
+    "routine_budget_positive_asserted": true,
+    "rows": [
+      {
+        "label": "exit request all holder shares",
+        "estimate": 166301,
+        "billed_gas": 136609,
+        "keeper_paid_wei": 0,
+        "caller_gas_cost_wei": 27321800000000
+      },
+      {
+        "label": "exit unpaid sixteen-record backlog",
+        "estimate": 355866,
+        "billed_gas": 350886,
+        "keeper_paid_wei": 0,
+        "caller_gas_cost_wei": 70177200000000
+      },
+      {
+        "label": "exit unlist real position",
+        "estimate": 632490,
+        "billed_gas": 525910,
+        "keeper_paid_wei": 0,
+        "caller_gas_cost_wei": 105182000000000
+      },
+      {
+        "label": "exit liquidate real pack and loose Shapes",
+        "estimate": 701660,
+        "billed_gas": 559584,
+        "keeper_paid_wei": 0,
+        "caller_gas_cost_wei": 111916800000000
+      },
+      {
+        "label": "exit checkpoint",
+        "estimate": 292721,
+        "billed_gas": 255435,
+        "keeper_paid_wei": 100000000000000,
+        "caller_gas_cost_wei": 51087000000000
+      },
+      {
+        "label": "exit claim",
+        "estimate": 115540,
+        "billed_gas": 90679,
+        "keeper_paid_wei": 0,
+        "caller_gas_cost_wei": 18135800000000
+      }
+    ],
+    "billed_gas": 1919103,
+    "gas_cost_wei": 383820600000000,
+    "checkpoint_pool_pay_wei": 100000000000000,
+    "net_caller_gas_less_pay_wei": 283820600000000,
+    "holder_sent_wei": 800187699000000000,
+    "holder_received_claim_plus_ckpay_wei": 798204438999250060,
+    "holder_all_seven_tx_gas_cost_wei": 416728650215460,
+    "holder_net_native_change_wei": -2399988650965400,
+    "holder_final_balance_inferred_wei": 897600011349034600,
+    "holder_claim_wei": 798104438999250060,
+    "final_vault_balance_direct_read_wei": 10073561000749940,
+    "checkpoint_residual_nav_from_event_wei": 10073561000749939,
+    "redemption_allocated_from_event_wei": 798104438999250061,
+    "redemption_rounding_reserve_event_derived_wei": 1,
+    "holder_share_locked_claimable_zero_direct_assertions": true,
+    "final_supply_from_checkpoint_event": 1000000000000000,
+    "distributed_from_event_wei": 0,
+    "processing_pool_event_and_source_derived_wei": 0,
+    "claimable_total_event_and_source_derived_wei": 0,
+    "ledger": {
+      "seed_wei": 10000000000000000,
+      "holder_gross_sent_wei": 800187699000000000,
+      "keeper_pay_wei": 1009699000000000,
+      "primary_mint_fee_wei": 1000000000000000,
+      "holder_claim_wei": 798104438999250060,
+      "residual_cash_wei": 10073561000749940,
+      "mismatch_wei": 0
+    }
+  },
+  "foreign_request_roundtrip": {
+    "acquisition_input_wei": 945679683438961584,
+    "actual_refund_event_wei": 943831021984321584,
+    "nonrefunded_vrf_or_protocol_cost_wei": 1848661454640000,
+    "kicker_gas_cost_wei": 747719447550055,
+    "records": 16,
+    "statuses": [
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3
+    ]
+  },
+  "restoration": {
+    "entry_snapshot_restored": true,
+    "all_six_actor_balances_nonces_code_match_entry": true,
+    "automine": true,
+    "pool_empty": true,
+    "node_pid": 98279,
+    "preserved": true
+  },
+  "limitations": [
+    "Actual paid calibration covers refunded global records with one real Active vault listing, not successful-foreign billed receipt matrix.",
+    "All branch receipts archived before snapshot reverts; transactions are simulated local and no longer canonical after entry restoration. They still count77toward80budget.",
+    "Only the0.15base/0.2effective fee matrix executed; no0.5control or new sourceQ360 local deployment was broadcast.",
+    "Final balance/holder zero-rights are direct read/assertions; protected totals and final holder native balance are event/source derived because full final getters were not archived before restoration.",
+    "Primary mint fee exact ledger uses real Shapes fork mintFee0.001ETH, paid real10Shape mint, and full principal redemption; no additional fee income credited.",
+    "Anti-split comparisons are actual billed two-part branches on old current quote. Candidate105k is arithmetic counterexample, not executed new policy code.",
+    "No quotation/policy/budget/outcome changes adopted."
+  ]
+}

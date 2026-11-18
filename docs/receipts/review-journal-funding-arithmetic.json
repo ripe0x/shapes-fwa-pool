@@ -1,0 +1,55 @@
+{
+  "method": "Perfect16-packed existing85000base+30000perentry catchup. All remaining entries treated foreign. Not a full own-work or exit bound. Routine allowance arithmetic deducts initial request-funded checkpoint: holder paid-in minus principal deposit (0.000092ETH at0.2gwei,0.0002ETH at0.5gwei).",
+  "options": [
+    {
+      "configuration": "canary.example",
+      "total_gwei": 0.2,
+      "volume": 439.7,
+      "backlog": 12923,
+      "minimum_catchup_wei": 91274000000000000,
+      "actual_end_free_wei": 1111596494053330038,
+      "minimum_30day_permission_increase_wei": 90388000000000000,
+      "minimum_refill_after_initial_cap_wei_per_day": "3812933333333333.333333333333",
+      "observed_routine_keeper_plus_catchup_wei": 144388000000000000,
+      "request_funded_checkpoint_excluded_wei": 92000000000000
+    },
+    {
+      "configuration": "canary.example",
+      "total_gwei": 0.5,
+      "volume": 439.7,
+      "backlog": 16251,
+      "minimum_catchup_wei": 286945000000000000,
+      "actual_end_free_wei": 1200010776010321589,
+      "minimum_30day_permission_increase_wei": 286127500000000000,
+      "minimum_refill_after_initial_cap_wei_per_day": "10337583333333333.33333333333",
+      "observed_routine_keeper_plus_catchup_wei": 340127500000000000,
+      "request_funded_checkpoint_excluded_wei": 200000000000000
+    },
+    {
+      "configuration": "canary.example",
+      "total_gwei": 0.5,
+      "volume": 71,
+      "backlog": 1473,
+      "minimum_catchup_wei": 26047500000000000,
+      "actual_end_free_wei": 109893743403053233,
+      "minimum_30day_permission_increase_wei": 25092500000000000,
+      "minimum_refill_after_initial_cap_wei_per_day": "1636416666666666.666666666667",
+      "observed_routine_keeper_plus_catchup_wei": 79092500000000000,
+      "request_funded_checkpoint_excluded_wei": 200000000000000
+    },
+    {
+      "configuration": "mainnet",
+      "total_gwei": 0.5,
+      "volume": 439.7,
+      "backlog": 10364,
+      "minimum_catchup_wei": 183000000000000000,
+      "actual_end_free_wei": 4210051276826364167,
+      "minimum_30day_permission_increase_wei": 177945000000000000,
+      "minimum_refill_after_initial_cap_wei_per_day": "10931500000000000",
+      "observed_routine_keeper_plus_catchup_wei": 427945000000000000,
+      "request_funded_checkpoint_excluded_wei": 200000000000000
+    }
+  ],
+  "source_context": "Current Q_CHECKPOINT360000 / unchanged Q_SYNC85000 / Q_JOURNAL30000",
+  "input": "review-journal-forward-q360-funding.json"
+}

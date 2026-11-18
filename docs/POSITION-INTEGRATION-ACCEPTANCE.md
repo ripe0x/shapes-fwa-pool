@@ -1,5 +1,71 @@
 # Production position accounting acceptance
 
+## Review repair status, 2026-11-18
+
+The empty-vault capital boundary, keeper dependencies and persistent index are repaired. The
+milestone remains blocked by exposed-vault funding, complete journal compensation calibration,
+and O2. Checkpoint's fixed gas component is reduced to 360,000 (D68), meeting the existing O6
+limit. No journal quote, budget, accepted outcome or owner signature was changed.
+Verified code and focused evidence: `6319d5e`; keeper packaging: `2f3ca40`.
+Checkpoint calibration and final affected verification: `e948b1e`.
+
+- The original Solidity drains 0.010000000000000001 ETH across 673 authentic foreign records,
+  then panics on its first deposit checkpoint. The repair pays zero for an onchain-proven unexposed
+  cursor advance and preserves that seed. Three bootstrap tests pass, including direct checkpoint,
+  protected escrow, positive-minPay rollback and reserve zero.
+- Five real exposure/admission regressions pass, including the new mutating checkpoint rejecting
+  an unseen own selection and receipt. Two OWED/FIFO kernel checks are model evidence only.
+- Four production receiver checks pass: cold keep 46,462 gas, difficult kick 69,730, and 99 sampled
+  low-gas attempts record or revert atomically. The two refreshed fork lifecycles reconcile all
+  financial buckets to the wei after correcting the model fixture's future-prefix chronology.
+- The repaired vault runtime is **24,322 bytes**, with **254 bytes** below EIP-170; linked library
+  runtime is 21,313 bytes. This replaces the earlier 27-byte-headroom observation for this source.
+- The actual production image builds and starts; separate containers sharing `/data` retain both
+  transaction state and index head. The isolated job passed at `bc39d63`, with exact packaging
+  hashes recorded in `receipts/review-packaging-ci-evidence.json`. No live Fly machine was replaced.
+- Eleven Python accounting tests, keeper policy checks and seven focused forward scenarios pass.
+  The funding proposal includes eight illustrative 30-day scenarios with absolute cash and holder
+  marks. They are not forecasts or realized exits.
+
+The affected economic scenarios were refreshed: O2 remains **1,919,655 quoted gas/position**
+versus 1,750,000; O6 now pays **0.0002 ETH**, meeting its unchanged limit. Even perfect amortization
+leaves 1,810,000 marginal build/list quoted gas per position; batching alone cannot satisfy O2.
+Fresh full-holder and essential-spike fork checks support the checkpoint calibration. Their
+refund-adjusted call measurements remain distinct from actual billed full-holder receipts, which
+are a release evidence gap. Above-ceiling caller gas can still exceed capped compensation.
+
+After the preserved node disappeared, the owner approved a replacement at the same endpoint and
+fork with the same six clean actors and exactly 3 simulated ETH initial funding. The batch passed:
+**77/80 transactions**, **1.755867382438961584/3 ETH aggregate transaction value**, no topups.
+It measured real refunded prefixes 1..16 and tails 1..15 with a real active vault listing, then
+completed the caller-funded backlog exit. Six exit calls billed **1,919,103 gas / 0.0003838206 ETH**
+at 0.2 gwei, with only **0.0001 ETH** checkpoint compensation; other essential work paid zero.
+Those receipts bind the preceding 400,000-checkpoint source. Journal quotes are unchanged.
+
+The entry snapshot was restored after preserving receipts; owned Anvil PID 98279 remains with an
+empty transaction pool. The refunded singleton billed 112,515 gas against 115,000 quoted; a full
+batch billed 361,632 against 565,000. Raising the base to 105,000 would already reward splitting
+in the actual refunded series. Successful-foreign billed small/full/tail receipts remain missing,
+so no new journal payment rule or blanket quote cut was adopted.
+
+Current evidence: `receipts/review-bootstrap-results.json`,
+`receipts/review-journal-receiver-reconciliation-evidence.json`, `receipts/review-python-evidence.json`,
+`receipts/review-journal-focused-evidence.json` and `receipts/review-independent.md`.
+The actual matrix and replacement proof are `receipts/review-journal-local-results.json` and
+`receipts/review-journal-replacement-startup.json`; fresh Q360 evidence is
+`receipts/review-bootstrap-q360-results.json`. Current outcomes and immutable repair inputs are
+`receipts/review-q360-outcomes.json` and `receipts/review-repair-manifest.json`.
+The complete funding options and remaining measurement limits are in `REVIEW-FUNDING-PROPOSAL.md`.
+
+Things that don't make sense: exposure to a small part of FWA obliges a vault to fund global work;
+zero essential budgets move that unrelated backlog cost to withdrawing callers; an allowance
+provides no ETH; and a positive ending model mark does not establish continuous keeper operation.
+
+## Earlier integration evidence
+
+The sections below describe the previous candidate. Their immutable manifest and broad test counts
+remain historical evidence for those exact inputs, not fresh release verification of this repair.
+
 Candidate: `codex/incremental-position-integration`, based on `f75ee770d0f0bce55a5f2607a23a3ee0104d1df1`.
 Date: 2026-11-18. Production commit `909e761`. **The milestone is blocked by maintenance funding and changed economic outcomes.** Keeper and simulation commit `c93ac2f`. Local verification is complete within the limits below; no acceptance or release approval is claimed.
 

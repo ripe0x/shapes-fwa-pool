@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/review_journal_calibration.py", line 180, in <module>
+    try: main()
+         ^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/review_journal_calibration.py", line 87, in main
+    freeze(); manifest = B.load_manifest()
+                         ^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/rehearsal_batch.py", line 104, in load_manifest
+    owners = raw("lsof", "-nP", "-tiTCP:8557", "-sTCP:LISTEN").splitlines()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/rehearsal_batch.py", line 46, in raw
+    raise RuntimeError(f"{' '.join(map(str, args))}: {r.stdout}\n{r.stderr}")
+RuntimeError: lsof -nP -tiTCP:8557 -sTCP:LISTEN: 
+

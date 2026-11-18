@@ -1,0 +1,9 @@
+{
+  "original_plan_before_completion_status_sha256": "8b70768962024cd666b850d687f26f2a823f955528d2652659e8ba959ba4974f",
+  "original_plan_after_completion_status_sha256": "bbcb77291f198dd458217ff6cbd1a74d602f6840f8ff5d1ad4ac470c35ca1b37",
+  "replacement_plan_before_completion_status_sha256": "beed369b98bfc8c4b785577bf85fae17c93e26ffc7cac0de78b8558f35cdf6ad",
+  "replacement_plan_after_completion_status_sha256": "286c9d277f156fe0b766ed17f16cde6b2d16fcd49bc18948c9487d6a7f206b11",
+  "change": "Status metadata only; no bound/action/approval expansion. Original approved plan bytes and original approval hash remain archived separately.",
+  "completion": "review-journal-calibration-summary.json",
+  "further_broadcasts_authorized": false
+}

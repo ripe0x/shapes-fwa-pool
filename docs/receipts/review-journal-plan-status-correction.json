@@ -1,0 +1,8 @@
+{
+  "original_approved_plan_sha256": "06cac5f1df177aced2d186488fe6543861ec76282cd30124d1a02539fa71dd9e",
+  "original_archived_path": "review-journal-local-plan-approved-original.json",
+  "original_status": "PREPARED ONLY: requires new explicit owner approval; no transaction sent",
+  "corrected_plan_sha256": "8b70768962024cd666b850d687f26f2a823f955528d2652659e8ba959ba4974f",
+  "change": "status metadata only; approved endpoints/actions/signers/spending limits unchanged",
+  "authority": "Root relay of owner approval of original80transaction/3simulatedETH preserved-node plan; no replacement-node approval received"
+}

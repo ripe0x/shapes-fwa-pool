@@ -1,0 +1,23 @@
+No files changed, compilation skipped
+
+Warning: the following cheatcode(s) are deprecated and will be removed in future versions:
+  lastCallGas(): replaced by `lastFrameGas`
+Ran 2 tests for test/fork/ReviewJournal.t.sol:ReviewJournalTest
+[PASS] test_cashOnlyHistoryRebasesWithoutMaintenanceExpense() (gas: 688448)
+Logs:
+  cash-only real historical records skipped unpaid: 269
+  complete gross unpaid rebase gas: 124351
+
+[FAIL: assertion failed: 1999894649974540410 != 2000000000000000000] test_realMixedHistoryCashOnlyExitWithZeroEssentialBudget() (block: 26434971) (gas: 20337249)
+Suite result: FAILED. 1 passed; 1 failed; 0 skipped; finished in 16.75s (16.50s CPU time)
+
+Ran 1 test suite in 17.13s (16.75s CPU time): 1 tests passed, 1 failed, 0 skipped (2 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/fork/ReviewJournal.t.sol:ReviewJournalTest
+[FAIL: assertion failed: 1999894649974540410 != 2000000000000000000] test_realMixedHistoryCashOnlyExitWithZeroEssentialBudget() (block: 26434971) (gas: 20337249)
+
+Encountered a total of 1 failing tests, 1 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 1 failed test
+Tip: Run `forge test --debug --match-test <TEST_NAME>` to inspect one failing test in the debugger
