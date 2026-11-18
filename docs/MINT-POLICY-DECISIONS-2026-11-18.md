@@ -60,3 +60,49 @@ operation, full-capital size planning, shared-vault registry and guard, keeper
 pagination, and corrected live economic gating. Run reconciliation to the
 wei against the FWA fork for bid, keep, staged, stuck-NFT, zero-activity,
 and full withdrawal cases, then re-review code size and invariants.
+
+## Second-pass review (original request revisited)
+
+The first PR was mostly a research artifact and could not satisfy "implement and
+simplify the complete vault". This pass intentionally favors small changes
+that can be validated against the existing system instead of shipping an
+unreviewed factory, global NAV rewrite, or persistent optimization engine.
+
+### Bugs corrected
+
+- FWA exposes `stagingHead` separately from its unsettled acquisition count.
+  A zero acquisition count does not imply that a freshly listed pack will
+  become active immediately. Both `restock` and `list` now refuse to spend
+  paid mint or listing capital while an old staging backlog exists.
+- The keeper maintains `queue_drained` and `staging_empty` as separate
+  fields: exits, checkpoints and activation remain possible while the
+  staging backlog exists. Conflating these gates deadlocks activation.
+- Liquidation planning uses original per-position pack units and recorded
+  backing when withdrawals are pending, not a new 3-unit pack's backing
+  quote. The extra RPC calls are omitted from normal keeper passes.
+- The research model now charges rounded whole initial mints, construction
+  and listing gas, keeper fees and seeds for independently deployed vaults.
+  Initial construction costs are subtracted from net-year P&L, including
+  when there are no acquisitions.
+
+### What remains deliberately unimplemented
+
+- Any onchain systemwide cap on FWA selection share; a second vault can
+  otherwise bypass the first vault's quota.
+- New whole-shape pack construction and combined mint/list operation.
+  These require bytecode-size and gas measurements and fork reconciliation.
+- A genuinely uncapped one-vault NAV. Current 300 position bound is retained
+  to avoid an impossible checkpoint.
+- A factory of multiple independent vaults. This is the likely least invasive
+  capacity solution, but its seed requirements and global admission contract
+  have not been implemented or audited.
+- Production adaptive sizing or a guaranteed mix of 0.05/0.1/0.2 packs.
+  The current live keeper still builds 0.03 packs only.
+
+### Release condition
+
+Do not merge as deploy-ready until full FWA mainnet fork tests, the
+accounting reconciler, measured worst-case gas, asset-flow signature updates,
+and independent security review pass. A successful Python CI job alone is
+insufficient. Never claim any percentage of certainty on a new mainnet
+fund-holding contract.
