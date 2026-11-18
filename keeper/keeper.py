@@ -84,15 +84,20 @@ def read_state(vault, slowdown, burn=False):
     window = num(call(FWA, "settlementWindow()(uint256)"))
     top = num(call(FWA, "topListingId()(uint256)"))
     top_since = num(call(FWA, "topListingSince()(uint64)"))
+    # Position-specific reads are only needed when planning an actual unwind.
+    # Avoid another RPC per active listing during routine reward/maintenance passes.
+    locked = num(call(vault, "lockedShares()(uint256)"))
+    winding = call(vault, "windingDown()(bool)") == "true"
+    needs_exit_values = locked != 0 or winding or num(k) < 10**18 + min_edge * 10**14
     listings = []
     for i in ids_of(call(vault, "openListings()(uint256[])")):
         f = call(FWA, f"listings(uint256)({LISTING_T})", i).strip("()").split(", ")
         status, allocated_at = num(f[10]), num(f[9])
         pend = num(call(FWA, "pendingFees(uint256)(uint256)", i)) if status == policy.ACTIVE else 0
-        # The keeper must plan exits from stored position values, not today's
-        # listing quote for a default 0.03 ETH pack.
-        pos = lines(call(vault, "positions(uint256)(uint64,uint64,uint128)", i))
-        units, posted_backing = num(pos[1]), num(pos[2])
+        units, posted_backing = 3, 0  # only used for liquidity selection during unwind
+        if needs_exit_values and status == policy.ACTIVE:
+            pos = lines(call(vault, "positions(uint256)(uint64,uint64,uint128)", i))
+            units, posted_backing = num(pos[1]), num(pos[2])
         owed = status in (policy.SETTLED, policy.WITHDRAWN) and \
             call(FWA, "stuckNFTRecipient(uint256)(address)", i).lower() == vault.lower()
         listings.append(policy.Listing(i, status, allocated_at, pend, owed,
@@ -103,7 +108,6 @@ def read_state(vault, slowdown, burn=False):
     reserves = pending + num(call(vault, "redemptionReserve()(uint256)")) + \
         num(call(vault, "distributionReserve()(uint256)")) + num(call(vault, "claimableTotal()(uint256)")) + \
         num(call(vault, "processingPool()(uint256)"))  # request charges: reserved like _free() (audit E4)
-    locked = num(call(vault, "lockedShares()(uint256)"))
     owed = 0
     if locked:
         last_nav, supply = num(call(vault, "lastNav()(uint256)")), num(call(vault, "totalShares()(uint256)"))
@@ -140,7 +144,7 @@ def read_state(vault, slowdown, burn=False):
         essential_ceiling=ess_ceiling, essential_cap=_ec, processing_pool=num(call(vault, "processingPool()(uint256)")),
         fee_credit=num(call(FWA, "feeCredit(address)(uint256)", vault)),
         open_positions=len(listings), max_positions=max_pos,
-        winding_down=call(vault, "windingDown()(bool)") == "true",
+        winding_down=winding,
         listing_paused=call(vault, "listingPaused()(bool)") == "true", distribution_bps=dist_bps,
         recent_volume=(seq_now - seq_then) / 7, slowdown_volume=slowdown, burn_tokens=burn,
         reserve=res, work_fee=wfee, routine_budget=num(rbud), essential_budget=num(ebud),
