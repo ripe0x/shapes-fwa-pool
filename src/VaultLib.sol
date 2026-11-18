@@ -68,7 +68,7 @@ library VaultLib {
     /// gas on real receipts (keeper/measure_gas.py, docs/GAS.md). Each base sits at most at the
     /// measured fixed cost of a call divided by 1.1, so splitting a job never earns a second base.
     // One checkpoint per interval cannot be split, so it is quoted at measured billed gas.
-    uint256 internal constant Q_CHECKPOINT = 400_000;
+    uint256 internal constant Q_CHECKPOINT = 360_000;
     uint256 internal constant Q_RESTOCK = 280_000;
     uint256 internal constant Q_PACK = 325_000; // createPack at the three-Shape reference size
     uint256 internal constant Q_PACK_UNIT = 35_000; // each additional packed Shape

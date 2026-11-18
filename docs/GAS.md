@@ -1,6 +1,9 @@
 # Position-accounting gas and compensation
 
-**The locally verified candidate has a funding blocker and failed historical economic outcomes.** Current acceptance
+**The candidate has a funding blocker and O2 remains above its accepted limit.** Checkpoint's gas
+component is now 360,000, bringing O6 to its existing 0.0002 ETH limit at the configured routine
+ceiling and work fee (D68). Full-holder refund calculations support this bounded calibration;
+actual billed full-holder receipts remain a release evidence gap. Current acceptance
 and numerical outcomes are in `POSITION-INTEGRATION-ACCEPTANCE.md`. The tables below the separator
 are historical and do not validate this candidate.
 
@@ -11,7 +14,7 @@ processing charge. Foreign/refunded journal entries earn no flat work fee; opera
 
 | Component | Quoted gas |
 | --- | ---: |
-| Checkpoint | 400,000, independent of position count |
+| Checkpoint | 360,000, independent of position count |
 | Restock base | 280,000 |
 | Pack assembly | 325,000 for three Shapes, plus 35,000 per additional Shape |
 | Paid primary mint and split | 2,200,000 per ten 0.01 ETH Shapes |
@@ -36,6 +39,15 @@ required. Other caller work limits remain sixteen, with restock/liquidation capp
 ordinary backing units and oversized gifts claimed in isolated thirty-Shape chunks.
 
 ## Evidence interpretation
+
+Current repair evidence is `receipts/review-bootstrap-q360-results.json`: vault runtime 24,322
+bytes, library 21,313, unchanged 46,462/69,730-gas receiver samples and 99 sampled atomicity cases.
+The Q360 full-holder and essential-spike fork checks pass; full-holder gross/refund measurements
+do not replace a standalone billed receipt. `receipts/review-journal-local-results.json` contains
+the preceding Q400 source's actual refunded prefixes/tails and exposed exit. Its singleton bills
+112,515 gas and sixteen records bill 361,632, against unchanged quotes of 115,000 and 565,000.
+The deployment and maximum-operation figures below describe the earlier linked source and remain
+valid only for those exact inputs.
 
 Foundry gross meters include execution plus intrinsic/calldata before transaction refunds. They
 bound the gas limit; they are not billed-gas or keeper-profit receipts. Actual local transaction

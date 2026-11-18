@@ -1,0 +1,37 @@
+{
+  "scope": "Current Q360 focused O2 max_load refresh; O6 refreshed separately in Q360 receipt",
+  "base_revision": "6319d5edab185f2443324aa40e5cf9bc62be25e1",
+  "source_sha256": {
+    "src/PackVault.sol": "1dc1ddb5d4c09057f34797efdff5d87929898c51bda671423de23625e7687af2",
+    "src/VaultLib.sol": "51fd0f008b590b9d85a862d0418038b834d31e34c6cab07264600b69c4740498",
+    "keeper/policy.py": "023df5a03eff840d9967af3e6200250b34c11e4103a83275e3fcb56c1a9107f4",
+    "test/scenario/VaultFlow.t.sol": "b6ca4a7885d7d74c703c1ef42a89274aac614c64e9a848d946432d39750c16e0",
+    "docs/receipts/flow/max_load.json": "b735cf33e165901e71a3fee4b1d3ded9ceff04e529b301f079b9d968e017bead",
+    "docs/receipts/flow/gas_spike.json": "d0bbde5934a28fcae0b5535d32d31ccd2a5b88a429f2eb0853f3258b3004dd1f"
+  },
+  "asset_source_hash": "b842725caa43f700be61110ac09d5586dd89aec29d248b64ec541290873065cf",
+  "command": "SOURCE_HASH=<asset_gate.py --print-source-hash output> forge test --match-path test/scenario/VaultFlow.t.sol --match-test test_flow_max_load --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+  "exit_status": 0,
+  "raw": "docs/receipts/review-q360-max-load.txt",
+  "o2_facts": {
+    "open_listings": 29,
+    "packs_listed": 29,
+    "keeper_gas_per_position": 1919655,
+    "work_fee_per_position_wei": 40000000000000,
+    "_4": 0,
+    "_5": 0
+  },
+  "o6_facts": {
+    "open_listings": 3,
+    "gas_price_gwei_x100": 200,
+    "checkpoint_pay_wei": 200000000000000,
+    "build_pay_wei": 0,
+    "_4": 0,
+    "_5": 0
+  },
+  "bucket_mismatches": [],
+  "limits": [
+    "Accounting test success does not accept O2; O2 remains1919655 vs1750000.",
+    "Only affected max_load/gas_spike were refreshed, not the full16regime gate or owner signature."
+  ]
+}

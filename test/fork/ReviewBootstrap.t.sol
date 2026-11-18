@@ -116,7 +116,7 @@ contract ReviewBootstrapTest is ForkBase {
         vm.prank(keeper); uint256 pay = vault.checkpoint(0, 0);
         uint256 used = beforeGas - gasleft();
         emit log_named_uint("bootstrap checkpoint call gas, excluding intrinsic", used);
-        assertLe(used, 400_000, "shared fixed checkpoint charge covers automatic empty-history advance");
+        assertLe(used, VaultLib.Q_CHECKPOINT, "shared fixed checkpoint charge covers automatic empty-history advance");
         assertEq(pay, ck, "only the existing shared request charge funds checkpoint");
         assertEq(address(vault).balance, seed + 0.1 ether);
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());

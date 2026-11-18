@@ -941,3 +941,24 @@ The change protects the minimum seed from unrelated history and preserves first-
 It does not protect exposed capital from its existing maintenance costs, change the reserve or
 budgets, fund essential exits, or approve revised O2/O6 outcomes. The strict public valuation view
 still requires an up-to-date cursor; checkpoint establishes the approved proof before pricing.
+
+## D68. Checkpoint compensation calibration within O6 (engineering, 2026-11-18)
+
+Reduce the fixed checkpoint gas component from 400,000 to 360,000. Keep one work unit, the
+configured work fee, gas ceilings, budgets, processing-pool funding and the owner's 0.0002 ETH
+O6 limit. At the configured 0.5 gwei routine ceiling and 0.00002 ETH work fee, checkpoint pay is
+0.0002 ETH. Shared request charges use the reduced component as well.
+
+The current full-holder fixture combines a redemption remainder, distribution and new deposit.
+It measured 372,366 gross gas and a 29,600 refund counter, yielding a 342,766 refund-adjusted
+sample upper bound. This supports testing 360,000 rather than comparing a billed compensation
+component directly with gross execution gas. Independent review accepted this as an in-scope
+candidate calibration, conditional on fresh affected checks. The earlier 400,000-source sample
+and subsequent changed-source evidence are recorded separately.
+
+This is a bounded sample, not a universal keeper profit guarantee. Foundry original-slot/refund
+context can differ from a standalone transaction. Actual billed full-holder receipts remain a
+release evidence gap. Above-ceiling caller gas can still exceed capped compensation. Journal
+quotes are unchanged: new real refund receipts show that raising their call base can reward
+splitting even when an older successful-foreign gross series suggested otherwise. O2 and exposed
+global funding remain acceptance blockers.

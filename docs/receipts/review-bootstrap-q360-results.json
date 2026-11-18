@@ -1,0 +1,166 @@
+{
+  "base_revision": "6319d5edab185f2443324aa40e5cf9bc62be25e1",
+  "scope": "Only production change after bootstrap repair is Q_CHECKPOINT400000\u2192360000. No other quote, logic, work fee, markup, budget or reserve change. Keeper/model mirror change belongs to root.",
+  "source_sha256": {
+    "src/PackVault.sol": "1dc1ddb5d4c09057f34797efdff5d87929898c51bda671423de23625e7687af2",
+    "src/VaultLib.sol": "51fd0f008b590b9d85a862d0418038b834d31e34c6cab07264600b69c4740498",
+    "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a",
+    "test/fork/ForkMaxBatchGas.t.sol": "06619e6bb6615b1d9c819986722c5c2388bbf9d03f2a05732af972279a9f3e15",
+    "test/fork/ReviewBootstrap.t.sol": "59e1338ffa2e9891e5a0a7168135cb54a8cdef749db605830063c207d0a70f37",
+    "test/fork/ForkIncrementalProduction.t.sol": "211071b3fb8f5d7057564e094ec948195e966719a324620e705fb47608558109",
+    "test/scenario/VaultFlow.t.sol": "b6ca4a7885d7d74c703c1ef42a89274aac614c64e9a848d946432d39750c16e0",
+    "test/fork/ForkReconcile.t.sol": "2ecce3650a2ed3e55c20c39a148d55794065f646c15619cc2bf21b0ee28ae849",
+    "test/fork/ForkPartialReconcile.t.sol": "1e47036316c3471575abd8d1a06f36e2c87ddec63ffd1f28e74f9982bb48dc82",
+    "sim/reconcile.py": "cbbe9121e1a1bf6c68fb6ef2b8d430a761175d31a2cc727ff2e000a5fce9eaff",
+    "sim/vault.py": "bc3784c2574e1b631b0971974a0913c85a2de691755cfabde1b1dfbee6c0c49a",
+    "keeper/policy.py": "023df5a03eff840d9967af3e6200250b34c11e4103a83275e3fcb56c1a9107f4",
+    "docs/receipts/flow/gas_spike.json": "d0bbde5934a28fcae0b5535d32d31ccd2a5b88a429f2eb0853f3258b3004dd1f",
+    "sim/out/reconcile-trace.jsonl": "f8e0834bcda692877ecbb2fadd388cc459cb0de3832e6d3ff1acb231a43a295a",
+    "sim/out/reconcile-partial-trace.jsonl": "64b10025a54a4a08934dc28f44e31c47f20a7533abd8dc6b17ef43678287b030"
+  },
+  "compiled_artifacts": {
+    "PackVault": {
+      "runtime_bytes": 24322,
+      "artifact_sha256": "1d6613c5f518039cb2a8fb643f614226388a3b14d194b212d4f38665930e4b7d",
+      "deployed_bytecode_object_sha256": "d3ad27c7715334ce1f961ccfb0d7749e83e99a0730000d3b2fddfefb7164d2bb"
+    },
+    "VaultLib": {
+      "runtime_bytes": 21313,
+      "artifact_sha256": "da404de87dfb5df9fb3ab125bdcf552aa5279cdba2765aacacca9d3d65525344",
+      "deployed_bytecode_object_sha256": "6d9802ac61bd20c7c49e00864ded091406e966b9a120f6258929186ff5263274"
+    }
+  },
+  "runs": [
+    {
+      "command": "forge test --match-path test/fork/ForkMaxBatchGas.t.sol --match-test test_checkpointFullHolderMixCompleteGas --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "log": "review-bootstrap-q360-holder.txt",
+      "exit_status": 0,
+      "tests": 1,
+      "scope": "Cold full-holder redemption/distribution/deposit checkpoint, frame refund instrumentation, and actual essential2gwei branch restored from genuine pre-deposit snapshot.",
+      "test_source_sha256": "98312ef1027222e98c047a47edb5c671da788866d5d725b604a297316c59dbfa",
+      "superseded_by_asserted_profile": "review-bootstrap-q360-holder-asserted.txt"
+    },
+    {
+      "command": "forge test --match-path test/fork/ReviewBootstrap.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "log": "review-bootstrap-q360-bootstrap.txt",
+      "exit_status": 0,
+      "tests": 3,
+      "scope": "Minimum-seed673-record catchup, automatic first checkpoint now bounded by Q_CHECKPOINT360k, minPay atomicity, reserve0 and no-progress."
+    },
+    {
+      "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test 'test_(productionColdKeepFee0|productionColdKickAfterFalseSettledBidCandidate|productionLowGasKeepRecordsOrFailsAtomically|productionLowGasKickRecordsOrFailsAtomically|mutatingCheckpointCannotSkipUnseenOwnSelectionAndReceipt)' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "log": "review-bootstrap-q360-receivers.txt",
+      "exit_status": 0,
+      "tests": 5,
+      "scope": "Mutating exposed pricing guard and exact-runtime cold receivers with99 low-gas atomicity samples."
+    },
+    {
+      "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test 'test_(productionColdKeepFee0|productionColdKickAfterFalseSettledBidCandidate)' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vvvv",
+      "log": "review-bootstrap-q360-receiver-traces.txt",
+      "exit_status": 0,
+      "tests": 2,
+      "scope": "Same two receiver cases repeated with verbose trace to obtain actual receive frame gas; not independent extra cases."
+    },
+    {
+      "command": "SOURCE_HASH=$(python3 /Users/dd/.agents/guidance/asset-flow-kit/asset_gate.py . --print-source-hash) forge test --match-path test/scenario/VaultFlow.t.sol --match-test test_flow_gas_spike --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "log": "review-bootstrap-q360-o6.txt",
+      "exit_status": 0,
+      "tests": 1,
+      "scope": "Only O6 actual gas_spike scenario; no full16-regime suite."
+    },
+    {
+      "command": "forge test --match-path test/fork/ForkReconcile.t.sol --match-test test_reconcileFullCycle --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "log": "review-bootstrap-q360-reconcile-cycle.txt",
+      "exit_status": 0,
+      "tests": 1,
+      "scope": "Real selection/bid/relist/deposit/redemption cycle trace."
+    },
+    {
+      "command": "forge test --match-path test/fork/ForkPartialReconcile.t.sol --match-test test_reconcilePartialRedemptionAndWindDown --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "log": "review-bootstrap-q360-reconcile-partial.txt",
+      "exit_status": 0,
+      "tests": 1,
+      "scope": "Real partial redemption, wind-down and complete holder exit trace."
+    },
+    {
+      "command": "python3 sim/reconcile.py",
+      "log": "review-bootstrap-q360-python-reconcile.txt",
+      "exit_status": 0,
+      "scope": "Both new360k fork traces replay through current model; every vault number and bucket match to the wei."
+    },
+    {
+      "command": "forge test --match-path test/fork/ForkMaxBatchGas.t.sol --match-test test_checkpointFullHolderMixCompleteGas --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "log": "review-bootstrap-q360-holder-asserted.txt",
+      "exit_status": 0,
+      "tests": 1,
+      "scope": "Same single cold full-holder profile with minimum assertion netUpper<=Q_CHECKPOINT; no universal margin requirement. Essential2gwei branch remains covered.",
+      "test_source_sha256": "06619e6bb6615b1d9c819986722c5c2388bbf9d03f2a05732af972279a9f3e15"
+    }
+  ],
+  "observations": {
+    "bootstrap_seed_preserved_wei": 10000000000000001,
+    "authentic_foreign_records": 673,
+    "foreign_catchup_payment_wei": 0,
+    "bootstrap_checkpoint_call_gas_excluding_intrinsic": 253773,
+    "checkpoint_fixed_quote": 360000,
+    "full_holder_gross_gas_including_intrinsic_calldata": 372366,
+    "full_holder_callee_execution_gas": 345971,
+    "full_holder_refund_counter": 29600,
+    "full_holder_sample_net_upper_bound_gas": 342766,
+    "full_holder_actual_base_fee_wei": 150000000,
+    "full_holder_actual_tx_gas_price_wei": 200000000,
+    "full_holder_actual_payment_wei": 92000000000000,
+    "matched_0_5gwei_arithmetic_payment_wei": 200000000000000,
+    "matched_0_5gwei_arithmetic_sample_cost_upper_bound_wei": 171383000000000,
+    "essential_spike_gross_gas": 372369,
+    "essential_spike_actual_base_fee_wei": 1950000000,
+    "essential_spike_actual_tx_gas_price_wei": 2000000000,
+    "essential_spike_ceiling_wei": 2000000000,
+    "essential_spike_actual_processing_charge_and_payment_wei": 740000000000000,
+    "essential_spike_budgets_unchanged": true,
+    "cold_keep_receive_frame_gas": 46462,
+    "cold_difficult_kick_receive_frame_gas": 69730,
+    "keep_low_gas_atomic_failures": 22,
+    "keep_low_gas_recorded_successes": 18,
+    "kick_low_gas_atomic_failures": 40,
+    "kick_low_gas_recorded_successes": 19,
+    "partial_wind_down_holder_claim_wei": 992779091300853720,
+    "partial_wind_down_remaining_rounding_reserve_wei": 6,
+    "sample_gas_component_guard": "assertLe(netUpper, VaultLib.Q_CHECKPOINT):342766<=360000"
+  },
+  "O6": {
+    "asset_gate_source_hash": "b842725caa43f700be61110ac09d5586dd89aec29d248b64ec541290873065cf",
+    "actual_checkpoint_payment_wei": 200000000000000,
+    "unchanged_max_wei": 200000000000000,
+    "outcome_pass": true,
+    "accounting_mismatches": [],
+    "build_pay_wei": 0,
+    "routine_ceiling_wei": 500000000,
+    "actual_base_fee_wei": 1950000000,
+    "actual_tx_gas_price_wei": 2000000000
+  },
+  "limits": [
+    "Real Tenderly forks only; no360k deployment or transaction receipt from a local broadcast, testnet or mainnet. The completed77-transaction approved rehearsal exercised preceding400k candidate; do not relabel it.",
+    "Full-holder gross/refund arithmetic is Foundry execution evidence, not an actual billed receipt or eth_estimateGas. Its shared-test original-storage/refund context may differ from separate transactions. Actual360k full-holder receipt remains a release evidence gap.",
+    "Cold account+all-slot marking and executed fee assertions are explicit, but one full-holder sample and99 receiver low-gas samples do not bound every future state.",
+    "The2gwei essential branch intentionally pays740\u00b5ETH from actual requester charges; O6 bounds the named routine gas_spike regime at0.5gwei ceiling, not every essential checkpoint. Both budgets remain unchanged because the pool funds it.",
+    "O2 remains unresolved; this pass refreshes O6 only and does not rerun all16 scenarios or grant an asset-gate signature. Prior400k input evidence remains separately attributed.",
+    "Passing accounting and O6 observations are not complete funding/return acceptance or release readiness."
+  ],
+  "things_that_do_not_make_sense": [
+    "The full-holder gross372366 exceeds360000, while refund-adjusted sample gas342766 is lower; fixed quotes must be compared with billed gas without losing gross gas-limit requirements.",
+    "At the2gwei gas spike the routine payment cap still leaves execution caller-funded in part; O6 success does not establish keeper willingness.",
+    "O2 and continuous exposed global maintenance funding remain substantive blockers."
+  ],
+  "review_repair": {
+    "change": "Added minimum sample guard requested by independent reviewer; no production or parameter changes.",
+    "old_test_sha256": "98312ef1027222e98c047a47edb5c671da788866d5d725b604a297316c59dbfa",
+    "new_test_sha256": "06619e6bb6615b1d9c819986722c5c2388bbf9d03f2a05732af972279a9f3e15",
+    "command": "forge test --match-path test/fork/ForkMaxBatchGas.t.sol --match-test test_checkpointFullHolderMixCompleteGas --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+    "exit_status": 0,
+    "log": "review-bootstrap-q360-holder-asserted.txt",
+    "net_upper_bound_gas": 342766,
+    "fixed_quote": 360000,
+    "limitations": "Refund-adjusted Foundry sample only, with shared-test original-storage caveat; does not establish a universal bound or actual billed-receipt coverage."
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "base_revision": "6319d5edab185f2443324aa40e5cf9bc62be25e1",
+  "scope": "One existing full-holder-mix checkpoint test, minimally instrumented. No source/quote/config changes, no new counterparties/signers, no broadcasts.",
+  "source_sha256": {
+    "src/PackVault.sol": "1dc1ddb5d4c09057f34797efdff5d87929898c51bda671423de23625e7687af2",
+    "src/VaultLib.sol": "259d85003ff2392be404ead8d067edc92b1277044ee905e4f3640235bc760aae",
+    "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a",
+    "test/fork/ForkMaxBatchGas.t.sol": "0743e8e486760f54fbdae5ff8f88ddf165232547f46b5cbf8e2b34f2c88e9628",
+    "test/fork/ForkBase.sol": "617a9de43d608ee4399647256557d142f573900c9c4a19c52d77b9e02e73e0e5",
+    "test/utils/TestVaultOps.sol": "8e14f307214f04129691f7a38f805f3c24b618ed433969e1839ff62450a2cbc3",
+    "test/utils/Charges.sol": "8c38472d6411cac3ad78a11c33ac1e3804d5fde550fb07fc9b2e660a3e367b51",
+    "lib/forge-std/src/Vm.sol": "83ad40329215a3bb1644e0ce64fd7276bff3c1f3ebfa1f0919adaa221f2abbdc"
+  },
+  "command": "forge test --match-path test/fork/ForkMaxBatchGas.t.sol --match-test test_checkpointFullHolderMixCompleteGas --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+  "exit_status": 0,
+  "tests_passed": 1,
+  "log": "review-bootstrap-checkpoint-refund.txt",
+  "environment": {
+    "fork_block": 26424971,
+    "base_fee_wei": 150000000,
+    "transaction_gas_price_wei": 200000000,
+    "set_and_asserted_inside_executed_call": true,
+    "cold_addresses_and_all_their_slots": [
+      "vault",
+      "VaultLib",
+      "keeper policy",
+      "FWA",
+      "ShapePacks",
+      "Shapes",
+      "keeper"
+    ],
+    "cold_method": "vm.cool, documented in bundled Vm.sol as marking both account and storage slots cold",
+    "counterparty_mocks": false,
+    "protocol_state_fakes": false
+  },
+  "fixture": {
+    "listed_positions": 40,
+    "shape_units_per_position": 3,
+    "first_holder_principal_before_entry_charges_wei": 4000000000000000000,
+    "requested_redemption": "Half first-holder shares, genuinely partial first fill; remaining locked shares are completed by measured checkpoint.",
+    "force_sent_gain_wei": 1000000000000000000,
+    "second_holder_principal_before_entry_charges_wei": 1000000000000000000,
+    "simultaneous_paths": [
+      "redemption remainder",
+      "eligible-gain distribution",
+      "new holder deposit pricing",
+      "processing-pool keeper payment"
+    ],
+    "assertions_passed": [
+      "first reserve greater than1ETH",
+      "locked shares zero after measured checkpoint",
+      "redemption reserve increases",
+      "distribution reserve positive",
+      "new holder shares positive",
+      "pending deposit zero",
+      "actual vault cash covers redemption/distribution/claimable/processing liabilities"
+    ]
+  },
+  "measurements": {
+    "gross_including_intrinsic_and_calldata_before_refund": 372366,
+    "callee_frame_execution_gas": 345971,
+    "callee_frame_refund_counter": 29600,
+    "refund_cap_from_gross_floor_one_fifth": 74473,
+    "applied_sample_refund": 29600,
+    "sample_net_upper_bound_gas": 342766,
+    "observed_keeper_payment_wei": 100000000000000,
+    "current_fixed_gas_quote": 400000,
+    "gross_padded_25_percent": 465458,
+    "historical_prior_candidate_gross": 370178
+  },
+  "hypothetical_360k_schedule_not_implemented": {
+    "gas_quote": 360000,
+    "unchanged_work_fee_wei": 20000000000000,
+    "matched_hypothetical_gas_and_compensation_price_wei": 500000000,
+    "sample_net_cost_upper_bound_wei": 171383000000000,
+    "total_payment_wei": 200000000000000,
+    "sample_payment_minus_cost_upper_bound_wei": 28617000000000,
+    "gas_component_quote_minus_sample_net_gas": 17234,
+    "max_total_payment_meets_existing_O6_wei": 200000000000000,
+    "sample_interpretation": "Both360k gas component and360k+flat-work-fee payment cover this refund-adjusted sample at matched0.5gwei. Gross gas still exceeds360k. These findings support further review of360k; they do not accept a changed quote."
+  },
+  "limitations": [
+    "Foundry call meter and callee refund counter, not an actual transaction receipt or eth_estimateGas result. Gross includes caller-side metering/return-data overhead, so subtraction provides an upper bound within this executed sample, not a universal transaction-gas bound.",
+    "The refund cap uses gross/5 and the observed frame refund;29600 is below that cap. Standalone transaction original-storage/refund context may differ from a fixture built through many calls in one test; confirm with approved real transaction receipts.",
+    "The measured fee environment was0.15gwei basefee and0.2gwei transaction price;0.5gwei matched-cost comparison is arithmetic using observed gas, not an executed0.5gwei receipt.",
+    "Existing full-holder fixture is distinct from gas_spike; no new spike flow or broad suite was run.",
+    "Test overall gas86780299 includes40-position setup and several checkpoints, not a single keeper transaction. Measured checkpoint gross372366 alone fits EIP7825 with25percent margin.",
+    "D61 quote-at-measured-cost rationale requires billed-receipt and affected-path review. This sample does not show every checkpoint or future state can run profitably under360k.",
+    "No quote changed. ExistingO6 scorecard remains0.00022ETH versus0.0002ETH and failed until an approved implemented change is separately verified."
+  ],
+  "things_that_do_not_make_sense": [
+    "Gross370178 was previously compared directly to360000 compensation gas despite legitimate transaction refunds. This sample shows why gross/billed/payout need separate columns.",
+    "At2gwei spike transaction price, compensation capped at0.5gwei does not establish keeper willingness even if a matched-price sample is profitable.",
+    "A single successful full-holder mix is useful evidence, not a universal fixed-gas calibration."
+  ]
+}

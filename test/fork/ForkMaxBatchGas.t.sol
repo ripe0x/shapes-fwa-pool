@@ -17,6 +17,10 @@ contract ForkMaxBatchGasTest is ForkBase {
         assertEq(block.basefee, 0.15 gwei); assertEq(tx.gasprice, 0.2 gwei);
     }
 
+    function assertEssentialSpikeContext() external view {
+        assertEq(block.basefee, 1.95 gwei); assertEq(tx.gasprice, 2 gwei);
+    }
+
     function _cold() private {
         address policy = address(vault.keeperPolicy());
         vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(policy);
@@ -184,17 +188,63 @@ contract ForkMaxBatchGasTest is ForkBase {
         toOpen();
         vm.deal(address(this), 2 ether);
         new ForceSender{value: 1 ether}(payable(address(vault)));
+        uint256 beforeSecondDeposit = vm.snapshotState();
         deposit = Charges.grossFor(vault, 1 ether);
         vm.prank(bob); vault.deposit{value: deposit}();
         toBlackout();
         uint256 witness = TestVaultOps.witness(vault);
-        _measure("checkpoint redemption index distribution deposit payment complete gas", abi.encodeCall(PackVault.checkpoint, (witness, 0)));
+        vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei); this.assertGasContext();
+        bytes memory input = abi.encodeCall(PackVault.checkpoint, (witness, 0));
+        uint256 intrinsic = 21_000;
+        for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
+        _cold();
+        vm.prank(keeper);
+        uint256 start = gasleft();
+        (bool ok, bytes memory result) = address(vault).call(input);
+        uint256 gross = start - gasleft() + intrinsic;
+        Vm.Gas memory frame = vm.lastCallGas();
+        if (!ok) assembly ("memory-safe") { revert(add(result, 32), mload(result)) }
+        assertGe(frame.gasRefunded, 0);
+        uint256 refund = uint256(uint64(frame.gasRefunded));
+        uint256 cappedRefund = refund < gross / 5 ? refund : gross / 5;
+        uint256 netUpper = gross - cappedRefund;
+        assertLe(netUpper, VaultLib.Q_CHECKPOINT, "fixed checkpoint gas component covers this refund-adjusted sample");
+        emit log_named_uint("checkpoint redemption index distribution deposit payment complete gas", gross);
+        emit log_named_uint("checkpoint redemption index distribution deposit payment complete gas pay wei", abi.decode(result, (uint256)));
+        emit log_named_uint("checkpoint callee frame execution gas", frame.gasTotalUsed);
+        emit log_named_uint("checkpoint callee frame refund counter", refund);
+        emit log_named_uint("checkpoint gross minus capped frame refund, gas upper bound", netUpper);
+        emit log_named_uint("checkpoint sample cost upper bound wei at matched 0.5 gwei", netUpper * 0.5 gwei);
+        assertLt((gross * 125 + 99) / 100, 16_777_216);
         assertEq(vault.lockedShares(), 0, "remaining partial redemption is completed");
         assertGt(vault.redemptionReserve(), firstReserve);
         assertGt(vault.distributionReserve(), 0, "eligible gain distribution is actually reserved");
         assertGt(vault.shareBalance(bob), 0, "new deposit is priced after flows");
         assertEq(vault.pendingDepositTotal(), 0);
         uint256 protected = vault.redemptionReserve() + vault.distributionReserve() + vault.claimableTotal() + vault.processingPool();
+        assertGe(address(vault).balance, protected);
+
+        assertTrue(vm.revertToState(beforeSecondDeposit));
+        p = vault.getParams(); p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei;
+        vm.prank(owner); vault.setParams(p);
+        vm.fee(1.95 gwei); vm.txGasPrice(2 gwei); this.assertEssentialSpikeContext();
+        uint256 spikeCharge = vault.requestCharge();
+        assertEq(spikeCharge, VaultLib.Q_CHECKPOINT * 2 gwei + p.workFee);
+        deposit = Charges.grossFor(vault, 1 ether);
+        vm.prank(bob); vault.deposit{value: deposit}();
+        toBlackout(); this.assertEssentialSpikeContext();
+        assertGt(vault.lockedShares(), 0, "pending redemption makes this checkpoint essential");
+        assertEq(vault.processingPool(), spikeCharge);
+        (uint256 routineBefore, uint256 essentialBefore) = vault.budget();
+        uint256 keeperBefore = keeper.balance;
+        witness = TestVaultOps.witness(vault);
+        _measure("essential spike full-holder checkpoint complete gas", abi.encodeCall(PackVault.checkpoint, (witness, 0)));
+        assertEq(keeper.balance - keeperBefore, spikeCharge, "essential ceiling is funded by the actual request charge");
+        (uint256 routineAfter, uint256 essentialAfter) = vault.budget();
+        assertEq(routineAfter, routineBefore); assertEq(essentialAfter, essentialBefore);
+        assertEq(vault.processingPool(), 0); assertEq(vault.pendingDepositTotal(), 0);
+        assertEq(vault.lockedShares(), 0); assertGt(vault.shareBalance(bob), 0);
+        protected = vault.redemptionReserve() + vault.distributionReserve() + vault.claimableTotal();
         assertGe(address(vault).balance, protected);
     }
 

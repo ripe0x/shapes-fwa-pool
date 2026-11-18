@@ -26,7 +26,7 @@ ACTIVE, ALLOCATED, WITHDRAWN, SETTLED = 1, 2, 3, 4
 
 # The vault's quoted-gas schedule, line for line (PackVault Q_* constants, D56). Pay is a quote
 # fixed by the operation and its completed work, never the caller's gas.
-Q = dict(checkpoint=400_000, restock=280_000, pack=325_000, pack_unit=35_000, mint=2_200_000,
+Q = dict(checkpoint=360_000, restock=280_000, pack=325_000, pack_unit=35_000, mint=2_200_000,
          list=280_000, listed=825_000, sync=85_000, synced=120_000, journal=30_000, selected=160_000,
          pruned=45_000, unlist=340_000, unlisted=285_000, liquidate=75_000, liq_pack=80_000,
          redeem_shape=35_000, liq_shape=65_000, recovery_base=100_000, recovery_shape=35_000,

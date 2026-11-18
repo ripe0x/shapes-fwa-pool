@@ -87,5 +87,9 @@
     "O2 cannot meet1.75M under current marginal quotes even with perfect batching:1.81M precedes call bases and indivisible ten-Shape mint rounding.",
     "Reducing checkpoint quote to360k to fit O6 would fall10178 below the existing full-holder gross measurement and conflict with a quote-at-measured-gas rationale until fresh billed-receipt calibration and full affected-path evidence support it.",
     "The spike scenario intentionally pays only the routine ceiling, below the caller actual2gwei gas price; it establishes flow behavior, not willingness of a keeper to execute."
-  ]
+  ],
+  "follow_up_refund_analysis": {
+    "evidence": "docs/receipts/review-bootstrap-checkpoint-refund-results.json",
+    "result": "Current-source full-holder sample gross372366, frame refund29600, sample net upper bound342766. This refines the earlier gross-only caution:360000 gas can cover this refund-adjusted sample. No actual billed receipt, universal bound, quote edit orO6 acceptance is established."
+  }
 }

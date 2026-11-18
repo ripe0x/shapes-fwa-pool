@@ -61,6 +61,10 @@ def main():
     assert "RESERVE_BELOW_NEED" in {c for c, _, _ in status(state(reserve=10**15))}
     assert P.checkpoint_cost(state(open_positions=301)) == P.checkpoint_cost(state(open_positions=10_000))
     assert P.request_charge(state(open_positions=1000)) == P.request_charge(state(open_positions=10_000))
+    # O6 retains its existing 0.0002 ETH ceiling in the configured gas-spike regime.
+    spike_checkpoint = state(base_fee=1_950_000_000, gas_price=2 * G,
+                             markup_bps=0, work_fee=20_000_000_000_000)
+    assert P.pay_v1(spike_checkpoint, P.Q["checkpoint"], 1) == 200_000_000_000_000
 
     # Necessary global catchup is bounded even with a huge foreign-only backlog; it runs at the
     # essential gas class for locked exits, and never pretends foreign entries are own positions.
