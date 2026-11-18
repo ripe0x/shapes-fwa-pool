@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
+import {FWAExposureRegistry} from "../../src/FWAExposureRegistry.sol";
 
 import {DeployCore} from "../../script/DeployCore.sol";
 import {ForkBase} from "./ForkBase.sol";
@@ -174,7 +175,7 @@ contract ForkKeeperPolicyTest is ForkBase {
         vm.expectRevert(PackVault.NotOwner.selector);
         vault.setPolicy(ok);
         vm.expectRevert(PackVault.OutOfBounds.selector);
-        new PackVault(FWA, SHAPES, PACKS, owner, defaultParams(), KeeperPolicyV1(eoa));
+        new PackVault(FWA, SHAPES, PACKS, owner, defaultParams(), KeeperPolicyV1(eoa), FWAExposureRegistry(address(0)));
     }
 
     /// A policy asking for everything is paid the envelope (quoted gas x ceiling-capped price with
