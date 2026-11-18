@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Verify keeper policy, including staged-backlog regressions
+      - name: Verify keeper policy and mixed-size redemption
         run: python3 keeper/test_policy.py
       - name: Verify revenue model and full-budget admission arithmetic
         run: python3 -m unittest discover -s sim -p "test_mint_policy_research.py" -v
