@@ -14,7 +14,7 @@ contract ForkMultiVaultTest is ForkBase {
         p.packUnitsMask = (uint64(1) << 3) | (uint64(1) << 5) | (uint64(1) << 10) | (uint64(1) << 20);
         p.maxPositions = 150;
         vm.prank(owner);
-        v = factory.createVault{value: 0.01 ether}(p);
+        v = factory.createVault{value: 0.01 ether}(p, type(PackVault).creationCode);
         assertTrue(factory.exposure().isVault(address(v)));
     }
 
@@ -25,7 +25,7 @@ contract ForkMultiVaultTest is ForkBase {
 
     function test_twoVaultsShareOneExposureGuardAndRelease() public {
         vm.deal(owner, 2 ether);
-        PackVaultFactory factory = new PackVaultFactory(FWA, SHAPES, PACKS, owner, 2500);
+        PackVaultFactory factory = new PackVaultFactory(FWA, SHAPES, PACKS, owner, 2500, keccak256(type(PackVault).creationCode));
         PackVault a = _create(factory);
         PackVault b = _create(factory);
         assertEq(factory.vaultCount(), 2);
@@ -68,7 +68,7 @@ contract ForkMultiVaultTest is ForkBase {
     function test_admissionRevertLeavesPackAndBackingUnchanged() public {
         vm.deal(owner, 1 ether);
         // Tiny permitted share: one ordinary listing should exceed this.
-        PackVaultFactory factory = new PackVaultFactory(FWA, SHAPES, PACKS, owner, 1);
+        PackVaultFactory factory = new PackVaultFactory(FWA, SHAPES, PACKS, owner, 1, keccak256(type(PackVault).creationCode));
         PackVault a = _create(factory);
         _fund(a, alice);
         toBlackout();
