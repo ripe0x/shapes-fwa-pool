@@ -108,7 +108,8 @@ def read_state(vault, slowdown, burn=False):
     head = num(cast("block-number"))
     seq_now = num(call(FWA, "lastIssuedSequence()(uint64)"))
     seq_then = num(call(FWA, "lastIssuedSequence()(uint64)", block=max(head - 7 * 7200, 1)))
-    tokens = read_tokens(vault, [l.id for l in listings if l.status == policy.ACTIVE])
+    tokens = (read_tokens(vault, [l.id for l in listings if l.status == policy.ACTIVE])
+              if burn else dict(token_pending=0, token_ids=[], token_credit=0, token_held=0))
     # A distribution-only checkpoint is due when simulating it succeeds (the vault reverts a
     # checkpoint that would neither settle flows nor distribute; audit E2, E3).
     due = False
