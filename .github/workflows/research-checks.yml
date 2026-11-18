@@ -1,8 +1,6 @@
 name: Research and keeper safety checks
 
 on:
-  push:
-    branches: [research/mint-revenue-adaptive-sizing]
   pull_request:
 
 jobs:
