@@ -5,6 +5,7 @@ against current FWA state and reconciled with the existing fork simulation.
 Amounts are ETH floats, not safe for settlement/accounting.
 """
 from dataclasses import dataclass
+from math import ceil
 
 SIZES = (0.03, 0.05, 0.10, 0.20)
 OUTSIDE_COUNT = 2584
@@ -27,11 +28,36 @@ class Choice:
     count: int
     selection_share: float
     initial_mint_fees: float
+    initial_gas_and_keeper_cost: float
+    vault_count: int
 
 
 def mint_fees(value):
-    """Amortized primary mint fee: one 0.1 ETH mint per 0.1 ETH backing."""
+    """Marginal average primary mint fee, only for long-run forecasting.
+
+    Onchain, each mint is indivisible. First construction must use ceil() on
+    the entire inventory requirement, and returned packs do not pay again.
+    """
     return value / 0.1 * MINT_FEE_PER_01
+
+
+def fresh_mint_count(pack_value, pack_count):
+    """Whole paid 0.1 ETH mints required to back an empty portfolio."""
+    return ceil(round(pack_value * pack_count / 0.1, 9))
+
+
+def first_build_cost(pack_value, count, gas_gwei):
+    """Estimate upfront paid mint fees, execution and keeper compensation.
+
+    Uses the old split-mint gas quote, deliberately conservative for larger
+    packs until whole-shape construction has actual fork gas measurements.
+    """
+    mints = fresh_mint_count(pack_value, count)
+    fees = mints * MINT_FEE_PER_01
+    gas = (mints * BUILD_GAS_PER_01 + count * (PACK_GAS + 530_000))
+    # Include a per-pack work fee for both restock and listing.
+    ops = gas * gas_gwei * 1e-9 + count * 2 * WORK_FEE
+    return fees, ops
 
 
 def cycle_cost(gas_gwei):
@@ -53,7 +79,8 @@ def outcome_margins(value, backing, gas_gwei=0.5):
     return bid, keep
 
 
-def candidate(capital, pack_value, *, cash_bid_ratio=1.0, max_share=0.25):
+def candidate(capital, pack_value, *, cash_bid_ratio=1.0, max_share=0.25,
+              gas_gwei=0.5, max_per_vault=300, seed_per_vault=0.01):
     """Selection-weight admission for the *entire* intended allocation.
 
     This approximates capital and mints, excluding first-mint rounding and
@@ -62,22 +89,32 @@ def candidate(capital, pack_value, *, cash_bid_ratio=1.0, max_share=0.25):
     backing = pack_value * cash_bid_ratio / BID_FACTOR
     if backing < 0.025:
         return None
-    price = pack_value + backing + mint_fees(pack_value)
-    n = int(capital // price)
-    if n == 0:
+    # Include exact whole-mint rounding and upfront build/list costs.
+    # The seed is a separate launch funding requirement per vault, not a
+    # trading expense. Count it to avoid suggesting an unfundable rollout.
+    n = int(capital / (pack_value + backing))
+    while n > 0:
+        fees, ops = first_build_cost(pack_value, n, gas_gwei)
+        vaults = ceil(n / max_per_vault)
+        if (n * (pack_value + backing) + fees + ops
+                + vaults * seed_per_vault <= capital + 1e-12):
+            break
+        n -= 1
+    if n <= 0:
         return None
     weight = n / backing
     share = weight / (OUTSIDE_WEIGHT + weight)
     if share > max_share:
         return None
-    return Choice(pack_value, backing, n, share, n * mint_fees(pack_value))
+    return Choice(pack_value, backing, n, share, fees, ops, vaults)
 
 
-def choose(capital, *, cash_bid_ratio=1.0, max_share=0.25, sizes=SIZES):
+def choose(capital, *, cash_bid_ratio=1.0, max_share=0.25, sizes=SIZES,
+           gas_gwei=0.5):
     """Choose smallest admissible size. A mismatch returns None, not a bypass."""
     for size in sizes:
         c = candidate(capital, size, cash_bid_ratio=cash_bid_ratio,
-                      max_share=max_share)
+                      max_share=max_share, gas_gwei=gas_gwei)
         if c is not None:
             return c
     return None
@@ -95,17 +132,21 @@ def expected_year(choice, *, acquisitions_per_day=97, keep_rate=0.0,
     selection_count = 365 * acquisitions_per_day * choice.selection_share
     fee_income = 365 * acquisitions_per_day * K * choice.count / weight
     bid, keep = outcome_margins(choice.pack_value, choice.backing, gas_gwei)
-    # fee_income contains K*backing per expected selection. The following
-    # outcome margins already include that share; subtract that duplicate.
+    # The margins already include fee income per expected selection. Initial
+    # construction is a distinct cost, incurred even if there are no draws.
     margin = ((1 - keep_rate) * bid + keep_rate * keep)
-    pnl = selection_count * margin
-    capital = choice.count * (
-        choice.pack_value + choice.backing + mint_fees(choice.pack_value))
+    pnl = (selection_count * margin - choice.initial_mint_fees
+           - choice.initial_gas_and_keeper_cost)
+    capital = (choice.count * (choice.pack_value + choice.backing)
+               + choice.initial_mint_fees + choice.initial_gas_and_keeper_cost
+               + choice.vault_count * 0.01)
     return {
         "net_annual_eth": pnl,
         "apr": pnl / capital,
         "selections": selection_count,
         "primary_mints_initial_eth": choice.initial_mint_fees,
+        "upfront_gas_and_keeper_eth": choice.initial_gas_and_keeper_cost,
+        "vaults_required": choice.vault_count,
         "primary_mints_replacement_eth": (
             selection_count * keep_rate * mint_fees(choice.pack_value)
         ),
