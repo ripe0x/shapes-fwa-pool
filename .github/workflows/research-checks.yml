@@ -58,3 +58,10 @@ jobs:
           --rpc-url https://mainnet.gateway.tenderly.co
           --fork-retries 30 --fork-retry-backoff 5000
           --compute-units-per-second 100 -vv
+
+      - name: Validate multi-vault global exposure on real FWA fork
+        run: >
+          forge test --match-path test/fork/ForkMultiVault.t.sol
+          --rpc-url https://mainnet.gateway.tenderly.co
+          --fork-retries 30 --fork-retry-backoff 5000
+          --compute-units-per-second 100 -vv
