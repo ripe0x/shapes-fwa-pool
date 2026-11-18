@@ -9,3 +9,6 @@ sim/out/audit_events.npz
 keeper/state-*.json
 keeper/state-*.json.lock
 keeper/state-*.json.tmp
+
+# Local-only audit prompt (kept out of the repository)
+docs/AUDIT-PROMPT.md
