@@ -75,7 +75,6 @@ interface IFWAV2 {
             uint8 status
         );
     function unsettledAcquisitionCount() external view returns (uint256);
-    function stagingHead() external view returns (uint256);
     function isPurchaseBlackout() external view returns (bool);
     function canDeposit(address collection) external view returns (bool);
     function oracleExemptCollections(address collection) external view returns (bool);
