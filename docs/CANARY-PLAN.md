@@ -18,7 +18,7 @@ consequence (chain operations rule 2).
 ## Deployment (one command, three transactions)
 
 - Values: `deploy/canary.json` (owner `0xCB43078C32423F5348Cab5885911C3B5faE217F9`, a Calibur
-  EIP-7702 smart-wallet EOA; seed 0.01 ETH; stage 1 caps 0.5 ETH and 10 positions).
+  EIP-7702 smart-wallet EOA; seed 0.01 ETH; full canary caps from the start: 2 ETH and 30 positions, owner, 2026-11-17).
 - The one deploy path: `script/deploy.sh` runs `script/Deploy.s.sol`, which deploys through
   `DeployCore` (the same code every fork and scenario test and both rehearsals deploy with) and
   runs its postflight (owner, policy, every parameter, budgets, seed shares, flags).
@@ -45,8 +45,8 @@ container's keystore path is not exercised by the tests.
 | 1 | 0.5 ETH (owner deposit only) | 10 | one full cycle: deposit, priced, built and listed, one real selection resolved and relisted, a partial redemption claimed | owner raises cap |
 | 2 | 2 ETH | 30 | 14 days or 5 real selections, whichever is later | review against the scorecard |
 
-Stage 1 sets `tvlCap` 0.5 ETH and `maxPositions` 10 in the deploy values; stage 2 raises them with
-`setParams` (immediate, D58).
+Owner decision (2026-11-17): deploy at the stage 2 caps (2 ETH, 30 positions) directly; stage 1's
+checks still apply to the first real cycle.
 
 ## Checks read from the live chain (each keeper pass and daily)
 
