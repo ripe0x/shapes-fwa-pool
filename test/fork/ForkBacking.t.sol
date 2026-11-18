@@ -55,7 +55,7 @@ contract ForkBackingTest is ForkBase {
 
     /// The position count binds (3 slots, 1 ETH): spare capital is spread as backing; exempt,
     /// no cap applies. With the oracle in force, the cap less the buffer limits it.
-    function test_spareCapitalSpreadAndCapped() public {
+    function test_spareCapitalDoesNotIncreaseBacking() public {
         _setPositions(3, 0.5 gwei);
         _priced(1 ether);
         (, uint256 capped,) = vault.edge(3);
@@ -63,8 +63,9 @@ contract ForkBackingTest is ForkBase {
         _exempt(true);
         (, uint256 spread, bool ok) = vault.edge(3);
         assertTrue(ok);
-        // Spare capital (about 0.29 ETH a slot) raises backing only to twice the floor (audit B).
-        assertEq(spread, 2 * FLOOR, "spread bounded at twice the floor");
+        // Additional vault instances can accept new capital, so spare ETH need
+        // not push FWA backing higher merely because local slots are full.
+        assertEq(spread, FLOOR, "no artificial backing spread on a full vault");
         vm.startPrank(keeper);
         vault.restock(3, 3, 0);
         vault.list(3, 0);
