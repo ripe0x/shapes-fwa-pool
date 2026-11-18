@@ -1,0 +1,20 @@
+name: Keeper image review
+
+on:
+  push:
+    branches:
+      - codex/keeper-image-review-20261118
+
+permissions:
+  contents: read
+
+jobs:
+  packaging:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build production image and verify persistent stores
+        run: python3 keeper/test_packaging.py
