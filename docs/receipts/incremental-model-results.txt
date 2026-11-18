@@ -1,0 +1,112 @@
+Incremental accounting model and scale evidence
+Date: 2026-11-18
+Workspace: /workspace/scratch/104f1b894a5c/cap-accounting-prototype
+Scope: research kernel and independent reference model only.
+No FWA, VRF, shapes, or pack contract mocks. No production files changed.
+
+Toolchain: Foundry 1.9.0, Solidity 0.8.30, optimizer 200, via_ir, cancun.
+
+Source SHA-256, recorded after a final comment-only clarification:
+80f3754db040036265a0c17ec59a84be92b73e1e4e1c5496346babaf4f933da4  test/research/IncrementalLedger.sol
+253fa32bc46479b07e7affe02b1d0e479b797499ac468f1084571052196c19a1  test/research/IncrementalLedgerModel.t.sol
+
+The clarification states that MODEL_MINT_FEE is an arbitrary positive accounting
+cost rather than a proposed or live mint policy. It changes no executable logic.
+
+RUN 1: FULL SCALE COMPARISON
+
+Exact command:
+/workspace/scratch/104f1b894a5c/cap-research-tools/forge test --match-path test/research/IncrementalLedgerModel.t.sol --match-test test_scale301 --gas-limit 10000000000 -vv
+
+Recorded output:
+Compiling 1 files with Solc 0.8.30
+Solc 0.8.30 finished in 3.28s
+Compiler run successful!
+
+Ran 1 test for test/research/IncrementalLedgerModel.t.sol:IncrementalLedgerModelTest
+[PASS] test_scale301_1000_10000MatchesReferenceAndHasConstantValuationGas() (gas: 3735359199)
+Logs:
+  bookkeeping positions: 301
+  cold NAV with zero fees: 18576
+  cold NAV with positive fees: 18660
+  cold selection transition: 124129
+  cold keep transition: 32514
+  cold one entry queue cleanup: 35418
+  bookkeeping positions: 1000
+  cold NAV with zero fees: 18576
+  cold NAV with positive fees: 18660
+  cold selection transition: 124129
+  cold keep transition: 32514
+  cold one entry queue cleanup: 35418
+  bookkeeping positions: 10000
+  cold NAV with zero fees: 18576
+  cold NAV with positive fees: 18660
+  cold selection transition: 124129
+  cold keep transition: 32514
+  cold one entry queue cleanup: 35418
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 118.56s (118.56s CPU time)
+
+Ran 1 test suite in 118.56s (118.56s CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)
+
+RUN 2: FINAL FOCUSED AND RANDOMIZED MODEL CHECKS
+
+Exact command:
+/workspace/scratch/104f1b894a5c/cap-research-tools/forge test --match-path test/research/IncrementalLedgerModel.t.sol --no-match-test test_scale301 --fuzz-runs 256 -vv
+
+Recorded output:
+Compiling 8 files with Solc 0.8.30
+Solc 0.8.30 finished in 11.61s
+Compiler run successful with warnings:
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:14:9:
+   |
+14 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+
+Ran 6 tests for test/research/IncrementalLedgerModel.t.sol:IncrementalLedgerModelTest
+[PASS] testFuzz_randomizedLifecycleMatchesFullReference(uint256) (runs: 256, μ: 36761819, ~: 36708779)
+[PASS] test_backingFloorCoversMaximumFeeAtRoundingBoundary() (gas: 16109683)
+[PASS] test_duplicateTransitionsCannotDoubleCountPrincipalOrFees() (gas: 1896480)
+[PASS] test_feeRoundingAndWitnessCompleteness() (gas: 1786183)
+[PASS] test_fifoOnlyNeedsBoundedTombstoneCleanup() (gas: 2515424)
+[PASS] test_owedReturnsKeepPrincipalAndCannotBeSpentEarly() (gas: 1563693)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 2.55s (2.55s CPU time)
+
+Ran 1 test suite in 2.55s (2.55s CPU time): 6 tests passed, 0 failed, 0 skipped (6 total tests)
+
+INTERPRETATION AND LIMITS
+
+Seven test functions passed across these two runs. The fuzz test ran 256 histories
+of 160 steps, or 40,960 randomized model steps. Each scale case also compared the
+reference after 64 randomized steps, alongside explicit measured transitions.
+
+The scale fixture creates 11,301 bookkeeping positions through separate calls.
+Its total setup and repeated reference scans require the explicit larger test
+budget. An earlier attempt using the default test budget stopped before finishing
+10,000 positions. Individual measured kernel calls remain bounded and separately
+asserted below 16,777,216 gas. These whole-test gas totals are not transaction gas
+estimates for a deployed vault.
+
+Each gas measurement cools the target account and storage, then invokes a separate
+meter contract so the reference model's growing memory does not alter the measured
+call frame. The quoted NAV measurements cover the pure accounting kernel and its
+external harness call. They exclude FWA reads, receipt and journal completeness
+guards, share issuance, redemption processing, and other complete checkpoint work.
+
+The independent reference stores one custody record per asset and fully scans the
+array at each comparison. It derives tracked principal, idle inventory, active
+backing, active count, fee debts, allocation exposure, the ceil-debt correction,
+and pending fees without reading the kernel aggregates. Each quantity has its own
+assertion before the final NAV comparison, so shared cash and fee-credit inputs
+cannot mask an incorrect kernel principal or fee total.
+
+Cash and fee credit are deliberately external inputs to the pure kernel. This
+model tests their contribution to NAV and models cash changes independently, but
+does not authenticate actual FWA payments or prove the external fee accumulator.
+The separate deployed-contract fork tests establish that integration boundary.
+
+These are 10,000 pure accounting positions, not 10,000 live FWA listings. No FWA
+selection or VRF behavior is asserted by this file. The real-FWA adapter and the
+full production share accounting retain their own integration and release gates.

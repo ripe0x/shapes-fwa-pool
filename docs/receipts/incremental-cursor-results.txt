@@ -1,0 +1,19 @@
+Incremental FWA cursor progress and checkpoint guard followup
+Run date: 2026-11-18
+Command:
+forge test --rpc-url https://mainnet.gateway.tenderly.co --match-path test/research/IncrementalFWAFork.t.sol --match-test 'test_cursorProgressSurvivesNewFWAActivityBetweenBatches|test_checkpointWindowAndExpiredAllocationRemainEnforced' --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv
+
+Compiling 1 files with Solc 0.8.30
+Solc 0.8.30 finished in 7.45s
+Compiler run successful!
+
+Ran 2 tests for test/research/IncrementalFWAFork.t.sol:IncrementalFWAForkTest
+[PASS] test_checkpointWindowAndExpiredAllocationRemainEnforced() (gas: 44200329)
+[PASS] test_cursorProgressSurvivesNewFWAActivityBetweenBatches() (gas: 44064281)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 5.97s (10.48s CPU time)
+
+Ran 1 test suite in 5.97s (5.97s CPU time): 2 tests passed, 0 failed, 0 skipped (2 total tests)
+
+This adds one distinct test and strengthens the existing expiry/window test.
+Together with the 20-case fork run and four independent adversarial tests,
+25 distinct fork test functions passed. No production contracts were modified.

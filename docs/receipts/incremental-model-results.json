@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-18",
+  "scope": "pure accounting kernel with an independent full-scan asset reference",
+  "production_changes": false,
+  "external_contract_mocks": false,
+  "live_fwa_listing_scale_test": false,
+  "test_functions_passed": 7,
+  "test_functions_failed": 0,
+  "randomized_histories": 256,
+  "steps_per_randomized_history": 160,
+  "randomized_model_steps": 40960,
+  "randomized_steps_per_scale_case": 64,
+  "scale_fixture_total_test_gas": 3735359199,
+  "scale_fixture_duration_seconds": 118.56,
+  "scale_test_gas_budget": 10000000000,
+  "gas_measurement_scope": "cold kernel harness call from a fresh meter frame; excludes complete FWA adapter and share checkpoint work",
+  "gas": [
+    {"positions":301,"nav_zero_fees":18576,"nav_positive_fees":18660,"selection":124129,"keep":32514,"prune_one":35418},
+    {"positions":1000,"nav_zero_fees":18576,"nav_positive_fees":18660,"selection":124129,"keep":32514,"prune_one":35418},
+    {"positions":10000,"nav_zero_fees":18576,"nav_positive_fees":18660,"selection":124129,"keep":32514,"prune_one":35418}
+  ],
+  "source_sha256": {
+    "test/research/IncrementalLedger.sol": "80f3754db040036265a0c17ec59a84be92b73e1e4e1c5496346babaf4f933da4",
+    "test/research/IncrementalLedgerModel.t.sol": "253fa32bc46479b07e7affe02b1d0e479b797499ac468f1084571052196c19a1"
+  }
+}
