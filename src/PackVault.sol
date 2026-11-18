@@ -6,6 +6,7 @@ import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {FixedPointMathLib as M} from "solady/utils/FixedPointMathLib.sol";
 import {VaultLib} from "./VaultLib.sol";
 import {IKeeperPolicy} from "./KeeperPolicy.sol";
+import {FWAExposureRegistry} from "./FWAExposureRegistry.sol";
 import {
     IShapes,
     IShapePacks,
@@ -87,6 +88,7 @@ contract PackVault is ReentrancyGuard {
     IFWARewards public immutable rewards;
     IFWAToken public immutable token;
     address public immutable owner;
+    FWAExposureRegistry public immutable exposure;
 
     // ------------------------------------------------------------------ parameters
 
@@ -206,7 +208,8 @@ contract PackVault is ReentrancyGuard {
         IShapePacks packs_,
         address owner_,
         VaultLib.Params memory initial,
-        IKeeperPolicy policy_
+        IKeeperPolicy policy_,
+        FWAExposureRegistry exposure_
     ) payable {
         fwa = fwa_;
         shapes = shapes_;
@@ -214,6 +217,7 @@ contract PackVault is ReentrancyGuard {
         rewards = IFWARewards(fwa_.rewards());
         token = IFWAToken(fwa_.token());
         owner = owner_;
+        exposure = exposure_;
         params = initial;
         VaultLib.checkBounds(params);
         VaultLib.checkPolicy(address(policy_));
@@ -339,6 +343,7 @@ contract PackVault is ReentrancyGuard {
             // Reverting here undoes the transfer and backing atomically.
             (,,,,,,,,,, uint8 status) = fwa.listings(listingId);
             if (status != LISTING_ACTIVE) revert Nothing();
+            if (address(exposure) != address(0)) exposure.book(listingId);
             positions[listingId] = VaultLib.Position(uint64(packId), uint64(units), uint128(backing));
             _open.push(listingId);
             _openIndex[listingId] = _open.length;
@@ -364,7 +369,9 @@ contract PackVault is ReentrancyGuard {
     }
 
     function _sync(uint256 listingId) internal returns (bool) {
-        return VaultLib.sync(positions, _open, _openIndex, _idlePacks, fwa, packs, listingId);
+        bool resolved = VaultLib.sync(positions, _open, _openIndex, _idlePacks, fwa, packs, listingId);
+        if (resolved && address(exposure) != address(0)) exposure.release(listingId);
+        return resolved;
     }
 
 
@@ -374,6 +381,7 @@ contract PackVault is ReentrancyGuard {
 
     function _removeOpen(uint256 listingId) internal {
         VaultLib.removeOpen(positions, _open, _openIndex, listingId);
+        if (address(exposure) != address(0)) exposure.release(listingId);
     }
 
     /// @notice Activate vault listings FWA staged because its acquisition queue was busy when they
