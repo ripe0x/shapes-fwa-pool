@@ -59,7 +59,7 @@ contract ForkBackingTest is ForkBase {
         _setPositions(3, 0.5 gwei);
         _priced(1 ether);
         (, uint256 capped,) = vault.edge(3);
-        assertEq(capped, 0.0363 ether, "oracle cap 0.033 x 1.10 binds when not exempt");
+        assertEq(capped, FLOOR, "minimum profitable backing, below oracle ceiling");
         _exempt(true);
         (, uint256 spread, bool ok) = vault.edge(3);
         assertTrue(ok);
