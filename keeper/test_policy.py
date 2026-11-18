@@ -89,6 +89,22 @@ def main():
     assert "checkpoint" not in fns(plan(state(listings=act, open_positions=10)))
     assert "checkpoint" not in fns(plan(state(distribution_due=True, listings=act, open_positions=10, **spike)))
 
+    # A drained acquisition queue can coexist with an older staged backlog.
+    # Do not list more inventory, but keep checkpoints, exits and activation live.
+    backlog = state(listings=act + staged, open_positions=11, idle_eth=E,
+                    free=E, idle_packs=2, staging_empty=False)
+    got = fns(plan(backlog))
+    assert "list" not in got and "restock" not in got, got
+    assert "activate" in got, got
+    assert "STAGING_BACKLOG" in {c for c, _, _ in status(backlog)}, status(backlog)
+    backlog_with_deposit = state(listings=act + staged, open_positions=11,
+                                 free=E, pending_deposits=10**17, staging_empty=False)
+    assert "checkpoint" in fns(plan(backlog_with_deposit)), plan(backlog_with_deposit)
+    backlog_with_redemption = state(listings=act, open_positions=10, free=0,
+                                    locked_shares=10**18, owed_estimate=E,
+                                    staging_empty=False)
+    assert "unlist" in fns(plan(backlog_with_redemption)), plan(backlog_with_redemption)
+
     # Audit E11: a mask without 3-unit packs builds nothing (this keeper builds 3-unit packs only).
     build = dict(listings=act, open_positions=10, idle_eth=E, free=E, loose_shapes=0)
     assert "restock" in fns(plan(state(**build)))
