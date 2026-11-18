@@ -89,10 +89,15 @@ def read_state(vault, slowdown, burn=False):
         f = call(FWA, f"listings(uint256)({LISTING_T})", i).strip("()").split(", ")
         status, allocated_at = num(f[10]), num(f[9])
         pend = num(call(FWA, "pendingFees(uint256)(uint256)", i)) if status == policy.ACTIVE else 0
+        # The keeper must plan exits from stored position values, not today's
+        # listing quote for a default 0.03 ETH pack.
+        pos = lines(call(vault, "positions(uint256)(uint64,uint64,uint128)", i))
+        units, posted_backing = num(pos[1]), num(pos[2])
         owed = status in (policy.SETTLED, policy.WITHDRAWN) and \
             call(FWA, "stuckNFTRecipient(uint256)(address)", i).lower() == vault.lower()
         listings.append(policy.Listing(i, status, allocated_at, pend, owed,
-                                       crown_locked=(i == top and now < top_since + 12 * 3600)))
+                                       crown_locked=(i == top and now < top_since + 12 * 3600),
+                                       units=units, backing=posted_backing))
     balance = num(cast("balance", vault))
     pending = num(call(vault, "pendingDepositTotal()(uint256)"))
     reserves = pending + num(call(vault, "redemptionReserve()(uint256)")) + \
