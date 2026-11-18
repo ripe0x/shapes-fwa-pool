@@ -125,8 +125,8 @@ def read_state(vault, slowdown, burn=False):
         max_tip=tip, markup_bps=premium, share_bps=share, k=num(k), backing=num(backing), min_edge_bps=min_edge,
         mint_fee=num(call(SHAPES, "mintFee()(uint256)")), settlement_window=window,
         blackout=call(FWA, "isPurchaseBlackout()(bool)") == "true",
-        queue_drained=(num(call(FWA, "unsettledAcquisitionCount()(uint256)")) == 0
-                       and num(call(FWA, "stagingHead()(uint256)")) == 0),
+        queue_drained=num(call(FWA, "unsettledAcquisitionCount()(uint256)")) == 0,
+        staging_empty=num(call(FWA, "stagingHead()(uint256)")) == 0,
         checkpoint_done_this_interval=num(call(vault, "lastCheckpointInterval()(uint256)")) == interval,
         listings=listings, idle_packs=len(ids_of(call(vault, "idlePacks()(uint256[])"))),
         loose_shapes=num(call(vault, "looseShapeCount()(uint256)")),
