@@ -18,6 +18,7 @@ This script never sees a key: cast signs (keystore password from cast's own prom
 """
 import argparse
 import json
+import hashlib
 import subprocess
 import sys
 import threading
@@ -28,11 +29,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import policy  # noqa: E402
 import tx as txm  # noqa: E402
+import index as event_index  # noqa: E402
 
+SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 RPC = "https://mainnet.gateway.tenderly.co"
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 SHAPES = "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0"
-PARAMS_T = "(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint96,uint128,uint128)"
+PARAMS_T = "(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint128,uint128)"
 LISTING_T = "(address,address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint64,uint8)"
 
 
@@ -40,9 +43,9 @@ def cast(*args):
     return subprocess.check_output(["cast", *map(str, args), "--rpc-url", RPC], text=True).strip()
 
 
-def call(to, sig, *args, block=None):
-    extra = ["--block", str(block)] if block else []
-    return cast("call", to, sig, *args, *extra)
+def call(to, sig, *args, block=None, fees=()):
+    extra = ["--block", str(block)] if block is not None else []
+    return cast("call", to, sig, *args, *extra, *fees)
 
 
 def num(v):
@@ -61,100 +64,271 @@ def ids_of(out):
 
 
 
-def read_tokens(vault, active_ids):
-    """Token entitlements from the deployed rewards and token contracts."""
-    rewards = call(FWA, "rewards()(address)")
-    token = call(FWA, "token()(address)")
-    pend = {i: num(call(rewards, "pendingDepositorTokens(uint256)(uint256)", i)) for i in active_ids}
+INDEXES = {}
+INDEX_PATH = None
+MAX_LOG_RANGE = 2_000
+MAX_LOG_RANGES = 8
+MAX_CANDIDATES = 16
+
+
+class IndexBehind(RuntimeError):
+    pass
+
+
+def rpc(method, *params):
+    return json.loads(cast("rpc", method, *[json.dumps(p) if not isinstance(p, str) else p for p in params]))
+
+
+def quantity(v):
+    return int(v, 0) if isinstance(v, str) and v.startswith("0x") else int(v)
+
+
+def block_hash(number):
+    b = rpc("eth_getBlockByNumber", hex(number), False)
+    return b["hash"] if b else None
+
+
+def sync_index(index, head):
+    index.repair(block_hash)
+    for _ in range(MAX_LOG_RANGES):
+        if index.head >= head:
+            return
+        start, end = index.head + 1, min(index.head + MAX_LOG_RANGE, head)
+        before = block_hash(end)
+        logs = rpc("eth_getLogs", {"address": [index.vault, FWA], "fromBlock": hex(start), "toBlock": hex(end),
+                                   "topics": [list(event_index.TOPICS) + [event_index.ALLOCATION_TOPIC]]})
+        timestamps = {}
+        for log in logs:
+            if log["topics"][0] == event_index.ALLOCATION_TOPIC:
+                number = quantity(log["blockNumber"])
+                if number not in timestamps:
+                    b = rpc("eth_getBlockByNumber", hex(number), False)
+                    if b["hash"] != log["blockHash"]:
+                        raise RuntimeError("allocation log block changed; retry range")
+                    timestamps[number] = quantity(b["timestamp"])
+                log["_timestamp"] = timestamps[number]
+        if not before or block_hash(end) != before:
+            raise RuntimeError("chain changed while reading event range; retry the pinned snapshot")
+        index.append(start, end, before, logs)
+    if index.head < head:
+        raise IndexBehind(f"event index at block {index.head}; target {head}; next pass resumes bounded replay")
+
+
+def first_block_at(timestamp, head):
+    lo, hi = 1, head
+    while lo < hi:
+        mid = (lo + hi) // 2
+        b = rpc("eth_getBlockByNumber", hex(mid), False)
+        if quantity(b["timestamp"]) < timestamp:
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo
+
+
+def get_index(vault, block, now):
+    chain = quantity(rpc("eth_chainId"))
+    deployment = num(call(vault, "deploymentBlock()(uint256)", block=block))
+    path = INDEX_PATH or str(Path(__file__).parent / f"index-{chain}-{vault.lower()}-{deployment}.sqlite")
+    key = (path, chain, vault.lower(), deployment)
+    if key not in INDEXES:
+        INDEXES[key] = event_index.EventIndex(path, chain, vault, deployment,
+                                             lambda: first_block_at(now - 7 * 86400, block))
+    index = INDEXES[key]
+    index.vault = vault
+    sync_index(index, block)
+    return index
+
+
+def inclusion_context():
+    """Authenticate prospective execution BASEFEE, not just a provider's pending header label."""
+    parent = rpc("eth_getBlockByNumber", "latest", False)
+    pending = rpc("eth_getBlockByNumber", "pending", False)
+    expected = txm.next_base_fee(parent)
+    if (quantity(pending["number"]) != quantity(parent["number"]) + 1
+            or pending["parentHash"] != parent["hash"] or quantity(pending["baseFeePerGas"]) != expected):
+        raise txm.StaleContext("pending header is not the deterministic next block; retry context")
+    # Read-only contract-creation simulation: BASEFEE; mstore(0); return32bytes. This deploys
+    # nothing and supplies no external service answer or protocol state override.
+    executed = quantity(rpc("eth_call", {"data": "0x485f5260205ff3", "from": "0x" + "00" * 20, "gas": hex(100_000),
+                                        "maxFeePerGas": hex(2 * expected + 50_000_000),
+                                        "maxPriorityFeePerGas": hex(50_000_000)}, "pending"))
+    if executed != expected:
+        if rpc("eth_getBlockByNumber", "latest", False)["hash"] != parent["hash"]:
+            raise txm.StaleContext("head changed during pending context authentication")
+        raise RuntimeError("RPC pending eth_call executes at the wrong basefee; admission disabled")
+    return parent, expected
+
+
+def stable_read_state(vault, slowdown, burn=False):
+    for attempt in range(3):
+        try:
+            return read_state(vault, slowdown, burn)
+        except txm.StaleContext:
+            if attempt == 2:
+                raise
+
+
+def read_tokens(vault, candidate_ids, block):
+    """Optional bounded candidates only; token value never enters NAV."""
+    rewards = call(FWA, "rewards()(address)", block=block)
+    token = call(FWA, "token()(address)", block=block)
+    pend = {i: num(call(rewards, "pendingDepositorTokens(uint256)(uint256)", i, block=block))
+            for i in candidate_ids[:policy.MAX_BATCH["tokens"]]}
     return dict(token_pending=sum(pend.values()), token_ids=[i for i, v in pend.items() if v],
-                token_credit=num(call(rewards, "tokenCredit(address)(uint256)", vault)),
-                token_held=num(call(token, "balanceOf(address)(uint256)", vault)))
+                token_credit=num(call(rewards, "tokenCredit(address)(uint256)", vault, block=block)),
+                token_held=num(call(token, "balanceOf(address)(uint256)", vault, block=block)))
+
+
+def proposal_limits(s, value, settlement_fee, discount, cap, build=False):
+    """Hard economic bounds for candidate construction; production preflight authenticates them."""
+    if s.k <= 10**18 or not 0 < discount <= 10_000 or not 0 <= settlement_fee < 10_000:
+        return 1, 0
+    up = lambda a, b: -(-a // b)
+    minimum = max(up(value * 10_000, 9500), up(value * 10_000, 10_000 - settlement_fee),
+                  up(value * 10_000, discount), up(value * 10**18, s.k - settlement_fee * 10**14))
+    cycle = policy.quote(s, policy.CYCLE_GAS, 2)
+    required = cycle + (policy.build_cost(s) if build else 1)
+    return max(minimum, up(required * 10**18, s.k - 10**18)), cap
 
 
 def read_state(vault, slowdown, burn=False):
-    p = [num(x) for x in call(vault, f"getParams()({PARAMS_T})").strip("()").split(", ")]
-    (min_edge, _buf, dist_bps, premium, share, _alloc, mask, ceiling, ess_ceiling, tip, wfee, _rc, _rr, _ec, _er, max_pos, res,
+    # Cash, book, candidate hydration and log prefix share this pinned block. Prospective
+    # admission prices later use one authenticated next-block execution context.
+    header = rpc("eth_getBlockByNumber", "latest", False)
+    head, now, base_fee = (quantity(header[k]) for k in ("number", "timestamp", "baseFeePerGas"))
+    index = get_index(vault, head, now)
+    at = lambda to, sig, *args: call(to, sig, *args, block=head)
+    p = [num(x) for x in at(vault, f"getParams()({PARAMS_T})").strip("()").split(", ")]
+    (min_edge, buf, dist_bps, premium, share, _alloc, mask, ceiling, ess_ceiling, tip, wfee, _rc, _rr, _ec, _er, res,
      _tvl) = p
-    rbud, ebud = lines(call(vault, "budget()(uint256,uint256)"))
-    try:  # FWA's owner can make its economics unreadable; exits do not need them
-        k, backing, _ok = lines(call(vault, "edge(uint256)(uint256,uint256,bool)", 3))
-    except subprocess.CalledProcessError:
-        k, backing = "0", "0"
-    now = num(cast("block", "latest", "--field", "timestamp"))
-    window = num(call(FWA, "settlementWindow()(uint256)"))
-    top = num(call(FWA, "topListingId()(uint256)"))
-    top_since = num(call(FWA, "topListingSince()(uint64)"))
-    listings = []
-    for i in ids_of(call(vault, "openListings()(uint256[])")):
-        f = call(FWA, f"listings(uint256)({LISTING_T})", i).strip("()").split(", ")
+    rbud, ebud = lines(at(vault, "budget()(uint256,uint256)"))
+    k, backing = "0", "0"  # prospective economics are read after pinned financial hydration
+    window = num(at(FWA, "settlementWindow()(uint256)"))
+    top, top_since = num(at(FWA, "topListingId()(uint256)")), num(at(FWA, "topListingSince()(uint64)"))
+    active_ids, terminal_ids = index.candidates(MAX_CANDIDATES, MAX_CANDIDATES)
+    listings, witness = [], 0
+    for i in dict.fromkeys(terminal_ids + active_ids):
+        f = at(FWA, f"listings(uint256)({LISTING_T})", i).strip("()").split(", ")
         status, allocated_at = num(f[10]), num(f[9])
-        pend = num(call(FWA, "pendingFees(uint256)(uint256)", i)) if status == policy.ACTIVE else 0
+        pend = num(at(FWA, "pendingFees(uint256)(uint256)", i)) if status == policy.ACTIVE else 0
         owed = status in (policy.SETTLED, policy.WITHDRAWN) and \
-            call(FWA, "stuckNFTRecipient(uint256)(address)", i).lower() == vault.lower()
+            at(FWA, "stuckNFTRecipient(uint256)(address)", i).lower() == vault.lower()
+        if status == policy.ACTIVE and not witness:
+            witness = i  # candidates are minimum cached debt first
+        cached = index.position(i)
         listings.append(policy.Listing(i, status, allocated_at, pend, owed,
-                                       crown_locked=(i == top and now < top_since + 12 * 3600)))
-    balance = num(cast("balance", vault))
-    pending = num(call(vault, "pendingDepositTotal()(uint256)"))
-    reserves = pending + num(call(vault, "redemptionReserve()(uint256)")) + \
-        num(call(vault, "distributionReserve()(uint256)")) + num(call(vault, "claimableTotal()(uint256)")) + \
-        num(call(vault, "processingPool()(uint256)"))  # request charges: reserved like _free() (audit E4)
-    locked = num(call(vault, "lockedShares()(uint256)"))
+                                       crown_locked=(i == top and now < top_since + 12 * 3600),
+                                       value=int(cached["value"]) if cached else 0, backing=num(f[5])))
+    total = [num(x) for x in lines(at(vault, "totals()(uint256,uint256,uint256,uint256,uint256,uint256)"))]
+    allocation = lines(at(vault, "allocationState()(uint256,uint256,uint256,uint64,bool)"))
+    balance = quantity(rpc("eth_getBalance", vault, hex(head)))
+    pending = num(at(vault, "pendingDepositTotal()(uint256)"))
+    processing_pool = num(at(vault, "processingPool()(uint256)"))
+    reserves = pending + num(at(vault, "redemptionReserve()(uint256)")) + \
+        num(at(vault, "distributionReserve()(uint256)")) + num(at(vault, "claimableTotal()(uint256)")) + processing_pool
+    locked = num(at(vault, "lockedShares()(uint256)"))
     owed = 0
     if locked:
-        last_nav, supply = num(call(vault, "lastNav()(uint256)")), num(call(vault, "totalShares()(uint256)"))
-        owed = -(-locked * last_nav // supply)
-    interval = now // (12 * 3600)
-    # Trailing 7-day volume from FWA's monotonic request sequence.
-    head = num(cast("block-number"))
-    seq_now = num(call(FWA, "lastIssuedSequence()(uint64)"))
-    seq_then = num(call(FWA, "lastIssuedSequence()(uint64)", block=max(head - 7 * 7200, 1)))
-    tokens = read_tokens(vault, [l.id for l in listings if l.status == policy.ACTIVE])
-    # A distribution-only checkpoint is due when simulating it succeeds (the vault reverts a
-    # checkpoint that would neither settle flows nor distribute; audit E2, E3).
-    due = False
+        owed = -(-locked * num(at(vault, "lastNav()(uint256)")) // num(at(vault, "totalShares()(uint256)")))
+    tokens = read_tokens(vault, index.token_candidates(policy.MAX_BATCH["tokens"]) if burn else [], head)
+    state = policy.State(
+        now=now, gas_price=base_fee + tip, base_fee=base_fee, gas_ceiling=ceiling,
+        max_tip=tip, markup_bps=premium, share_bps=share, k=num(k), backing=num(backing), min_edge_bps=min_edge,
+        mint_fee=num(at(SHAPES, "mintFee()(uint256)")), settlement_window=window,
+        blackout=at(FWA, "isPurchaseBlackout()(bool)") == "true",
+        queue_drained=num(at(FWA, "unsettledAcquisitionCount()(uint256)")) == 0,
+        checkpoint_done_this_interval=num(at(vault, "lastCheckpointInterval()(uint256)")) == now // (12 * 3600),
+        listings=listings, idle_packs=num(at(vault, "idlePackCount()(uint256)")), idle_value=total[1],
+        idle_funding=num(at(vault, "idleFunding()(uint256)")),
+        recovery_packs=num(at(vault, "recoveryPackCount()(uint256)")),
+        loose_shapes=num(at(vault, "looseShapeCount()(uint256)")),
+        free=max(0, balance - reserves), idle_eth=num(at(vault, "idleEth()(uint256)")), owed_estimate=owed,
+        pending_deposits=pending, locked_shares=locked, pack_units_mask=mask,
+        essential_ceiling=ess_ceiling, essential_cap=_ec, processing_pool=processing_pool,
+        fee_credit=num(at(FWA, "feeCredit(address)(uint256)", vault)),
+        open_positions=num(at(vault, "openListingCount()(uint256)")), active_count=total[3], witness_id=witness,
+        journal_cursor=num(at(vault, "acquisitionCursor()(uint64)")),
+        completed_prefix=num(at(FWA, "nextSequenceToProcess()(uint64)")),
+        pending_receipts=num(at(vault, "pendingReceipts()(uint256)")), allocation_stale=allocation[4] == "true",
+        winding_down=at(vault, "windingDown()(bool)") == "true",
+        listing_paused=at(vault, "listingPaused()(bool)") == "true", distribution_bps=dist_bps,
+        recent_volume=index.recent_volume(now), slowdown_volume=slowdown, burn_tokens=burn,
+        reserve=res, work_fee=wfee, routine_budget=num(rbud), essential_budget=num(ebud), **tokens,
+    )
+    prospective_parent, future_base_fee = inclusion_context()
+    # Financial candidates may come from a canonical ancestor while pricing uses the current
+    # pending block. The full pending call authenticates capital, eligibility and payment.
+    state.base_fee = future_base_fee
+    state.gas_price = future_base_fee + tip
+    state.pending_parent = prospective_parent["hash"]
+    prospective = lambda to, sig, *args: call(to, sig, *args, block="pending", fees=fee_args(future_base_fee, tip))
+    try:
+        future_k, future_backing, _ = lines(prospective(vault, "edge(uint256)(uint256,uint256,bool)", 3))
+        state.k, state.backing = num(future_k), num(future_backing)
+    except subprocess.CalledProcessError:
+        state.k, state.backing = 0, 0
+    # A distribution-only checkpoint is due when this exact pinned simulation succeeds.
     if dist_bps and not pending and not locked:
         try:
-            cast("call", vault, "checkpoint(uint256)(uint256)", "0")
-            due = True
+            prospective(vault, "checkpoint(uint256,uint256)(uint256)", witness, 0)
+            state.distribution_due = True
         except subprocess.CalledProcessError:
             pass
-    return policy.State(
-        # The keeper bids basefee + maxTip (run_pass), so that is its price.
-        now=now, gas_price=num(cast("base-fee")) + tip, base_fee=num(cast("base-fee")), gas_ceiling=ceiling,
-        max_tip=tip, markup_bps=premium, share_bps=share, k=num(k), backing=num(backing), min_edge_bps=min_edge,
-        mint_fee=num(call(SHAPES, "mintFee()(uint256)")), settlement_window=window,
-        blackout=call(FWA, "isPurchaseBlackout()(bool)") == "true",
-        queue_drained=num(call(FWA, "unsettledAcquisitionCount()(uint256)")) == 0,
-        checkpoint_done_this_interval=num(call(vault, "lastCheckpointInterval()(uint256)")) == interval,
-        listings=listings, idle_packs=len(ids_of(call(vault, "idlePacks()(uint256[])"))),
-        loose_shapes=num(call(vault, "looseShapeCount()(uint256)")),
-        free=max(0, balance - reserves), idle_eth=num(call(vault, "idleEth()(uint256)")), owed_estimate=owed,
-        pending_deposits=pending, locked_shares=locked, distribution_due=due, pack_units_mask=mask,
-        essential_ceiling=ess_ceiling, essential_cap=_ec, processing_pool=num(call(vault, "processingPool()(uint256)")),
-        fee_credit=num(call(FWA, "feeCredit(address)(uint256)", vault)),
-        open_positions=len(listings), max_positions=max_pos,
-        winding_down=call(vault, "windingDown()(bool)") == "true",
-        listing_paused=call(vault, "listingPaused()(bool)") == "true", distribution_bps=dist_bps,
-        recent_volume=(seq_now - seq_then) / 7, slowdown_volume=slowdown, burn_tokens=burn,
-        reserve=res, work_fee=wfee, routine_budget=num(rbud), essential_budget=num(ebud),
-        **tokens,
-    )
-
+    if state.backing and state.gas_price <= state.gas_ceiling and not state.winding_down \
+            and not state.listing_paused and state.queue_drained:
+        packs = prospective(vault, "packs()(address)")
+        fee, discount = num(prospective(FWA, "ownerSettlementFeeBps()(uint256)")), num(prospective(FWA, "settlementDiscountBps()(uint256)"))
+        cap = 2**256 - 1
+        if prospective(FWA, "oracleExemptCollections(address)(bool)", packs) != "true":
+            oracle = prospective(FWA, "floorOracle()(address)")
+            _, ask, _, _ = lines(prospective(oracle, "getFloorRange(address)(uint256,uint256,uint48,uint48)", packs))
+            cap = num(ask) * (10_000 + num(prospective(FWA, "oracleCeilingPremiumBps()(uint256)"))) // 10_000
+            cap = cap * (10_000 - buf) // 10_000
+        reserved = num(prospective(vault, "reservedCount()(uint256)"))
+        lo, hi = proposal_limits(state, 3 * policy.UNIT, fee, discount, cap, build=True)
+        one = policy.propose_backings(state.backing, reserved, 1, index.reserved, lo, hi, head)
+        state.restock_proposals = one * policy.MAX_BATCH["restock"]
+        chosen = []
+        for _, value in index.idle(policy.MAX_BATCH["list"]):
+            units = value // policy.UNIT
+            _, target, ok = lines(prospective(vault, "edge(uint256)(uint256,uint256,bool)", units))
+            if ok != "true":
+                break
+            lo, hi = proposal_limits(state, value, fee, discount, cap)
+            proposal = policy.propose_backings(num(target), reserved + len(chosen), 1,
+                                               lambda b: b in chosen or index.reserved(b), lo, hi, head)
+            if not proposal:
+                break
+            # Authenticate only bounded proposed amounts; another keeper may have won since
+            # indexing. The final preflight also refreshes economics, witness and uniqueness.
+            if num(prospective(vault, "idForBacking(uint256)(uint256)", proposal[0])):
+                break
+            chosen += proposal
+        state.backing_proposals = chosen
+    if block_hash(head) != header["hash"]:
+        raise txm.StaleContext("pinned state block was reorganized; retry snapshot")
+    if rpc("eth_getBlockByNumber", "latest", False)["hash"] != prospective_parent["hash"]:
+        raise txm.StaleContext("head changed during prospective pricing; refresh quote")
+    return state
 
 def to_cast(step, min_pay=0):
-    """Signature and arguments of a planned call. Every paid call takes `minPay` last (D56)."""
+    """Encode exactly the planned bounded call. OP4 activation is retired."""
     fn, *args = step
+    array = lambda xs: "[" + ",".join(map(str, xs)) + "]"
     if fn == "burnTokens":
-        return ["burnTokens(uint256[])", "[" + ",".join(map(str, args[0])) + "]"]
-    if fn in ("sync", "harvest", "unlist"):
-        return [f"{fn}(uint256[],uint256)", "[" + ",".join(map(str, args[0])) + "]", min_pay]
-    if fn == "activate":
-        return ["activate(uint256[],uint256,uint256)", "[" + ",".join(map(str, args[0])) + "]", args[1], min_pay]
-    if fn in ("list", "liquidate"):
-        return [f"{fn}(uint256,uint256)", args[0], min_pay]
+        return ["burnTokens(uint256[])", array(args[0])]
+    if fn in ("harvest", "unlist", "list"):
+        return [f"{fn}(uint256[],uint256)", array(args[0]), min_pay]
+    if fn == "sync":
+        return ["sync(uint256,uint256[],uint256,uint256)", args[0], array(args[1]), args[2], min_pay]
+    if fn == "liquidate":
+        return ["liquidate(uint256,uint256)", args[0], min_pay]
     if fn == "restock":
-        return ["restock(uint256,uint256,uint256)", args[0], args[1], min_pay]
-    return [f"{fn}(uint256)", min_pay]
+        return ["restock(uint256,uint256[],uint256)", args[0], array(args[1]), min_pay]
+    if fn == "checkpoint":
+        return ["checkpoint(uint256,uint256)", args[0], min_pay]
+    raise ValueError(f"unknown keeper operation: {fn}")
 
 
 HEALTH = dict(last_pass=0, block=0, status=[], pending=None, stats={}, errors=[], pass_errors=0)
@@ -172,14 +346,14 @@ def compensation(vault, args, sender, fees=()):
     if args[0].startswith("burnTokens"):
         return 0
     sig = args[0].replace(")", ")(uint256)", 1) if args[0].endswith(")") else args[0]
-    return num(cast("call", vault, sig, *args[1:], "--from", sender, *fees))
+    return num(cast("call", vault, sig, *args[1:], "--from", sender, "--block", "pending", *fees))
 
 
 # Billed gas / eth_estimateGas per call, from canary-rehearsal receipts (docs/GAS.md). The estimate
 # sets the gas limit; billed gas sets the cost. Replaced by this keeper's own receipts once it has
 # three of a kind.
 BILLED_PER_ESTIMATE = dict(restock=0.92, list=0.98, sync=0.93, unlist=0.80, liquidate=0.80, checkpoint=0.97,
-                           harvest=0.95, activate=0.95, burnTokens=0.95)
+                           harvest=0.95, burnTokens=0.95)
 
 
 def billed_ratio(tm, label):
@@ -195,6 +369,13 @@ def execution_cost(est, bid, fail_rate_bps, ratio=1.0):
     return int(est * ratio) * bid * (10_000 + fail_rate_bps) // 10_000
 
 
+def refresh_after_race(operation, reason, benign, refreshed):
+    if benign and reason in txm.REFRESH_ERRORS and refreshed.get(operation, 0) < 2:
+        refreshed[operation] = refreshed.get(operation, 0) + 1
+        return True
+    return False
+
+
 def run_pass(a, tm):
     """One pass: settle any in-flight transaction, then plan, preflight and send one call at a
     time, waiting for each receipt and re-reading the chain before choosing the next."""
@@ -203,12 +384,15 @@ def run_pass(a, tm):
     if tm:
         tm.check_reorgs(head)
     failed, skip, sent, declined = 0, set(), 0, []
+    refreshed = {}
     for _ in range(a.max_steps):
-        state = read_state(a.vault, a.slowdown_volume, a.burn_tokens)
+        state = stable_read_state(a.vault, a.slowdown_volume, a.burn_tokens)
 
         def wanted(p, prio=None, max_fee=None, state=state):
             """Preflight again; on a replacement also re-check profit at the bumped tip."""
-            est, _why, _exp = tm.preflight(p["to"], p["args"])
+            est, _why, _exp = tm.preflight(p["to"], p["args"],
+                                         ["--gas-price", str(max_fee), "--priority-gas-price", str(prio)]
+                                         if prio is not None else fee_args(state.base_fee, state.max_tip))
             if est is None or prio is None or p["label"] == "burnTokens":
                 return est
             pay = compensation(a.vault, p["args"], tm.sender, fee_args(state.base_fee, prio))
@@ -217,16 +401,18 @@ def run_pass(a, tm):
                 return None
             return est
 
+        had_pending = bool(tm and tm.state["pending"])
         if tm and tm.wait(wanted, a.pending_timeout):
             print(f"in flight: {tm.state['pending']['label']} nonce {tm.state['pending']['nonce']}; next pass resumes it")
             break
-        state = read_state(a.vault, a.slowdown_volume, a.burn_tokens)
+        if had_pending:
+            state = stable_read_state(a.vault, a.slowdown_volume, a.burn_tokens)
         steps = [st for st in policy.plan(state) if st[0] not in skip]
         codes = policy.status(state)  # from the full plan: skips in this pass are this keeper's choice
         HEALTH.update(block=head, status=codes + declined, policy=policy_info(a.vault))
         if sent == 0:
             print(HEALTH["policy"])
-            print(f"gas {state.gas_price / 1e9:.3f} gwei, {len(state.listings)} open, {state.idle_packs} idle packs, "
+            print(f"gas {state.gas_price / 1e9:.3f} gwei, {state.open_positions} open, {state.idle_packs} idle packs, "
                   f"idle {state.idle_eth / 1e18:.4f} ETH, cycle net {policy.cycle_net(state) / 1e15:.3f} mETH, "
                   f"7d volume {state.recent_volume:.0f}/day")
             for code, kind, detail in codes:
@@ -241,11 +427,16 @@ def run_pass(a, tm):
                 print("cast send", a.vault, *map(str, to_cast(st)))
             break
         step, args = steps[0], to_cast(steps[0])
-        est, why, benign = tm.preflight(a.vault, args)
+        est, why, benign = tm.preflight(a.vault, args, fee_args(state.base_fee, state.max_tip))
         pay = 0
         if est is None:
+            if refresh_after_race(step[0], why, benign, refreshed):
+                print(f"refresh {step[0]}: {why}; reindexing and quoting at a new pinned block")
+                continue
             skip.add(step[0])
             if benign:
+                if step[0] in ("restock", "list") and why in txm.ADMISSION_WAIT:
+                    declined.append(("ADMISSION_WAIT", "wait", "live FWA listing admission changed; retry after its backlog/economics changes"))
                 tm.state["stats"]["skipped_expected"] += 1
                 print(f"skip {step[0]}: vault says {why} (state moved on)")
             else:
@@ -258,8 +449,9 @@ def run_pass(a, tm):
             # Past the cumulative limit the keeper accepts no further loss; paid work goes on.
             max_loss = 0
             declined.append(("KEEPER_LOSS_LIMIT", "action", "cumulative loss limit reached: only paid work; operator review"))
-        # Cost at the next block's highest basefee (+12.5%): inclusion can land there (audit B).
-        bid = state.base_fee * 9 // 8 + state.max_tip
+        # State already authenticates the deterministic inclusion-block fee. Parent changes
+        # refresh the quote before send; delayed/racing inclusion remains in fail-rate/loss controls.
+        bid = state.base_fee + state.max_tip
         fees = fee_args(state.base_fee, state.max_tip)
         pay = compensation(a.vault, args, tm.sender, fees)
         cost_ = execution_cost(est, bid, a.fail_rate_bps, billed_ratio(tm, step[0]))
@@ -284,7 +476,18 @@ def run_pass(a, tm):
             tm.state["stats"]["skipped_expected"] += 1
             print(f"skip {step[0]}: the signed call would revert ({why2})")
             continue
-        tm.submit(step[0], a.vault, args, est, state.base_fee, state.max_tip, pay)
+        if est2 > est and step[0] != "burnTokens":
+            signed_cost = execution_cost(est2, bid, a.fail_rate_bps, billed_ratio(tm, step[0]))
+            if pay + max_loss < signed_cost * (10_000 + a.min_return_bps) // 10_000:
+                skip.add(step[0])
+                tm.state["stats"]["skipped_loss"] += 1
+                print(f"skip {step[0]}: signed-call cost ~{signed_cost} exceeds accepted payment/loss")
+                continue
+        try:
+            tm.submit(step[0], a.vault, args, est2, state.base_fee, state.max_tip, pay, state.pending_parent)
+        except txm.StaleContext:
+            print("head changed before send; refreshing prospective quote")
+            continue
         sent += 1
         if tm.wait(wanted, a.pending_timeout):
             print(f"in flight: {step[0]}; next pass resumes it")
@@ -327,7 +530,7 @@ def policy_info(vault):
 
 
 def print_status(a):
-    state = read_state(a.vault, a.slowdown_volume, a.burn_tokens)
+    state = stable_read_state(a.vault, a.slowdown_volume, a.burn_tokens)
     print(policy_info(a.vault))
     for code, kind, detail in policy.status(state):
         print(f"{code:28} {kind:7} {detail}")
@@ -357,6 +560,7 @@ def main():
     ap.add_argument("--from", dest="sender", help="sender for an unlocked local node (rehearsal)")
     ap.add_argument("--rpc", default=RPC)
     ap.add_argument("--state", help="keeper state file (default keeper/state-<vault>.json)")
+    ap.add_argument("--index", help="SQLite event index path (default keyed by chain, vault and deployment block)")
     ap.add_argument("--loop", type=int, default=0, help="seconds between passes; 0 runs once")
     ap.add_argument("--slowdown-volume", type=float, default=0.0)
     ap.add_argument("--max-steps", type=int, default=40, help="calls per pass, each after a fresh read")
@@ -376,7 +580,9 @@ def main():
     ap.add_argument("--pending-timeout", type=float, default=120, help="seconds a pass waits for a receipt")
     ap.add_argument("--health-port", type=int, default=0)
     a = ap.parse_args()
+    print("client " + json.dumps(txm.client_identity([sys.modules[__name__], policy, txm, event_index]), sort_keys=True))
     globals()["RPC"] = a.rpc
+    globals()["INDEX_PATH"] = a.index
     a.state = a.state or str(Path(__file__).parent / f"state-{a.vault.lower()}.json")
     if a.status:
         print_status(a)
@@ -404,6 +610,18 @@ def main():
     while True:
         try:
             failed = run_pass(a, tm)
+        except txm.StaleContext as e:
+            failed = 0
+            HEALTH.update(status=[("CONTEXT_MOVED", "wait", str(e))], last_pass=int(time.time()), pass_errors=0)
+            print(str(e))
+        except IndexBehind as e:
+            failed = 0
+            HEALTH.update(status=[("INDEX_CATCHUP", "wait", str(e))], last_pass=int(time.time()), pass_errors=0)
+            print(str(e))
+        except RuntimeError as e:
+            failed = 1
+            HEALTH["pass_errors"] = 1
+            print(f"read failed: {e}")
         except subprocess.CalledProcessError as e:  # RPC hiccup: read again next pass
             failed = 1
             HEALTH["pass_errors"] = 1

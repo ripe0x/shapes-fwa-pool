@@ -21,6 +21,35 @@ import json
 import os
 import subprocess
 import time
+import hashlib
+import marshal
+from pathlib import Path
+
+from eth_utils import keccak
+
+SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+
+
+def client_identity(modules):
+    """Bind evidence to imported source and actual loaded function/method code."""
+    result = {}
+    for module in modules:
+        if module is None:
+            continue
+        codes = {}
+        for name, value in vars(module).items():
+            if getattr(value, "__module__", None) != module.__name__:
+                continue
+            if hasattr(value, "__code__"):
+                codes[name] = marshal.dumps(value.__code__).hex()
+            elif isinstance(value, type):
+                for method, function in vars(value).items():
+                    if hasattr(function, "__code__"):
+                        codes[name + "." + method] = marshal.dumps(function.__code__).hex()
+        result[module.__name__] = dict(source_sha256_at_import=getattr(module, "SOURCE_SHA256", None),
+                                      loaded_code_sha256=hashlib.sha256(json.dumps(codes, sort_keys=True).encode()).hexdigest())
+    return result
+
 
 KEEPER_PAID = "0x496b3bf0725d338a836ecf0b614e039f3736dacfd57aa32af1bf55ea601ceaf5"  # KeeperPaid(address,uint256)
 EXPECTED = {  # selector -> name: the vault refused because the work is done, early or not allowed now
@@ -28,6 +57,32 @@ EXPECTED = {  # selector -> name: the vault refused because the work is done, ea
     "0xcdda955f": "AlreadyCheckpointed", "0x9e87fac8": "Paused",
     "0x233d9570": "WindingDown", "0x46e807b5": "AllocatedExposure",
 }
+
+# A competitor may advance the journal, consume a receipt, change the fee witness or reserve a
+# proposed backing between our pinned read and preflight. Refresh the index and quote again.
+REFRESH_ERRORS = {"BadWitness", "InvalidBacking", "CatchUpFirst", "PendingReceipts", "NeedsPrune", "SyncFirst"}
+EXPECTED.update({"0x" + keccak(text=f"{name}()").hex()[:8]: name for name in REFRESH_ERRORS})
+
+ADMISSION_WAIT = {"InvalidListing", "EdgeGate", "InvalidBacking"}
+ADMISSION_EXPECTED = {"0x" + keccak(text=f"{name}()").hex()[:8]: name for name in ADMISSION_WAIT}
+
+
+class StaleContext(Exception):
+    pass
+
+
+def next_base_fee(header):
+    """EIP1559 next basefee from the complete parent header, including integer/minimum rules."""
+    number = lambda v: int(v, 0) if isinstance(v, str) and v.startswith("0x") else int(v)
+    base, used, limit = (number(header[k]) for k in ("baseFeePerGas", "gasUsed", "gasLimit"))
+    target = limit // 2
+    if target <= 0:
+        raise ValueError("invalid parent gas limit")
+    if used == target:
+        return base
+    if used > target:
+        return base + max(base * (used - target) // target // 8, 1)
+    return base - base * (target - used) // target // 8
 
 
 class Locked(Exception):
@@ -84,10 +139,20 @@ class TxManager:
     def preflight(self, to, args, fees=()):
         """Gas estimate from the keeper's address, or (None, reason, expected?)."""
         try:
-            return int(self.cast("estimate", to, *args, "--from", self.sender, *fees).split()[0]), "", True
+            if not fees:
+                pending = self.rpc_call("eth_getBlockByNumber", "pending", False)
+                base = int(pending["baseFeePerGas"], 16)
+                fees = ["--gas-price", str(2 * base + 1), "--priority-gas-price", "1"]
+            estimate = int(self.cast("estimate", to, *args, "--from", self.sender, "--block", "pending", *fees).split()[0])
+            if (estimate * 5 + 3) // 4 > 16_777_216:
+                return None, "25% gas margin exceeds EIP7825 transaction limit", False
+            return estimate, "", True
         except subprocess.CalledProcessError as e:
             msg = (e.output or "").strip()
-            for sel, name in EXPECTED.items():
+            expected = dict(EXPECTED)
+            if args and args[0].split("(")[0] in ("list", "restock"):
+                expected.update(ADMISSION_EXPECTED)
+            for sel, name in expected.items():
                 if sel in msg or f"{name}()" in msg:  # selector or decoded name, never the bare word
                     return None, name, True
             return None, msg.splitlines()[-1][:200] if msg else "estimate failed", False
@@ -100,12 +165,14 @@ class TxManager:
             raise subprocess.CalledProcessError(1, "cast send", output=out)
         return h
 
-    def submit(self, label, to, args, est, base_fee, tip, expected_pay):
+    def submit(self, label, to, args, est, base_fee, tip, expected_pay, expected_parent=None):
         """Save, then broadcast. A failed broadcast keeps the entry: the nonce may be in flight."""
+        if expected_parent is not None and self.rpc_call("eth_getBlockByNumber", "latest", False)["hash"] != expected_parent:
+            raise StaleContext("head changed after prospective quote; refresh before broadcast")
         max_fee = 2 * base_fee + tip
         if self.max_fee is not None:
             max_fee = min(max_fee, self.max_fee)
-        p = dict(label=label, to=to, args=[str(a) for a in args], nonce=self.nonce("pending"), gas=est * 5 // 4,
+        p = dict(label=label, to=to, args=[str(a) for a in args], nonce=self.nonce("pending"), gas=(est * 5 + 3) // 4,
                  est=est, prio=tip, max_fee=max_fee, sent_block=self.head(), replacements=0, hashes=[],
                  expected_pay=expected_pay, submitted=int(time.time()))
         self.state["pending"] = p
@@ -124,6 +191,11 @@ class TxManager:
         return self.rpc_call("eth_getTransactionReceipt", h)
 
     def _count(self, p, h, r):
+        # A re-included hash replaces its orphan record; otherwise reorg polling counts it twice.
+        for old in self.state["counted"]:
+            if old["hash"] == h and not old.get("reorged"):
+                self._apply(old, -1)
+        self.state["counted"] = [old for old in self.state["counted"] if old["hash"] != h]
         gas_used, price = int(r["gasUsed"], 16), int(r["effectiveGasPrice"], 16)
         pay = sum(int(l["data"], 16) for l in r["logs"]
                   if l["topics"] and l["topics"][0] == KEEPER_PAID and l["address"].lower() == p["to"].lower()
@@ -231,7 +303,8 @@ class TxManager:
         if self.max_fee is not None and max_fee > self.max_fee:
             self.log(f"waiting: replacing {p['label']} would bid above the {self.max_fee} wei cap")
             return True
-        if still_wanted(p, prio, max_fee) is None:
+        estimate = still_wanted(p, prio, max_fee)
+        if estimate is None:
             # Never confirmed broadcast and no longer needed: forget it. If the lost broadcast did
             # land, it sits at this nonce doing work that is gone (it reverts); the next submit
             # takes the following nonce. No work runs twice.
@@ -244,11 +317,17 @@ class TxManager:
             # on it rather than paying more for a call that now fails.
             self.log(f"{p['label']} no longer needed; waiting for nonce {p['nonce']} to clear")
             return True
-        p.update(prio=prio, max_fee=max_fee, sent_block=head)
+        gas = (estimate * 5 + 3) // 4
+        if gas > 16_777_216:
+            self.error(f"replacement of {p['label']} needs gas above the EIP7825 bound")
+            return True
+        # The attempt and current estimate survive an accepted broadcast whose response is lost.
+        p.update(prio=prio, max_fee=max_fee, sent_block=head, est=estimate, gas=gas,
+                 replacements=p["replacements"] + 1)
+        self.save()
         try:
             first = not p["hashes"]
             p["hashes"].append(self._broadcast(p))
-            p["replacements"] += 1
             self.state["stats"]["sent" if first else "replaced"] += 1
             self.log(f"{'sent' if first else 'replaced'} {p['label']} nonce {p['nonce']} max fee {max_fee} prio {prio}")
         except subprocess.CalledProcessError as e:

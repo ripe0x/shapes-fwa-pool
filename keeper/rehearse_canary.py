@@ -1,28 +1,20 @@
 #!/usr/bin/env python3
-"""Local rehearsal of the proposed canary with the production deploy script and the production
-keeper (keeper/keeper.py, unmodified), on an anvil fork pinned just before a real FWA buyback.
+"""Pinned local-only canary phase. Run through rehearsal_batch.py after owner approval.
 
-Start the fork first (local only; never a public network). Block 26,418,539 is after FWA admitted
-packs and quoted them, one block before a searcher paid FWA's accrued protocol fees into its V2
-buyback; the rehearsal makes that permissionless payout and buyback itself, after the vault lists:
-  anvil --fork-url https://mainnet.gateway.tenderly.co --fork-block-number 26418539 \
-    --port 8547 --base-fee 150000000
-Then: python3 keeper/rehearse_canary.py   (writes sim/out/canary-rehearsal.json)
-
-Values: deploy/canary.example.json exactly (owner placeholder impersonated).
-Other parties act only through their real entry points: the buyback is the real transaction
-FWA's own permissionless buyback() spending real protocol fees, the oracle owner moves the ask, anyone kicks, holders deposit and redeem.
-Not reachable here: acquisitions selecting vault listings (their VRF proofs bind the original
-request block hash, which a local chain cannot reproduce); those run in test/fork/ForkSelection.
+Uses production deployment and keeper/index paths on the batch-owned Anvil endpoint. Values
+remain the2ETH canary values with the fresh test owner. Successful VRF selections remain Forge
+replay evidence; this phase does not manufacture local proofs or failed NFT deliveries.
 """
 import json
+import hashlib
+import rehearsal_batch as B
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RPC = "http://127.0.0.1:8547"
+RPC = B.RPC
 KEEPER_STATE = tempfile.mkdtemp(prefix="pack-vault-keeper-") + "/state.json"  # fresh per run
 VALUES = json.loads((ROOT / "deploy/canary.example.json").read_text())
 FWA = VALUES["fwa"]
@@ -34,14 +26,16 @@ HOLDER = "0xDd4B0D7470953fb19b97fa130A15Af59537Bc523"
 HOLDER2 = "0xb9A3188644D5A55A98C68B056A2685Cd6C915725"
 KEEPER = "0x6B401c3364dFb17fe7D54237fC04aba3f7739dd0"
 KICKER = "0x2C42b18832Cef2Eb8C8C0f83250700176694E341"  # "anyone": kicks, processes FWA's queue
-OWNER = "0x" + subprocess.run(["cast", "keccak", "pack-vault-rehearsal-owner"], capture_output=True,
-                              text=True).stdout.strip()[-40:]  # the deploy refuses a placeholder owner
+OWNER = B.ACTORS["owner"]
 VALUES["owner"] = OWNER
 E = 10**18
 log = []
+SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
 
 def sh(*args, check=True):
+    if "--broadcast" in args:
+        B.load_manifest()
     r = subprocess.run([str(a) for a in args], capture_output=True, text=True, cwd=ROOT)
     if check and r.returncode:
         sys.exit(f"failed: {' '.join(map(str, args))}\n{r.stdout}\n{r.stderr}")
@@ -49,16 +43,28 @@ def sh(*args, check=True):
 
 
 def cast(*a):
+    if a and a[0] == "rpc" and len(a) > 1 and a[1].startswith(("anvil_", "evm_")):
+        B.load_manifest()
     return sh("cast", *a, "--rpc-url", RPC)
 
 
+def pricing(to, sig, *a):
+    _, fees = B.pending_fees()
+    return cast("call", to, sig, *a, "--block", "pending", *fees)
+
+
 def call(to, sig, *a):
+    if sig.split("(")[0] in ("edge", "requestCharge", "deployCharge", "unwindCharge"):
+        return pricing(to, sig, *a).split(" ")[0]
     return cast("call", to, sig, *a).split(" ")[0]
 
 
-def ids(sig="openListings()(uint256[])"):
-    out = cast("call", VAULT, sig).strip("[]")
-    return [int(x.strip().split(" ")[0]) for x in out.split(",") if x.strip()]
+def ids(inventory="open"):
+    """Independent full enumeration for rehearsal assertions, never normal keeper work."""
+    count_sig, item_sig = (("idlePackCount()(uint256)", "idlePackAt(uint256)(uint256)")
+                           if inventory == "idle" else
+                           ("openListingCount()(uint256)", "openListingAt(uint256)(uint256)"))
+    return [num(call(VAULT, item_sig, i)) for i in range(num(call(VAULT, count_sig)))]
 
 
 def num(v):
@@ -67,18 +73,11 @@ def num(v):
 
 
 def send(frm, to, sig, *a, value=None, expect=True):
-    extra = ["--value", str(value)] if value is not None else []
-    r = subprocess.run(["cast", "send", to, sig, *map(str, a), *extra, "--from", frm, "--unlocked",
-                        "--rpc-url", RPC, "--json"], capture_output=True, text=True)
-    ok = r.returncode == 0 and json.loads(r.stdout).get("status") == "0x1"
-    if ok != expect:
-        sys.exit(f"{sig} from {frm}: expected {'success' if expect else 'revert'}\n{r.stdout}{r.stderr}")
-    return ok
+    return B.send(frm, to, sig, a, value or 0, expect)
 
 
 def impersonate(addr):
-    cast("rpc", "anvil_impersonateAccount", addr)
-    cast("rpc", "anvil_setBalance", addr, hex(10 * E))
+    B.prepare_actor(addr)
 
 
 def warp_to(offset):  # seconds into FWA's 12 h interval: 42,360 = 11:46 (blackout), 60 = open
@@ -90,11 +89,63 @@ def warp_to(offset):  # seconds into FWA's 12 h interval: 42,360 = 11:46 (blacko
     cast("rpc", "evm_mine")
 
 
+def expire_queue():
+    """Expire only real pending requests, using their snapshotted deadlines in bounded chunks."""
+    for _ in range(128):
+        if not num(call(FWA, "unsettledAcquisitionCount()(uint256)")):
+            return
+        cursor = num(call(FWA, "nextSequenceToProcess()(uint64)"))
+        last = num(call(FWA, "lastIssuedSequence()(uint64)"))
+        deadline = 0
+        for sequence in range(cursor, min(cursor + 16, last + 1)):
+            request = num(call(FWA, "requestIdAtSequence(uint64)(uint256)", sequence))
+            status = num(cast("call", FWA, "acquisitions(uint256)(address,uint256,uint256,uint256,uint8)", request).splitlines()[-1])
+            if status == 1:
+                meta = cast("call", FWA, "acquisitionMeta(uint256)(uint64,uint64,uint64,uint16,uint16,uint256)", request).splitlines()
+                deadline = max(deadline, num(meta[1]))
+        current = num(cast("block-number"))
+        needed = max(0, deadline + 1 - current) if deadline else 0
+        if needed > 7201:
+            raise RuntimeError("snapshotted deadline exceeds the deployed protocol bound")
+        for _ in range(226):
+            if needed == 0:
+                break
+            amount = min(needed, 32)
+            cast("rpc", "anvil_mine", hex(amount))
+            needed -= amount
+        if needed:
+            raise RuntimeError("bounded expiry mining did not reach the real deadline")
+        send(KICKER, FWA, "processAcquisitions(uint256)", 16)
+        if num(call(FWA, "nextSequenceToProcess()(uint64)")) <= cursor:
+            raise RuntimeError("real FWA queue made no completed progress")
+    raise RuntimeError("queue exceeds128 bounded expiry/processor calls")
+
+
 def keeper(*extra):
-    out = sh("python3", "keeper/keeper.py", VAULT, "--send", "--from", KEEPER, "--rpc", RPC, "--state", KEEPER_STATE,
-             *extra, check=False)
-    print("  " + out.replace("\n", "\n  "))
-    return out
+    B.load_manifest()
+    for _ in range(16):
+        command = ["python3", "keeper/keeper.py", VAULT, "--send", "--from", KEEPER, "--rpc", RPC,
+                   "--state", KEEPER_STATE, "--index", KEEPER_STATE + ".sqlite", *extra]
+        result = subprocess.run(command, capture_output=True, text=True, cwd=ROOT)
+        out = result.stdout + result.stderr
+        print("  " + out.replace("\n", "\n  "), flush=True)
+        if result.returncode:
+            raise RuntimeError(f"production keeper exited{result.returncode}: {out}")
+        if "event index at block" not in out:
+            if Path(KEEPER_STATE).exists():
+                saved = json.loads(Path(KEEPER_STATE).read_text())
+                if any(e["gas_limit"] > B.MAX_GAS or not e["status"]
+                       for e in saved["counted"] if not e.get("reorged")):
+                    raise RuntimeError("keeper receipt or transaction gas limit mismatch")
+                B.append_action(dict(operation="production keeper", arguments=list(extra), output=out,
+                                     tx_state=saved))
+            return out
+    raise RuntimeError("event index reconstruction exceeded16 bounded keeper passes")
+
+
+def recover_keeper_transaction():
+    from test_tx import exercise
+    return exercise(sys.modules[__name__])
 
 
 def spike():  # basefee 1 gwei, twice the ceiling (empty blocks decay it ~12.5% each)
@@ -116,7 +167,8 @@ def redeem_charge(shares):
 def state(tag):
     s = dict(tag=tag, balance=num(cast("balance", VAULT)), lastNav=num(call(VAULT, "lastNav()(uint256)")),
              totalShares=num(call(VAULT, "totalShares()(uint256)")),
-             open=len(ids()), idle=len(ids("idlePacks()(uint256[])")),
+             open=num(call(VAULT, "openListingCount()(uint256)")),
+             idle=num(call(VAULT, "idlePackCount()(uint256)")),
              loose=num(call(VAULT, "looseShapeCount()(uint256)")),
              tokens=num(call(TOKEN, "balanceOf(address)(uint256)", VAULT)),
              keeper=num(cast("balance", KEEPER)), holder=num(cast("balance", HOLDER)))
@@ -128,26 +180,10 @@ def state(tag):
 
 def main():
     global VAULT, TOKEN
-    if num(cast("chain-id")) != 1:
-        sys.exit("expects a local mainnet fork")
-    sh("forge", "build", "--force")
-    for a in (DEPLOYER, HOLDER, HOLDER2, KEEPER, KICKER, OWNER):
-        if cast("code", a) != "0x" or num(cast("nonce", a)) != 0:
-            sys.exit(f"actor {a} is not a clean address on this chain")
-        impersonate(a)
-    values_file = ROOT / "deploy/rehearse-pinned.json"
-    values_file.write_text(json.dumps(VALUES, indent=1))
-    try:
-        # The mainnet command itself (script/deploy.sh), against the local fork.
-        r = subprocess.run(["script/deploy.sh", "deploy/rehearse-pinned.json", "--broadcast"], capture_output=True,
-                           text=True, cwd=ROOT, env={**__import__("os").environ, "RPC_URL": RPC, "I_AM_THE_OWNER": "yes",
-                                                     "FORGE_WALLET_ARGS": f"--unlocked --sender {DEPLOYER}"})
-    finally:
-        values_file.unlink()
-    if r.returncode:
-        sys.exit(r.stdout + r.stderr)
-    run = json.loads((ROOT / "broadcast/Deploy.s.sol/1/run-latest.json").read_text())
-    VAULT = next(t["contractAddress"] for t in run["transactions"] if t.get("contractName") == "PackVault")
+    B.load_manifest()
+    for actor in B.ACTORS.values():
+        impersonate(actor)
+    VAULT = B.deploy(VALUES, "pinned")
     TOKEN = call(FWA, "token()(address)")
     print("vault", VAULT)
     keeper_start = num(cast("balance", KEEPER))
@@ -173,18 +209,16 @@ def main():
         if ids():
             sys.exit("keeper listed while FWA's queue was busy")
         # FWA's own processor expires a stale request after its word deadline (anyone may call).
-        for _ in range(8):
-            cast("rpc", "anvil_mine", hex(1000))
-        send(KICKER, FWA, "processAcquisitions(uint256)", 50)
+        expire_queue()
         warp_to(60)
     keeper()
     built = state("deployed capital")
     staged0 = sum(1 for i in ids() if num(cast("call", FWA, "listings(uint256)(address,address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint64,uint8)", i).split("\n")[-1]) == 5)
     print(f"  FWA staged {staged0} of {built['open']} listings")
     if staged0:
-        keeper()  # the keeper activates any staged listings, paid per listing activated
+        sys.exit("production admission accepted a staged listing")
     staged1 = sum(1 for i in ids() if num(cast("call", FWA, "listings(uint256)(address,address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint64,uint8)", i).split("\n")[-1]) == 5)
-    print(f"  staged after the keeper's activation: {staged1}")
+    print(f"  staged after admission: {staged1}")
 
     # 3. Token rewards through FWA's real permissionless path: anyone pays out FWA's accrued
     #    protocol fees (a slice funds the buyback contract) and anyone runs the buyback, which
@@ -199,6 +233,7 @@ def main():
     listed = ids()
     pending = sum(num(call(rewards, "pendingDepositorTokens(uint256)(uint256)", i)) for i in listed)
     print(f"  real buyback accrued {pending} token wei to {len(listed)} listings")
+    transaction_recovery = recover_keeper_transaction()
     # 4. Without the opt-in the keeper leaves tokens alone and says so.
     out_idle = keeper()
     # 5. With --burn-tokens the same production keeper claims and burns them, unpaid.
@@ -218,15 +253,21 @@ def main():
     # 6. Settlement-like transition: the oracle owner lowers the ask; anyone kicks in the blackout;
     #    the keeper resolves and relists at the new cap.
     oracle = call(FWA, "floorOracle()(address)")
-    owner = call(oracle, "owner()(address)")
-    impersonate(owner)
-    send(owner, oracle, "setFloor(address,uint256)", PACKS, 25 * 10**15)  # cap 0.0275 < posted backing (D62 floor 0.0303)
-    warp_to(42360)
-    impersonate(KICKER)
-    send(KICKER, FWA, "kickListing(uint256)", listed[0])
-    warp_to(60)
-    keeper()
-    state("after kick, sync, relist")
+    oracle_owner = call(oracle, "owner()(address)")
+    local_gaps = []
+    if oracle_owner.lower() != B.ORACLE_OWNER.lower() or oracle.lower() != B.ORACLE.lower():
+        raise RuntimeError("oracle test authority changed from the approved pinned identity")
+    if cast("code", oracle_owner) != "0x":
+        local_gaps.append("Oracle owner is a3451-byte contract; its real controller is outside the approved signer set. Local kick/oracle-change branch skipped; no contract-origin EOA transaction was fabricated.")
+        state("oracle admin branch unavailable")
+    else:
+        impersonate(oracle_owner)
+        send(oracle_owner, oracle, "setFloor(address,uint256)", PACKS, 25 * 10**15)
+        warp_to(42360)
+        send(KICKER, FWA, "kickListing(uint256)", listed[0])
+        warp_to(60)
+        keeper()
+        state("after kick, sync, relist")
 
     # 6b. Keeper payment policy swap (D57, D58): deploy a policy with a different formula (3 work
     #     fees per unit, no gas); the owner sets it at once. Assets, shares and positions carry
@@ -234,7 +275,7 @@ def main():
     fee = VALUES["workFeeWei"]
     v1 = call(VAULT, "keeperPolicy()(address)")
     out = sh("forge", "create", "--broadcast", "--unlocked", "--from", DEPLOYER, "--rpc-url", RPC,
-             "test/fork/ForkKeeperPolicy.t.sol:KeeperPolicyFlat")
+             "--gas-limit", B.MAX_GAS, "test/fork/ForkKeeperPolicy.t.sol:KeeperPolicyFlat")
     v2 = next(l.split()[-1] for l in out.splitlines() if l.startswith("Deployed to:"))
     impersonate(VALUES["owner"])
     send(KICKER, VAULT, "setPolicy(address)", v2, expect=False)  # owner only
@@ -305,7 +346,7 @@ def main():
     ins = s0["balance"] + deposited
     outs = claims + pay + mint_fees + end["balance"]
     report = dict(
-        values=VALUES, positions_built=built["open"] + built["idle"], positions_listed=built["open"],
+        values=VALUES, local_gaps=local_gaps, transaction_recovery=transaction_recovery, positions_built=built["open"] + built["idle"], positions_listed=built["open"],
         capital_idle_after_build=built["balance"], deposited=deposited, claimed=claims,
         holder_result=claims - deposited, keeper_pay=pay, keeper_net=end["keeper"] - keeper_start,
         keeper_gas_spent=pay - (end["keeper"] - keeper_start), mints=mints, mint_fees=mint_fees,
@@ -322,7 +363,7 @@ def main():
     kt = report["keeper_tx"]
     # Item 13: every paid call's receipt pays exactly what the keeper's simulation of that call
     # quoted, unless basefee moved between simulation and inclusion (the gas-spike steps).
-    counted = json.load(open(KEEPER_STATE))["counted"]
+    counted = [e for e in json.load(open(KEEPER_STATE))["counted"] if not e.get("reorged")]
     exact = [e for e in counted if e["label"] != "burnTokens" and e["pay"] == e["expected_pay"]]
     moved = [(e["label"], e["expected_pay"], e["pay"]) for e in counted if e["label"] != "burnTokens" and e["pay"] != e["expected_pay"]]
     report["quote_matches_payment"] = dict(exact=len(exact), differed=moved)

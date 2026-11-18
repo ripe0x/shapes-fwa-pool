@@ -19,6 +19,7 @@ MIN_DISTRIBUTION = 10**16
 SHAPES_PER_MINT = 10
 
 ACTIVE, ALLOCATED, WITHDRAWN, SETTLED, STAGED = 1, 2, 3, 4, 5
+OWED = 3  # cached book state; distinct from the live FWA status namespace
 
 
 def mul_div(a, b, c):
@@ -37,6 +38,10 @@ class Position:
     pending_fees: int = 0  # FWA pendingFees for an active listing
     pack_owned: bool = False  # settled or withdrawn: pack held or owed to the vault
     expired: bool = False  # allocated and past FWA's settlement window (sync can resolve it)
+    value: int = 0  # exact wei backing, independent of strategy units
+    fee_debt: int = 0
+    state: int = ACTIVE  # cached book membership, independent of live FWA status
+    allocated_at: int = 0
 
 
 @dataclass
@@ -82,8 +87,32 @@ class Vault:
     distribution_reserve: int = 0
 
     positions: dict = field(default_factory=dict)  # listing id -> Position
-    idle_packs: list = field(default_factory=list)  # units of each idle pack
+    idle_packs: list = field(default_factory=list)  # exact wei backing of each idle pack
+    idle_quotes: list = field(default_factory=list)  # funding quote paired with the idle stack
+    idle_funding: int = 0
     loose_shapes: int = 0
+    tracked_value: int = 0
+    idle_value: int = 0
+    active_backing: int = 0
+    active_count: int = 0
+    fee_debt_sum: int = 0
+    count_by_debt: dict = field(default_factory=dict)
+    allocated_value: int = 0
+    allocation_queue: list = field(default_factory=list)
+    allocation_head: int = 0
+    fee_accumulator: int = 0
+    fee_credit: int = 0
+    acquisition_cursor: int = 0
+    completed_prefix: int = 0
+    receipts: dict = field(default_factory=dict)  # payment-time identity, kind, amount and fee
+    recovery_packs: list = field(default_factory=list)  # exact remaining backing in oversized gifts
+    routine_budget: int = 10**30
+    essential_budget: int = 10**30
+    routine_cap: int = 10**30
+    essential_cap: int = 10**30
+    routine_rate: int = 0
+    essential_rate: int = 0
+    budget_at: int = 0
 
     # Expense and income ledger (wei). NAV changes only through these and holder flows.
     keeper_paid: int = 0
@@ -111,29 +140,140 @@ class Vault:
         f = self.free()
         return f - keep if f > keep else 0
 
-    def pay_keeper(self, amount):
-        amount = min(amount, self.free())
+    def sync_budget(self, now):
+        elapsed = now - self.budget_at
+        self.routine_budget = min(self.routine_cap, self.routine_budget + elapsed * self.routine_rate // 86400)
+        self.essential_budget = min(self.essential_cap, self.essential_budget + elapsed * self.essential_rate // 86400)
+        self.budget_at = now
+
+    def pay_keeper(self, amount, essential=False, cap=None):
+        budget = self.essential_budget if essential else self.routine_budget
+        amount = min(amount, self.free(), budget if cap is None else cap)
+        if cap is None:
+            if essential:
+                self.essential_budget -= amount
+            else:
+                self.routine_budget -= amount
         self.balance -= amount
         self.keeper_paid += amount
         return amount
 
     # ------------------------------------------------------------ inventory and listings
-    def restock(self, count, units, mint_fee):
+    def restock(self, count, units, mint_fee, proposals=None):
+        quotes = [0] * count if proposals is None else list(proposals)
+        if count == 0 or units < 3 or units > 30 or count * units > 30 or len(quotes) != count:
+            raise RuntimeError("BadBatch")
         need = count * units
         mints = -(-(need - self.loose_shapes) // SHAPES_PER_MINT) if need > self.loose_shapes else 0
+        if self.idle() < mints * (UNIT * SHAPES_PER_MINT + mint_fee) + self.idle_funding + sum(quotes):
+            raise RuntimeError("InsufficientBacking")
         self.balance -= mints * (UNIT * SHAPES_PER_MINT + mint_fee)
         self.mint_fees += mints * mint_fee
         self.loose_shapes += mints * SHAPES_PER_MINT - need
-        self.idle_packs += [units] * count
+        self.idle_packs += [units * UNIT] * count
+        self.idle_quotes += quotes
+        self.idle_funding += sum(quotes)
+        self.tracked_value += mints * SHAPES_PER_MINT * UNIT
+        self.idle_value += mints * SHAPES_PER_MINT * UNIT
         return mints
 
-    def list(self, listing_id, backing, status=ACTIVE):
-        units = self.idle_packs.pop()
+    def _debt_count(self, debt, change):
+        self.count_by_debt[debt] = self.count_by_debt.get(debt, 0) + change
+
+    def adopt(self, value):
+        """Explicitly register a gift at its actual current backing after old listing retirement."""
+        self.tracked_value += value
+        self.idle_value += value
+        if value > 30 * UNIT:
+            self.recovery_packs.append(value)
+        else:
+            self.idle_packs.append(value)
+            self.idle_quotes.append(0)
+
+    def _remove_active(self, p):
+        self.active_backing -= p.backing
+        self.active_count -= 1
+        self.fee_debt_sum -= p.fee_debt
+        self._debt_count(p.fee_debt, -1)
+
+    def list(self, listing_id, backing, status=ACTIVE, fee_debt=None):
+        if status != ACTIVE:
+            raise RuntimeError("InvalidListing")
+        value = self.idle_packs.pop()
+        self.idle_funding -= self.idle_quotes.pop()
+        units = value // UNIT
         self.balance -= backing
-        self.positions[listing_id] = Position(units, backing, status)
+        debt = self.fee_accumulator if fee_debt is None else fee_debt
+        self.positions[listing_id] = Position(units, backing, status, value=value, fee_debt=debt)
+        self.idle_value -= value
+        self.active_backing += backing
+        self.active_count += 1
+        self.fee_debt_sum += debt
+        self._debt_count(debt, 1)
 
     def accrue(self, listing_id, amount):
-        self.positions[listing_id].pending_fees += amount
+        p = self.positions[listing_id]
+        p.pending_fees += amount
+        self.fee_accumulator = max(self.fee_accumulator, p.fee_debt + p.pending_fees)
+
+    def select(self, listing_id, allocated_at=0):
+        """Apply an authenticated journal entry, once, before consuming its terminal outcome."""
+        p = self.positions[listing_id]
+        if p.state != ACTIVE:
+            raise RuntimeError("InvalidJournal")
+        self._remove_active(p)
+        p.state = ALLOCATED
+        p.allocated_at = allocated_at
+        if p.status == ACTIVE:
+            p.status = ALLOCATED
+        self.allocated_value += p.value
+        self.allocation_queue.append(listing_id)
+
+    def process_journal(self, entries):
+        """Authenticated completed IDs or None for foreign/refunded entries, at most16 per call."""
+        if len(entries) > 16 or self.acquisition_cursor + len(entries) > self.completed_prefix:
+            raise RuntimeError("BadBatch")
+        for listing_id in entries:
+            if listing_id is not None:
+                self.select(listing_id)
+            self.acquisition_cursor += 1
+
+    def harvest_listing(self, listing_id, new_debt=None):
+        p = self.positions[listing_id]
+        debt = self.fee_accumulator if new_debt is None else new_debt
+        self._debt_count(p.fee_debt, -1)
+        self._debt_count(debt, 1)
+        self.fee_debt_sum += debt - p.fee_debt
+        p.fee_debt = debt
+        p.pending_fees = 0
+
+    def pending_active_fees(self, witness_id=None):
+        if self.active_count == 0:
+            return 0
+        if witness_id is None:
+            # Offchain convenience only. Production callers select this ID from their event index.
+            witness_id = min((i for i, p in self.positions.items() if p.state == ACTIVE),
+                             key=lambda i: self.positions[i].fee_debt)
+        p = self.positions[witness_id]
+        if p.state != ACTIVE or p.status != ACTIVE:
+            raise RuntimeError("BadWitness")
+        d, pending = p.fee_debt, p.pending_fees
+        if pending == 0:
+            if self.count_by_debt.get(d, 0) + self.count_by_debt.get(d + 1, 0) != self.active_count:
+                raise RuntimeError("BadWitness")
+            return 0
+        a = d + pending
+        return self.active_count * a + self.count_by_debt.get(a + 1, 0) - self.fee_debt_sum
+
+    def prune(self, max_count):
+        advanced = 0
+        while advanced < max_count and self.allocation_head < len(self.allocation_queue):
+            p = self.positions.get(self.allocation_queue[self.allocation_head])
+            if p and p.state == ALLOCATED:
+                break
+            self.allocation_head += 1
+            advanced += 1
+        return advanced
 
     def receive_fees(self, amount):
         """ETH FWA paid the vault from claimListingFees or withdrawEarnings."""
@@ -151,36 +291,94 @@ class Vault:
         """FWA kicked the listing (backing above a lowered cap): full backing and pack back."""
         p = self.positions[listing_id]
         p.status, p.pack_owned, p.pending_fees = WITHDRAWN, True, 0
+        if listing_id in self.receipts:
+            raise RuntimeError("Duplicate")
+        self.receipts[listing_id] = (2, p.backing, 0)
         self.balance += p.backing
 
-    def sync_owned(self, listing_id):
+    def sync_owned(self, listing_id, owned=True):
         """sync of a settled or withdrawn position whose pack the vault holds: pack goes idle."""
-        p = self.positions.pop(listing_id)
-        self.idle_packs.append(p.units)
+        p = self.positions[listing_id]
+        if p.state == ACTIVE:
+            self._remove_active(p)
+        elif p.state == ALLOCATED:
+            self.allocated_value -= p.value
+        elif p.state != OWED:
+            raise RuntimeError("InvalidListing")
+        if not owned:
+            p.state = OWED
+            return
+        del self.positions[listing_id]
+        self.receipts.pop(listing_id, None)
+        self.idle_value += p.value
+        self.idle_packs.append(p.value)
+        self.idle_quotes.append(p.backing)
+        self.idle_funding += p.backing
 
     def resolve_bid(self, listing_id):
+        if self.positions[listing_id].state == ACTIVE:
+            self.select(listing_id)
         self.bid_settled(listing_id)
         self.sync_owned(listing_id)
 
     def resolve_keep(self, listing_id):
         """Purchaser kept the pack (or the vault reclaimed backing): backing less the fee back."""
-        p = self.positions.pop(listing_id)
-        fee = p.backing * self.settlement_fee_bps // BPS
-        self.balance += p.backing - fee
-        self.settlement_fees += fee
-        self.backing_lost += p.units * UNIT  # the pack left: its value is the loss
+        self.record_keep(listing_id, self.settlement_fee_bps)
+        self.consume_keep(listing_id)
+
+    def record_keep(self, listing_id, fee_bps):
+        p = self.positions[listing_id]
+        if listing_id in self.receipts:
+            raise RuntimeError("Duplicate")
+        amount = p.backing * (BPS - fee_bps) // BPS
+        self.receipts[listing_id] = (1, amount, fee_bps)
+        self.balance += amount
+        self.settlement_fees += p.backing - amount
+        p.status = SETTLED
+        p.pack_owned = False
+
+    def consume_keep(self, listing_id):
+        p = self.positions[listing_id]
+        if p.state != ALLOCATED or self.receipts.get(listing_id, (0,))[0] != 1:
+            raise RuntimeError("InvalidListing")
+        del self.receipts[listing_id]
+        del self.positions[listing_id]
+        self.allocated_value -= p.value
+        self.tracked_value -= p.value
+        self.backing_lost += p.value  # the pack left: its value is the loss
 
     def unlist(self, listing_id):
         p = self.positions.pop(listing_id)
+        self._remove_active(p)
+        self.idle_value += p.value
         self.balance += p.backing
-        self.idle_packs.append(p.units)
+        self.idle_packs.append(p.value)
+        self.idle_quotes.append(p.backing)
+        self.idle_funding += p.backing
 
     def liquidate_one(self):
         if self.idle_packs:
-            self.balance += self.idle_packs.pop() * UNIT
+            value = self.idle_packs.pop()
+            self.idle_funding -= self.idle_quotes.pop()
         elif self.loose_shapes:
             self.loose_shapes -= 1
-            self.balance += UNIT
+            value = UNIT
+        else:
+            return
+        self.balance += value
+        self.tracked_value -= value
+        self.idle_value -= value
+
+    def recover_pack(self, amount, complete=False):
+        """Actual ETH paid by ShapePacks.claimEth's bounded chunk, supplied by the real caller."""
+        if not self.recovery_packs or amount > self.recovery_packs[-1] or (complete and amount != self.recovery_packs[-1]):
+            raise RuntimeError("InvalidRecovery")
+        self.recovery_packs[-1] -= amount
+        self.tracked_value -= amount
+        self.idle_value -= amount
+        self.balance += amount
+        if complete:
+            self.recovery_packs.pop()
 
     # ------------------------------------------------------------ holders
     def deposit(self, h, amount, ck=0, charge=0):
@@ -272,36 +470,40 @@ class Vault:
 
     # ------------------------------------------------------------ checkpoint
     def nav_positions(self):
-        nav = alloc = 0
         expired = False
-        for p in self.positions.values():
-            value = p.units * UNIT
-            if p.status == ACTIVE:
-                nav += value + p.backing + p.pending_fees
-            elif p.status == STAGED:
-                nav += value + p.backing
-            elif p.status == ALLOCATED:
-                expired = expired or p.expired
-                floor = min(value, p.backing * (BPS - self.settlement_fee_bps) // BPS)
-                nav += floor
-                alloc += floor
-            elif p.pack_owned:
-                nav += value
-        return nav, alloc, expired
+        if self.allocation_head < len(self.allocation_queue):
+            p = self.positions.get(self.allocation_queue[self.allocation_head])
+            if p is None or p.state != ALLOCATED:
+                raise RuntimeError("NeedsPrune")
+            expired = p.expired
+        return (self.tracked_value - self.idle_value + self.active_backing + self.pending_active_fees(),
+                self.allocated_value, expired)
 
     def checkpoint(self, credit=0):
+        snapshot = copy.deepcopy(self.__dict__)
+        try:
+            return self._checkpoint(credit)
+        except Exception:
+            self.__dict__.update(snapshot)
+            raise
+
+    def _checkpoint(self, credit):
         """Mirror of PackVault.checkpoint. `credit` is FWA fee credit harvested inside it.
         Returns True when holder flows made it a paid call."""
         work = self.pending_total != 0 or self.locked_shares != 0
         if not work and not self.distribution_bps:
             raise RuntimeError("Nothing")
-        snap = copy.deepcopy(self.__dict__)  # the contract reverts the whole call
+        if self.acquisition_cursor != self.completed_prefix:
+            raise RuntimeError("CatchUpFirst")
+        if self.receipts:
+            raise RuntimeError("PendingReceipts")
         nav_pos, alloc, expired = self.nav_positions()
         if expired:
             raise RuntimeError("SyncFirst")
         if credit:
             self.receive_fees(credit)
-        inventory = self.loose_shapes * UNIT + sum(self.idle_packs) * UNIT
+            self.fee_credit = 0
+        inventory = self.idle_value
         nav = self.free() + nav_pos + inventory
         if alloc * BPS > nav * self.allocated_bound_bps:
             raise RuntimeError("AllocatedExposure")
@@ -356,12 +558,10 @@ class Vault:
         if work:
             self.processing_pool = 0  # keeper pay comes out of it (pay_keeper); the rest is free ETH
         elif distributed == 0:
-            self.__dict__.update(snap)
             raise RuntimeError("Nothing")
         return work or distributed != 0
 
     # ------------------------------------------------------------ reporting
     def nav_now(self):
         """NAV as a checkpoint would compute it now (before flows)."""
-        nav_pos, _, _ = self.nav_positions()
-        return self.free() + nav_pos + self.loose_shapes * UNIT + sum(self.idle_packs) * UNIT
+        return self.free() + self.tracked_value + self.active_backing + self.pending_active_fees() + self.fee_credit

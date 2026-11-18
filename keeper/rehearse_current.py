@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
-"""Launch step D: the canary lifecycle on a local fork of the CURRENT mainnet block, through the
-production deploy script and the production keeper, with real signed transactions and real gas
-fields. Nothing on the fork is altered except funding fresh actors and moving time forward to
-FWA's purchase blackouts (checkpoints only run there). No oracle, basefee or protocol state is
-changed; FWA's live queue, fees and gas market are whatever the block holds.
+"""Quiet holder lifecycle on the approved batch's pinned fork, through production paths.
 
-  anvil --fork-url https://mainnet.gateway.tenderly.co --port 8547
-  python3 keeper/rehearse_current.py        (writes sim/out/rehearsal-current.json)
-
-Local only; never a public network. Owner is a fresh address impersonated as its test signer.
+The filename is historical. This phase uses block26418539, not an unapproved moving current
+block. No oracle or fee parameters change in this phase. Run via rehearsal_batch.py only.
 """
 import json
 import os
@@ -18,45 +12,22 @@ import sys
 import rehearse_canary as rc
 from rehearse_canary import FWA, ROOT, call, cast, ids, impersonate, num, send, sh, state, warp_to
 
-OWNER = "0x" + sh("cast", "keccak", "pack-vault-rehearsal-owner")[-40:]
+OWNER = rc.OWNER
 VALUES_FILE = ROOT / "deploy/rehearse-current.json"
 SELF = ["--max-loss-wei", str(10**16)]  # whoever runs unpaid exit work accepts its gas
 
 
 def drain_queue():
-    """FWA's queue holds live requests whose VRF words never arrive on a fork; FWA's own
-    permissionless processor expires them after their deadline (up to 7,200 blocks)."""
-    if num(call(FWA, "unsettledAcquisitionCount()(uint256)")):
-        for _ in range(8):
-            cast("rpc", "anvil_mine", hex(1000))
-        send(rc.KICKER, FWA, "processAcquisitions(uint256)", 50)
-    if num(call(FWA, "unsettledAcquisitionCount()(uint256)")):
-        sys.exit("FWA queue did not drain")
+    rc.expire_queue()
 
 
 def main():
-    if num(cast("chain-id")) != 1:
-        sys.exit("expects a local mainnet fork")
+    rc.B.load_manifest()
     head = num(cast("block-number"))
-    sh("forge", "build", "--force")
-    actors = (rc.DEPLOYER, rc.HOLDER, rc.KEEPER, rc.KICKER, OWNER)
-    for a in actors:
-        if cast("code", a) != "0x" or num(cast("nonce", a)) != 0:
-            sys.exit(f"actor {a} is not a clean address on this chain")
-        impersonate(a)
+    for actor in rc.B.ACTORS.values():
+        impersonate(actor)
     values = dict(rc.VALUES, owner=OWNER)
-    VALUES_FILE.write_text(json.dumps(values, indent=1))
-    try:
-        # The mainnet command itself (script/deploy.sh), against the local fork.
-        r = subprocess.run(["script/deploy.sh", "deploy/rehearse-current.json", "--broadcast"], capture_output=True,
-                           text=True, cwd=ROOT, env={**os.environ, "RPC_URL": rc.RPC, "I_AM_THE_OWNER": "yes",
-                                                     "FORGE_WALLET_ARGS": f"--unlocked --sender {rc.DEPLOYER}"})
-    finally:
-        VALUES_FILE.unlink()
-    if r.returncode:
-        sys.exit(r.stdout + r.stderr)
-    run = json.loads((ROOT / "broadcast/Deploy.s.sol/1/run-latest.json").read_text())
-    rc.VAULT = next(t["contractAddress"] for t in run["transactions"] if t.get("contractName") == "PackVault")
+    rc.VAULT = rc.B.deploy(values, "quiet")
     rc.TOKEN = call(FWA, "token()(address)")
     vault = rc.VAULT
     print("block", head, "vault", vault, "basefee", num(cast("base-fee")))
