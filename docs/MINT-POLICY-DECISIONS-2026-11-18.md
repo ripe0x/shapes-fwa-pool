@@ -70,13 +70,15 @@ unreviewed factory, global NAV rewrite, or persistent optimization engine.
 
 ### Bugs corrected
 
-- FWA exposes `stagingHead` separately from its unsettled acquisition count.
-  A zero acquisition count does not imply that a freshly listed pack will
-  become active immediately. Both `restock` and `list` now refuse to spend
-  paid mint or listing capital while an old staging backlog exists.
-- The keeper maintains `queue_drained` and `staging_empty` as separate
-  fields: exits, checkpoints and activation remain possible while the
-  staging backlog exists. Conflating these gates deadlocks activation.
+- FWA has an internal staging backlog even when unsettled acquisitions are
+  zero. The live deployed FWA does **not** expose a callable `stagingHead()`
+  getter; that mistaken assumption was caught by the mainnet fork trace.
+- The vault now requires the returned FWA listing to be `Active` before
+  recording it. If FWA stages it, the entire listing transaction reverts,
+  returning the pack and backing to their pre-call state. This avoids a new
+  external getter and does not block checkpoint or redemption work.
+  A preceding `restock` call can still construct idle packs; this remains a
+  reason to examine an atomic build-and-list action in the next milestone.
 - Liquidation planning uses original per-position pack units and recorded
   backing when withdrawals are pending, not a new 3-unit pack's backing
   quote. The extra RPC calls are omitted from normal keeper passes.
