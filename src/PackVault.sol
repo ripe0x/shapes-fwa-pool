@@ -390,21 +390,7 @@ contract PackVault is ReentrancyGuard {
         nonReentrant
         returns (uint256)
     {
-        bool[] memory staged = new bool[](listingIds.length);
-        for (uint256 i; i < listingIds.length; ++i) {
-            // Strictly increasing ids: a repeated id cannot count twice toward the pay cap.
-            if (i != 0 && listingIds[i] <= listingIds[i - 1]) revert Amount();
-            if (_openIndex[listingIds[i]] == 0) continue;
-            (,,,,,,,,,, uint8 status) = fwa.listings(listingIds[i]);
-            staged[i] = status == LISTING_STAGED;
-        }
-        fwa.activateListings(maxCount);
-        uint256 moved;
-        for (uint256 i; i < listingIds.length; ++i) {
-            if (!staged[i]) continue;
-            (,,,,,,,,,, uint8 status) = fwa.listings(listingIds[i]);
-            if (status == LISTING_ACTIVE) ++moved;
-        }
+        uint256 moved = VaultLib.activate(_openIndex, fwa, listingIds, maxCount);
         if (moved == 0) revert Nothing();
         return _pay(OP_ACTIVATE, VaultLib.Q_ACTIVATE + moved * VaultLib.Q_ACTIVATED, moved, false, minPay, type(uint256).max);
     }
