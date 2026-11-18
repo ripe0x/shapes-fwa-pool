@@ -1,7 +1,7 @@
 # Owner requirements
 
 The owner's own words, numbered and dated. Later decisions are appended, never rewritten.
-Section B2 lists outcomes proposed for the owner's sign-off; none is approved yet.
+Section B2 lists the outcomes; the owner signed the current asset-flow outcomes on 2026-11-17 (approval hash 452c764d…f5d2 in `asset-flow.json`; the gate passes).
 
 ## A. Requirements (owner's words)
 
@@ -55,7 +55,7 @@ Numbers measured at block 26,424,971 unless stated. P = 0.03 ETH pack, B = 0.036
 | O7 | User pays | mint fee 0.001 ETH per 0.1 ETH of Shapes (about 0.0003 per pack); no vault fee | lifecycle round trip (absolute) |
 | O8 | End state | wind-down with zero acquisitions returns every holder's NAV share; only the 0.01 ETH seed's share remains | lifecycle wind-down test |
 | O9 | Token income | counted as zero; one real buyback paid 20 listings 2.5e12 wei in total | ForkTokens |
-## B2. Revised proposed outcomes (2026-11-16, supersede section B; awaiting sign-off)
+## B2. Revised proposed outcomes (2026-11-16, supersede section B; signed 2026-11-17 via asset-flow.json)
 
 Section B's O2 and O5 rested on a 5% keeper fee skim that exceeded the edge (D19). Numbers at
 block 26,424,971 unless stated; P = 0.03 ETH pack, B = 0.0363 ETH backing, k = 1.0385.
