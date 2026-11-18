@@ -146,6 +146,7 @@ library VaultLib {
         paid = M.mulDivUp(locked, unit, 1e36);
     }
 
+    error Amount();
     error OutOfBounds();
 
     /// Gas a keeper policy's quote may use: enough for arithmetic and reads, not for griefing.
@@ -462,4 +463,28 @@ library VaultLib {
         if (periodUsed < f.minOracleChallengePeriod()) return (k1e18, 0, s);
         cap = ask * (BPS + f.oracleCeilingPremiumBps()) / BPS;
     }
+    /// @notice Activate previously staged listings while validating each id and
+    ///         paying only for positions owned by this vault that actually moved.
+    /// @dev Kept in the linked library to stay below EIP-170 on PackVault.
+    function activate(
+        mapping(uint256 => uint256) storage openIndex,
+        IFWAV2 f,
+        uint256[] calldata listingIds,
+        uint256 maxCount
+    ) external returns (uint256 moved) {
+        bool[] memory staged = new bool[](listingIds.length);
+        for (uint256 i; i < listingIds.length; ++i) {
+            if (i != 0 && listingIds[i] <= listingIds[i - 1]) revert Amount();
+            if (openIndex[listingIds[i]] == 0) continue;
+            (,,,,,,,,,, uint8 status) = f.listings(listingIds[i]);
+            staged[i] = status == LISTING_STAGED;
+        }
+        f.activateListings(maxCount);
+        for (uint256 i; i < listingIds.length; ++i) {
+            if (!staged[i]) continue;
+            (,,,,,,,,,, uint8 status) = f.listings(listingIds[i]);
+            if (status == LISTING_ACTIVE) ++moved;
+        }
+    }
+
 }
