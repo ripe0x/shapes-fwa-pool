@@ -283,8 +283,6 @@ contract PackVault is ReentrancyGuard {
         _requireOperating();
         _precheck(minPay, false);
         if (listingPaused) revert Paused();
-        // Never spend on new paid mints while FWA would stage their listings.
-        if (fwa.unsettledAcquisitionCount() != 0 || fwa.stagingHead() != 0) revert Nothing();
         if (count == 0 || (params.packUnitsMask >> units) & 1 == 0) revert Amount();
         if (_open.length + _idlePacks.length + count > params.maxPositions) revert Amount();
         (uint256 k, uint256 backing, bool ok) = edge(units);
@@ -327,9 +325,7 @@ contract PackVault is ReentrancyGuard {
         _precheck(minPay, false);
         if (listingPaused) revert Paused();
         // A listing made while FWA's queue is busy is staged and earns nothing until activated.
-        // A drained request queue does not imply that an older staging backlog is empty.
-        // Avoid paying for listings that would wait staged without earning fees.
-        if (fwa.unsettledAcquisitionCount() != 0 || fwa.stagingHead() != 0) revert Nothing();
+        if (fwa.unsettledAcquisitionCount() != 0) revert Nothing();
         uint256 listed;
         while (listed < maxCount && _idlePacks.length != 0 && _open.length < params.maxPositions) {
             uint256 packId = _idlePacks[_idlePacks.length - 1];
@@ -339,6 +335,10 @@ contract PackVault is ReentrancyGuard {
             if (_idle() < backing) break;
             _idlePacks.pop();
             uint256 listingId = fwa.listNFT{value: backing}(address(packs), packId);
+            // FWA can have a staging backlog even with no pending draws.
+            // Reverting here undoes the transfer and backing atomically.
+            (,,,,,,,,,, uint8 status) = fwa.listings(listingId);
+            if (status != LISTING_ACTIVE) revert Nothing();
             positions[listingId] = VaultLib.Position(uint64(packId), uint64(units), uint128(backing));
             _open.push(listingId);
             _openIndex[listingId] = _open.length;
