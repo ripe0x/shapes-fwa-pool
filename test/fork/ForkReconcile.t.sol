@@ -4,7 +4,7 @@ pragma solidity 0.8.30;
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {Charges} from "../utils/Charges.sol";
-import {LISTING_ACTIVE, LISTING_STAGED} from "../../src/interfaces/External.sol";
+import {LISTING_ACTIVE} from "../../src/interfaces/External.sol";
 
 /// @notice One full cycle on real contracts with a real VRF selection, written step by step to
 ///         sim/out/reconcile-trace.jsonl. sim/reconcile.py replays the same steps through the
@@ -125,6 +125,10 @@ contract ForkReconcileTest is SelectionBase {
         uint256 gHarvest = g - gasleft();
         _snap("harvest");
 
+        // FWA's queue is busy (the forked block's other request): the vault refuses to list into it.
+        vm.expectRevert(PackVault.Nothing.selector);
+        vault.list(1, 0);
+        _toBlackout(); // FWA's own processor drains the queue
         g = gasleft();
         vault.list(1, 0);
         uint256 gList = g - gasleft();
@@ -133,7 +137,6 @@ contract ForkReconcileTest is SelectionBase {
         vm.writeLine(OUT, string.concat('{"step":"relistBacking","backing":', vm.toString(relistBacking), "}"));
         _snap("list");
 
-        _toBlackout();
         g = gasleft();
         vault.checkpoint(0);
         uint256 gCheckpoint = g - gasleft();
@@ -166,22 +169,9 @@ contract ForkReconcileTest is SelectionBase {
         _snap("claim");
         vm.writeLine(OUT, string.concat('{"step":"aliceReceived","amount":', vm.toString(alice.balance), "}"));
 
-        // The relist went in while FWA's queue was busy, so FWA staged it: no fees, no rewards.
-        // With the queue drained, the vault activates it through FWA's own activation, paid.
-        uint256 relist = open[open.length - 1];
-        (,,,,,,,,,, uint8 st) = FWA.listings(relist);
-        assertEq(st, LISTING_STAGED, "staged while the queue was busy");
-        uint256[] memory one2 = new uint256[](1);
-        one2[0] = relist;
-        uint256 gA = gasleft();
-        vault.activate(one2, 50, 0);
-        gA = gA - gasleft();
-        vm.writeLine(OUT, string.concat('{"step":"gasActivate","activate1":', vm.toString(gA), "}"));
-        (,,,,,,,,,, st) = FWA.listings(relist);
-        assertEq(st, LISTING_ACTIVE, "activated");
-        _snap("activate");
-        vm.expectRevert(PackVault.Nothing.selector);
-        vault.activate(one2, 50, 0); // nothing left to activate: no pay for a repeat
+        // The relist went in with the queue drained, so FWA activated it at once.
+        (,,,,,,,,,, uint8 st) = FWA.listings(open[open.length - 1]);
+        assertEq(st, LISTING_ACTIVE, "relist active");
         // Every position is live; nothing strands.
         for (uint256 i; i < open.length; ++i) {
             (,,,,,,,,,, uint8 status) = FWA.listings(open[i]);

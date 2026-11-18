@@ -41,7 +41,7 @@
  "outcomes": [
   {
    "id": "O1",
-   "text": "DRAFT. Where a bid ends: on a bid outcome the vault keeps the pack and the whole backing leaves (0.9 to the purchaser, 0.1 to FWA), the posted backing per selection (0.0303 to 0.0363 ETH at canary values, D62; 0.0363 in this regime); the vault's edge is the fee share it keeps.",
+   "text": "DRAFT. Where a bid ends: on a bid outcome the vault keeps the pack and the whole backing leaves (0.9 to the purchaser, 0.1 to FWA), the posted backing per selection (0.0333 to 0.0360 ETH at canary values, D62; 0.0363 in this regime); the vault's edge is the fee share it keeps.",
    "metric": "destinations.backing to purchaser and FWA on a bid",
    "max_wei": "40000000000000000",
    "regimes": [
@@ -123,8 +123,8 @@
   },
   {
    "id": "O10",
-   "text": "DRAFT. A listing made while FWA's queue is busy is staged and earns nothing until activated. The keeper lists only when the queue is drained (D61, audit E7), so its own listings never stage; one staged by any caller is activated through FWA's permissionless activation in batches of 20 once the queue drains (D36, audit E5).",
-   "metric": "facts.relist_active_after_activate",
+   "text": "DRAFT. A listing made while FWA's queue is busy would be staged and earn nothing. The vault refuses to list while the queue is busy (D62, audit B), so nothing it lists is staged; once the queue drains the relist goes in active.",
+   "metric": "facts.relist_active_after_drain",
    "min": 1,
    "regimes": [
     "staged_activation"

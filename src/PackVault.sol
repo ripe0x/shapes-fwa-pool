@@ -324,6 +324,8 @@ contract PackVault is ReentrancyGuard {
         _requireOperating();
         _precheck(minPay, false);
         if (listingPaused) revert Paused();
+        // A listing made while FWA's queue is busy is staged and earns nothing until activated.
+        if (fwa.unsettledAcquisitionCount() != 0) revert Nothing();
         uint256 listed;
         while (listed < maxCount && _idlePacks.length != 0 && _open.length < params.maxPositions) {
             uint256 packId = _idlePacks[_idlePacks.length - 1];
@@ -401,12 +403,16 @@ contract PackVault is ReentrancyGuard {
     ///         (k below 1 + minEdge), or to cover locked redemptions free ETH and inventory cannot.
     ///         A stale quote or a gas spike stops new listings but never unwinds earning ones.
     function unlist(uint256[] calldata listingIds, uint256 minPay) external nonReentrant returns (uint256) {
-        (uint256 k,,) = edge(MIN_PACK_UNITS);
-        bool ok = k >= 1e18 + uint256(params.minEdgeBps) * 1e14;
         uint256 shortfall = _redemptionShortfall();
-        if (!windingDown && ok && shortfall == 0) revert UnlistNotAllowed();
         // Essential when it frees ETH for redeemers or winds down; routine when only the edge failed.
+        // Exits never read FWA's economics: a broken or hostile oracle or fee cannot block them.
         bool essential = windingDown || shortfall != 0;
+        bool ok = true;
+        if (!essential) {
+            (uint256 k,,) = edge(MIN_PACK_UNITS);
+            if (k >= 1e18 + uint256(params.minEdgeBps) * 1e14) revert UnlistNotAllowed();
+            ok = false;
+        }
         _precheck(minPay, essential);
         uint256 realized;
         uint256 moved;
@@ -437,6 +443,7 @@ contract PackVault is ReentrancyGuard {
         uint256 before = address(this).balance;
         uint256 n;
         for (uint256 i; i < activeIds.length; ++i) {
+            if (i != 0 && activeIds[i] <= activeIds[i - 1]) revert Amount(); // no repeats
             if (_openIndex[activeIds[i]] != 0 && fwa.pendingFees(activeIds[i]) != 0) ++n;
         }
         // One listing that moved on since the caller looked must not block the rest.
@@ -612,7 +619,7 @@ contract PackVault is ReentrancyGuard {
         bool work = pendingDepositTotal != 0 || lockedShares != 0;
         if (!work && params.distributionBps == 0) revert Nothing();
         bool essential = lockedShares != 0 || windingDown;
-        _precheck(minPay, essential);
+        if (!work) _precheck(minPay, essential); // with flows, the charge pool pays (no budget)
         lastCheckpointInterval = interval;
         uint256 gasQ = VaultLib.Q_CHECKPOINT + _open.length * VaultLib.Q_CHECKPOINT_POS;
 
@@ -833,11 +840,10 @@ contract PackVault is ReentrancyGuard {
         keeperPolicy = IKeeperPolicy(policy);
     }
 
-    /// @notice Owner stops: each flag can only be raised, and wind-down is one-way.
+    /// @notice Owner pauses or resumes deposits and listing. Wind-down is one-way.
     function guard(bool pauseDeposits, bool pauseListing) external {
         if (msg.sender != owner) revert NotOwner();
-        if (pauseDeposits) depositsPaused = true;
-        if (pauseListing) listingPaused = true;
+        (depositsPaused, listingPaused) = (pauseDeposits, pauseListing);
     }
 
     function startWindDown() external {

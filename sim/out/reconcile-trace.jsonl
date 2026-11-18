@@ -8,11 +8,9 @@
 {"step":"relistBacking","backing":36300000000000000}
 {"step":"list","pay":353250000000000,"balance":2464463537067792041,"totalShares":1000000000000000,"lastNav":0,"pendingDepositTotal":1500000000000000000,"redemptionReserve":0,"lockedShares":0,"open":30,"idle":0,"loose":0,"aliceShares":0,"bobShares":0,"aliceLocked":0,"aliceClaimable":0,"pendingFeesSum":0,"feeCredit":0}
 {"step":"checkpoint1","pay":546750000000000,"balance":2463916787067792041,"totalShares":1459296270526746,"lastNav":4452916787067792041,"pendingDepositTotal":0,"redemptionReserve":0,"lockedShares":0,"open":30,"idle":0,"loose":0,"aliceShares":306197513684497,"bobShares":153098756842248,"aliceLocked":0,"aliceClaimable":0,"pendingFeesSum":0,"feeCredit":0}
-{"step":"gas","sync1":183163,"harvest29":663979,"list1":532285,"checkpoint30":1189049}
+{"step":"gas","sync1":183268,"harvest29":670507,"list1":860352,"checkpoint30":1185186}
 {"step":"redeemCharge","ck":546750000000000,"total":2576075583309479}
 {"step":"redeem","pay":0,"balance":2466492862651101520,"totalShares":1459296270526746,"lastNav":4452916787067792041,"pendingDepositTotal":0,"redemptionReserve":0,"lockedShares":306197513684497,"open":30,"idle":0,"loose":0,"aliceShares":0,"bobShares":153098756842248,"aliceLocked":306197513684497,"aliceClaimable":0,"pendingFeesSum":0,"feeCredit":0}
 {"step":"checkpoint2","pay":546750000000000,"balance":2465946112651101520,"totalShares":1153098756842249,"lastNav":3520184987824954538,"pendingDepositTotal":0,"redemptionReserve":934761124826146982,"lockedShares":0,"open":30,"idle":0,"loose":0,"aliceShares":0,"bobShares":153098756842248,"aliceLocked":306197513684497,"aliceClaimable":0,"pendingFeesSum":0,"feeCredit":0}
 {"step":"claim","pay":0,"balance":1531184987824954539,"totalShares":1153098756842249,"lastNav":3520184987824954538,"pendingDepositTotal":0,"redemptionReserve":1,"lockedShares":0,"open":30,"idle":0,"loose":0,"aliceShares":0,"bobShares":153098756842248,"aliceLocked":0,"aliceClaimable":0,"pendingFeesSum":0,"feeCredit":0}
 {"step":"aliceReceived","amount":934761124826146981}
-{"step":"gasActivate","activate1":525137}
-{"step":"activate","pay":225000000000000,"balance":1530959987824954539,"totalShares":1153098756842249,"lastNav":3520184987824954538,"pendingDepositTotal":0,"redemptionReserve":1,"lockedShares":0,"open":30,"idle":0,"loose":0,"aliceShares":0,"bobShares":153098756842248,"aliceLocked":0,"aliceClaimable":0,"pendingFeesSum":0,"feeCredit":0}

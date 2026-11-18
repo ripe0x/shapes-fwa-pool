@@ -417,3 +417,11 @@ position count binds; FWA's oracle cap only when not exempt. Forward simulation,
 400 runs: gate window at 0.5 gwei **+76.8%** (p5 -12.0%); last 14 days **+20.3%, 17% chance of a
 losing year** (was +18.7%, 22%); 1.0 gwei from day 30 +6.1%, 22% (was +2.4%, 41%). 98 tests;
 reconciler exact; rehearsals at the pinned and the current block list 30 positions, ledgers exact.
+
+## 20. Launch audit B and comparison (D63, 2026-11-17)
+
+Uninformed audit B at `c884959` (Fable 5.2): no path to take holders' principal; one high
+(exits read FWA's economics and could be frozen by FWA's owner) and six medium findings. All code
+findings are repaired and proven by B's own tests rewritten as regressions
+(`audit/release-c884959-B/REPAIRS.md`). 105 fork, audit and scenario tests; reconciler exact.
+Open: canary essential budget sizing (owner), outcome signature, mainnet canary (step E).

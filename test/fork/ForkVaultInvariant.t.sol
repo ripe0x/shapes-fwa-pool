@@ -118,6 +118,10 @@ contract ForkVaultInvariantTest is ForkBase {
         vm.deal(carol, 50 ether);
         handler = new VaultHandler(vault, keeper, [alice, bob, carol]);
         targetContract(address(handler));
+        // One fresh fuzz sender: the fuzzer otherwise picks addresses it has seen (the holders, the
+        // vault itself) as transaction senders, and funding or charging a sender for gas then moves
+        // a tracked balance outside the vault's accounting.
+        targetSender(makeAddr("pack-vault-test-fuzz-sender"));
     }
 
     /// INV01: the vault always holds every amount it owes outside the strategy.

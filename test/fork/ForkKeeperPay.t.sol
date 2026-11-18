@@ -239,8 +239,12 @@ contract ForkKeeperPayTest is ForkBase {
         assertEq(vault.liquidate(40, 0), 0);
         vm.stopPrank();
         toBlackout();
+        // The checkpoint is paid from her own request charge, not the empty budgets (audit B).
+        uint256 pool = vault.processingPool();
         vm.prank(alice);
-        assertEq(vault.checkpoint(0), 0, "the holder prices her own redemption, unpaid");
+        uint256 ckPay = vault.checkpoint(0);
+        assertGt(ckPay, 0, "charge-funded checkpoint paid with budgets empty");
+        assertLe(ckPay, pool);
         vm.prank(alice);
         vault.claim();
         assertGt(alice.balance, 0.98 ether);

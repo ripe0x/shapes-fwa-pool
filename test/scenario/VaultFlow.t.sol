@@ -859,9 +859,9 @@ contract VaultFlowSelectionTest is VaultFlowBase {
         flowReport("acquire_silent", a, f);
     }
 
-    /// @dev Staged listing and delayed activation (as ForkReconcile): after a bid, the pack is
-    ///      relisted while FWA's queue is still busy, so FWA stages it (no fees). With the queue
-    ///      drained the vault activates it through FWA's own permissionless activation, paid.
+    /// @dev Busy FWA queue (D62, audit B): after a bid the vault refuses to relist while FWA's queue
+    ///      is busy (a listing would be staged and earn nothing); once the queue drains the relist
+    ///      goes in active. Regime name kept for the asset-flow config.
     function test_flow_staged_activation() public {
         Candidate memory c = late();
         _select(c);
@@ -874,17 +874,16 @@ contract VaultFlowSelectionTest is VaultFlowBase {
         bidBackingOutCum += backing;
         _kSync(address(this), _one(selected));
         _kHarvest(address(this), vault.openListings());
-        uint256 relisted = _kList(address(this), 1); // relists into a busy queue
-        uint256[] memory open = vault.openListings();
-        uint256 relistId = open[open.length - 1];
-        (,,,,,,,,,, uint8 st) = FWA.listings(relistId);
-        bool staged = st == LISTING_STAGED;
+        assertGt(FWA.unsettledAcquisitionCount(), 0, "queue busy");
+        vm.expectRevert(PackVault.Nothing.selector);
+        vault.list(1, 0);
         _drainQueue();
-        if (staged) _kActivate(address(this), _one(relistId));
-        (,,,,,,,,,, st) = FWA.listings(relistId);
+        uint256 relisted = _kList(address(this), 1);
+        uint256[] memory open = vault.openListings();
+        (,,,,,,,,,, uint8 st) = FWA.listings(open[open.length - 1]);
         Fact[] memory f = _facts("open_listings", vault.openListings().length);
-        f[1] = Fact("relisted_staged", staged ? 1 : 0);
-        f[2] = Fact("relist_active_after_activate", st == LISTING_ACTIVE ? 1 : 0);
+        f[1] = Fact("relist_refused_while_busy", 1);
+        f[2] = Fact("relist_active_after_drain", st == LISTING_ACTIVE ? 1 : 0);
         f[3] = Fact("relisted_count", relisted);
         flowReport("staged_activation", a, f);
     }

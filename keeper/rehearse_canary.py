@@ -34,6 +34,9 @@ HOLDER = "0xDd4B0D7470953fb19b97fa130A15Af59537Bc523"
 HOLDER2 = "0xb9A3188644D5A55A98C68B056A2685Cd6C915725"
 KEEPER = "0x6B401c3364dFb17fe7D54237fC04aba3f7739dd0"
 KICKER = "0x2C42b18832Cef2Eb8C8C0f83250700176694E341"  # "anyone": kicks, processes FWA's queue
+OWNER = "0x" + subprocess.run(["cast", "keccak", "pack-vault-rehearsal-owner"], capture_output=True,
+                              text=True).stdout.strip()[-40:]  # the deploy refuses a placeholder owner
+VALUES["owner"] = OWNER
 E = 10**18
 log = []
 
@@ -128,13 +131,18 @@ def main():
     if num(cast("chain-id")) != 1:
         sys.exit("expects a local mainnet fork")
     sh("forge", "build", "--force")
-    for a in (DEPLOYER, HOLDER, HOLDER2, KEEPER, KICKER):
+    for a in (DEPLOYER, HOLDER, HOLDER2, KEEPER, KICKER, OWNER):
         if cast("code", a) != "0x" or num(cast("nonce", a)) != 0:
             sys.exit(f"actor {a} is not a clean address on this chain")
         impersonate(a)
-    r = subprocess.run(["forge", "script", "script/Deploy.s.sol", "--rpc-url", RPC, "--broadcast", "--unlocked",
-                        "--sender", DEPLOYER], capture_output=True, text=True, cwd=ROOT,
-                       env={**__import__("os").environ, "DEPLOY_VALUES": "deploy/canary.example.json"})
+    values_file = ROOT / "deploy/rehearse-pinned.json"
+    values_file.write_text(json.dumps(VALUES, indent=1))
+    try:
+        r = subprocess.run(["forge", "script", "script/Deploy.s.sol", "--rpc-url", RPC, "--broadcast", "--unlocked",
+                            "--sender", DEPLOYER], capture_output=True, text=True, cwd=ROOT,
+                           env={**__import__("os").environ, "DEPLOY_VALUES": "deploy/rehearse-pinned.json"})
+    finally:
+        values_file.unlink()
     if r.returncode:
         sys.exit(r.stdout + r.stderr)
     run = json.loads((ROOT / "broadcast/Deploy.s.sol/1/run-latest.json").read_text())

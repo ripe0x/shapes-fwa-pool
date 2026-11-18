@@ -232,12 +232,18 @@ library VaultLib {
         uint256 free
     ) external returns (uint256 amount) {
         (uint256 r, uint256 e) = budgetNow(p, b);
+        // A finite `cap` is the request-charge pool: requesters already paid for this work, so it
+        // is bounded by the pool, not by the holders' budgets.
+        bool charged = cap != type(uint256).max;
+        if (charged) (r, e) = (type(uint256).max, type(uint256).max);
         uint256 o =
             offer(policy, op, units, gasQ, essential, essential ? p.essentialCeiling : p.gasCeiling, p.maxTip, p.workFee);
         amount = M.min(M.min(o, M.min(quote(p, gasQ, units, essential), cap)), M.min(free, essential ? e : r));
         if (amount < minPay) revert Payment();
-        (b.routine, b.essential, b.at) =
-            (uint128(essential ? r : r - amount), uint128(essential ? e - amount : e), block.timestamp);
+        if (!charged) {
+            (b.routine, b.essential, b.at) =
+                (uint128(essential ? r : r - amount), uint128(essential ? e - amount : e), block.timestamp);
+        }
         if (amount == 0) return 0;
         (bool ok,) = msg.sender.call{value: amount}("");
         if (!ok) revert Payment();
@@ -311,13 +317,16 @@ library VaultLib {
         (k1e18, cap, s) = economics(f, packs);
         uint256 value = units * UNIT;
         uint256 floor = M.max(M.divUp(value * BPS, BPS - s), M.divUp(value * BPS, f.settlementDiscountBps()));
-        backing = M.max(floor, spread);
+        backing = floor;
         if (k1e18 > 1e18) {
             uint256 a = k1e18 - 1e18;
             uint256 c = (Q_SYNCED + Q_LISTED + Q_HARVESTED) * p.gasCeiling * (BPS + p.payMarkupBps) / BPS + 2 * p.workFee;
             backing = M.max(backing, (c + M.sqrt(c * c + a * c / 1e18 * value)) * 1e18 / a);
             backing = M.max(backing, M.divUp((build + quote(p, Q_SYNCED + Q_LISTED + Q_HARVESTED, 2, false)) * 1e18, a));
         }
+        // Spare capital raises backing to at most twice what the rules above need: past that it
+        // only concentrates capital (and could win FWA's crown, which locks an exit for a window).
+        backing = M.max(backing, M.min(spread, 2 * backing));
         if (cap != type(uint256).max) backing = M.min(backing, cap * (BPS - p.bufferBps) / BPS);
         // Bid outcome B (k - 1) > 0 given k >= 1 + edge; spending callers also require it to clear
         // the keeper pay it causes (cycleNet). Keep outcome B (k - s) >= P holds from the floor.

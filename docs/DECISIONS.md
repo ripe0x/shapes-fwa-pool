@@ -817,3 +817,17 @@ listings are rarely kickable.
 oracle cap when not exempt; gas-optimal above the floor at a 1 gwei ceiling); 98 fork, audit and
 scenario tests; reconciler exact; pinned rehearsal; current-block rehearsal lists 30 positions,
 ledger exact.
+
+## D63. Repairs from launch audit B (2026-11-17)
+
+**Source:** uninformed whole-candidate audit at `c884959` (`audit/release-c884959-B/`), then the
+A/B comparison (step C): every executed B finding reproduced on main and became a regression.
+**Chose:** exits (wind-down, redemption unwinding) never read FWA's economics; harvest ids strictly
+ascending; checkpoint pay funded by request charges is outside the holder budgets; spare-capital
+backing at most twice the rule's need; `list` refuses while FWA's queue is busy (nothing the vault
+lists is ever staged); the owner can resume pauses (wind-down stays one-way); the deploy script
+range-checks values and refuses a placeholder owner; the keeper prices cost at the next block's
+highest basefee and past a cumulative loss limit (`--max-total-loss-wei`, default 0.005 ETH) accepts no further loss while paid work continues. Independent repair review: all sound.
+Table in `audit/release-c884959-B/REPAIRS.md`.
+**Open, owner's call:** the canary essential budget (cap 0.01 ETH, refill 0.0002 ETH a day) is
+emptied by one full exit at about 1 gwei; holders can still exit unpaid.

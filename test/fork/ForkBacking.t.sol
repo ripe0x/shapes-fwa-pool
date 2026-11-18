@@ -63,7 +63,8 @@ contract ForkBackingTest is ForkBase {
         _exempt(true);
         (, uint256 spread, bool ok) = vault.edge(3);
         assertTrue(ok);
-        assertGt(spread, 0.25 ether, "about (free ETH - 3 builds) / 3 slots");
+        // Spare capital (about 0.29 ETH a slot) raises backing only to twice the floor (audit B).
+        assertEq(spread, 2 * FLOOR, "spread bounded at twice the floor");
         vm.startPrank(keeper);
         vault.restock(3, 3, 0);
         vault.list(3, 0);

@@ -76,7 +76,10 @@ def read_state(vault, slowdown, burn=False):
     (min_edge, _buf, dist_bps, premium, share, _alloc, mask, ceiling, ess_ceiling, tip, wfee, _rc, _rr, _ec, _er, max_pos, res,
      _tvl) = p
     rbud, ebud = lines(call(vault, "budget()(uint256,uint256)"))
-    k, backing, _ok = lines(call(vault, "edge(uint256)(uint256,uint256,bool)", 3))
+    try:  # FWA's owner can make its economics unreadable; exits do not need them
+        k, backing, _ok = lines(call(vault, "edge(uint256)(uint256,uint256,bool)", 3))
+    except subprocess.CalledProcessError:
+        k, backing = "0", "0"
     now = num(cast("block", "latest", "--field", "timestamp"))
     window = num(call(FWA, "settlementWindow()(uint256)"))
     top = num(call(FWA, "topListingId()(uint256)"))
@@ -249,23 +252,30 @@ def run_pass(a, tm):
                 failed += 1
                 tm.error(f"preflight of {step[0]} reverted: {why}")
             continue
-        bid = state.base_fee + state.max_tip
+        st = tm.state["stats"]
+        max_loss = a.max_loss_wei
+        if max_loss and st.get("spent_wei", 0) - st.get("paid_wei", 0) > a.max_total_loss_wei:
+            # Past the cumulative limit the keeper accepts no further loss; paid work goes on.
+            max_loss = 0
+            declined.append(("KEEPER_LOSS_LIMIT", "action", "cumulative loss limit reached: only paid work; operator review"))
+        # Cost at the next block's highest basefee (+12.5%): inclusion can land there (audit B).
+        bid = state.base_fee * 9 // 8 + state.max_tip
         fees = fee_args(state.base_fee, state.max_tip)
         pay = compensation(a.vault, args, tm.sender, fees)
         cost_ = execution_cost(est, bid, a.fail_rate_bps, billed_ratio(tm, step[0]))
         need = cost_ * (10_000 + a.min_return_bps) // 10_000
-        if pay + a.max_loss_wei < need and step[0] != "burnTokens":  # burns are the operator's opt-in cost
+        if pay + max_loss < need and step[0] != "burnTokens":  # burns are the operator's opt-in cost
             skip.add(step[0])
             tm.state["stats"]["skipped_loss"] += 1
             # Liability work this keeper declined: holders wait on it, so monitoring must see it.
             declined.append(("LIABILITY_WORK_SKIPPED", "action",
                              f"{step[0]} needs --max-loss-wei >= {cost_ - pay} or lower gas"))
-            print(f"skip {step[0]}: pay {pay} wei < cost ~{need} wei beyond --max-loss-wei {a.max_loss_wei}")
+            print(f"skip {step[0]}: pay {pay} wei < cost ~{need} wei beyond --max-loss-wei {max_loss}")
             continue
         # minPay: pay and this keeper's gas both move with basefee, so the floor is relative: 80% of
         # the simulated quote (basefee falls at most 12.5% a block). A larger drop means less work
         # was left to do; the whole call reverts instead of paying less.
-        args = to_cast(step, pay * 8 // 10 if step[0] != "burnTokens" and a.max_loss_wei == 0 else 0)
+        args = to_cast(step, pay * 8 // 10 if step[0] != "burnTokens" and max_loss == 0 else 0)
         # Re-check the exact signed call, minPay included, at the signed fees: a call that would
         # revert is not sent. A state change between this check and inclusion can still revert it.
         est2, why2, _ = tm.preflight(a.vault, args, fees)
@@ -350,6 +360,8 @@ def main():
     ap.add_argument("--max-steps", type=int, default=40, help="calls per pass, each after a fresh read")
     ap.add_argument("--burn-tokens", action="store_true",
                     help="claim and burn FWA token rewards; unpaid, the operator pays the gas")
+    ap.add_argument("--max-total-loss-wei", type=int, default=5 * 10**15,
+                    help="stop sending once spent minus paid exceeds this (default 0.005 ETH)")
     ap.add_argument("--max-loss-wei", type=int, default=0,
                     help="loss this keeper accepts per call (liability work above the gas ceiling)")
     ap.add_argument("--max-fee-gwei", type=float, help="never bid a max fee above this")

@@ -12,7 +12,7 @@ import json
 import sys
 from pathlib import Path
 
-from vault import ACTIVE, BPS, STAGED, Vault
+from vault import BPS, Vault
 
 TRACE = Path(__file__).parent / "out/reconcile-trace.jsonl"
 MINT_FEE = 10**15  # Shapes mintFee at the fork block (0.001 ETH per 0.1 ETH mint)
@@ -77,7 +77,7 @@ def main():
         p.pending_fees = 0
     v.receive_fees(sel["pendingFeesSum"] + credit)
     compare("harvest")
-    v.list("relist", by["relistBacking"]["backing"], STAGED)
+    v.list("relist", by["relistBacking"]["backing"])  # listed with FWA's queue drained: active
     compare("list")
     v.checkpoint()
     compare("checkpoint1")
@@ -89,8 +89,6 @@ def main():
     got = v.claim("alice")
     compare("claim")
     check("claim", "aliceReceived", got, by["aliceReceived"]["amount"])
-    v.positions["relist"].status = ACTIVE  # FWA activated the staged relist
-    compare("activate")
 
     # The ledger: every wei in equals every wei out plus what the vault still holds.
     held = (v.balance + sum(p.backing + p.units * 10**16 for p in v.positions.values())

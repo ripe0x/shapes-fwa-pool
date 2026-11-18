@@ -125,7 +125,7 @@ def edge_backing(k, cap, s_bps, units, gas_ceiling, markup_bps, work_fee, spread
     price now (default: the ceiling)."""
     value = units * UNIT
     floor = max(-(-value * BPS // (BPS - s_bps)), -(-value * BPS // discount_bps))
-    backing = max(floor, spread)
+    backing = floor
     if k > 10**18:
         a = k - 10**18
         cyc = Q["synced"] + Q["listed"] + Q["harvested"]
@@ -135,6 +135,7 @@ def edge_backing(k, cap, s_bps, units, gas_ceiling, markup_bps, work_fee, spread
         q = lambda g, u: g * pr * (BPS + markup_bps) // BPS + u * work_fee  # noqa: E731
         build = q(Q["pack"] + Q["mint"] * units // 10 + Q["listed"], 2) + mint_fee * units // 10
         backing = max(backing, -(-(build + q(cyc, 2)) * 10**18 // a))
+    backing = max(backing, min(spread, 2 * backing))
     if cap is not None:
         backing = min(backing, cap * (BPS - buffer_bps) // BPS)
     ok = cap != 0 and k >= 10**18 + min_edge_bps * 10**14 and k > s_bps * 10**14 and backing >= floor \
@@ -209,7 +210,7 @@ def plan(s):
     amount = s.fee_credit + sum(l.pending_fees for l in earning)
     hcost = quote(s, Q["harvest"] + Q["harvested"] * len(earning))
     if amount and ((hcost * BPS <= amount * s.share_bps and not spike) or shortfall):
-        out.append(("harvest", [l.id for l in earning]))
+        out.append(("harvest", sorted(l.id for l in earning)))  # the vault takes ids ascending, no repeats
         shortfall = max(0, shortfall - amount)
 
     # 3. Redemption liquidity or wind-down: idle inventory first, then unlist (needs FWA's
