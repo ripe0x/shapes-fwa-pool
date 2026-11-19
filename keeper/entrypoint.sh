@@ -15,4 +15,4 @@ unset KEEPER_KEYSTORE_JSON KEEPER_KEYSTORE_PASSWORD
 # shellcheck disable=SC2086
 exec python3 keeper/keeper.py "$VAULT" --send --keystore /tmp/keystore.json --password-file /tmp/keystore.pw \
   --rpc "${RPC_URL:-https://mainnet.gateway.tenderly.co}" --state /data/keeper-state.json --index /data/keeper-index.sqlite \
-  --loop "${POLL_SECONDS:-60}" --confirmations 2 --health-port 8788 ${KEEPER_ARGS:-}
+  --loop "${POLL_SECONDS:-60}" --confirmations 2 --health-port "${HEALTH_PORT:-8788}" ${KEEPER_ARGS:-}

@@ -125,17 +125,18 @@ class DropFirstSend(http.server.BaseHTTPRequestHandler):
 class Keeper:
     """One keeper worker: the production container, or the same command as a host process."""
 
-    def __init__(self, name, keystore, password, data, image, rpc=RPC, poll=5):
-        self.name, self.keystore, self.password, self.data, self.image, self.rpc, self.poll = \
-            name, keystore, password, data, image, rpc, poll
+    def __init__(self, name, keystore, password, data, image, rpc=RPC, poll=5, health=8788):
+        self.name, self.keystore, self.password, self.data, self.image, self.rpc, self.poll, self.health = \
+            name, keystore, password, data, image, rpc, poll, health
         self.proc = None
 
     def start(self):
         env = dict(os.environ, VAULT=VAULT, RPC_URL=self.rpc, POLL_SECONDS=str(self.poll), KEEPER_ARGS="",
+                   HEALTH_PORT=str(self.health),
                    KEEPER_KEYSTORE_JSON=Path(self.keystore).read_text(), KEEPER_KEYSTORE_PASSWORD=self.password)
         if self.image:  # values travel as inherited environment, never in argv
             sh("docker", "run", "-d", "--name", self.name, "--network", "host", "--mount",
-               f"type=volume,source={self.data},target=/data", *[x for k in ("VAULT", "RPC_URL", "POLL_SECONDS", "KEEPER_ARGS",
+               f"type=volume,source={self.data},target=/data", *[x for k in ("VAULT", "RPC_URL", "POLL_SECONDS", "KEEPER_ARGS", "HEALTH_PORT",
                                                                      "KEEPER_KEYSTORE_JSON", "KEEPER_KEYSTORE_PASSWORD") for x in ("-e", k)],
                self.image, env=env)
         else:
@@ -152,6 +153,12 @@ class Keeper:
         path.write_text(self.password)
         path.chmod(0o600)
         return path
+
+    def logs(self):
+        if self.image:
+            r = subprocess.run(["docker", "logs", "--tail", "40", self.name], capture_output=True, text=True)
+            return (r.stdout + r.stderr)[-3000:]
+        return (Path(self.data) / f"{self.name}.log").read_text()[-3000:]
 
     def stop(self):
         if self.image:
@@ -228,7 +235,8 @@ def main():
             for n in ("primary-data", "backup-data"):
                 sh("docker", "volume", "create", n)
         primary = Keeper("primary", *keys["primary"][:2], volume("primary-data"), a.image)
-        backup = Keeper("backup", *keys["backup"][:2], volume("backup-data"), a.image, poll=30)
+        # Fly runs each worker on its own machine; sharing this host needs separate health ports.
+        backup = Keeper("backup", *keys["backup"][:2], volume("backup-data"), a.image, poll=30, health=8789)
         keepers = [primary, backup]
         primary.start()
         backup.start()
@@ -270,6 +278,7 @@ def main():
     finally:
         for k in keepers:
             try:
+                evidence.setdefault("worker_log_tails", {})[k.name] = k.logs()
                 k.stop()
             except Exception as e:  # keep the evidence; report the cleanup failure
                 evidence.setdefault("cleanup_errors", []).append(str(e))
