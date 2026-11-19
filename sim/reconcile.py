@@ -202,10 +202,81 @@ def reconcile_partial():
     return 0
 
 
+def reconcile_scan():
+    """Replay test/fork/ForkScanReconcile.t.sol: a real own selection, a real >= 41-entry foreign
+    backlog, then one paid scan sync that reads the single own position and jumps the cursor over
+    the whole backlog. The model takes the same scan path via Vault.scan_rebase and must match every
+    vault number to the wei."""
+    trace = TRACE.with_name("reconcile-scan-trace.jsonl")
+    rows = [json.loads(line) for line in trace.read_text().splitlines()]
+    by = {r["step"]: r for r in rows}
+    s = by["setup"]
+    sel = by["selected"]
+    selected = s["selectedListing"]
+    failures = []
+
+    v = Vault(seed=3 * 10**18, balance=s["deployBalance"], reserve=0)
+    v.acquisition_cursor = s["initCursor"]
+    v.completed_prefix = s["initCursor"]
+    v.restock(s["count"], s["units"], MINT_FEE, s["backings"])
+    for live, backing in zip(sel["positions"], s["backings"], strict=True):
+        v.list(live["id"], backing, fee_debt=s["activationDebt"])
+    v.completed_prefix = sel["completedPrefix"]
+    v.pay_keeper(s["selectPay"])
+    if v.balance != s["balance"]:
+        failures.append(f"setup.balance: model {v.balance} chain {s['balance']}")
+
+    # FWA's per-listing share from its own formula, within 1 wei per listing.
+    fee = s["acqFee"]
+    distributable = fee - fee * s["acqCutBps"] // BPS
+    distributable -= distributable * s["acqCrownBps"] // BPS
+    share = distributable // s["acqActive"]
+    paid_by_fwa = sel["pendingFeesSum"] + sel["feeCredit"]
+    if abs(paid_by_fwa - share * s["count"]) > s["count"]:
+        failures.append(f"fee share: chain {paid_by_fwa} vs formula {share * s['count']}")
+    v.fee_credit = sel["feeCredit"]
+
+    def compare(step):
+        compare_snapshot(v, by[step], failures)
+
+    compare("selected")
+
+    # The real foreign backlog is an external input: it moves FWA's completed prefix but touches no
+    # vault bucket until the scan reads it.
+    v.completed_prefix = by["backlog"]["completedPrefix"]
+    compare("backlog")
+
+    at = sel["positions"][0]["liveAllocatedAt"]
+    scanned = v.scan_rebase([(at, selected)])
+    if scanned != 1:
+        failures.append(f"scan: model scanned {scanned}, expected 1")
+    if v.acquisition_cursor != v.completed_prefix:
+        failures.append(f"scan: cursor {v.acquisition_cursor} did not jump to {v.completed_prefix}")
+    v.prune(16)
+    compare("scan")
+
+    # Every wei in equals the vault's holdings plus keeper pay out; the uncollected fee credit stays
+    # on FWA (never swept here), so it is neither an inflow nor a holding yet.
+    held = (v.balance + sum(p.backing + p.value for p in v.positions.values())
+            + sum(v.idle_packs) + v.loose_shapes * 10**16)
+    ins = s["deployBalance"]
+    outs = v.keeper_paid + v.mint_fees + v.backing_lost
+    if held + outs != ins:
+        failures.append(f"scan ledger: held+out {held + outs} vs in {ins}")
+    print(f"scan: backlog {by['backlog']['completedPrefix'] - s['initCursor']} entries cleared, "
+          f"keeper paid {v.keeper_paid}, fee credit still on FWA {v.fee_credit}")
+    if failures:
+        print("MISMATCH\n" + "\n".join(failures))
+        return 1
+    print("reconciled: scan path, one selection applied over a 47-entry backlog, every bucket to the wei")
+    return 0
+
+
 def main():
     cycle = reconcile_cycle()
     partial = reconcile_partial()
-    return max(cycle, partial)
+    scan = reconcile_scan()
+    return max(cycle, partial, scan)
 
 
 if __name__ == "__main__":

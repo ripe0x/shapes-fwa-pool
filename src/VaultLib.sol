@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import {FixedPointMathLib as M} from "solady/utils/FixedPointMathLib.sol";
 import {IKeeperPolicy} from "./KeeperPolicy.sol";
+import {ScanLib} from "./ScanLib.sol";
 import {
     IFWAV2,
     IFWAView,
@@ -89,6 +90,7 @@ library VaultLib {
     uint256 internal constant Q_REQUIRED_TAIL = 120_000;
     uint256 internal constant Q_DISTRIBUTION_PROOF = 80_000;
     uint256 internal constant Q_JOURNAL = 22_000; // each completed global acquisition
+    uint256 internal constant Q_SCAN = 30_000; // each Active position's FWA listing read (scan proof)
     uint256 internal constant Q_SELECTED = 180_000; // own selection bookkeeping
     uint256 internal constant Q_SYNCED = 120_000; // terminal or recovered return
     uint256 internal constant Q_PRUNED = 45_000; // resolved allocation head
@@ -130,7 +132,7 @@ library VaultLib {
         uint8 state;
     }
 
-    struct Work { uint256 processed; uint256 own; uint256 resolved; uint256 pruned; }
+    struct Work { uint256 processed; uint256 own; uint256 resolved; uint256 pruned; uint256 scanned; }
 
     struct BackingTerms {
         uint256 k;
@@ -338,10 +340,6 @@ library VaultLib {
         return Q_PACK + (units > MIN_PACK_UNITS ? units - MIN_PACK_UNITS : 0) * Q_PACK_UNIT;
     }
 
-    function cycleNet(Params storage p, uint256 k1e18, uint256 backing) external view returns (uint256) {
-        return _cycleNet(p, k1e18, backing);
-    }
-
     /// @notice A request's checkpoint charge: one checkpoint at its envelope, at cost plus one unit.
     function requestCharge(Params storage p) external view returns (uint256) {
         return quote(p, Q_CHECKPOINT, 1, true);
@@ -421,7 +419,7 @@ library VaultLib {
         if (minPay > M.min(free, essential ? e : r)) revert Payment();
     }
 
-    function owns(IShapePacks packs, uint256 packId) public view returns (bool) {
+    function owns(IShapePacks packs, uint256 packId) internal view returns (bool) {
         try packs.ownerOf(packId) returns (address o) {
             return o == address(this);
         } catch {
@@ -431,7 +429,7 @@ library VaultLib {
 
     /// @notice Live k (1e18 scale) and FWA's backing cap for `packs` (zero when FWA would refuse
     ///         a listing). k = (1 + surcharge)(1 - protocolCut)(1 - crownShare).
-    function economics(IFWAV2 f, address packs) public view returns (uint256 k1e18, uint256 cap, uint256 s) {
+    function economics(IFWAV2 f, address packs) internal view returns (uint256 k1e18, uint256 cap, uint256 s) {
         s = f.ownerSettlementFeeBps();
         uint256 w = f.totalWeight();
         if (w == 0) return (0, 0, s);
@@ -471,7 +469,7 @@ library VaultLib {
         cap = ask * (BPS + f.oracleCeilingPremiumBps()) / BPS;
     }
 
-    function _emitPosition(Book storage b, uint256 id) private {
+    function _emitPosition(Book storage b, uint256 id) internal {
         Position storage p = b.positions[id];
         emit PositionUpdated(id, p.packId, p.value, p.backing, p.feeDebt, p.allocatedAt, p.state);
     }
@@ -524,6 +522,8 @@ library VaultLib {
         _emitPosition(b, id);
     }
 
+    /// @dev Every caller (`_syncJournal`, `ScanLib.rebase`) must move the cursor past this selection's
+    ///      sequence in the same call; completeness of both proofs relies on it.
     function select(Book storage b, uint256 id, uint64 at) internal {
         Position storage p = b.positions[id];
         if (p.state != ACTIVE) revert WrongState();
@@ -633,7 +633,7 @@ library VaultLib {
         at = p.allocatedAt;
     }
 
-    function _removeActive(Book storage b, Position storage p) private {
+    function _removeActive(Book storage b, Position storage p) internal {
         b.activeBacking -= p.backing;
         --b.activeCount;
         b.feeDebtSum -= p.feeDebt;
@@ -714,27 +714,35 @@ library VaultLib {
         if (unexposed) {
             rebased = _rebaseUnexposed(b, f);
         } else {
-            (work.processed, work.own) = _syncJournal(b, f, packs);
+            // A scan of the vault's own positions replaces the global journal whenever it costs no
+            // more than the next journal batch (ScanLib.rebase).
+            (rebased, work.scanned, work.own) = ScanLib.rebase(b, f);
+            if (!rebased) (work.processed, work.own) = _syncJournal(b, f, packs);
         }
         for (uint256 i; i < ids.length; ++i) if (_syncTerminal(b, f, packs, ids[i])) ++work.resolved;
         work.pruned = prune(b, MAX_PRUNES);
         if (work.processed + work.resolved + work.pruned == 0 && !rebased) revert Nothing();
         // Rebase is unpaid. Empty-vault head cleanup also cannot consume its bootstrap cash.
-        if ((unexposed && b.trackedValue == 0) || work.processed + work.resolved + work.pruned == 0) return (0, 0, false);
+        if ((unexposed && b.trackedValue == 0) || work.processed + work.scanned + work.resolved + work.pruned == 0) {
+            return (0, 0, false);
+        }
         bool journalPaid = work.processed == MAX_JOURNAL || work.own + work.resolved != 0;
         bool requiredTail;
         uint256 tailBase = Q_REQUIRED_TAIL;
-        if (!journalPaid && work.processed != 0 && checkpointMode != 0) {
+        if (!journalPaid && work.processed + work.scanned != 0 && checkpointMode != 0) {
             journalPaid = f.isPurchaseBlackout() && f.unsettledAcquisitionCount() == 0;
             if (journalPaid && checkpointMode == 2) {
                 tailBase += Q_DISTRIBUTION_PROOF;
                 journalPaid = _distributionTail(p, b, f, witnessId,
-                    tailBase + work.processed * Q_JOURNAL + work.pruned * Q_PRUNED);
+                    tailBase + work.processed * Q_JOURNAL + work.scanned * Q_SCAN + work.pruned * Q_PRUNED);
             }
             requiredTail = journalPaid;
         }
         if (!journalPaid && work.own + work.resolved + work.pruned == 0) return (0, 0, false);
-        gasQ = (requiredTail ? tailBase : Q_SYNC) + (journalPaid ? work.processed * Q_JOURNAL : 0) + work.own * Q_SELECTED
+        // A scan is paid only when it applied an own selection or is the required checkpoint proof:
+        // splitting a cycle's terminal work into later calls cannot earn a second scan.
+        gasQ = (requiredTail ? tailBase : Q_SYNC) + (journalPaid ? work.processed * Q_JOURNAL : 0)
+            + (work.own != 0 || requiredTail ? work.scanned * Q_SCAN : 0) + work.own * Q_SELECTED
             + work.resolved * Q_SYNCED + work.pruned * Q_PRUNED;
         units = work.resolved;
         distributionTail = requiredTail && checkpointMode == 2;

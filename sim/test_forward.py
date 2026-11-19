@@ -16,7 +16,7 @@ class CandidateProjectionTest(unittest.TestCase):
             min_edge_bps=100, mint_fee=10**15, settlement_window=3600,
             blackout=False, queue_drained=True, checkpoint_done_this_interval=False,
             listings=[policy.Listing(i, ACTIVE, pending_fees=500_000) for i in (1, 2)],
-            own_journal_pending=True, completed_prefix=2, open_positions=4, routine_budget=1_000_000)
+            own_journal_pending=True, completed_prefix=2, open_positions=100, routine_budget=1_000_000)
         alternatives = [step for step in policy.plan(state) if step[0] == 'sync']
         v = Vault(seed=0, balance=0, routine_budget=1_000_000)
         v.positions = {i: Position(3, 1, pending_fees=500_000) for i in (1, 2)}

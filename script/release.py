@@ -28,7 +28,8 @@ SIGNERS = ROOT / "deploy/allowed_signers"
 RPC = os.environ.get("RPC_URL", "https://mainnet.gateway.tenderly.co")
 CODE_LIMIT = 24_576
 CREATE2_FACTORY = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
-CONTRACTS = {"PackVault": "src/PackVault.sol", "VaultLib": "src/VaultLib.sol", "KeeperPolicyV1": "src/KeeperPolicy.sol"}
+CONTRACTS = {"PackVault": "src/PackVault.sol", "VaultLib": "src/VaultLib.sol", "ScanLib": "src/ScanLib.sol",
+             "KeeperPolicyV1": "src/KeeperPolicy.sol"}
 KEEPER = ["keeper/Dockerfile", "keeper/entrypoint.sh", "keeper/requirements.txt", "keeper/keeper.py",
           "keeper/policy.py", "keeper/tx.py", "keeper/index.py", "fly.keeper-primary.toml", "fly.keeper-backup.toml"]
 VALUES = ["deploy/canary.json", "deploy/mainnet.json"]
@@ -81,10 +82,18 @@ def build():
         init = normalized(a["bytecode"]["object"], links(a["bytecode"]))
         out[name] = dict(runtime_bytes=len(runtime), runtime_sha256=hashlib.sha256(runtime).hexdigest(),
                          initcode_sha256=hashlib.sha256(init).hexdigest())
-    lib = bytes.fromhex(artifact("VaultLib")["bytecode"]["object"].removeprefix("0x"))
     from eth_utils import keccak, to_checksum_address
-    address = keccak(b"\xff" + bytes.fromhex(CREATE2_FACTORY[2:]) + bytes(32) + keccak(lib))[12:]
-    out["VaultLib"]["create2_address"] = to_checksum_address(address)  # forge script: factory, salt 0
+    create2 = lambda init: keccak(b"\xff" + bytes.fromhex(CREATE2_FACTORY[2:]) + bytes(32) + keccak(init))[12:]  # noqa: E731
+    # forge script deploys each library through the factory with salt 0; VaultLib links ScanLib.
+    scan = create2(bytes.fromhex(artifact("ScanLib")["bytecode"]["object"].removeprefix("0x")))
+    lib = artifact("VaultLib")["bytecode"]
+    refs = lib["linkReferences"]
+    assert list(refs) == ["src/ScanLib.sol"] and list(refs["src/ScanLib.sol"]) == ["ScanLib"], refs
+    code = bytearray.fromhex(re.sub(r"__\$[0-9a-f]{34}\$__", "0" * 40, lib["object"].removeprefix("0x")))
+    for r in refs["src/ScanLib.sol"]["ScanLib"]:
+        code[r["start"]:r["start"] + r["length"]] = scan
+    out["ScanLib"]["create2_address"] = to_checksum_address(scan)
+    out["VaultLib"]["create2_address"] = to_checksum_address(create2(bytes(code)))
     return out
 
 
@@ -155,7 +164,8 @@ def postflight(vault, values):
     check = lambda ok, what: ok or fail.append(what)  # noqa: E731
     policy = cast("call", vault, "keeperPolicy()(address)")
     lib = m["build"]["VaultLib"]["create2_address"]
-    for name, address in (("PackVault", vault), ("KeeperPolicyV1", policy), ("VaultLib", lib)):
+    scan = m["build"]["ScanLib"]["create2_address"]
+    for name, address in (("PackVault", vault), ("KeeperPolicyV1", policy), ("VaultLib", lib), ("ScanLib", scan)):
         a = artifact(name)
         code = cast("code", address)
         runtime = normalized(code, links(a["deployedBytecode"]), a["deployedBytecode"].get("immutableReferences", {}).values())
@@ -165,6 +175,10 @@ def postflight(vault, values):
     for refs in links(artifact("PackVault")["deployedBytecode"]):
         for r in refs:
             check(vcode[r["start"]:r["start"] + 20].hex() == lib[2:].lower(), "PackVault links another VaultLib")
+    lcode = bytes.fromhex(cast("code", lib)[2:])
+    for refs in links(artifact("VaultLib")["deployedBytecode"]):
+        for r in refs:
+            check(lcode[r["start"]:r["start"] + 20].hex() == scan[2:].lower(), "VaultLib links another ScanLib")
     check(cast("call", vault, "owner()(address)").lower() == v["owner"].lower(), "owner")
     for k, sig in (("fwa", "fwa()(address)"), ("shapes", "shapes()(address)"), ("packs", "packs()(address)")):
         check(cast("call", vault, sig).lower() == v[k].lower(), k)
@@ -191,7 +205,9 @@ def postflight(vault, values):
         sys.exit("postflight FAILED: " + "; ".join(fail))
     print(f"postflight passed: {vault} policy {policy} library {lib} owner {v['owner']}")
     print("verification commands (Etherscan; ETHERSCAN_API_KEY from your environment):")
-    print(f"  forge verify-contract {lib} src/VaultLib.sol:VaultLib --chain mainnet --watch")
+    print(f"  forge verify-contract {scan} src/ScanLib.sol:ScanLib --chain mainnet --watch")
+    print(f"  forge verify-contract {lib} src/VaultLib.sol:VaultLib --chain mainnet "
+          f"--libraries src/ScanLib.sol:ScanLib:{scan} --watch")
     print(f"  forge verify-contract {policy} src/KeeperPolicy.sol:KeeperPolicyV1 --chain mainnet --watch")
     print(f"  forge verify-contract {vault} src/PackVault.sol:PackVault --chain mainnet --guess-constructor-args "
           f"--libraries src/VaultLib.sol:VaultLib:{lib} --watch")

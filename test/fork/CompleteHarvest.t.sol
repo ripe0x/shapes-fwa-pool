@@ -98,19 +98,28 @@ contract CompleteHarvestTest is ForkBase {
         billed = vm.lastCallGas().gasTotalUsed;
     }
 
-    function test_profileActiveFundingIncrementAtDiagnosticPrice() public {
+    function test_scanIgnoresCashAndClaimsNoActiveFee() public {
         vm.skip(!vm.isIsolateMode());
         _fullJob();
+        // Two own listings scan their positions instead of walking the 128-record journal, so a
+        // foreign-only sync does no paid work and never reaches the active-fee funding path this
+        // test once profiled (Q_FUND + Q_HARVESTED is reachable only with paid own-selection or
+        // >= 94-position journal work; see ScanGas.t.sol and the own-selection fee funding). Cash
+        // level is therefore irrelevant: with or without cash the scan pays nothing and claims no
+        // active fee, so the funding "increment" this test measured is not reachable here.
         uint256[] memory ids = new uint256[](1); ids[0] = first;
+        uint256 firstFees = FWA.pendingFees(first);
         uint256 snapshot = vm.snapshotState();
-        uint256 withoutClaim = _measure(ids);
+        uint256 withCash = _measure(ids);
+        assertEq(FWA.pendingFees(first), firstFees, "scan with cash claims no active fee");
         assertTrue(vm.revertToState(snapshot));
         vm.deal(address(vault), 0);
-        uint256 withClaim = _measure(ids);
-        emit log_named_uint("same journal active fee candidate with enough cash billed gas", withoutClaim);
-        emit log_named_uint("same journal with necessary active fee claim billed gas", withClaim);
-        emit log_named_uint("attached first active fee claim incremental billed gas", withClaim - withoutClaim);
-        assertLe(withClaim - withoutClaim, VaultLib.Q_FUND + VaultLib.Q_HARVESTED);
+        uint256 drained = _measure(ids);
+        assertEq(FWA.pendingFees(first), firstFees, "scan with no cash still claims no active fee");
+        emit log_named_uint("foreign-only scan billed gas with cash", withCash);
+        emit log_named_uint("foreign-only scan billed gas drained", drained);
+        uint256 delta = withCash > drained ? withCash - drained : drained - withCash;
+        assertLe(delta, VaultLib.Q_FUND, "cash level does not engage a funding path");
     }
 
     function test_profileRefundedRequiredSingletonAfterFundingGate() public {
@@ -186,48 +195,71 @@ contract CompleteHarvestTest is ForkBase {
 
     function test_ampleCashNeverClaimsActiveFeesForPay() public {
         _fullJob();
+        // The 128-record journal that once paid this sync is displaced by a scan of the two own
+        // positions. A foreign-only scan outside a checkpoint window applies no own selection and
+        // earns nothing, so it cannot claim active fees for pay; the minPay offer is refused and a
+        // zero-minPay sync just clears the backlog free. (The paid-journal active-fee funding this
+        // test pinned is unreachable for a small vault; it is covered by own-selection work.)
         uint256 pending = FWA.pendingFees(first);
         uint256 debt = vault.position(first).feeDebt;
-        uint256 paid = vault.sync(_ids(), 0, 1);
-        assertEq(paid, _base());
+        uint256 cash = address(vault).balance;
+        uint256 keeperCash = address(this).balance;
+        vm.expectRevert(PackVault.Payment.selector);
+        vault.sync(_ids(), 0, 1);
+        uint256 paid = vault.sync(_ids(), 0, 0);
+        assertEq(paid, 0, "foreign-only scan is unpaid");
+        assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess(), "one scan clears the backlog");
+        assertEq(address(vault).balance, cash, "no vault cash moved");
+        assertEq(address(this).balance, keeperCash, "keeper paid nothing");
         assertEq(FWA.pendingFees(first), pending);
         assertEq(vault.position(first).feeDebt, debt);
     }
 
-    function test_cashShortfallClaimsOnlyFirstUsefulPositionAndKeepsProtectedCash() public {
+    function test_cashShortfallScanClaimsNoFeesAndKeepsProtectedCash() public {
         _fullJob();
         uint256 charge = vault.requestCharge();
         vm.prank(alice); vault.deposit{value: 0.1 ether + charge}();
         uint256 protectedCash = vault.pendingDepositTotal() + vault.processingPool();
         vm.deal(address(vault), protectedCash);
+        // Cash is at the liabilities floor. The 128-record journal that once forced the cash-short
+        // funding path (claim only the first useful position's fees) is displaced by a scan of the
+        // two own positions; a foreign-only scan does no paid work, so nothing is claimed and the
+        // protected cash stands. (The cash-shortfall funding path is reached by paid own-selection
+        // or >= 94-position journal work, not by a small foreign-only scan.)
         uint256 firstFees = FWA.pendingFees(first);
         uint256 secondFees = FWA.pendingFees(second);
         uint256 secondDebt = vault.position(second).feeDebt;
-        uint256 paid = vault.sync(_ids(), 0, 1);
-        assertEq(paid, _base() + VaultLib.Q_FUND + VaultLib.Q_HARVESTED);
-        assertEq(FWA.pendingFees(first), 0);
+        vm.expectRevert(PackVault.Payment.selector);
+        vault.sync(_ids(), 0, 1);
+        uint256 paid = vault.sync(_ids(), 0, 0);
+        assertEq(paid, 0, "foreign-only scan is unpaid");
+        assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess(), "one scan clears the backlog");
+        assertEq(FWA.pendingFees(first), firstFees, "no active fee claimed");
         assertEq(FWA.pendingFees(second), secondFees);
         assertEq(vault.position(second).feeDebt, secondDebt);
-        assertEq(vault.freeEth(), firstFees - paid);
-        assertEq(address(vault).balance, protectedCash + firstFees - paid);
+        assertEq(address(vault).balance, protectedCash, "protected cash untouched");
         assertEq(vault.pendingDepositTotal() + vault.processingPool(), protectedCash);
-        (,,,,,,, uint256 actualDebt,,,) = FWA.listings(first);
-        assertEq(vault.position(first).feeDebt, actualDebt);
-        uint256 nav = vault.accountedNav(second);
-        (uint256 tracked,, uint256 backing,,,) = vault.totals();
-        assertEq(nav, vault.freeEth() + tracked + backing + secondFees);
     }
 
-    function test_irrelevantAndDuplicateIdsDoNotIncreaseFundingPayment() public {
+    function test_irrelevantAndDuplicateIdsDoNotManufacturePay() public {
         _fullJob(); vm.deal(address(vault), 0);
+        // With no cash and a foreign-only scan (no own selection, no checkpoint window) there is no
+        // paid work for ids to inflate: a lone real id and a 16-slot batch padded with irrelevant
+        // and duplicate ids both earn nothing, and both just clear the backlog. The minPay offer is
+        // refused either way. (The journal/own-selection funding this guarded is covered there.)
         uint256 snapshot = vm.snapshotState();
         uint256[] memory one = new uint256[](1); one[0] = first;
-        uint256 paid = vault.sync(one, 0, 1);
+        vm.expectRevert(PackVault.Payment.selector);
+        vault.sync(one, 0, 1);
+        uint256 paid = vault.sync(one, 0, 0);
+        assertEq(paid, 0, "lone real id earns nothing from a foreign-only scan");
         assertTrue(vm.revertToState(snapshot));
         uint256[] memory padded = new uint256[](16);
         for (uint256 i; i < padded.length; ++i) padded[i] = i % 2 == 0 ? 1e9 + i : first;
-        assertEq(vault.sync(padded, 0, 1), paid);
-        assertGt(FWA.pendingFees(second), 0);
+        vm.expectRevert(PackVault.Payment.selector);
+        vault.sync(padded, 0, 1);
+        assertEq(vault.sync(padded, 0, 0), paid, "padded ids neither shrink nor inflate the scan pay");
+        assertGt(FWA.pendingFees(second), 0, "no active fee claimed");
     }
 
     function test_optionalTailAndNoProgressCannotCreateFundingWork() public {
@@ -240,16 +272,21 @@ contract CompleteHarvestTest is ForkBase {
         assertEq(FWA.pendingFees(first), pending);
     }
 
-    function test_duplicateCannotSupplyTheMissingSecondFeeBalance() public {
+    function test_duplicateCannotManufactureScanPayOrClaimFees() public {
         _fullJob(); vm.deal(address(vault), 0);
-        uint256 fees = FWA.pendingFees(first);
-        uint256 price = fees / (_base() + VaultLib.Q_FUND + VaultLib.Q_HARVESTED) + 1;
-        vm.fee(price); vm.txGasPrice(price);
+        // A foreign-only scan over the two own positions does no paid work, so a duplicated id can
+        // supply no "second fee balance" to a payment that never happens: the scan pays nothing and
+        // claims no fees. (The paid-journal duplicate-id fee gate this test pinned is unreachable
+        // for a small vault; its coverage moves to paid own-selection / journal work.)
+        uint256 firstFees = FWA.pendingFees(first);
+        uint256 secondFees = FWA.pendingFees(second);
         uint256[] memory ids = new uint256[](3); ids[0] = first; ids[1] = first; ids[2] = second;
-        uint256 paid = vault.sync(ids, 0, 1);
-        assertEq(paid, (_base() + VaultLib.Q_FUND + 2 * VaultLib.Q_HARVESTED) * price);
-        assertEq(FWA.pendingFees(first), 0);
-        assertEq(FWA.pendingFees(second), 0);
+        vm.expectRevert(PackVault.Payment.selector);
+        vault.sync(ids, 0, 1);
+        uint256 paid = vault.sync(ids, 0, 0);
+        assertEq(paid, 0, "duplicate ids earn nothing from a foreign-only scan");
+        assertEq(FWA.pendingFees(first), firstFees);
+        assertEq(FWA.pendingFees(second), secondFees);
     }
 
     function test_firstCashCoveringPrefixCannotBePaddedToPassTheFeeShareGate() public {

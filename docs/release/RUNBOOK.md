@@ -41,20 +41,18 @@ difference, including uncommitted inputs. `script/deploy.sh` runs it before ever
 ### Economic (owner requirements A.3, A.8, A.10; B2 "holder return")
 
 Actual trailing 30 days to block 26,450,200: **11,604 successful acquisitions (386.8 a day)**, 5,090
-refunded. Replayed for 360 days plus exit, 16 seeds each, tokens at zero, every expense, complete
-claims only. Method and limits: [formal-assessment.json](../receipts/formal-assessment.json).
+refunded, replayed for 360 days plus exit, tokens at zero, every expense, complete claims only.
+After D75 (scan proof); detail in [KEEPER-ECONOMICS.md](../KEEPER-ECONOMICS.md).
 
 | Gate | Result |
 |---|---|
-| ≥10% a year net at 0.5 gwei, canary 1.96 ETH | **FAIL**: median −5.3%, mean +5.3%, p10 −67%, 9 of 16 seeds lose |
-| Same at 6.8 ETH | pass: median +76%, p10 +34%, 1 of 16 loses |
-| Same at 20 ETH | pass: median +49%, p10 +18%, none lose |
-| Bid outcome after gas at 0.5 gwei | pass: +1.245 mETH per cycle (backing 0.04995 ETH) |
-| At least one usable exit window a day | pass: 30 of 30 days, 59 of 60 blackouts drained |
-| Diagnostics, not the gate | 0.2 gwei canary median +80%; last 10 days only −36%; zero demand −1.9%; oracle cap restored: nothing lists, −0.05% |
+| ≥10% a year net at 0.5 gwei, canary 1.96 ETH (400 seeds) | **pass**: median +40.5%, mean +62.7%; p10 −62%, 33% of years lose (selection luck) |
+| Same at 6.8 ETH (32 seeds) | pass: median +68.9%, p10 +1.3%, 9% lose |
+| Same at 20 ETH (32 seeds) | pass: median +41.2%, p10 +16.3%, 3% lose |
+| At least one usable exit window a day | pass: 30 of 30 days |
 
-Why the canary fails: the shared FWA journal costs about 1.5 ETH a year of routine keeper pay at
-0.5 gwei regardless of vault size. The 2 ETH vault's edge does not cover it; 6.8 ETH does.
+Before D75 the canary failed (median −5.3%): 1.2 ETH a year paid keepers to read every global
+FWA acquisition on-chain.
 
 ## 3. Deployment configuration and funding
 

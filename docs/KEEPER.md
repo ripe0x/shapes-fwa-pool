@@ -68,6 +68,16 @@ including OWED custody, or pending receipt keeps strict ordered processing. Idle
 allowed by the proof. The public `accountedNav` view remains strict until a state-changing operation
 advances the cursor.
 
+Scan proof (D75). With at most 93 open positions the vault reads its own open listings instead of
+FWA's global journal whenever that costs no more than the next journal batch, and the keeper never
+syncs for FWA's global activity alone. It waits until an own selection settles (bid, keep) or its
+settlement window expires, then one `sync([id])` applies the selection, resolves the outcome and is
+paid `85,000 + 30,000 per Active position read + 180,000 per selection + 120,000 per resolution`.
+Other terminal or cleanup work waits for that paid call unless holders are waiting, a checkpoint is
+due or the vault is winding down; in a checkpoint window the keeper sends `sync([])` (paid as the
+required tail) first and the terminals after it. A scan with no own selection outside a checkpoint
+window earns nothing. Larger vaults keep the journal rules below.
+
 Journal compensation is enforced onchain. A full 128-record batch, actual own selection or
 terminal reconciliation qualifies. A shorter foreign-only tail qualifies only in a fresh checkpoint
 window with a drained queue and pending holder flows, or an authenticated distribution that can
