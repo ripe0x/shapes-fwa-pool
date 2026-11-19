@@ -1,3 +1,5 @@
+> **Current release instructions: [docs/release/RUNBOOK.md](release/RUNBOOK.md)** (2026-11-19). This document is history for the candidate it names; where it gives current instructions, the runbook replaces them.
+
 # Final operating and complete exit results
 
 The implementation removes recurring paid standalone harvests and funds useful fee collection through verified bounded sync work. Actual keeper preflight selects the shortest useful funding prefix. Creator mint fees and the primary mint recipe remain intact. The canary now permits 0.01 eth of routine spending per day with a 0.03 eth bucket; mainnet permits 0.02 eth per day with a 0.1 eth bucket. These permissions provide no additional cash.

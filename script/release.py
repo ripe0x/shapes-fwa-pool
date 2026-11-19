@@ -32,7 +32,10 @@ CONTRACTS = {"PackVault": "src/PackVault.sol", "VaultLib": "src/VaultLib.sol", "
 KEEPER = ["keeper/Dockerfile", "keeper/entrypoint.sh", "keeper/requirements.txt", "keeper/keeper.py",
           "keeper/policy.py", "keeper/tx.py", "keeper/index.py", "fly.keeper-primary.toml", "fly.keeper-backup.toml"]
 VALUES = ["deploy/canary.json", "deploy/mainnet.json"]
-EVIDENCE = ["docs/receipts/formal-assessment.json", "docs/release/acceptance.json", "docs/release/RUNBOOK.md"]
+# The acceptance package names this manifest, so it is not listed here (no cycle).
+EVIDENCE = ["docs/receipts/formal-assessment.json", "docs/receipts/release-rehearsal/result.json",
+            "docs/receipts/image-rehearsal/ci-44577532617.json", "docs/receipts/release-review.md",
+            "docs/receipts/release-verify/SUMMARY.md", "docs/receipts/allocation-burst-coverage.md", "asset-flow.json"]
 
 
 def sha(path):

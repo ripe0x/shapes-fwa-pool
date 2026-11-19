@@ -1,3 +1,5 @@
+> **Current release instructions: [docs/release/RUNBOOK.md](release/RUNBOOK.md)** (2026-11-19). This document is history for the candidate it names; where it gives current instructions, the runbook replaces them.
+
 # Current completion status
 
 The integrated operating pass and final evidence are in [Complete operating pass](COMPLETE-OPERATING-PASS.md). This supersedes the implementation and evidence gaps described in the historical review sections below to the extent explicitly measured there. The original O2 failure and need for a new outcome acceptance remain visible. No historic signature approves this candidate.

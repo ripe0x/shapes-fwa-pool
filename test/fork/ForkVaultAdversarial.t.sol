@@ -91,7 +91,9 @@ contract ForkVaultAdversarialTest is ForkBase {
         toBlackout();
         checkpoint();
         toOpen();
-        lowerTo(100 ether, 0.3 gwei, 0.00002 ether);
+        // Under the 0.0363 ETH oracle cap at this block, one bid cycle repays a new pack's build only
+        // up to about 0.30 gwei with this fixture's 10% markup (0.33 gwei with none), so 0.25 gwei.
+        lowerTo(100 ether, 0.25 gwei, 0.00002 ether);
         vm.fee(1.9 gwei);
         vm.txGasPrice(2 gwei); // well above the ceiling
         uint256 idle0 = TestVaultOps.idle(vault).length;
@@ -100,7 +102,7 @@ contract ForkVaultAdversarialTest is ForkBase {
         uint256 pay = TestVaultOps.restock(vault, 1, 3, 0);
         assertEq(TestVaultOps.idle(vault).length, idle0 + 1, "built above the ceiling");
         assertEq(keeper.balance - kb, pay);
-        assertEq(pay, (VaultLib.Q_RESTOCK + VaultLib.Q_PACK + VaultLib.Q_MINT) * 0.3 gwei + vault.getParams().workFee, "quote at the ceiling price + one pack's work fee");
+        assertEq(pay, (VaultLib.Q_RESTOCK + VaultLib.Q_PACK + VaultLib.Q_MINT) * 0.25 gwei + vault.getParams().workFee, "quote at the ceiling price + one pack's work fee");
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
     }

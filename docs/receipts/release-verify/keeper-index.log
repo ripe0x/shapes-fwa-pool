@@ -1,0 +1,3 @@
+index projection: restart, identity, exact wei/debt, rollback/replay, duplicate atomicity, identifier reuse, 10k bounded candidates: pass
+actual ETH/token bid payloads: >16 allocation discovery, independent expiry, unseen selection retention, upgrade replay, restart, prefix rollback and retirement: pass
+keeper discovery: >16 authentic returned packs surface across bounded interrupted passes; reorg replay restores the projection: pass

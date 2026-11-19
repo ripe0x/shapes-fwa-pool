@@ -29,6 +29,16 @@ forge test --match-path test/scenario/VaultFlow.t.sol --rpc-url https://mainnet.
 python3 ~/.agents/guidance/asset-flow-kit/asset_gate.py .   # PASS needs the owner's signature on asset-flow.json
 ```
 
+Release (current instructions: `docs/release/RUNBOOK.md`; owner items: `docs/release/ACCEPTANCE.md`):
+
+```sh
+script/verify.sh                                   # every candidate check, in order
+python3 sim/formal.py                              # formal holder-return assessment (needs sim/data/fwa.sqlite)
+python3 script/release.py manifest|check|postflight|keeper-config
+python3 keeper/rehearsal_batch.py --execute-approved-local-batch --fork-block <recent> --port <free> --phases rehearse_current.py
+python3 keeper/rehearse_image.py [--image <tag>]   # CI: .github/workflows/keeper-image.yml
+```
+
 ## Rules specific to this repo
 
 - No mocks of FWA, its VRF, oracle, Shapes, ShapePacks or the token pool. Selections come only

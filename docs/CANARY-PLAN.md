@@ -1,3 +1,5 @@
+> **Current release instructions: [docs/release/RUNBOOK.md](release/RUNBOOK.md)** (2026-11-19). This document is history for the candidate it names; where it gives current instructions, the runbook replaces them.
+
 # Historical mainnet canary plan (launch step E)
 
 This pre-integration draft is retained as history. Its position caps, backing bands, gas,

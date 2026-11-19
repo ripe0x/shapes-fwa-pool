@@ -1,3 +1,5 @@
+> **Current release instructions: [docs/release/RUNBOOK.md](release/RUNBOOK.md)** (2026-11-19). This document is history for the candidate it names; where it gives current instructions, the runbook replaces them.
+
 # Complete operating pass
 
 2026-11-18. The remaining contract, keeper and economic changes are implemented together. Standalone harvesting is caller funded. Economical fee credit and the smallest necessary active fee prefix can fund verified sync work, with protected cash, fee share, budget and distribution checks enforced onchain. The keeper uses bounded exact preflight alternatives and the model follows the same indexed candidates.

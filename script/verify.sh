@@ -24,7 +24,11 @@ step keeper-index python3 keeper/test_index.py
 if [[ "${1:-}" == "--quick" ]]; then exit 0; fi
 if [[ -f sim/data/fwa.sqlite ]]; then step archive-replay python3 sim/replay.py; fi
 # Every suite: contract, audit and research tests, the 16 asset-flow regimes and both reconciliations.
-step forge-all forge test "${FORK[@]}" -vv
+SCALE='test_checkpointGasWith301RealListings|test_scale301_1000_10000MatchesReferenceAndHasConstantValuationGas'
+step forge-all forge test "${FORK[@]}" --no-match-test "$SCALE" -vv
+# 301 real listings and 10,000 model positions need more than the default test gas for fixture
+# setup; the measured production calls inside still assert the 16,777,216 transaction cap.
+step forge-scale forge test "${FORK[@]}" --match-test "$SCALE" --gas-limit 10000000000 -vv
 step reconcile python3 sim/reconcile.py
 step release-check python3 script/release.py check deploy/canary.json
 echo "all checks passed; logs in $LOG_DIR"

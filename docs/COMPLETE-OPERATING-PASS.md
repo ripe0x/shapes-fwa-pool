@@ -1,3 +1,5 @@
+> **Current release instructions: [docs/release/RUNBOOK.md](release/RUNBOOK.md)** (2026-11-19). This document is history for the candidate it names; where it gives current instructions, the runbook replaces them.
+
 # Complete operating pass
 
 2026-11-18. This pass resolves the remaining implementation choices together under the owner's instruction to finish the system autonomously. PR 2 remains one vault, one capital pool and one authoritative incremental book. There is no total position ceiling, factory, shared exposure contract or new mint strategy.

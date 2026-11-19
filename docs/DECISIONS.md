@@ -1019,3 +1019,29 @@ Choose mainnet capacity 0.1 ETH with 0.02 ETH per day refill, and canary capacit
 These are spending permissions, funded only by real unencumbered vault cash. They increase authorized maintenance outflow over time and do not create operating income. The larger vault's ninety day stress case pays every routine job, keeps permission near capacity at each monthly observation and completes the holder exit. Small vault losses and zero demand remain visible. Results are conditional engineering scenarios with explicit pool, volume, purchaser timing and caller gas inputs.
 
 No original acceptance threshold or outcome signature is silently changed. Current evidence and limits are in `COMPLETE-OPERATING-PASS.md`. PR 2 remains draft; this decision records implementation work, not a public deployment or merge.
+
+
+## D72. Formal holder-return assessment replays the actual window (engineering, 2026-11-19)
+
+The owner's gate (A.3, A.8, A.10) is measured by `sim/formal.py`: the actual trailing 30 days at a
+pinned block, replayed for 360 days plus exit through the timed model, 16 seeds, complete claims
+only, no annualization. Purchasers respond at recorded delays but bid inside the settlement window,
+because a vault pack's bid beats keeping it and the vault reclaims at expiry; recorded late answers
+and keeps are diagnostics that show a large upside the gate does not count. Result at 26,450,200:
+fails at the 2 ETH canary (median −5.3%), passes at 6.8 and 20 ETH. Shared journal cost is the cause.
+
+## D73. One release identity and a signed gate before any public broadcast (engineering, 2026-11-19)
+
+`deploy/release-manifest.json` binds sources, toolchain, normalized runtimes (with the library's
+CREATE2 address), values, keeper image inputs and evidence. `script/deploy.sh` simulates freely and
+broadcasts to anything but a local Anvil only when `script/release.py check --broadcast` passes,
+including the owner's ssh signature over `docs/release/acceptance.json`; it then runs the onchain
+postflight. This replaces `I_AM_THE_OWNER=yes`. Keeper configs keep a zero VAULT that the
+entrypoint refuses until `release.py keeper-config` writes a postflight-checked address.
+
+## D74. Keeper image toolchain stays Foundry 1.8.1 (engineering, 2026-11-19)
+
+All tests and rehearsals of this candidate ran with Foundry 1.8.1, the version the image installs;
+the image itself passed the fork rehearsal in CI. Earlier 1.9.0 receipts remain valid for their
+contract gas: bytecode depends on solc settings, not on the Foundry version. `FOUNDRY_DIR` is pinned
+because the current installer otherwise writes to `~/.config/.foundry`.

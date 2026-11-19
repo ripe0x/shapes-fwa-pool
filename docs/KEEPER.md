@@ -1,3 +1,5 @@
+> **Current release instructions: [docs/release/RUNBOOK.md](release/RUNBOOK.md)** (2026-11-19). This document is history for the candidate it names; where it gives current instructions, the runbook replaces them.
+
 # Keeper operations and recovery
 
 Current operation is documented in [Complete operating pass](COMPLETE-OPERATING-PASS.md). The final journal schedule is 22,000 per record,120,000 for a required tail,80,000 for its qualified distribution proof and 85,000 for an ordinary sync. Own selections quote 180,000. Actual successful foreign and full holder checkpoint receipts include signed 80% minimum payments and ordinary profitability preflight.
