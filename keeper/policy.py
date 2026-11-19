@@ -13,6 +13,7 @@ wind-down. Everything else (new packs, relists, fee harvests, deposit pricing, t
 burns) waits for gas to fall. Whether a keeper accepts the loss on liability work above the
 ceiling is the executor's choice (keeper.py --max-loss-wei), not the vault's.
 """
+import functools
 import hashlib
 import math
 from dataclasses import dataclass, field
@@ -27,7 +28,7 @@ ACTIVE, ALLOCATED, WITHDRAWN, SETTLED = 1, 2, 3, 4
 # The vault's quoted-gas schedule, line for line (PackVault Q_* constants, D56). Pay is a quote
 # fixed by the operation and its completed work, never the caller's gas.
 Q = dict(checkpoint=360_000, restock=280_000, pack=325_000, pack_unit=100_000, mint=2_200_000,
-         list=280_000, listed=825_000, sync=85_000, journal_tail=120_000, distribution_proof=80_000, synced=120_000, journal=22_000, selected=180_000,
+         list=280_000, listed=825_000, sync=85_000, journal_tail=120_000, distribution_proof=80_000, synced=120_000, journal=22_000, scan=30_000, selected=180_000,
          pruned=45_000, unlist=340_000, unlisted=285_000, liquidate=75_000, liq_pack=80_000,
          redeem_shape=35_000, liq_shape=65_000, recovery_base=100_000, recovery_shape=35_000,
          recovery_unseal=70_000, harvest=125_000, harvested=80_000,
@@ -48,6 +49,7 @@ class Listing:
     crown_locked: bool = False  # holds FWA's crown inside its early-exit window
     value: int = 3 * UNIT
     backing: int = 0
+    unapplied: bool = False  # the vault's book still holds it Active although FWA allocated it
 
 
 @dataclass
@@ -179,13 +181,7 @@ def propose_backings(target, reserved_count, count, is_reserved, minimum=0, maxi
     proposals, used = [], set()
     for i in range(count):
         width = reserved_count + i + 1
-        # Test the actual band edges too: a dense run around the target must not require luck.
-        offsets = [0] + [sign * j for j in range(1, 9) for sign in (1, -1)]
-        offsets += [width, -width, max(width - 1, 0), -max(width - 1, 0)]
-        for attempt in range(43):
-            word = int.from_bytes(hashlib.sha256(f"{nonce}:{target}:{i}:{attempt}".encode()).digest(), "big")
-            offsets.append(word % (2 * width + 1) - width)
-        for offset in offsets:
+        for offset in _probe_offsets(nonce, target, i, width):
             proposed = base + offset * quantum
             if (proposed <= 0 or proposed < minimum or proposed > maximum
                     or abs(proposed - target) > width * quantum or proposed in used or is_reserved(proposed)):
@@ -196,6 +192,17 @@ def propose_backings(target, reserved_count, count, is_reserved, minimum=0, maxi
         else:
             break
     return proposals
+
+
+@functools.lru_cache(maxsize=65_536)
+def _probe_offsets(nonce, target, i, width):
+    # Test the actual band edges too: a dense run around the target must not require luck.
+    offsets = [0] + [sign * j for j in range(1, 9) for sign in (1, -1)]
+    offsets += [width, -width, max(width - 1, 0), -max(width - 1, 0)]
+    for attempt in range(43):
+        word = int.from_bytes(hashlib.sha256(f"{nonce}:{target}:{i}:{attempt}".encode()).digest(), "big")
+        offsets.append(word % (2 * width + 1) - width)
+    return tuple(offsets)
 
 
 def cycle_net(s):
@@ -255,6 +262,18 @@ def sync_funding_candidates(s, terminal_ids, active, checkpoint_due):
     return list(dict.fromkeys(l.id for l in candidates))[:MAX_BATCH["sync"]]
 
 
+def scan_proof(s):
+    """ScanLib.rebase's choice: the vault reads its open positions instead of FWA's journal when
+    that costs no more than the next journal batch."""
+    backlog = s.completed_prefix - s.journal_cursor
+    return backlog > 0 and s.open_positions * Q["scan"] <= min(backlog, MAX_BATCH["journal"]) * Q["journal"]
+
+
+def scan_vault(s):
+    """Small enough that any full journal batch is replaced by one scan (at most 93 open)."""
+    return s.open_positions * Q["scan"] <= MAX_BATCH["journal"] * Q["journal"]
+
+
 def plan(s):
     """Ordered list of calls for this pass. Each is a tuple: (function, args...)."""
     out = []
@@ -273,12 +292,25 @@ def plan(s):
     unexposed = not s.open_positions and not s.active_count and not s.pending_receipts and not s.listings
     checkpoint_due = (s.blackout and s.queue_drained and not s.checkpoint_done_this_interval
                       and (s.pending_deposits or s.locked_shares or s.distribution_bps))
-    journal_due = catchup and not unexposed and (
-        s.completed_prefix - s.journal_cursor >= MAX_BATCH["journal"]
-        or s.own_journal_pending or checkpoint_due)
+    scanning = scan_vault(s) and not unexposed
+    selected_due = [i for i in due if any(l.id == i and l.unapplied for l in s.listings)]
+    defer = False
+    if scanning:
+        # A scan pays only when it applies an own selection or proves a checkpoint. Wait until
+        # each selection settles or expires, so one paid call selects and resolves it; other
+        # terminal and cleanup work rides along unless holders need it now.
+        journal_due = catchup and checkpoint_due
+        defer = (scan_proof(s) and not selected_due and not checkpoint_due and not s.locked_shares
+                 and not shortfall and not s.winding_down)
+    else:
+        journal_due = catchup and not unexposed and (
+            s.completed_prefix - s.journal_cursor >= MAX_BATCH["journal"]
+            or s.own_journal_pending or checkpoint_due)
     # All sync work uses routine funding, including while holders are withdrawing.
-    if (due or journal_due or s.allocation_stale) and not spike:
+    if (due or journal_due or s.allocation_stale) and not spike and not defer:
         ids = due[:MAX_BATCH["sync"]]
+        if scanning and checkpoint_due and scan_proof(s) and not selected_due:
+            ids = []  # the paid checkpoint scan first; terminals follow without a scan
         # Ordinary preflight tries the no-claim job first, then the shortest funded prefix.
         # The executor replans after one successful call; these are alternatives, not a batch.
         out.append(("sync", ids, s.witness_id))
@@ -403,6 +435,8 @@ def journal_backlog_floor(s):
     if not s.open_positions and not s.active_count and not s.pending_receipts and not s.listings:
         return 0
     records = s.completed_prefix - s.journal_cursor
+    if records and scan_vault(s):
+        return quote(s, Q["journal_tail"] + s.open_positions * Q["scan"])
     full, tail = divmod(records, MAX_BATCH["journal"])
     return quote(s, full * Q["sync"] + (Q["journal_tail"] if tail else 0) + records * Q["journal"])
 

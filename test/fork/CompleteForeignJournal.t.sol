@@ -118,8 +118,18 @@ contract CompleteForeignJournalTest is SelectionBase {
         uint256 escrow = vault.pendingDepositTotal();
         uint256 processing = vault.processingPool();
         uint256 before = keeper.balance;
+        // One own listing reaches its completed prefix by scanning that position whenever the scan
+        // costs no more than the next journal batch; only a backlog below open*Q_SCAN/Q_JOURNAL
+        // (here backlog 1) still walks the journal. The required tail prices whichever path runs.
+        uint256 backlog = FWA.nextSequenceToProcess() - vault.acquisitionCursor();
+        assertEq(backlog, records, "backlog is the record count under test");
+        uint256 open = vault.openListingCount();
+        uint256 batch = backlog < 128 ? backlog : 128;
+        uint256 gasQ = open * VaultLib.Q_SCAN <= batch * VaultLib.Q_JOURNAL
+            ? VaultLib.Q_REQUIRED_TAIL + open * VaultLib.Q_SCAN
+            : VaultLib.Q_REQUIRED_TAIL + backlog * VaultLib.Q_JOURNAL;
         vm.prank(keeper); uint256 pay = vault.sync(new uint256[](0), 0, 1);
-        assertEq(pay, (VaultLib.Q_REQUIRED_TAIL + records * VaultLib.Q_JOURNAL) * 0.2 gwei);
+        assertEq(pay, gasQ * 0.2 gwei);
         assertEq(keeper.balance - before, pay);
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
         assertEq(vault.pendingDepositTotal(), escrow, "journal payment cannot consume deposit escrow");
@@ -234,22 +244,32 @@ contract CompleteForeignJournalTest is SelectionBase {
     function test_125SuccessfulForeignRecordsAndThreeRefundsFill128Batch() public {
         _replayForeignHistory(); _threeDeadlineRefunds();
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
-        vm.prank(keeper); uint256 pay = vault.sync(new uint256[](0), 0, 1);
-        assertEq(pay, (VaultLib.Q_SYNC + 128 * VaultLib.Q_JOURNAL) * 0.2 gwei);
-        assertEq(vault.acquisitionCursor(), uint256(begin) + 128);
+        // A one-listing vault scans its single own position rather than walking the 128-record
+        // journal: one scan clears the whole 128-record foreign backlog. Applying no own selection
+        // and outside a checkpoint window, that scan earns nothing, so the minPay=1 keeper offer is
+        // refused (the paid 128-record journal this test once pinned is unreachable for a small
+        // vault; that journal path is reachable at >= 94 open positions, covered in ScanGas.t.sol).
+        vm.expectRevert(VaultLib.Payment.selector);
+        vm.prank(keeper); vault.sync(new uint256[](0), 0, 1);
+        assertEq(vault.acquisitionCursor(), begin, "refused payment rolls back the scan progress");
+        vm.prank(keeper); uint256 pay = vault.sync(new uint256[](0), 0, 0);
+        assertEq(pay, 0, "foreign-only scan is unpaid");
+        assertEq(vault.acquisitionCursor(), uint256(begin) + 128, "one scan clears the whole 128-record backlog");
         _assertExposure();
     }
 
-    /// @notice The largest authentically reachable single sync (goal 2 base / goal 3): a full
-    ///         128-record foreign journal in one call. Measures receipt-equivalent gas (cold
-    ///         state) under the normal transaction limit and asserts the keeper's padded estimate
-    ///         fits EIP-7825. The 16 own transitions a maximal sync could add are not authentically
-    ///         reachable (no real VRF burst selects 17 vault listings); their gas is bounded
-    ///         analytically in docs/receipts/allocation-burst-coverage.md, never measured here.
-    function test_full128ForeignJournalSyncReceiptGasFitsCap() public {
+    /// @notice A one-listing vault's largest authentic single sync is now a scan, not the journal:
+    ///         it clears the full 128-record foreign backlog with a single own-position read.
+    ///         Measures receipt-equivalent gas (cold state) under the normal transaction limit and
+    ///         asserts it fits EIP-7825. The 128-record JOURNAL path (reachable only at >= 94 open
+    ///         positions) keeps its own EIP-7825 coverage in
+    ///         ScanGas.t.sol::test_full128ForeignJournalReceiptGasFitsCap; the 16 own transitions a
+    ///         maximal sync could add are bounded analytically in
+    ///         docs/receipts/allocation-burst-coverage.md, never measured here.
+    function test_full128ForeignScanReceiptGasFitsCap() public {
         _replayForeignHistory(); _threeDeadlineRefunds();
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
-        bytes memory input = abi.encodeCall(PackVault.sync, (new uint256[](0), 0, uint256(1)));
+        bytes memory input = abi.encodeCall(PackVault.sync, (new uint256[](0), 0, uint256(0)));
         uint256 intrinsic = 21_000;
         for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
         // Receipt-equivalent: cold every contract the sync touches, as a mined transaction would.
@@ -260,11 +280,11 @@ contract CompleteForeignJournalTest is SelectionBase {
         (bool ok, bytes memory ret) = address(vault).call(input);
         uint256 used = g - gasleft() + intrinsic;
         if (!ok) assembly ("memory-safe") { revert(add(ret, 32), mload(ret)) }
-        emit log_named_uint("full 128-record foreign journal sync receipt-equivalent gas", used);
-        emit log_named_uint("full 128-record foreign journal sync pay wei", abi.decode(ret, (uint256)));
-        assertEq(vault.acquisitionCursor(), uint256(begin) + 128, "one call drains the full 128-record journal");
+        emit log_named_uint("full 128-record foreign backlog scan receipt-equivalent gas", used);
+        emit log_named_uint("full 128-record foreign backlog scan pay wei", abi.decode(ret, (uint256)));
+        assertEq(vault.acquisitionCursor(), uint256(begin) + 128, "one scan drains the full 128-record backlog");
         _assertExposure();
-        assertLt((used * 125 + 99) / 100, 16_777_216, "128-record journal plus 25% keeper gas margin fits EIP-7825");
+        assertLt((used * 125 + 99) / 100, 16_777_216, "128-record backlog scan plus 25% keeper gas margin fits EIP-7825");
     }
 
     function test_125SuccessfulForeignRequiredTail() public {

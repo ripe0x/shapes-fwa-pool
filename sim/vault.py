@@ -247,6 +247,24 @@ class Vault:
             processed += 1
         return processed
 
+    def scan_rebase(self, found):
+        """ScanLib.rebase: read every open Active listing instead of FWA's journal when that costs no
+        more than the next journal batch. `found` is the (allocation time, id) of each own listing FWA
+        allocated that the book still holds Active. Returns the listings read, or None when the journal
+        path runs instead (not eligible, more than 16 found, or an order the queue cannot take)."""
+        backlog = self.completed_prefix - self.acquisition_cursor
+        if not backlog or len(self.positions) * 30_000 > min(backlog, 128) * 22_000:
+            return None
+        found = sorted(found)
+        if len(found) > 16 or (found and found[0][0] < max((p.allocated_at for p in self.positions.values()
+                                                           if p.state != ACTIVE), default=0)):
+            return None
+        scanned = sum(p.state == ACTIVE for p in self.positions.values())
+        for at, listing_id in found:
+            self.select(listing_id, at)
+        self.acquisition_cursor = self.completed_prefix
+        return scanned
+
     def advance_unexposed(self):
         """Owner-approved O(1) completeness proof; no journal payment is earned."""
         if (self.positions or self.receipts or self.active_count or self.active_backing

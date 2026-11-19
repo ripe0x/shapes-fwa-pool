@@ -62,16 +62,22 @@ contract EfficientJournalTest is ForkBase {
         VaultLib.Params memory p = vault.getParams(); p.distributionBps = 5000;
         vm.prank(owner); vault.setParams(p);
         uint64 cursor = _refund(128);
+        // A one-listing vault scans its own position instead of walking the 128-record journal, so
+        // the paid 128-record journal job this test once pinned is unreachable here: the scan
+        // displaces it (the journal path is reachable only at >= 94 open positions, covered in
+        // ScanGas.t.sol::test_full128ForeignJournalReceiptGasFitsCap). The anti-gaming intent
+        // carries to the scan: a foreign-only scan in the same checkpoint interval earns nothing,
+        // and irrelevant terminal ids neither inflate the pay nor change how much one call clears.
         uint256 snapshot = vm.snapshotState();
         vm.prank(keeper); uint256 normalPay = vault.sync(new uint256[](0), 0, 0);
-        assertEq(vault.acquisitionCursor(), uint256(cursor) + 128);
-        assertEq(normalPay, (VaultLib.Q_SYNC + 128 * VaultLib.Q_JOURNAL) * 0.2 gwei);
+        assertEq(vault.acquisitionCursor(), uint256(cursor) + 128, "one scan clears the whole backlog");
+        assertEq(normalPay, 0, "foreign-only scan applies no own selection and is unpaid");
         assertTrue(vm.revertToState(snapshot));
         uint256[] memory irrelevant = new uint256[](16);
         for (uint256 i; i < irrelevant.length; ++i) irrelevant[i] = 1e9 + i;
         vm.prank(keeper); uint256 paddedPay = vault.sync(irrelevant, 0, 0);
         assertEq(vault.acquisitionCursor(), uint256(cursor) + 128);
-        assertEq(paddedPay, normalPay, "IDs do not shrink or increase the journal job");
+        assertEq(paddedPay, normalPay, "IDs do not shrink or increase the scan job");
         assertEq(vault.openListingCount(), 1);
     }
 
@@ -90,8 +96,11 @@ contract EfficientJournalTest is ForkBase {
         uint256 escrow = vault.pendingDepositTotal();
         toBlackout();
         uint256 pool = vault.processingPool();
+        // The checkpoint window reaches its completed prefix with one scan of the single own
+        // listing, not by walking 32 journal entries: the required tail now prices that scan
+        // (Q_REQUIRED_TAIL + scanned*Q_SCAN, scanned == openListingCount == 1).
         vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), 0, 1);
-        assertEq(paid, (VaultLib.Q_REQUIRED_TAIL + 32 * VaultLib.Q_JOURNAL) * 0.2 gwei);
+        assertEq(paid, (VaultLib.Q_REQUIRED_TAIL + VaultLib.Q_SCAN) * 0.2 gwei);
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
         assertEq(vault.processingPool(), pool);
         assertEq(vault.pendingDepositTotal(), escrow);
@@ -105,12 +114,18 @@ contract EfficientJournalTest is ForkBase {
         uint256 shares = vault.shareBalance(alice) / 10;
         vm.prank(alice); vault.requestRedeem{value: charge}(shares);
         assertGt(vault.lockedShares(), 0);
+        // Locked shares make the checkpoint tail required. A one-listing vault reaches its completed
+        // prefix with one scan rather than the 128-record journal, so the routine sync it earns is
+        // the required tail over that scan (Q_REQUIRED_TAIL + 1*Q_SCAN). It is still drawn from the
+        // routine budget while the essential budget stays zero, which is the point of the test.
+        toBlackout();
+        vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
         (uint256 routineBefore, uint256 essentialBefore) = vault.budget();
         assertEq(essentialBefore, 0);
         uint256 pool = vault.processingPool();
         vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), 0, 1);
         (uint256 routineAfter, uint256 essentialAfter) = vault.budget();
-        assertEq(paid, (VaultLib.Q_SYNC + 128 * VaultLib.Q_JOURNAL) * 0.2 gwei);
+        assertEq(paid, (VaultLib.Q_REQUIRED_TAIL + VaultLib.Q_SCAN) * 0.2 gwei);
         assertEq(routineBefore - routineAfter, paid);
         assertEq(essentialAfter, 0);
         assertEq(vault.processingPool(), pool);

@@ -58,7 +58,7 @@ def main():
     fees = [Listing(i, ACTIVE, pending_fees=i * 10**15) for i in range(1, 30)]
     ample = state(listings=fees, free=E, fee_credit=E, blackout=False)
     assert "harvest" not in fns(plan(ample))
-    funded_sync = state(listings=fees + settled, free=0, completed_prefix=128, open_positions=30)
+    funded_sync = state(listings=fees + settled, free=0, completed_prefix=128, open_positions=100)  # journal vault
     choices = [step for step in plan(funded_sync) if step[0] == "sync"]
     assert choices[0][1] == [30] and choices[1][1] == [30, 29], choices
     assert len(choices[-1][1]) == 16
@@ -67,11 +67,11 @@ def main():
     funded_sync.free, funded_sync.routine_budget = 0, 0
     assert plan(funded_sync)[0][1] == [30], "active fees cannot fix exhausted spending permission"
     one_own = state(listings=[Listing(1, ACTIVE, pending_fees=10**15)], free=0,
-                    own_journal_pending=True, completed_prefix=1, open_positions=2,
+                    own_journal_pending=True, completed_prefix=1, open_positions=100,
                     routine_budget=150_000_000_000_000, markup_bps=0)
     assert plan(one_own)[1][1] == [1], "upper16-own bound must not hide a funded one-own job"
     two_own = state(listings=[Listing(i, ACTIVE, pending_fees=500_000) for i in (1, 2)],
-                    own_journal_pending=True, completed_prefix=2, open_positions=4,
+                    own_journal_pending=True, completed_prefix=2, open_positions=100,
                     free=0, base_fee=1, max_tip=0, gas_price=1, markup_bps=0, routine_budget=1_000_000)
     assert [step[1] for step in plan(two_own) if step[0] == "sync"] == [[], [1], [1, 2]], \
         "exact preflight must reach the funded two-claim alternative"
@@ -109,19 +109,19 @@ def main():
     assert P.pay_v1(spike_checkpoint, P.Q["checkpoint"], 1) == 200_000_000_000_000
 
     # Global reads and terminal IDs have independent bounds; small unrelated tails wait.
-    s = state(journal_cursor=7, completed_prefix=100_007, open_positions=1, active_count=1)
+    s = state(journal_cursor=7, completed_prefix=100_007, open_positions=100, active_count=100)
     sync = plan(s)[0]
     assert sync == ("sync", [], 0), sync
-    s = state(journal_cursor=7, completed_prefix=100_007,
+    s = state(journal_cursor=7, completed_prefix=100_007, open_positions=100,
               listings=[Listing(30 + i, SETTLED) for i in range(20)])
     sync = plan(s)[0]
     assert len(sync[1]) == 16
     assert "sync" not in fns(plan(state(journal_cursor=7, completed_prefix=8, open_positions=1)))
-    assert "sync" in fns(plan(state(journal_cursor=7, completed_prefix=8, open_positions=1, own_journal_pending=True)))
+    assert "sync" in fns(plan(state(journal_cursor=7, completed_prefix=8, open_positions=100, own_journal_pending=True)))
     assert "sync" in fns(plan(state(journal_cursor=7, completed_prefix=8, open_positions=1, pending_deposits=E)))
     assert "sync" in fns(plan(state(journal_cursor=7, completed_prefix=8, open_positions=1,
                                    distribution_bps=5000, distribution_due=False, witness_id=91)))
-    blocked = state(journal_cursor=0, completed_prefix=128, open_positions=1, free=E,
+    blocked = state(journal_cursor=0, completed_prefix=128, open_positions=100, free=E,
                     idle_eth=E, idle_packs=1, routine_budget=1, markup_bps=0)
     assert P.journal_backlog_floor(blocked) == 580_200_000_000_000
     assert "sync" in fns(plan(blocked))
@@ -139,6 +139,28 @@ def main():
     assert "MAINTENANCE_UNFUNDED" not in {c for c, _, _ in status(resumed)}
     assert "list" in fns(plan(resumed)) or "restock" in fns(plan(resumed)) or "sync" in fns(plan(resumed))
     assert "checkpoint" not in fns(plan(state(journal_cursor=7, completed_prefix=8, pending_deposits=E, open_positions=1)))
+
+    # Scan vaults (at most 93 open): FWA's global activity alone never triggers paid work. One scan
+    # selects and resolves each own selection once it settles or expires; other work rides along.
+    scan = dict(journal_cursor=0, completed_prefix=5_000, open_positions=28, active_count=27, free=E)
+    assert P.scan_vault(state(**scan)) and P.scan_proof(state(**scan))
+    assert not P.scan_proof(state(journal_cursor=0, completed_prefix=37, open_positions=28))  # 28*30k > 37*22k
+    assert "sync" not in fns(plan(state(**scan))), "foreign backlog alone is not vault work"
+    inside = Listing(5, ALLOCATED, allocated_at=10**6 - 10, unapplied=True)
+    assert "sync" not in fns(plan(state(listings=[inside], own_journal_pending=True, **scan))), \
+        "a selection inside the window waits for its outcome"
+    settled_own = Listing(5, SETTLED, allocated_at=10**6 - 10, unapplied=True)
+    assert ("sync", [5], 0) in plan(state(listings=[settled_own], own_journal_pending=True, **scan))
+    expired_own = Listing(5, ALLOCATED, allocated_at=10**6 - 3_601, unapplied=True)
+    assert ("sync", [5], 0) in plan(state(listings=[expired_own], own_journal_pending=True, **scan))
+    kicked = Listing(6, P.WITHDRAWN)
+    assert "sync" not in fns(plan(state(listings=[kicked], **scan))), "an unpaid scan waits for a paid one"
+    assert ("sync", [6, 5], 0) in plan(state(listings=[kicked, settled_own], own_journal_pending=True, **scan))
+    assert ("sync", [6], 0) in plan(state(listings=[kicked], locked_shares=E, owed_estimate=E // 10, blackout=False, **scan)), \
+        "holders waiting are served even when the scan is unpaid"
+    assert plan(state(listings=[kicked], pending_deposits=E, **scan))[0] == ("sync", [], 0), \
+        "in a checkpoint window the paid scan runs first, the terminal after it without a scan"
+    assert P.journal_backlog_floor(state(markup_bps=0, routine_budget=1, **scan)) == (120_000 + 28 * 30_000) * 200_000_000
     assert "checkpoint" in fns(plan(state(journal_cursor=7, completed_prefix=100_007, pending_deposits=E)))
     assert "sync" not in fns(plan(state(journal_cursor=7, completed_prefix=100_007)))
     assert "checkpoint" not in fns(plan(state(pending_receipts=1, pending_deposits=E)))

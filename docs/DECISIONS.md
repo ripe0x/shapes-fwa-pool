@@ -1045,3 +1045,35 @@ All tests and rehearsals of this candidate ran with Foundry 1.8.1, the version t
 the image itself passed the fork rehearsal in CI. Earlier 1.9.0 receipts remain valid for their
 contract gas: bytecode depends on solc settings, not on the Foundry version. `FOUNDRY_DIR` is pinned
 because the current installer otherwise writes to `~/.config/.foundry`.
+
+## D75. A scan of the vault's own positions replaces the global journal for small vaults (engineering, 2026-11-19)
+
+The D72 gate failed at the 2 ETH canary (median −5.3%, 9 of 16 seeds lose). Root cause, reproduced
+exactly from `sim/formal.py`: 1.203 of the 1.525 ETH a year of routine keeper pay bought on-chain
+reads of FWA's global acquisition journal: 92,120 records a year were read at the 22,000 quoted gas
+each (16.6k marginal measured), whatever the vault's size. The journal proves that no own selection
+was missed, but it costs in proportion to FWA's global activity, not to the vault's own work.
+
+`src/ScanLib.sol` `rebase` proves the same completeness by reading `listings(id)` for every open
+position the book holds Active (29,337 gas each, measured, `docs/receipts/scan-gas.json`), selecting
+in allocation order each one FWA shows Allocated or Settled (at most 16; otherwise no state change and
+the journal runs), then moving the cursor to `nextSequenceToProcess`. It is sound because FWA allocates
+a listing only inside `processAcquisitions` while advancing that counter, and an Allocated listing can
+only become Settled. VaultLib takes it automatically whenever `open * Q_SCAN <= min(backlog, 128) *
+Q_JOURNAL`, so it never costs more than the next journal batch and stays inside that batch's gas
+envelope; vaults with more than 93 open positions keep the journal. `Q_SCAN = 30,000`. The scan
+component is paid only when the call applied an own selection or is the required checkpoint tail, so
+a cycle's terminal work split into later calls cannot earn a second scan. PackVault is unchanged; the
+read loop lives in a second library only for EIP-170 size (VaultLib 24,440 bytes, ScanLib 1,935).
+`script/release.py` derives both CREATE2 addresses and checks the VaultLib→ScanLib link.
+
+Keeper (`keeper/policy.py`): a scan vault does no work for FWA's global activity alone. It waits for
+each own selection to settle or expire and then selects and resolves it in one paid call; other
+terminal and cleanup work rides along with the next paid scan unless holders are waiting, a checkpoint
+is due or the vault is winding down. In a checkpoint window the paid scan runs first and terminals
+follow without a scan.
+
+Unchanged: the payment formula (quoted gas x min(basefee + 0.05 gwei, 0.5 gwei) + 0.00002 ETH per
+work unit, no premium), ceilings, budgets, the canary's D71 refill (0.01 ETH a day; main's 0.0008 is
+assessed as an alternative), essential pay disabled (D64), liabilities, the trailing-30-day gate.
+Results and limits: `docs/KEEPER-ECONOMICS.md`.

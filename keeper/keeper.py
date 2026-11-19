@@ -267,11 +267,12 @@ def read_state(vault, slowdown, burn=False):
         if status == policy.ACTIVE and not witness:
             witness = i  # candidates are minimum cached debt first
         cached = index.position(i)
-        if cached and cached["state"] == 1 and status in (policy.ALLOCATED, policy.SETTLED):
-            own_journal_pending = True
+        unapplied = bool(cached and cached["state"] == 1 and status in (policy.ALLOCATED, policy.SETTLED))
+        own_journal_pending |= unapplied
         listings.append(policy.Listing(i, status, allocated_at, pend, owed,
                                        crown_locked=(i == top and now < top_since + 12 * 3600),
-                                       value=int(cached["value"]) if cached else 0, backing=num(f[5])))
+                                       value=int(cached["value"]) if cached else 0, backing=num(f[5]),
+                                       unapplied=unapplied))
     total = [num(x) for x in lines(at(vault, "totals()(uint256,uint256,uint256,uint256,uint256,uint256)"))]
     allocation = lines(at(vault, "allocationState()(uint256,uint256,uint256,uint64,bool)"))
     balance = quantity(rpc("eth_getBalance", vault, hex(head)))

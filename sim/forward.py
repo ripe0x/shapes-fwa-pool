@@ -18,6 +18,7 @@ equally over active listings; selection odds proportional to 1 / backing. FWA to
 """
 import json
 import copy
+import functools
 import heapq
 from itertools import islice
 from fractions import Fraction
@@ -43,6 +44,7 @@ P = 3 * 10**16
 SUR, CUT, S_FEE, BID_RATE = 0.05, 0.01, 0.01, 0.90
 ASK, PREMIUM = 0.033, 0.10
 MINT_FEE = 10**15
+MARK_DAYS = 30  # operating marks interval (diagnostics may lower it)
 DAY = 86_400
 WORK_FEE = 2 * 10**13  # wei per unit of work, canary value (D55)
 CEILING = 0.5  # gwei: canary gasCeiling; above it the keeper waits (D45, D51)
@@ -216,13 +218,18 @@ def charge_state(gas, open_positions, pool=0):
                         essential_ceiling=int(ESSENTIAL_CEILING * GWEI), processing_pool=pool)
 
 
-def backing_proposals(target, positions, minimum=0, maximum=2**256 - 1):
+def backing_proposals(target, positions, minimum=0, maximum=2**256 - 1, count=policy.MAX_BATCH["list"]):
     """Bounded offchain identifier proposals, using current outstanding identifiers."""
     if not target:
         return []
-    reserved = {p.backing for p in positions.values()}
-    return policy.propose_backings(target, len(reserved), policy.MAX_BATCH["list"],
-                                   lambda b: b in reserved, minimum=minimum, maximum=maximum)
+    return list(_proposals(target, frozenset(p.backing for p in positions.values()), minimum, maximum, count))
+
+
+@functools.lru_cache(maxsize=65_536)
+def _proposals(target, reserved, minimum, maximum, count):
+    # Speed only: the proposals are a pure function of these arguments.
+    return tuple(policy.propose_backings(target, len(reserved), count, reserved.__contains__,
+                                         minimum=minimum, maximum=maximum))
 
 
 def economic_nav(v, credit):
@@ -364,7 +371,10 @@ def run(sc, n_target, seed, days=365, values=None):
     v.routine_rate, v.essential_rate = values["routineRatePerDayWei"], values["essentialRatePerDayWei"]
     journal = deque()  # (our listing ID or None, actual selection time)
     journal_paid = journal_own = journal_foreign = journal_pruned = terminal_work = 0
-    journal_rebased = 0
+    journal_rebased = journal_scans = journal_scanned = journal_skipped = 0
+    # Operating-period diagnostics (timed mode): time-weighted deployed capital and book value, and
+    # keeper passes that left due work waiting for gas or deferred it.
+    last_tick = deployed_int = book_int = gas_wait_seconds = deferred_seconds = settlement_wait_seconds = 0
     self_serve_cost = skipped_funding = call_limit_days = 0
     g0 = g_of(0) if callable(g_of) else g_of
     st0 = charge_state(int(g0 * GWEI), 0)
@@ -451,13 +461,18 @@ def run(sc, n_target, seed, days=365, values=None):
 
     ticks = clock if timed else ((d * DAY, "day", None) for d in range(days + exit_days))
     for now, event_kind, payload in ticks:
+        if timed and now // DAY < days and now > last_tick:
+            deployed_int += (now - last_tick) * (v.active_backing + v.active_count * 3 * policy.UNIT)
+            book_int += (now - last_tick) * (v.free() + v.tracked_value + v.active_backing)
+        last_tick = max(last_tick, now)
         event_order += 1
         d = now // DAY
         absolute_now = (clock.start if timed else 0) + now
         v.sync_budget(now)
-        if d <= days and d % 30 == 0 and str(d) not in operating_budget_marks:
+        if d <= days and d % MARK_DAYS == 0 and str(d) not in operating_budget_marks:
             operating_budget_marks[str(d)] = dict(elapsed_seconds=now, routine_budget_wei=v.routine_budget,
-                routine_paid_wei=routine_paid, free_wei=v.free(), positions=len(v.positions))
+                routine_paid_wei=routine_paid, free_wei=v.free(), positions=len(v.positions),
+                fees_wei=v.fees_received, lost_wei=v.backing_lost, selections=selected)
         gas = int((g_of(d) if callable(g_of) else g_of) * GWEI)
         for day, key, val in sc.get("changes", []):
             if day != d or (timed and (day, key) in applied_changes):
@@ -522,6 +537,7 @@ def run(sc, n_target, seed, days=365, values=None):
                             # Empirical purchaser behaviour: (seconds or None for silence, kept).
                             delay, kept = sc["response_sampler"](rng)
                             response_keep[chosen] = kept
+                        settlement_wait_seconds += clock.SETTLEMENT if delay is None else min(int(delay), clock.SETTLEMENT)
                         if delay is not None:
                             clock.push(now + int(delay), "response", chosen)
                 journal.append((chosen, absolute_now if chosen is not None else 0))
@@ -611,7 +627,9 @@ def run(sc, n_target, seed, days=365, values=None):
                     hydrated, owed_after = bounded_policy_positions(v, absolute_now, clock.SETTLEMENT,
                                                                      returned_order, selected_times, owed_after)
                 listings = [policy.Listing(i, p.status, allocated_at=selected_times.get(i, p.allocated_at) if timed else p.allocated_at, pending_fees=p.pending_fees,
-                                           value=p.value, backing=p.backing) for i in hydrated for p in [v.positions[i]]]
+                                           value=p.value, backing=p.backing,
+                                           unapplied=p.state == ACTIVE and p.status in (ALLOCATED, SETTLED))
+                            for i in hydrated for p in [v.positions[i]]]
                 st = policy.State(
                     now=absolute_now, gas_price=gas + tip, base_fee=gas, gas_ceiling=ceiling, max_tip=tip,
                     markup_bps=values["payMarkupBps"], share_bps=values["keeperShareBps"], k=k, backing=backing,
@@ -644,13 +662,21 @@ def run(sc, n_target, seed, days=365, values=None):
                                   up(P * 10_000, int(BID_RATE * 10_000)),
                                   up(P * E, k - keep_bps * 10**14), cycle * E // (k - E) + 1)
                     maximum = 2**256 - 1 if sc.get("exempt", True) else cap * (10_000 - values["bufferBps"]) // 10_000
-                    st.backing_proposals = backing_proposals(backing, v.positions, minimum, maximum)
-                    reserved = {p.backing for p in v.positions.values()}
-                    build_minimum = max(minimum, up((cycle + policy.build_cost(st)) * E, k - E))
-                    build_quote = policy.propose_backings(backing, len(reserved), 1, lambda b: b in reserved,
-                                                          minimum=build_minimum, maximum=maximum)
-                    st.restock_proposals = build_quote * policy.MAX_BATCH["restock"]
+                    # Speed only: with no idle pack and idle ETH below one backing, the planner can
+                    # use neither list nor restock proposals, so skipping them changes no decision.
+                    if v.idle_packs or st.idle_eth >= minimum:
+                        st.backing_proposals = backing_proposals(backing, v.positions, minimum, maximum)
+                        build_minimum = max(minimum, up((cycle + policy.build_cost(st)) * E, k - E))
+                        build_quote = backing_proposals(backing, v.positions, build_minimum, maximum, 1)
+                        st.restock_proposals = build_quote * policy.MAX_BATCH["restock"]
                 planned = policy.plan(st)
+                if timed and calls == 0 and d < days:
+                    waiting = v.idle_packs or any(l.status in (SETTLED, WITHDRAWN) or (l.status == ALLOCATED and
+                                                  absolute_now >= l.allocated_at + clock.SETTLEMENT) for l in listings)
+                    if waiting and st.gas_price > st.gas_ceiling:
+                        gas_wait_seconds += clock.poll
+                    elif any(l.status in (SETTLED, WITHDRAWN) for l in listings) and not any(a[0] == "sync" for a in planned):
+                        deferred_seconds += clock.poll
                 Q = policy.Q
                 essential = v.locked_shares != 0
                 executed = False
@@ -723,6 +749,14 @@ def run(sc, n_target, seed, days=365, values=None):
                             assert all(i is None for i, _ in journal)
                             entries = []
                         own_ids = [i for i, _ in entries if i is not None]
+                        # ScanLib.rebase: read the open positions instead of the journal when cheaper.
+                        found = [(at, i) for i, at in journal if i is not None]
+                        scanned, scan_now = 0, False
+                        if (not unexposed and journal and len(v.positions) * Q["scan"] <= min(len(journal), policy.MAX_BATCH["journal"]) * Q["journal"]
+                                and len(found) <= policy.MAX_BATCH["selected"]):
+                            entries, scan_now = [], True
+                            own_ids = [i for _, i in sorted(found)]
+                            scanned = sum(p.state == ACTIVE for p in v.positions.values())
                         expired_ids = [i for i in action[1] if timed and i in v.positions
                                        and v.positions[i].status == ALLOCATED and v.positions[i].expired
                                        and (v.positions[i].state == ALLOCATED or i in own_ids)]
@@ -740,13 +774,13 @@ def run(sc, n_target, seed, days=365, values=None):
                             if i not in resolved and (i in own_ids or (p and p.state == ALLOCATED)):
                                 break
                             pruned += 1
-                        if not entries and not resolved and not pruned and not rebase_count:
+                        if not entries and not scan_now and not resolved and not pruned and not rebase_count:
                             continue
                         checkpoint_due = (st.blackout and st.queue_drained and not st.checkpoint_done_this_interval
                                           and (st.pending_deposits or st.locked_shares or st.distribution_bps))
                         tail_base = Q["journal_tail"] + (Q["distribution_proof"]
                             if st.distribution_bps and not (st.pending_deposits or st.locked_shares) else 0)
-                        tail_q = tail_base + len(entries) * Q["journal"] + pruned * Q["pruned"]
+                        tail_q = tail_base + len(entries) * Q["journal"] + scanned * Q["scan"] + pruned * Q["pruned"]
                         distribution_probe = v
                         if pruned and st.distribution_bps and not (st.pending_deposits or st.locked_shares):
                             distribution_probe = copy.deepcopy(v)
@@ -754,11 +788,12 @@ def run(sc, n_target, seed, days=365, values=None):
                         tail_paid = checkpoint_due and (st.pending_deposits or st.locked_shares
                             or distribution_probe.distribution_tail(policy.quote(st, tail_q), credit))
                         journal_paid_work = (len(entries) == policy.MAX_BATCH["journal"] or own_ids or resolved
-                                             or (entries and tail_paid))
-                        required_tail = (entries and len(entries) < policy.MAX_BATCH["journal"]
-                                         and not own_ids and not resolved and tail_paid)
+                                             or ((entries or scanned) and tail_paid))
+                        required_tail = bool((entries or scanned) and len(entries) < policy.MAX_BATCH["journal"]
+                                             and not own_ids and not resolved and tail_paid)
                         base_q = tail_base if required_tail else Q["sync"]
-                        gas_q = base_q + (len(entries) * Q["journal"] if journal_paid_work else 0) + len(own_ids) * Q["selected"] \
+                        gas_q = base_q + (len(entries) * Q["journal"] if journal_paid_work else 0) \
+                            + (scanned * Q["scan"] if own_ids or required_tail else 0) + len(own_ids) * Q["selected"] \
                             + len(resolved) * Q["synced"] + pruned * Q["pruned"]
                         if ((unexposed and not v.tracked_value) or (rebase_count and not pruned)
                                 or (not journal_paid_work and not own_ids and not resolved and not pruned)):
@@ -791,6 +826,12 @@ def run(sc, n_target, seed, days=365, values=None):
                             assert v.advance_unexposed()
                             journal.clear()
                             journal_rebased += rebase_count
+                        if scan_now:
+                            assert v.scan_rebase(found) == scanned
+                            journal_scans += 1
+                            journal_scanned += scanned
+                            journal_skipped += len(journal) - len(found)
+                            journal.clear()
                         for i, at in entries:
                             journal.popleft()
                             if i is not None:
@@ -827,7 +868,7 @@ def run(sc, n_target, seed, days=365, values=None):
                                                sync_collection_gas=gas_q - base_gas_q)
                         journal_paid += pay(gas_q, len(resolved), False, liability=essential)
                         journal_own += len(own_ids)
-                        journal_foreign += len(entries) - len(own_ids)
+                        journal_foreign += 0 if scan_now else len(entries) - len(own_ids)
                         journal_pruned += pruned
                         terminal_work += len(resolved)
                     elif fn == "harvest":
@@ -940,7 +981,7 @@ def run(sc, n_target, seed, days=365, values=None):
                         pay(gas_q, len(proposals))
                     else:
                         continue
-                    rebased_now = v.acquisition_cursor - journal_own - journal_foreign - journal_rebased
+                    rebased_now = v.acquisition_cursor - journal_own - journal_foreign - journal_rebased - journal_skipped
                     for _ in range(rebased_now):
                         skipped_id, _at = journal.popleft()
                         assert skipped_id is None, "unexposed proof cannot hide an own selection"
@@ -1010,7 +1051,7 @@ def run(sc, n_target, seed, days=365, values=None):
                         v.positions[v.allocation_queue[v.allocation_head]].state != ALLOCATED))
                        or v.allocated_value * 10_000 > end_nav * v.allocated_bound_bps)
     assert len(journal) == v.completed_prefix - v.acquisition_cursor
-    assert journal_own + journal_foreign + journal_rebased == v.acquisition_cursor
+    assert journal_own + journal_foreign + journal_rebased + journal_skipped == v.acquisition_cursor
     supply = v.total_shares
     d_ = v.pending.get("h", [0, 0])
     unpriced = d_[0] if d_[1] >= v.epoch else 0
@@ -1048,6 +1089,11 @@ def run(sc, n_target, seed, days=365, values=None):
                 positions=len(v.positions), pos_mean=float(np.mean(open_days)), pos_max=max(open_days, default=0),
                 checkpoints=checkpoints, journal_paid=journal_paid / deposit, journal_backlog=len(journal),
                 journal_own=journal_own, journal_foreign=journal_foreign, journal_pruned=journal_pruned, journal_rebased=journal_rebased,
+                journal_scans=journal_scans, journal_scanned=journal_scanned, journal_skipped=journal_skipped,
+                avg_deployed_wei=deployed_int // max(1, days * DAY) if timed else 0,
+                avg_book_wei=book_int // max(1, days * DAY) if timed else 0,
+                gas_wait_seconds=gas_wait_seconds, deferred_terminal_seconds=deferred_seconds,
+                settlement_wait_seconds=settlement_wait_seconds,
                 terminal_work=terminal_work, pending_receipts=len(v.receipts), end_pricing_blocked=end_blocked,
                 skipped_unfunded=skipped_funding, call_limit_days=call_limit_days,
                 self_serve_gas_proxy=(holder_maintenance_gas - holder_keeper_pay if exit_all else self_serve_cost) / deposit,
