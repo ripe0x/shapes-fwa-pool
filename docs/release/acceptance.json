@@ -1,0 +1,156 @@
+{
+ "name": "PackVault mainnet canary acceptance package (unsigned)",
+ "commit": "e8458b55e4a8f113459615298936491a7e4abdaa",
+ "manifest_sha256": "9a9f5b137bf5682c2f15c7f76d44655ab7f7b52c9c8bc6ae58f405c6a2a6da71",
+ "deployment_values": "deploy/canary.json",
+ "deployment_values_sha256": "530dbc542ae3dc4ab9e6a1e39218fccef7c5b2d80a5057835d23b9ef6f69138c",
+ "asset_flow_outcomes_sha256": "226c8e341787202636d706aa374942fcc2fb016d6bea6815966fd094132cc2d1",
+ "signing": "printf %s <sha256 of this file> | ssh-keygen -Y sign -f <owner key> -n packvault-release > deploy/release-acceptance.sig",
+ "engineering": {
+  "full_suite": "237 of 243 forge tests passed in one run, 2 opt-in skipped; 4 failures resolved and rerun to pass (docs/receipts/release-verify/SUMMARY.md)",
+  "reconciliations": "both fork cycles match the Python model to the wei",
+  "regimes": "16 asset-flow regimes, zero bucket mismatches; O3-O10 within bounds; O2 fails",
+  "sizes": {
+   "PackVault": 24136,
+   "VaultLib": 24304,
+   "KeeperPolicyV1": 216,
+   "limit": 24576
+  },
+  "largest_sync_measured_gas": 2540933,
+  "largest_sync_padded": 3176166,
+  "combined_sync_bound_padded": 10576250,
+  "tx_cap": 16777216,
+  "rehearsal": {
+   "block": 26450200,
+   "hash": "0xda7052eb890b621f2ed635feb0af056e155f801305427af666aa7930d4baabc5",
+   "result": "pass",
+   "holder_loss_wei": 16145496644398700,
+   "holder_paid_in_wei": 1990182217000000000,
+   "seed_residue_wei": 10025117557698457
+  },
+  "image_ci_run": 44577532617,
+  "image_result": "PASS",
+  "independent_review": "no defects; items A3 below"
+ },
+ "economic": {
+  "window": {
+   "start": 1792512215,
+   "end": 1795104215,
+   "successful": 11604,
+   "refunded": 5090,
+   "successful_per_day": 386.8,
+   "daily_successful": null,
+   "purchaser_responses": {
+    "DepositorBidAccepted": 8134,
+    "NFTKept": 2391,
+    "DepositorBidAcceptedAsTokens": 888,
+    "silent": 191
+   }
+  },
+  "canary_0_5_gwei": {
+   "runs": 16,
+   "completed_claims": 16,
+   "median_return_bps": -528,
+   "mean_return_bps": 531,
+   "p10_return_bps": -6710,
+   "worst_return_bps": -7539,
+   "loss_runs": 9,
+   "mean_creator_mint_fees_eth": 0.013875,
+   "mean_routine_keeper_eth": 1.525220375
+  },
+  "mainnet_6_8_eth_0_5_gwei": {
+   "runs": 16,
+   "completed_claims": 16,
+   "median_return_bps": 7624,
+   "mean_return_bps": 7520,
+   "p10_return_bps": 3424,
+   "worst_return_bps": -926,
+   "loss_runs": 1,
+   "mean_creator_mint_fees_eth": 0.066,
+   "mean_routine_keeper_eth": 4.43729153125
+  },
+  "mainnet_20_eth_0_5_gwei": {
+   "runs": 16,
+   "completed_claims": 16,
+   "median_return_bps": 4941,
+   "mean_return_bps": 4989,
+   "p10_return_bps": 1776,
+   "worst_return_bps": 1393,
+   "loss_runs": 0,
+   "mean_creator_mint_fees_eth": 0.1394375,
+   "mean_routine_keeper_eth": 6.521608718749999
+  },
+  "bid_outcome_0_5_gwei": {
+   "total_price_gwei": 0.5,
+   "backing_wei": 49947348578411618,
+   "k": 1.0384605,
+   "edge_before_gas_wei": 1921000000000000,
+   "cycle_quote_wei": 676000000000000,
+   "net_wei": 1245000000000000,
+   "positive": true
+  },
+  "exit_windows": {
+   "blackouts": 60,
+   "usable_blackouts": 59,
+   "days_with_usable_window": 30,
+   "days": 30,
+   "minimum_per_day_met": true
+  },
+  "holder_return_requirement": "FAIL at the 2 ETH canary; pass at 6.8 and 20 ETH"
+ },
+ "decisions": [
+  {
+   "id": "A1",
+   "requirement": "OWNER-REQUIREMENTS A.3/A.8, B2 O1: holder return >=10%/yr",
+   "status": "fails at 2 ETH canary",
+   "recommendation": "deploy the 2 ETH canary as an owner-funded functional test, review after 14 days or 5 real selections",
+   "cost": "about 0.06 ETH routine pay over 14 days at 0.5 gwei"
+  },
+  {
+   "id": "A2",
+   "requirement": "asset-flow O2: quoted gas per position built and listed <= 1,750,000",
+   "measured": 1919655,
+   "exception_gas": 169655,
+   "exception_eth_per_position_at_0_5_gwei": "0.0000848275",
+   "yearly_eth": {
+    "canary": 0.0039,
+    "mainnet_6_8": 0.019,
+    "mainnet_20": 0.039
+   }
+  },
+  {
+   "id": "A3",
+   "item": "raised constants",
+   "values": {
+    "MAX_ROUTINE_RATE": "0.01->0.02 ETH/day",
+    "Q_PACK_UNIT": "35000->100000",
+    "Q_SELECTED": "160000->180000",
+    "Q_REQUIRED_TAIL": "110000->120000"
+   }
+  },
+  {
+   "id": "A4",
+   "item": "spending and owner-key bounds",
+   "canary_first_24h_routine_eth": 0.04,
+   "canary_daily_routine_eth": 0.01,
+   "compromised_owner_first_24h_eth": 0.055,
+   "compromised_owner_daily_eth": 0.025,
+   "checkpoint_per_interval_eth": 0.00074
+  },
+  {
+   "id": "A5",
+   "item": "coverage limits",
+   "text": "no authentic >16 own allocations; combined sync is a bound; pure-128 success bounded; keeper races cost gas"
+  },
+  {
+   "id": "A6",
+   "item": "new unsigned asset-flow outcomes replace the 2026-11-17 signature for this candidate"
+  },
+  {
+   "id": "A7",
+   "item": "signing authorizes no broadcast, funding or Fly deployment"
+  }
+ ],
+ "human_readable": "docs/release/ACCEPTANCE.md",
+ "runbook": "docs/release/RUNBOOK.md"
+}
