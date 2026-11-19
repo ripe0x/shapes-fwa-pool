@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {TestVaultOps} from "../../utils/TestVaultOps.sol";
+
 import {ForkBase} from "../../fork/ForkBase.sol";
 import {PackVault} from "../../../src/PackVault.sol";
 import {VaultLib} from "../../../src/VaultLib.sol";
@@ -10,7 +12,7 @@ contract IndependentCheckpointCaller {
     function run(PackVault vault) external returns (uint256) {
         require(block.basefee == 0.15 gwei, "basefee inside call");
         require(tx.gasprice == 0.2 gwei, "gas price inside call");
-        return vault.checkpoint(0);
+        return TestVaultOps.checkpoint(vault, 0);
     }
 }
 
@@ -59,7 +61,7 @@ contract IndependentChallenge is ForkBase {
         assertEq(vault.lockedShares(), aliceShares);
         // The redemption prices in the same interval.
         vm.prank(keeper);
-        vault.checkpoint(0);
+        TestVaultOps.checkpoint(vault, 0);
         assertEq(vault.lockedShares(), 0, "redemption priced without waiting an interval");
     }
 }

@@ -1,0 +1,77 @@
+{
+  "revision": "2f3ca40023c001f7c65b8ecb16d54d106962ec2e",
+  "source_sha256": {
+    "src/PackVault.sol": "1dc1ddb5d4c09057f34797efdff5d87929898c51bda671423de23625e7687af2",
+    "src/VaultLib.sol": "259d85003ff2392be404ead8d067edc92b1277044ee905e4f3640235bc760aae",
+    "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a",
+    "sim/vault.py": "bc3784c2574e1b631b0971974a0913c85a2de691755cfabde1b1dfbee6c0c49a",
+    "sim/reconcile.py": "cbbe9121e1a1bf6c68fb6ef2b8d430a761175d31a2cc727ff2e000a5fce9eaff",
+    "test/fork/ForkIncrementalProduction.t.sol": "211071b3fb8f5d7057564e094ec948195e966719a324620e705fb47608558109",
+    "test/fork/ForkReconcile.t.sol": "2ecce3650a2ed3e55c20c39a148d55794065f646c15619cc2bf21b0ee28ae849",
+    "test/fork/ForkPartialReconcile.t.sol": "1e47036316c3471575abd8d1a06f36e2c87ddec63ffd1f28e74f9982bb48dc82"
+  },
+  "scope": "Focused refreshed production receiver and two recorded fork accounting lifecycles on repaired source; no blockchain broadcasts",
+  "checks": [
+    {
+      "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-contract ForkProductionReceiptsTest --match-test 'test_production(Cold(KeepFee0|KickAfterFalseSettledBidCandidate)|LowGas(Keep|Kick)RecordsOrFailsAtomically)' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vvvv",
+      "exit_status": 0,
+      "passed": 4,
+      "failed": 0,
+      "raw": "review-journal-receiver.txt"
+    },
+    {
+      "command": "forge test --match-path test/fork/ForkReconcile.t.sol --match-test test_reconcileFullCycle --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "passed": 1,
+      "failed": 0,
+      "raw": "review-journal-reconcile-full.txt",
+      "trace": "review-journal-reconcile-full-trace.jsonl"
+    },
+    {
+      "command": "forge test --match-path test/fork/ForkPartialReconcile.t.sol --match-test test_reconcilePartialRedemptionAndWindDown --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "passed": 1,
+      "failed": 0,
+      "raw": "review-journal-reconcile-partial.txt",
+      "trace": "review-journal-reconcile-partial-trace.jsonl"
+    },
+    {
+      "command": "python3 sim/reconcile.py",
+      "exit_status": 1,
+      "raw": "review-journal-reconcile-python-first.txt",
+      "result": "Partial exact; full lifecycle cursor +1 before catchup. Replay sets future completed-prefix input before simulated restock/list; new unexposed admit rebase reveals chronology error. Root owns correction."
+    }
+  ],
+  "receiver": {
+    "runtime_bytes": 24322,
+    "keep_gas": 46462,
+    "difficult_kick_gas": 69730,
+    "stipend": 100000,
+    "min_headroom": 30270,
+    "keep_attempts": 40,
+    "keep_atomic_failures": 22,
+    "keep_recorded": 18,
+    "kick_attempts": 59,
+    "kick_atomic_failures": 40,
+    "kick_recorded": 19
+  },
+  "limitations": [
+    "Exact callback gas is a nested frame, not whole transaction billed gas.",
+    "99 sampled low-gas attempts establish only sampled atomic failure/receipt capture.",
+    "No receiver security guarantee or release readiness follows from focused checks.",
+    "Reconciliation replay failure remains visible until its input chronology is corrected; fork traces themselves passed."
+  ],
+  "things_that_do_not_make_sense": [
+    "Existing ForkReconcile comment says keeper gas pay depends on gasleft; production uses fixed quotes. No source change made to that comment.",
+    "Replaying an end-of-setup completed prefix before listing exposes future global history to the simulator; chronological inputs must match the fork path."
+  ],
+  "replay_repair": {
+    "source": "sim/reconcile.py",
+    "source_sha256": "cbbe9121e1a1bf6c68fb6ef2b8d430a761175d31a2cc727ff2e000a5fce9eaff",
+    "change": "Initialize completed prefix at setup initCursor during modeled restock/list; reveal selected completedPrefix only after listings exist, matching real chronology.",
+    "command": "python3 sim/reconcile.py",
+    "exit_status": 0,
+    "raw": "review-journal-reconcile-python-fixed.txt",
+    "result": "Both current fork traces reconcile every vault bucket to the wei. No Solidity rerun needed: source and recorded traces unchanged."
+  }
+}

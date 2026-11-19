@@ -1,0 +1,44 @@
+name: Keeper image rehearsal
+
+# Builds the production keeper image (keeper/Dockerfile, the image Fly deploys) and runs it against a
+# fresh local mainnet fork: encrypted disposable keystores, primary and backup workers, container
+# replacement on the same volume, and a lost RPC response. Local simulated funds only.
+on:
+  push:
+    branches: [codex/incremental-position-integration]
+    paths: [keeper/**, script/**, src/**, deploy/**, foundry.toml, .github/workflows/keeper-image.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Toolchain pinned like the image
+        run: |
+          FOUNDRY=$(sed -n 's/.*foundryup --install \([^ ]*\).*/\1/p' keeper/Dockerfile)
+          export FOUNDRY_DIR="$HOME/.foundry"
+          curl -L https://foundry.paradigm.xyz | bash
+          ~/.foundry/bin/foundryup --install "$FOUNDRY"
+          echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
+          python3 -m pip install --no-cache-dir -r keeper/requirements.txt
+      - name: Build contracts
+        run: forge build --skip test
+      - name: Build production image
+        run: docker build --platform linux/amd64 -f keeper/Dockerfile -t packvault-keeper:${{ github.sha }} .
+      - name: Image smoke and shared volume
+        run: python3 keeper/test_packaging.py --image packvault-keeper:${{ github.sha }}
+      - name: Image against a fresh fork
+        shell: bash  # pipefail: a failed rehearsal fails the job despite tee
+        run: python3 keeper/rehearse_image.py --image packvault-keeper:${{ github.sha }} | tee image-rehearsal.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: image-rehearsal
+          path: image-rehearsal.json

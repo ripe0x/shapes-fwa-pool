@@ -1,0 +1,116 @@
+{
+  "step": "Completed exact owner-approved local amended receipt calibration, not economic/release acceptance",
+  "code_revision": "aa38fabb2ec60573d7393933839d066426c6059f",
+  "source_sha256": {
+    "src/PackVault.sol": "448106b8915413badef411355a5cb729ca15046743be768919d74e9349ddcd8b",
+    "src/VaultLib.sol": "8223991816433e0aff0b50253d6daa212d822f5545ad53ca04482efbf94d5252",
+    "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a",
+    "src/interfaces/External.sol": "d50229cf80a4a036c9ba3f4f8bb60452129ee51dc7ca0263ad612b2ea76e499d",
+    "script/Deploy.s.sol": "2a059502479a22360346994c7e5246fff96db98bff3f03a8586b610f0ac23d36",
+    "script/DeployCore.sol": "9246881b6c6fe32325ce1af731e083f5ed68a79b95f170f8db0cc93fa4e7d2b3",
+    "script/deploy.sh": "cd740c8dd3debc457c52aa8b558f004e465a397802f9562d01e7c76bc2ee5d67",
+    "test/fork/ForkKeeperPolicy.t.sol": "803b97992b420327c08098fc40a9eb8380879988ea01d686cafc55130f50b026",
+    "keeper/policy.py": "8e6ee88e5a1b86712c11c1d6d264844c48d820f576646631ed14bdec681061d0",
+    "keeper/tx.py": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230",
+    "keeper/keeper.py": "30c1af8cc1483561ebefa3b36c110cb7ede200e9b36f8ca922b08e53594d3d0e",
+    "keeper/index.py": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63",
+    "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520",
+    "lib/solady/src/utils/FixedPointMathLib.sol": "bb0c06fe117d69df9bff7baf442255aa114e1c01d1ebe077213e2eb4e06ae2d6",
+    "lib/solady/src/utils/ReentrancyGuard.sol": "aeeda18221419e3409255c6505e0eb78fe13e3bd8329663cfa56a0316a970eaf",
+    "lib/solady/src/utils/SafeTransferLib.sol": "9d3f890f184b26b67f56097085e8a3286089a1c77e390f1a5bd4498cbeb0956e",
+    "keeper/efficient_journal_rehearsal.py": "bd54f4eabd3fe7239fc8c1f0694c48c4ada7d835e55ae281eb765fedfda65b0c",
+    "keeper/efficient_journal_candidate.py": "abaa9f45ef303829f2bd7350cd482132f5d9a49da829648bf9237b5e6979ca88",
+    "docs/receipts/efficient-journal-recovery-review.py": "e9186a9fa591260d6d00be1573c0f1287d64c4c73b9c5660c212760801ae175b"
+  },
+  "additional_verified_source_sha256": {
+    "src/PackVault.sol": "448106b8915413badef411355a5cb729ca15046743be768919d74e9349ddcd8b",
+    "src/VaultLib.sol": "8223991816433e0aff0b50253d6daa212d822f5545ad53ca04482efbf94d5252",
+    "keeper/policy.py": "8e6ee88e5a1b86712c11c1d6d264844c48d820f576646631ed14bdec681061d0",
+    "keeper/test_policy.py": "2d33f0ebf2a829059fb231fff472c24b7b4d7465a790774c9dfcd3d8625500fa",
+    "keeper/efficient_journal_candidate.py": "abaa9f45ef303829f2bd7350cd482132f5d9a49da829648bf9237b5e6979ca88",
+    "test/fork/EfficientJournal.t.sol": "1a042d2d45780fb241a416058ac0405e9d83189430d4035a172a69adf2d3720b",
+    "sim/vault.py": "e958d86859ff9ddd9e2766459683f77cf9caea9ac87691be6360d2e92614ba7a",
+    "sim/forward.py": "f36f9295aec5c41583e2c6a6763134c2f1dc30a33f5e8790e55c96747685daa7",
+    "sim/efficient_operating.py": "027df41dfb2e6d9153c465351863ca4fa3af95afb89a50ac3491e1e847832e90",
+    "test/scenario/VaultFlow.t.sol": "324d0e538fbb977ae63bd1ff2fe770032d2317a9a05e7b970aaf8e9ac4da75da"
+  },
+  "approved_original_sha256": "1c7e115fe1f62751f0b0bc6c478817d214e1bd97c1f1f09259d9cb48ff1340fd",
+  "approved_amendment_sha256": "23aaa40e8dd8d8cdaac03ba3662bb83dc39b3ef64d5b17c8d5a5a7687af99089",
+  "owner_answer": "Approve the amended local candidate batch",
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "-u",
+        "keeper/efficient_journal_candidate.py",
+        "--execute-approved-amendment",
+        "--approved-amendment-sha256",
+        "23aaa40e8dd8d8cdaac03ba3662bb83dc39b3ef64d5b17c8d5a5a7687af99089"
+      ],
+      "exit_status": 0,
+      "elapsed_wall_seconds": 676.5509912967682,
+      "result": "199candidate/517cumulative transactions; entry restored; no broadcast repairs or topups"
+    },
+    {
+      "command": [
+        "python3",
+        "docs/receipts/efficient-journal-analyze-candidate.py"
+      ],
+      "exit_status": 0,
+      "result": "All24exact cases, cumulativecount/value, sourcefreeze, receipt fees/payments, protected/free cash and signed-estimate margins verified offline"
+    },
+    {
+      "command": "Read-only Python/cast postflight to owned127.0.0.1:8559, archived actual RPC results",
+      "exit_status": 0,
+      "artifact": "docs/receipts/efficient-journal-candidate-postflight.json",
+      "result": "OwnedPID96649/fork26418539/source/artifact freeze; exactentry6actors/head; empty pool; automine"
+    },
+    {
+      "command": "Independent read-only arithmetic over archived receipts and conditional harvest traces",
+      "exit_status": 0,
+      "artifact": "docs/receipts/efficient-final-receipt-review.md",
+      "result": "No actionable inconsistency found within bounded stored-record/narrative review"
+    }
+  ],
+  "reused_verification": "docs/receipts/efficient-quote-candidate-verification.json; code/config/dependencies unchanged from executed source; no duplicate build or broad release run",
+  "cumulative_transactions": 517,
+  "cumulative_external_value_wei": 27869594973162081536,
+  "initial_funding_wei": 8300000000000000000,
+  "topups": 0,
+  "candidate_broadcast_repairs": 0,
+  "entry_restored": true,
+  "artifact_sha256": {
+    "docs/EFFICIENT-JOURNAL-RESULTS.md": "45799093de3c40b524208e150f45d9cc2e98155cef76d6c3503030edb5d92629",
+    "docs/GAS.md": "80d764569a909ab49bac4c731e35b4f71d519ce9fafc0421c7b1d97aac43fdec",
+    "docs/KEEPER.md": "fd23462247e750ec74f014b6fd268b2c0828c8f1241cfc6ae609acdab395124a",
+    "docs/POSITION-INTEGRATION-PR.md": "d7b48882a65f61d7e0b66fc68905a50c9734e105e64134e28d0df1d74113bcff",
+    "docs/REPORT.md": "521e17db059f500386b636202d2c4bd6f682c87cd947d0d4f034abdc8b4d6d25",
+    "docs/REVIEW-FUNDING-PROPOSAL.md": "c6f5d1bde0e8c4231c1b56e7637303fc1f70fca98025e76a2af8cdb122f18f9a",
+    "docs/receipts/efficient-candidate-analysis-first-schema-failure.txt": "8b5099a28ddd431c4c67b118efc4523f7f1008ee733b11496c55f953d9b27fab",
+    "docs/receipts/efficient-final-receipt-review.md": "f4c5f2ca79c8d26d1a352be2d67a822233bd3bca33e84cd44fc1259df92875d9",
+    "docs/receipts/efficient-harvest-next-step.md": "13cd2e9e3dca7c6f53e4707e5fd6c79ecfc3cc5e0491d5a19748892ff5ec5984",
+    "docs/receipts/efficient-harvest-payment-attribution.json": "65c27efa23ca599756e9aae71085c728639c28a15edf6bab4715ac9318be9d58",
+    "docs/receipts/efficient-journal-analyze-candidate.py": "dffda1ccb2b7df290f032ea1bf10aab73ad77692bf63430b3d9fc94d5aa8399c",
+    "docs/receipts/efficient-journal-approved-candidate-run.txt": "4b186fdc0503f898f979828406ac9228dc8f01d82f47b7d6d80167e6759c9136",
+    "docs/receipts/efficient-journal-baseline-and-candidate.md": "18e6b16d8e932326988a89182fb46f6ebe2e6941ee04740febc4a3dbc66bcce5",
+    "docs/receipts/efficient-journal-candidate-analysis.txt": "6258ad5f204da0ceb1ae319d7614d66442531639dae52fc5ec958b0068dc9a16",
+    "docs/receipts/efficient-journal-candidate-ledger.json": "3b184047ba54785b08f87a203b6a936b5007703f85109f539bec0471105623f3",
+    "docs/receipts/efficient-journal-candidate-postflight.json": "fc5a05196d64b27d7425bfa4744d6b538379fbb4c1ed566b049f95e07637abf6",
+    "docs/receipts/efficient-journal-candidate-results.json": "2e9f459dd783833cef7c938eebf2d229e3198ba06c85f366bc994de54e4b5942",
+    "docs/receipts/efficient-journal-candidate-summary.json": "7e4b5acddbf932d9d660d3d8720c88c8b203cf5630283d9bb90215d3ffbc62b4",
+    "docs/receipts/efficient-journal-execution-status.json": "f7994737dcb67512db47855d985c9a1e140ce31e279dcf9e4477e2f3c107dad7"
+  },
+  "limitations": [
+    "Calibrationtransactions use minPay0; real ordinary80percent-minPay estimates/gates are separate, not actual80percent receipts.",
+    "OneActivecandidate versus40baseline: no matched-state source-only savings claim.",
+    "Successfulforeign, combinedownmaximum and authenticprepriced-holder cashcycle remain gaps.",
+    "FullholderQ360 standalone receipt is baseline source evidence, not repeated on candidate.",
+    "Conditionaltimed model is not a fullfork replay, funding forecast or annualreturn acceptance.",
+    "O2 remains1919655>1750000; O6routine0.0002 fixture passes; economicfunding/holderreturn/harvesteligibility remain unresolved.",
+    "No allowance, mintfee, minimumTVL, subsidy, publicdeployment, owneroutcomesignature or merge change."
+  ],
+  "preserved_failures": [
+    "Candidate offline analysis first rejected the distinct GreedyCREATE schema; explicitly recognized its frozen zero-value path and reconciled all actions/deployments. No chain retries or added transactions resulted.",
+    "Baseline operator/cache/timestamp/HTTP2 failures and prior invalid dailyclock evidence remain separately archived without overwriting."
+  ]
+}

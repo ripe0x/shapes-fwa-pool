@@ -1,0 +1,75 @@
+Position accounting adapter probe
+Run date: 2026-11-18
+Research only. No production source changes or remote writes.
+Toolchain: Foundry 1.9.0, Solidity 0.8.30, optimizer 200, via_ir, cancun.
+Source: test/research/ReceiptIdentity.t.sol
+
+Command:
+forge test --rpc-url https://mainnet.gateway.tenderly.co --match-path test/research/ReceiptIdentity.t.sol --fork-retries 10 --fork-retry-backoff 1000 --compute-units-per-second 100 -vv
+
+No files changed, compilation skipped
+
+Ran 12 tests for test/research/ReceiptIdentity.t.sol:ReceiptIdentityTest
+[PASS] test_controlledFeeCreditHarvestDoesNotCreateAsyncReceipt() (gas: 40792205)
+[PASS] test_controlledWithdrawalDoesNotCreateAsyncReceipt() (gas: 2895553)
+[PASS] test_lowGasKeepNeverCommitsAnUnrecordedPayment() (gas: 48526206)
+Logs:
+  failed gas limits: 22
+  successful gas limits: 18
+  first successful gas limit: 460000
+
+[PASS] test_lowGasKickNeverCommitsAnUnrecordedPayment() (gas: 61011343)
+Logs:
+  failed kick gas limits: 39
+  successful kick gas limits: 20
+  successful kicks with stuck NFT: 0
+  first successful kick gas limit: 410000
+
+[PASS] test_protocolAndStrangerGiftsDoNotDuplicateTerminalReceipt() (gas: 41167044)
+[PASS] test_realCashBidDoesNotInventETHReceipt() (gas: 40930884)
+[PASS] test_realKeepAtDefaultFee() (gas: 40960989)
+Logs:
+  receiver logic gas: 44740
+  receiver gas bound including instrumentation: 47740
+
+[PASS] test_realKeepAtMaximumFee() (gas: 40963933)
+Logs:
+  receiver logic gas: 44740
+  receiver gas bound including instrumentation: 47740
+
+[PASS] test_realKeepAtZeroFee() (gas: 40951186)
+Logs:
+  receiver logic gas: 44740
+  receiver gas bound including instrumentation: 47740
+
+[PASS] test_realKickChecksSettledBidDecoyAndRecordsCorrectID() (gas: 42925324)
+Logs:
+  receiver logic gas: 67737
+  receiver gas bound including instrumentation: 70737
+
+[PASS] test_realRelistIdentifiesReceiptWithoutNFTTransfer() (gas: 41198263)
+Logs:
+  receiver logic gas: 44740
+  receiver gas bound including instrumentation: 47740
+
+[PASS] test_realSilentPurchaserReclaimIdentifiesReceipt() (gas: 40930554)
+Logs:
+  receiver logic gas: 44740
+  receiver gas bound including instrumentation: 47740
+
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 12.33s (73.57s CPU time)
+
+Ran 1 test suite in 12.33s (12.33s CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)
+
+Interpretation:
+Whole test gas includes fixture minting, listing and VRF replay, and sometimes
+many snapshot replay attempts. It is not the gas required by one production
+settlement. The receiver measurements above isolate the bounded payment handler.
+
+The prototype prepares a nonzero receipt slot at listing and keeps a biased
+pending counter. Its earlier unprepared version failed the difficult kick path:
+FWA force-sent the payment without a receipt after the handler exceeded its gas
+stipend. That failed version is not the design recommended by the plan.
+
+These tests do not implement or prove the complete vault accounting integration,
+tag retirement and reuse, or checkpoint scaling. See POSITION-ACCOUNTING-PLAN.md.

@@ -1,0 +1,43 @@
+Intermediate integration record, before final source/quote freeze.
+Base revision: f75ee770d0f0bce55a5f2607a23a3ee0104d1df1 plus working changes.
+Exit status: 1
+Scope/limits: exact whole-tree source hash was not captured at execution for this intermediate run. The final frozen acceptance manifest supersedes intermediate pass counts. Gas meters report gross execution plus intrinsic/calldata, before transaction refunds, unless explicitly labeled otherwise. Historical real Tenderly forks only; pure static checks do not claim execution. The exact command follows.
+Command: forge test --match-path test/fork/ForkVaultLifecycle.t.sol --match-test 'test_depositListRedeem_roundTrip|test_edgeGateStopsListingWhenCrownShareRaised|test_paddedSyncPaysOnlyForWorkDone' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv
+
+Compiling 1 files with Solc 0.8.30
+Solc 0.8.30 finished in 3.85s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:171:35:
+    |
+171 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:564:5:
+    |
+564 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+
+Ran 3 tests for test/fork/ForkVaultLifecycle.t.sol:ForkVaultLifecycleTest
+[PASS] test_depositListRedeem_roundTrip() (gas: 23393735)
+[FAIL: backing back, less gas pay: 72599999999990000 != 72600000000000000] test_edgeGateStopsListingWhenCrownShareRaised() (block: 26424971) (gas: 7229824)
+[PASS] test_paddedSyncPaysOnlyForWorkDone() (gas: 6500266)
+Suite result: FAILED. 2 passed; 1 failed; 0 skipped; finished in 801.18ms (343.97ms CPU time)
+
+Ran 1 test suite in 1.09s (801.18ms CPU time): 2 tests passed, 1 failed, 0 skipped (3 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/fork/ForkVaultLifecycle.t.sol:ForkVaultLifecycleTest
+[FAIL: backing back, less gas pay: 72599999999990000 != 72600000000000000] test_edgeGateStopsListingWhenCrownShareRaised() (block: 26424971) (gas: 7229824)
+
+Encountered a total of 1 failing tests, 2 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 1 failed test
+Tip: Run `forge test --debug --match-test <TEST_NAME>` to inspect one failing test in the debugger

@@ -1,0 +1,35 @@
+{
+  "source_sha256": {
+    "src/PackVault.sol": "1dc1ddb5d4c09057f34797efdff5d87929898c51bda671423de23625e7687af2",
+    "src/VaultLib.sol": "51fd0f008b590b9d85a862d0418038b834d31e34c6cab07264600b69c4740498",
+    "sim/forward.py": "d129f9cb4a644fcd011825be8b837714ab03d1b341ab2ba022e14010e046c105",
+    "sim/vault.py": "bc3784c2574e1b631b0971974a0913c85a2de691755cfabde1b1dfbee6c0c49a",
+    "sim/reconcile.py": "cbbe9121e1a1bf6c68fb6ef2b8d430a761175d31a2cc727ff2e000a5fce9eaff",
+    "keeper/policy.py": "023df5a03eff840d9967af3e6200250b34c11e4103a83275e3fcb56c1a9107f4",
+    "deploy/mainnet.json": "bcf29731a40d403a77c8380b3f4b691406995b2182ce42bb90d7d2993f76b489",
+    "deploy/canary.example.json": "f50e7a3dd992c2ff7e155471fbef727ac0ae4e6ffbd0e418bdf8dfd4d3665015",
+    "docs/receipts/review-journal-forward-q360-funding.json": "42f06a7b2f4dd2825de0bcf13737fb102d2c2988a44ea82476630c444b664115",
+    "docs/receipts/review-journal-forward-q360-selfcheck.txt": "6b3906881b7cd19ac7275ca4fdef3424409eed829f7ee56e8e8691bebb084f5a",
+    "docs/receipts/review-journal-forward-q360-generator.py": "987679f9b9c859f5cfb1fdb1284cda7b131c069db262d12288a4418f74ca5b42"
+  },
+  "database_sha256": "430881b0555cda5c0a6161b7c7be1b973fd58a7a4dd0217a7ccd32d491af7819",
+  "commands": [
+    "python3 /private/tmp/review-forward-q360.py matrix",
+    "python3 /private/tmp/review-forward-q360.py self-check"
+  ],
+  "execution_exit_status": 0,
+  "results": {
+    "matrix_rows": 8,
+    "focused_selfchecks": 7
+  },
+  "source_context": "Fresh Q_CHECKPOINT360000; unchanged85000syncbase/30000journal; source hashes measured after run on frozen production source",
+  "limits": [
+    "Single random seed per illustrative30day regime; not a forecast or annual return gate.",
+    "Gas is a fixed keeper quote; actual caller gas beyond explicitly identified proxies is not modeled.",
+    "Holder end value includes independently marked assets and unharvested fees; not realized exit cash.",
+    "Minimum free cash sampled at initialization and after successful keeper calls, not a continuous minimum.",
+    "Exact vault model reconciled with fresh real fork traces; forward stochastic external-event approximations are not fork replay."
+  ],
+  "historical_q400_matrix": "review-journal-forward-funding.json",
+  "reproducible_generator": "review-journal-forward-q360-generator.py"
+}

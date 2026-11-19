@@ -1,0 +1,72 @@
+{
+  "endpoint": "http://127.0.0.1:8557",
+  "fork_block": 26418539,
+  "max_gas": 16777216,
+  "pid": 98279,
+  "fork_hash": "0x6bd9b2b1b4f8a69f234bdaf92fe78650113485f168e8a134890ef75f7bfae0e2",
+  "actions": "/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/pack-vault-review-journal-replacement-m_lz3n75/actions.jsonl",
+  "funding": {
+    "0xe0980b9f7f5fb4a98813552894f4e980836cda7c": {
+      "before_code": "0x",
+      "before_nonce": 0,
+      "before_balance": 0,
+      "funded": 100000000000000000
+    },
+    "0xdd4b0d7470953fb19b97fa130a15af59537bc523": {
+      "before_code": "0x",
+      "before_nonce": 0,
+      "before_balance": 0,
+      "funded": 900000000000000000
+    },
+    "0xb9a3188644d5a55a98c68b056a2685cd6c915725": {
+      "before_code": "0x",
+      "before_nonce": 0,
+      "before_balance": 0,
+      "funded": 200000000000000000
+    },
+    "0x6b401c3364dfb17fe7d54237fc04aba3f7739dd0": {
+      "before_code": "0x",
+      "before_nonce": 0,
+      "before_balance": 0,
+      "funded": 200000000000000000
+    },
+    "0x2c42b18832cef2eb8c8c0f83250700176694e341": {
+      "before_code": "0x",
+      "before_nonce": 0,
+      "before_balance": 0,
+      "funded": 1500000000000000000
+    },
+    "0x37dcd875c4e367e080f1e05f18f10db0d45a65b5": {
+      "before_code": "0x",
+      "before_nonce": 0,
+      "before_balance": 0,
+      "funded": 100000000000000000
+    }
+  },
+  "approval": "owner-approved-review-journal-replacement-3ETH",
+  "node_command": [
+    "anvil",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "8557",
+    "--accounts",
+    "0",
+    "--silent",
+    "--fork-url",
+    "https://mainnet.gateway.tenderly.co",
+    "--fork-block-number",
+    "26418539",
+    "--fork-retry-backoff",
+    "5000",
+    "--retries",
+    "30",
+    "--base-fee",
+    "150000000",
+    "--code-size-limit",
+    "24576",
+    "--gas-limit",
+    "16777216",
+    "--enable-tx-gas-limit"
+  ]
+}

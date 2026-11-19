@@ -1,0 +1,275 @@
+block 26450203 vault 0x2113cd2d86788331e4ef44e4e428da0a112f68d6
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  event index at block 26418239; target 26450205; next pass resumes bounded replay
+  
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  event index at block 26434239; target 26450205; next pass resumes bounded replay
+  
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1
+  gas 0.142 gwei, 0 open, 0 idle packs, idle 0.0050 ETH, cycle net 1.567 mETH, 7d volume 173/day
+  status RESERVE_BELOW_NEED [info] reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH
+  sent checkpoint nonce 0 hash 0x6361f7495e8d3fdf726a928111a01b490e4dfd920fb4b533974ff7c103a80aca
+  mined checkpoint gas 238458 (est 257844) cost 33975388533900 pay 71292638000000 net 37317249466100 wei
+  sent restock nonce 1 hash 0x60ec0da13f99820464f7dd5b2e31c2cd737e4b7fa5b32f9d0dcde5fe771ddc1a
+  mined restock gas 9594648 (est 9986643) cost 1259280413958672 pay 1529544407820000 net 270263993861328 wei
+  sent list nonce 2 hash 0xf9dfcada179a942176866ab7f989db194c078ec921a6d9b5dc8d747af06c456d
+  mined list gas 6057352 (est 6238332) cost 803861231690664 pay 1073033496160000 net 269172264469336 wei
+  sent list nonce 3 hash 0x3e42faf48c965586c38f7c0e9add5d32c48e3993cd638aaecb844edfd3169d06
+  mined list gas 1720368 (est 1788548) cost 223364323353600 pay 290581936000000 net 67217612646400 wei
+  sent restock nonce 4 hash 0x8f2d96743929700c24f515c6b44927965394d660f328dc1df07e231516e8ad7b
+  mined restock gas 9614773 (est 9972856) cost 1172064038762022 pay 1434871453820000 net 262807415057978 wei
+  sent list nonce 5 hash 0x2e3937d570252e6db84ece48286b030a620843bba8811ca78059b28aa25a6407
+  mined list gas 5966018 (est 6146998) cost 735109846348934 pay 1007727201440000 net 272617355091066 wei
+  sent list nonce 6 hash 0xcbd7f929b4f7741a0d7f2cf4befa342bde06ee7daf75f7f950c3e77e4b7c65bc
+  mined list gas 1690964 (est 1759144) cost 203884778232256 pay 272706090720000 net 68821312487744 wei
+  sent restock nonce 7 hash 0x93bf56a50ec3c90b9ce245c1c291c48f475ae0074577033797a5f2a21848fa35
+  mined restock gas 6027215 (est 6245828) cost 684268031329800 pay 815804884600000 net 131536853270200 wei
+  sent list nonce 8 hash 0x95f1ce7da210f3e366fbeff16715be23f933fd649bb700d689754782f938bde3
+  mined list gas 3841551 (est 3970931) cost 427542610371219 pay 590251254945000 net 162708644573781 wei
+  done: 9 sent, 0 failed
+  
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1
+  gas 0.100 gwei, 25 open, 0 idle packs, idle 0.0176 ETH, cycle net 1.621 mETH, 7d volume 173/day
+  status RESERVE_BELOW_NEED [info] reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH
+  nothing to do
+  
+[listed] balance 0.022644 open 25 idle 0 loose 5 tokens 0 lastNav 2.000000
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  event index at block 26418314; target 26450216; next pass resumes bounded replay
+  
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  event index at block 26434314; target 26450216; next pass resumes bounded replay
+  
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1
+  gas 0.094 gwei, 25 open, 0 idle packs, idle 0.0000 ETH, cycle net 1.629 mETH, 7d volume 173/day
+  status WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue
+  status REDEMPTION_LIQUIDITY_SHORT [wait] 0.9723 ETH owed to redeemers beyond free ETH
+  status ESSENTIAL_BUDGET_EMPTY [action] unlisting and liquidation are unpaid; holders can run them; sync uses routine permission
+  status RESERVE_BELOW_NEED [info] reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH
+  sent liquidate nonce 2 hash 0x60c3ff11c5734c11ba6ed34e096491b1b2b22a3e4a71e4ed8b9cbf771f140d69
+  mined liquidate gas 294210 (est 369942) cost 27616124035080 pay 0 net -27616124035080 wei
+  sent unlist nonce 3 hash 0xcd5d09d4132afd01d02cb871f0e9de93e47c3d6b8723be9e87ef3f197e91d7e9
+  mined unlist gas 3475392 (est 4346420) cost 307831070474688 pay 0 net -307831070474688 wei
+  sent liquidate nonce 4 hash 0x7f8349ddf84ffcaba1aa49ac4d47d6c1a9f39bf98dcff6bee60841f70ca619fb
+  mined liquidate gas 1760348 (est 2202615) cost 150950457121800 pay 0 net -150950457121800 wei
+  sent liquidate nonce 5 hash 0xcca0e208edd96a59d2e0e84adab8b0ac934d614fac4b4e3384ec4cc49ee97c2d
+  mined liquidate gas 271336 (est 341350) cost 22309064667552 pay 0 net -22309064667552 wei
+  done: 4 sent, 0 failed
+  
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1
+  gas 0.075 gwei, 12 open, 2 idle packs, idle 0.0071 ETH, cycle net 1.653 mETH, 7d volume 155/day
+  status ESSENTIAL_BUDGET_EMPTY [action] unlisting and liquidation are unpaid; holders can run them; sync uses routine permission
+  status RESERVE_BELOW_NEED [info] reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH
+  sent checkpoint nonce 9 hash 0xf6369e488a7202efbaa43ac18bbaeba22048877a8f78fe72675ed8a7dd7434ea
+  mined checkpoint gas 295459 (est 329945) cost 22094989233067 pay 46921488680000 net 24826499446933 wei
+  done: 1 sent, 0 failed
+  
+[partial withdrawal claimed] balance 0.019589 open 12 idle 2 loose 0 tokens 0 lastNav 0.997509
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1
+  gas 0.067 gwei, 12 open, 2 idle packs, idle 0.0000 ETH, cycle net 1.663 mETH, 7d volume 155/day
+  status REDEMPTION_LIQUIDITY_SHORT [wait] 0.9679 ETH owed to redeemers beyond free ETH
+  status ESSENTIAL_BUDGET_EMPTY [action] unlisting and liquidation are unpaid; holders can run them; sync uses routine permission
+  status RESERVE_BELOW_NEED [info] reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH
+  sent liquidate nonce 8 hash 0x16b23648347e325b02fcc417c1a7ff5a40e817bb893fae5b9900faf0de528c04
+  mined liquidate gas 439857 (est 552001) cost 29357054655390 pay 0 net -29357054655390 wei
+  sent unlist nonce 9 hash 0x1aa052709c9094398d92c58523a4a4c413d26e5eb2c974824f39b53efe7da375
+  mined unlist gas 3102935 (est 3880848) cost 200943656516570 pay 0 net -200943656516570 wei
+  sent liquidate nonce 10 hash 0xbe23e474bbd05887ede6ed81819ca1c88e13c702aa482d2613ffb14f3f057211
+  mined liquidate gas 1760348 (est 2202615) cost 111952406387956 pay 0 net -111952406387956 wei
+  sent liquidate nonce 11 hash 0x134ef0c962efc6af446a846cf436c09da27d889a2f4ce11b32258b2566ab103b
+  mined liquidate gas 436352 (est 547619) cost 27164576246528 pay 0 net -27164576246528 wei
+  done: 4 sent, 0 failed
+  
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1
+  gas 0.059 gwei, 0 open, 0 idle packs, idle 0.0050 ETH, cycle net 1.673 mETH, 7d volume 142/day
+  status ESSENTIAL_BUDGET_EMPTY [action] unlisting and liquidation are unpaid; holders can run them; sync uses routine permission
+  status RESERVE_BELOW_NEED [info] reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH
+  sent checkpoint nonce 10 hash 0xb852e7bd560e65b008d3aa2f9aeb96a4abec0f3cd7c7b67f5862c15cdfc6ac6f
+  mined checkpoint gas 220883 (est 255369) cost 13131835393352 pay 41402555840000 net 28270720446648 wei
+  done: 1 sent, 0 failed
+  
+[complete withdrawal claimed] balance 0.010025 open 0 idle 0 loose 0 tokens 0 lastNav 0.010022
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  event index at block 26418314; target 26450217; next pass resumes bounded replay
+  
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  event index at block 26434314; target 26450217; next pass resumes bounded replay
+  
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1
+  gas 0.088 gwei, 25 open, 0 idle packs, idle 0.0000 ETH, cycle net 1.636 mETH, 7d volume 173/day
+  status WINDING_DOWN [info] 25 positions, 0 idle packs left to unwind
+  status WAITING_CHECKPOINT_WINDOW [wait] flows wait for FWA's blackout with a drained queue
+  status REDEMPTION_LIQUIDITY_SHORT [wait] 1.9673 ETH owed to redeemers beyond free ETH
+  status ESSENTIAL_BUDGET_EMPTY [action] unlisting and liquidation are unpaid; holders can run them; sync uses routine permission
+  sent liquidate nonce 1 hash 0xa9a73dde3838ff74e1582b48bdbe048c146007a4a735056145790a0e18de785f
+  mined liquidate gas 281035 (est 353473) cost 24840055536775 pay 0 net -24840055536775 wei
+  sent unlist nonce 2 hash 0x188b4b3187b694879377f7c9a190c789fea2e7d8c2594f90ec9ded35723479f3
+  mined unlist gas 4147760 (est 5186879) cost 347375119831280 pay 0 net -347375119831280 wei
+  sent liquidate nonce 3 hash 0xc642d84f46758e1e7fba6f238a8c1cccf5abb1c1c15d3b8b7550651a66adcebb
+  mined liquidate gas 1741193 (est 2178671) cost 142111415720724 pay 0 net -142111415720724 wei
+  sent liquidate nonce 4 hash 0x06327f92347591dbb2872f31ee0470842736efacc0a2983ba00b5f86d1b275ea
+  mined liquidate gas 1085547 (est 1359113) cost 85199639363415 pay 0 net -85199639363415 wei
+  sent unlist nonce 5 hash 0x1394390864d43208f2b25a121f2cd201bfba9a181747f0f7caeaca3e4f340692
+  mined unlist gas 2418237 (est 3024976) cost 182300109347691 pay 0 net -182300109347691 wei
+  sent liquidate nonce 6 hash 0xc52ea7f92530279bd35353a9ae40e782d67370bc12dc7b3644638b8de3d3ac41
+  mined liquidate gas 1577004 (est 1973435) cost 115321740247428 pay 0 net -115321740247428 wei
+  done: 6 sent, 0 failed
+  
+  client {"__main__": {"loaded_code_sha256": "ca2d3d697fe9a231c54f15be422d938c7918d0bcb54962de8ec55ad856ad8aab", "source_sha256_at_import": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb"}, "index": {"loaded_code_sha256": "fdeb4489bf88a3b545c460ca179270c35c55755ab7297827b93ab44cf2bb7d30", "source_sha256_at_import": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63"}, "policy": {"loaded_code_sha256": "fd698b5514661147f02c86e670d9c7826f9cbe9607a5529983df3ccb45d3e14a", "source_sha256_at_import": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b"}, "tx": {"loaded_code_sha256": "e2ea0736803f57ad12db1b01b116ab37c5865ddb5bf0264ecd0483d38264e26c", "source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230"}}
+  error: reorg: checkpoint 0xf6369e488a7202efbaa43ac18bbaeba22048877a8f78fe72675ed8a7dd7434ea no longer in block 26450222; chain state is re-read
+  error: reorg: checkpoint 0xb852e7bd560e65b008d3aa2f9aeb96a4abec0f3cd7c7b67f5862c15cdfc6ac6f no longer in block 26450230; chain state is re-read
+  policy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6 v1
+  gas 0.068 gwei, 0 open, 0 idle packs, idle 0.0000 ETH, cycle net 1.661 mETH, 7d volume 155/day
+  status WINDING_DOWN [info] 0 positions, 0 idle packs left to unwind
+  status REDEMPTION_LIQUIDITY_SHORT [wait] 0.0049 ETH owed to redeemers beyond free ETH
+  status ESSENTIAL_BUDGET_EMPTY [action] unlisting and liquidation are unpaid; holders can run them; sync uses routine permission
+  sent checkpoint nonce 9 hash 0x3c1fd619ae4def714e55e2660a8fda54ae733df89c55978736ef0e6f242f773c
+  mined checkpoint gas 255083 (est 289569) cost 17392127009841 pay 44545601720000 net 27153474710159 wei
+  done: 1 sent, 0 failed
+  
+[wound down] balance 0.010031 open 0 idle 0 loose 0 tokens 0 lastNav 0.010022
+{
+ "fork_block": 26450200,
+ "fork_hash": "0xda7052eb890b621f2ed635feb0af056e155f801305427af666aa7930d4baabc5",
+ "vault": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6",
+ "real_owner_replaced": "0xCB43078C32423F5348Cab5885911C3B5faE217F9",
+ "phases": {
+  "partial": {
+   "shares_requested": 98536324327737536,
+   "shares_remaining": 98536324327737536,
+   "charge_wei": 56000000000000,
+   "protected": {
+    "pendingDepositTotal": 0,
+    "redemptionReserve": 1,
+    "distributionReserve": 0,
+    "claimableTotal": 0,
+    "processingPool": 0
+   },
+   "open": 12,
+   "idle": 2
+  },
+  "holder_workflow": {
+   "holder_claims_wei": 1974982962034276543,
+   "keeper_pay_wei": 678575299465000,
+   "holder_balance_change_wei": -16145496644398700,
+   "deposit_wei": 1990081341000000000,
+   "charges_wei": 100876000000000,
+   "holder_tx_gas_wei": 946241678675243,
+   "holder_operator_spent_wei": 878124410105564,
+   "holder_operator_paid_wei": 0,
+   "holder_operator_calls": [
+    {
+     "label": "liquidate",
+     "gas_used": 294210,
+     "cost": 27616124035080,
+     "pay": 0
+    },
+    {
+     "label": "unlist",
+     "gas_used": 3475392,
+     "cost": 307831070474688,
+     "pay": 0
+    },
+    {
+     "label": "liquidate",
+     "gas_used": 1760348,
+     "cost": 150950457121800,
+     "pay": 0
+    },
+    {
+     "label": "liquidate",
+     "gas_used": 271336,
+     "cost": 22309064667552,
+     "pay": 0
+    },
+    {
+     "label": "liquidate",
+     "gas_used": 439857,
+     "cost": 29357054655390,
+     "pay": 0
+    },
+    {
+     "label": "unlist",
+     "gas_used": 3102935,
+     "cost": 200943656516570,
+     "pay": 0
+    },
+    {
+     "label": "liquidate",
+     "gas_used": 1760348,
+     "cost": 111952406387956,
+     "pay": 0
+    },
+    {
+     "label": "liquidate",
+     "gas_used": 436352,
+     "cost": 27164576246528,
+     "pay": 0
+    }
+   ],
+   "shares_remaining": 0,
+   "total_shares": 1000000000000000,
+   "dead_shares": 1000000000000000,
+   "vault_balance_wei": 10025117557698457,
+   "open": 0,
+   "idle": 0,
+   "loose": 0,
+   "protected": {
+    "pendingDepositTotal": 0,
+    "redemptionReserve": 2,
+    "distributionReserve": 0,
+    "claimableTotal": 0,
+    "processingPool": 0
+   }
+  },
+  "owner_wind_down": {
+   "holder_claims_wei": 1974973974730979156,
+   "keeper_pay_wei": 634796856665000,
+   "holder_balance_change_wei": -15213054456054434,
+   "owner_spent_wei": 897148080047313,
+   "owner_paid_wei": 0,
+   "open": 0,
+   "idle": 0,
+   "loose": 0,
+   "vault_balance_wei": 10030765303795844,
+   "winding_down": true,
+   "total_shares": 1000000000000000,
+   "protected": {
+    "pendingDepositTotal": 0,
+    "redemptionReserve": 1,
+    "distributionReserve": 0,
+    "claimableTotal": 0,
+    "processingPool": 0
+   }
+  }
+ },
+ "keeper": {
+  "stats": {
+   "sent": 12,
+   "mined": 10,
+   "reverted": 0,
+   "replaced": 0,
+   "dropped": 0,
+   "reorged": 2,
+   "skipped_expected": 0,
+   "skipped_loss": 0,
+   "spent_wei": 5560742789590908,
+   "paid_wei": 7130358965225000
+  },
+  "reverted": 0
+ },
+ "senders": {
+  "deposit, requestRedeem, claim": "holder, own gas",
+  "unlist, liquidate, sync during exit (keeper.py --max-loss-wei)": "holder in steps 2-3; owner in step 4; own gas, pay clipped to zero",
+  "checkpoint": "normal keeper; paid from the request charges (processingPool)",
+  "restock, list, routine sync": "normal keeper; paid from free vault ETH within the routine budget",
+  "startWindDown": "owner, own gas"
+ }
+}

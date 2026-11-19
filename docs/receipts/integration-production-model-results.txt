@@ -1,0 +1,55 @@
+Command: CANDIDATE_RUN=1 forge test --match-path test/fork/ProductionLedgerModel.t.sol --gas-limit 10000000000 -vv
+Inputs/hashes: integration-production-model-inputs.json
+Exit status: 0
+Scope: pure production accounting kernel through test harness. Gas includes individual calls only where named; scale fixture total gas4750775804 is setup and reference scans, not a production transaction. No external counterparty is replaced.
+
+Compiling 1 files with Solc 0.8.30
+Solc 0.8.30 finished in 2.08s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:175:35:
+    |
+175 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:572:5:
+    |
+572 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Ran 8 tests for test/fork/ProductionLedgerModel.t.sol:ProductionLedgerModelTest
+[PASS] testFuzz_randomizedLifecycleMatchesFullReference(uint256) (runs: 256, μ: 36870133, ~: 36812809)
+[PASS] test_backingFloorCoversMaximumFeeAtRoundingBoundary() (gas: 21677834)
+[PASS] test_duplicateTransitionsCannotDoubleCountPrincipalOrFees() (gas: 2357405)
+[PASS] test_feeRoundingAndWitnessCompleteness() (gas: 2314362)
+[PASS] test_fifoOnlyNeedsBoundedTombstoneCleanup() (gas: 3253007)
+[PASS] test_maximumPruneBatchHasBoundedProductionKernelGas() (gas: 10424649)
+Logs:
+  production kernel prune sixteen gas excluding financial payment: 156618
+
+[PASS] test_owedReturnsKeepPrincipalAndCannotBeSpentEarly() (gas: 1997603)
+[PASS] test_scale301_1000_10000MatchesReferenceAndHasConstantValuationGas() (gas: 4750775804)
+Logs:
+  bookkeeping positions: 301
+  cold NAV with zero fees: 18553
+  cold NAV with positive fees: 18652
+  cold selection transition: 129580
+  cold keep transition: 62205
+  cold one entry queue cleanup: 35418
+  bookkeeping positions: 1000
+  cold NAV with zero fees: 18553
+  cold NAV with positive fees: 18652
+  cold selection transition: 129580
+  cold keep transition: 62205
+  cold one entry queue cleanup: 35418
+  bookkeeping positions: 10000
+  cold NAV with zero fees: 18553
+  cold NAV with positive fees: 18652
+  cold selection transition: 129580
+  cold keep transition: 62205
+  cold one entry queue cleanup: 35418
+
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 41.08s (41.93s CPU time)
+
+Ran 1 test suite in 41.08s (41.08s CPU time): 8 tests passed, 0 failed, 0 skipped (8 total tests)

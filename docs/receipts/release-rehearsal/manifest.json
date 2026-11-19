@@ -1,0 +1,46 @@
+{
+  "endpoint": "http://127.0.0.1:8571",
+  "fork_block": 26450200,
+  "max_gas": 16777216,
+  "pid": 3722,
+  "fork_hash": "0xda7052eb890b621f2ed635feb0af056e155f801305427af666aa7930d4baabc5",
+  "actions": "/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/pack-vault-integration-batch-3kbo22n5/actions.jsonl",
+  "funding": {
+    "0xe0980b9f7f5fb4a98813552894f4e980836cda7c": {
+      "before_code": "0x",
+      "before_nonce": 0,
+      "before_balance": 0,
+      "funded": 10000000000000000000
+    },
+    "0xdd4b0d7470953fb19b97fa130a15af59537bc523": {
+      "before_code": "0x",
+      "before_nonce": 0,
+      "before_balance": 0,
+      "funded": 10000000000000000000
+    },
+    "0xb9a3188644d5a55a98c68b056a2685cd6c915725": {
+      "before_code": "0x",
+      "before_nonce": 0,
+      "before_balance": 0,
+      "funded": 10000000000000000000
+    },
+    "0x6b401c3364dfb17fe7d54237fc04aba3f7739dd0": {
+      "before_code": "0x",
+      "before_nonce": 0,
+      "before_balance": 0,
+      "funded": 10000000000000000000
+    },
+    "0x2c42b18832cef2eb8c8c0f83250700176694e341": {
+      "before_code": "0x",
+      "before_nonce": 0,
+      "before_balance": 0,
+      "funded": 10000000000000000000
+    },
+    "0x37dcd875c4e367e080f1e05f18f10db0d45a65b5": {
+      "before_code": "0x",
+      "before_nonce": 0,
+      "before_balance": 0,
+      "funded": 10000000000000000000
+    }
+  }
+}

@@ -1,0 +1,191 @@
+{
+  "scope": "Local fork correctness tests and isolated-call gas diagnostics. No public-network transactions.",
+  "base_commit": "e9cee616e40602ac475471df986f16c927a15448",
+  "source_state": "Working tree after final contract constants and removal of obsolete paid-harvest constants; hashes below authenticate this state.",
+  "source_sha256": {
+    "src/PackVault.sol": "38c9f37988377a0a9dca9b5026c28ba33b519bbe406608d0ac8c1add24b1d801",
+    "src/VaultLib.sol": "1310c034a0cca8f5e3f62ab076d6626d7947d6ce4456da2803a9e572535e430c",
+    "src/KeeperPolicy.sol": "612d2ccce98e642e89586372eeecfd31e6ceb7d0ecdf9df8c77899afc9010929",
+    "test/fork/CompleteHarvest.t.sol": "ba831ec79da2feb4260bc2a8c7731b6776e1fecc8f142a2cb87b871581dfdd85",
+    "test/fork/ForkKeeperPay.t.sol": "3d009e186d0cce1780c63f48b8341cbd6a71fa5dc1f3253481cdc577ce5ee0a0"
+  },
+  "compiler": {
+    "version": "0.8.30+commit.73712a01",
+    "via_ir": true,
+    "optimizer": true,
+    "optimizer_runs": 200,
+    "evm_version": "cancun",
+    "bytecode_hash": "none",
+    "cbor_metadata": false
+  },
+  "runtime": {
+    "PackVault": {
+      "bytes": 24136,
+      "eip170_headroom_bytes": 440
+    },
+    "VaultLib": {
+      "bytes": 24304,
+      "eip170_headroom_bytes": 272
+    },
+    "KeeperPolicyV1": {
+      "bytes": 216,
+      "eip170_headroom_bytes": 24360
+    }
+  },
+  "final_constants": {
+    "Q_REQUIRED_TAIL": 120000,
+    "Q_SELECTED": 180000,
+    "Q_CREDIT": 40000,
+    "Q_FUND": 40000,
+    "Q_HARVESTED": 80000,
+    "Q_PACK_UNIT": 100000,
+    "MAX_ROUTINE_RATE_WEI_PER_DAY": 20000000000000000
+  },
+  "routine_refill_change": {
+    "previous_max_wei_per_day": 10000000000000000,
+    "new_max_wei_per_day": 20000000000000000,
+    "other_hard_caps_changed": false,
+    "meaning": "Permission ceiling only. Increasing it creates no ETH and does not immediately refill spent capacity."
+  },
+  "focused_runs": [
+    {
+      "name": "main correctness and regression run",
+      "command": "CANDIDATE_RUN=1 /workspace/scratch/104f1b894a5c/cap-research-tools/forge test --match-path 'test/fork/{CompleteHarvest,EfficientJournal,ForkIncrementalProduction}.t.sol' --match-contract 'CompleteHarvestTest|CompleteCreditTest|EfficientJournalTest|ForkProductionFeeWitnessTest' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 --threads 1 --isolate -vv",
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0,
+      "suites": {
+        "CompleteCreditTest": 3,
+        "CompleteHarvestTest": 13,
+        "EfficientJournalTest": 5,
+        "ForkProductionFeeWitnessTest": 3
+      },
+      "source_variant": "Final sync and unpaid-harvest behavior; tail120000/selected180000; before final pack-unit slope, refill-ceiling and unused-constant/comment cleanup.",
+      "log": "docs/receipts/complete-contract-main-tests.log"
+    },
+    {
+      "name": "final constants and affected-path run",
+      "command": "CANDIDATE_RUN=1 /workspace/scratch/104f1b894a5c/cap-research-tools/forge test --match-path 'test/fork/{ForkKeeperPay,RestockEfficiency,CompleteHarvest}.t.sol' --match-test 'test_budgetsBoundSpendingOverTime|test_newRoutineRateCeilingOnlyRefillsPermission|test_fourUnitLeftoversAndMixedMintsPreserveExactRecipe|test_maximumThirtyUnitNoLeftovers|test_profile' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 --threads 1 --isolate -vv",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "suites": {
+        "CompleteCreditTest": 1,
+        "CompleteHarvestTest": 2,
+        "ForkKeeperPayTest": 2,
+        "RestockEfficiencyTest": 2
+      },
+      "source_variant": "Final source hashes listed above.",
+      "log": "docs/receipts/complete-contract-final-tests.log"
+    }
+  ],
+  "earlier_focused_runs": [
+    {
+      "command": "CANDIDATE_RUN=1 /workspace/scratch/104f1b894a5c/cap-research-tools/forge test --match-path test/fork/CompleteHarvest.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "source_variant": "Initial sync funding implementation; before final marginal quotes and additional cases."
+    },
+    {
+      "command": "CANDIDATE_RUN=1 /workspace/scratch/104f1b894a5c/cap-research-tools/forge test --match-path test/fork/CompleteHarvest.t.sol --match-test 'test_profile|test_duplicateCannot|test_firstCash' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 --threads 1 --isolate -vv",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "source_variant": "Initial marginal quotes; bounded-prefix cases and paired diagnostics."
+    },
+    {
+      "command": "CANDIDATE_RUN=1 /workspace/scratch/104f1b894a5c/cap-research-tools/forge test --match-path test/fork/CompleteHarvest.t.sol --match-test test_profileRefundedRequiredSingleton --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 --threads 1 --isolate -vv",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "source_variant": "Before final tail120000/selected180000 constants."
+    }
+  ],
+  "diagnostics": {
+    "method": "Forge isolated external-call frame gas, using vm.lastCallGas().gasTotalUsed. These are isolated receipt-equivalent diagnostics, not new signed transaction receipts.",
+    "paired_price_wei": 1,
+    "external_fee_source": "Authentic historical Chainlink request and fulfillment replay through real FWA; no mocked external fees or fee debts.",
+    "cash_setup": "The active-funding pair changes only local vault ETH to create the cash-short branch. It retains the same journal job and calldata.",
+    "credit": {
+      "without_collection": 279306,
+      "with_collection": 298823,
+      "increment": 19517,
+      "quoted_increment": 40000
+    },
+    "one_active_fee_claim": {
+      "without_collection": 2281335,
+      "with_collection": 2361607,
+      "increment": 80272,
+      "quoted_increment": 120000
+    },
+    "required_refunded_singleton": {
+      "billed_gas": 129457,
+      "final_quoted_gas": 142000,
+      "price_wei": 200000000
+    },
+    "limits": [
+      "The one-wei price makes small genuine historical fees eligible. These pairs do not prove keeper viability at production gas prices.",
+      "Per-test gas totals include setup and must not be used as operation transaction gas.",
+      "The preserved logs contain test-result stdout chunks, not the entire process stdout. Compiler diagnostics and tool transport envelopes were omitted."
+    ]
+  },
+  "pack_quote_calibration_limits": {
+    "current_signed_four_unit_two_leftover_billed_gas": 1099991,
+    "final_raw_quote": 1130000,
+    "historical_isolated_four_unit_two_leftover_billed_gas": 1170288,
+    "configured_work_fee_wei_per_pack": 20000000000000,
+    "configured_total_quote_gas_equivalent_at_0_5_gwei": 1210000,
+    "statement": "The raw gas quote covers the current signed sample. The older historical isolated sample requires the configured work fees; zero-work-fee coverage is not established for that sample. Larger packs receive a conservative linear quote.",
+    "current_signed_four_unit_two_leftover_price_wei": 500000000,
+    "current_signed_four_unit_two_leftover_provenance": {
+      "report": "docs/receipts/complete-cost-receipts.json",
+      "label": "four leftover two",
+      "price_wei": 500000000
+    }
+  },
+  "o2": {
+    "original_gas_quote_per_position": 1919655,
+    "original_limit": 1750000,
+    "result": "Still fails the original requirement. Three-unit pack, mint and listing quote constants were not lowered to manufacture a pass."
+  },
+  "log_sha256": {
+    "docs/receipts/complete-contract-main-tests.log": "806d84754ed54bfda06028f1d6a81b53ca440bf83113b955186e92a2a88d309c",
+    "docs/receipts/complete-contract-final-tests.log": "1968c66f3789cd987eed1c41c5cef802f8d0f72fb48b07545e561190fef9b437"
+  },
+  "simulation_review": {
+    "method": "Independent source and transaction-order comparison; no broad new simulation or fork run.",
+    "source_sha256": {
+      "sim/vault.py": "574967a741ceb4cabdaca366302d0fc8006029537a61b0d74dab6495d251529c",
+      "sim/forward.py": "2af21c78565fd760c6d991602a7178e65b3e1da03ad9bc0a07cfc04b77037d24",
+      "keeper/policy.py": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b",
+      "keeper/keeper.py": "32cc4754c35312960b4334a921ab7ef76cad98ebfa1299702dda55929f6b7db6"
+    },
+    "funding_helper_result": "No mismatch found between sync_fee_plan and final VaultLib._fundSync.",
+    "timed_order_checks": [
+      "Acquisition selection transfers pending active fees to external credit once before the vault synchronizes its book.",
+      "Purchaser keep and kick callbacks place actual backing cash in balance before sync. They are not added again through cash_delta.",
+      "Expired positions resolved inside sync supply only their prospective net backing through cash_delta.",
+      "Journal selections, terminal reconciliation and head pruning precede actual active fee claims and payment.",
+      "Distribution-only proof uses the pruned book and the total prospective quote. Retaining original credit in the preview equals cash plus remaining credit after a sweep.",
+      "Successful collection updates active fee debt, receives its cash once, subtracts collected external credit once and replans after the transaction."
+    ],
+    "preexisting_precision_limit": {
+      "description": "The forward loop materializes budget refill at every event; Solidity computes a lazy refill from the last stored budget timestamp. Per-event integer truncation can conservatively reduce modeled spending permission by a few wei.",
+      "reproduction": {
+        "routine_rate_wei_per_day": 20000000000000000,
+        "initial_routine_wei": 0,
+        "event_times_seconds": [
+          1,
+          2,
+          3
+        ],
+        "model_permission_wei": 694444444443,
+        "solidity_lazy_permission_wei": 694444444444,
+        "difference_wei": 1
+      },
+      "asset_effect": "No ETH or fee income is created. This is a permission-rounding difference, not an asset-ledger difference.",
+      "changes_made": false
+    }
+  }
+}

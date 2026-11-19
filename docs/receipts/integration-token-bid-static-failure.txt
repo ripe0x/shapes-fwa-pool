@@ -1,0 +1,49 @@
+Intermediate integration record, before final source/quote freeze.
+Base revision: f75ee770d0f0bce55a5f2607a23a3ee0104d1df1 plus working changes.
+Exit status: 1
+Scope/limits: exact whole-tree source hash was not captured at execution for this intermediate run. The final frozen acceptance manifest supersedes intermediate pass counts. Gas meters report gross execution plus intrinsic/calldata, before transaction refunds, unless explicitly labeled otherwise. Historical real Tenderly forks only; pure static checks do not claim execution. The exact command follows.
+Command: forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test test_realTokenBidReturnsPack --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv
+
+Error: Compiler run failed:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:175:35:
+    |
+175 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:572:5:
+    |
+572 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Error (9322): No matching declaration found after argument-dependent lookup.
+   --> test/fork/ForkIncrementalProduction.t.sol:639:9:
+    |
+639 |         assertGt(lower, (0.03 ether * 10_000 + 8_999) / 9_000, "economic floor leaves both tag directions usable");
+    |         ^^^^^^^^
+Note: Candidate:
+   --> lib/forge-std/src/StdAssertions.sol:755:5:
+    |
+755 |     function assertGt(uint256 left, uint256 right) internal pure virtual {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+Note: Candidate:
+   --> lib/forge-std/src/StdAssertions.sol:765:5:
+    |
+765 |     function assertGt(uint256 left, uint256 right, string memory err) internal pure virtual {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+Note: Candidate:
+   --> lib/forge-std/src/StdAssertions.sol:791:5:
+    |
+791 |     function assertGt(int256 left, int256 right) internal pure virtual {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+Note: Candidate:
+   --> lib/forge-std/src/StdAssertions.sol:801:5:
+    |
+801 |     function assertGt(int256 left, int256 right, string memory err) internal pure virtual {
+    |     ^ (Relevant source part starts here and spans across multiple lines).

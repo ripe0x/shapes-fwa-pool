@@ -1,0 +1,47 @@
+Compiling 1 files with Solc 0.8.30
+Solc 0.8.30 finished in 4.79s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:193:35:
+    |
+193 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:598:5:
+    |
+598 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkMaxBatchGas.t.sol:16:5:
+   |
+16 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Warning: the following cheatcode(s) are deprecated and will be removed in future versions:
+  lastCallGas(): replaced by `lastFrameGas`
+Ran 1 test for test/fork/ForkMaxBatchGas.t.sol:ForkMaxBatchGasTest
+[PASS] test_checkpointFullHolderMixCompleteGas() (gas: 87861441)
+Logs:
+  checkpoint redemption index distribution deposit payment complete gas: 375537
+  checkpoint redemption index distribution deposit payment complete gas pay wei: 92000000000000
+  checkpoint call meter plus intrinsic: 372332
+  checkpoint isolated receipt-equivalent gas: 345937
+  checkpoint finalized frame refund: 29600
+  checkpoint sample receipt-equivalent cost wei at matched 0.5 gwei: 172968500000000
+  essential spike checkpoint isolated receipt-equivalent gas: 345937
+  essential spike checkpoint finalized frame refund: 29600
+  essential spike checkpoint isolated gross before refund: 375537
+  essential spike checkpoint call meter plus intrinsic: 372332
+  essential spike checkpoint actual pay wei: 740000000000000
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.11s (297.67ms CPU time)
+
+Ran 1 test suite in 1.41s (1.11s CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)

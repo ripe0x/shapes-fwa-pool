@@ -1,0 +1,65 @@
+{
+  "status": "PREPARED; NEEDS EXACT OWNER AMENDMENT BEFORE BROADCAST",
+  "original_approved_plan_sha256": "1c7e115fe1f62751f0b0bc6c478817d214e1bd97c1f1f09259d9cb48ff1340fd",
+  "baseline_results": "/private/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/efficient-journal-baseline-eqm_12s8/results.json",
+  "baseline_results_sha256": "36456b7191f6b9b47c9d609636ecbd461ebb18afaaed5a65462678d4ded6252f",
+  "baseline_broadcasts": 318,
+  "baseline_external_value_wei": 17501610827424708864,
+  "source_sha256": {
+    "src/PackVault.sol": "448106b8915413badef411355a5cb729ca15046743be768919d74e9349ddcd8b",
+    "src/VaultLib.sol": "8223991816433e0aff0b50253d6daa212d822f5545ad53ca04482efbf94d5252",
+    "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a",
+    "src/interfaces/External.sol": "d50229cf80a4a036c9ba3f4f8bb60452129ee51dc7ca0263ad612b2ea76e499d",
+    "script/Deploy.s.sol": "2a059502479a22360346994c7e5246fff96db98bff3f03a8586b610f0ac23d36",
+    "script/DeployCore.sol": "9246881b6c6fe32325ce1af731e083f5ed68a79b95f170f8db0cc93fa4e7d2b3",
+    "script/deploy.sh": "cd740c8dd3debc457c52aa8b558f004e465a397802f9562d01e7c76bc2ee5d67",
+    "test/fork/ForkKeeperPolicy.t.sol": "803b97992b420327c08098fc40a9eb8380879988ea01d686cafc55130f50b026",
+    "keeper/policy.py": "8e6ee88e5a1b86712c11c1d6d264844c48d820f576646631ed14bdec681061d0",
+    "keeper/tx.py": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230",
+    "keeper/keeper.py": "30c1af8cc1483561ebefa3b36c110cb7ede200e9b36f8ca922b08e53594d3d0e",
+    "keeper/index.py": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63",
+    "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520",
+    "lib/solady/src/utils/FixedPointMathLib.sol": "bb0c06fe117d69df9bff7baf442255aa114e1c01d1ebe077213e2eb4e06ae2d6",
+    "lib/solady/src/utils/ReentrancyGuard.sol": "aeeda18221419e3409255c6505e0eb78fe13e3bd8329663cfa56a0316a970eaf",
+    "lib/solady/src/utils/SafeTransferLib.sol": "9d3f890f184b26b67f56097085e8a3286089a1c77e390f1a5bd4498cbeb0956e",
+    "keeper/efficient_journal_rehearsal.py": "bd54f4eabd3fe7239fc8c1f0694c48c4ada7d835e55ae281eb765fedfda65b0c",
+    "keeper/efficient_journal_candidate.py": "abaa9f45ef303829f2bd7350cd482132f5d9a49da829648bf9237b5e6979ca88",
+    "docs/receipts/efficient-journal-recovery-review.py": "e9186a9fa591260d6d00be1573c0f1287d64c4c73b9c5660c212760801ae175b"
+  },
+  "artifact_templates_sha256": {
+    "out/PackVault.sol/PackVault.json": "e2dae8502a269bec5866427e67042c15089189d5a1fb6d11f007e09d5b15ef13",
+    "out/VaultLib.sol/VaultLib.json": "c2892cf4d9eff512551ebd2a48ea2bf6b03b2c0e86e304f04ab04de9dd958bb9",
+    "out/KeeperPolicy.sol/KeeperPolicyV1.json": "300305f5db6b758fc42eaabac8d278e23ad1a4382755f6db2559196621a099eb",
+    "out/ForkKeeperPolicy.t.sol/PolicyGreedy.json": "6fda2616f0ee3138834f6381bca5bc601650545d2a8e50a90ff91e540d384ac9"
+  },
+  "tool_versions": {
+    "forge": "forge Version: 1.8.1\nCommit SHA: 982849d3140c01fd3b72905759581a132df7aa98\nBuild Timestamp: 2026-08-28T17:50:40.383510000Z (1787939440)\nBuild Profile: dist",
+    "cast": "cast Version: 1.8.1\nCommit SHA: 982849d3140c01fd3b72905759581a132df7aa98\nBuild Timestamp: 2026-08-28T17:50:40.383510000Z (1787939440)\nBuild Profile: dist",
+    "anvil": "anvil Version: 1.8.1\nCommit SHA: 982849d3140c01fd3b72905759581a132df7aa98\nBuild Timestamp: 2026-08-28T17:50:40.383510000Z (1787939440)\nBuild Profile: dist"
+  },
+  "quotes": {
+    "sync": 85000,
+    "journal": 22000,
+    "journal_tail": 110000,
+    "distribution_proof": 80000,
+    "pack": 325000
+  },
+  "one_candidate_only": true,
+  "owned_pid": 96649,
+  "endpoint": "http://127.0.0.1:8559",
+  "maximum_total_broadcast_transactions": 540,
+  "maximum_total_external_value_wei": 32000000000000000000,
+  "initial_funding_wei": 8300000000000000000,
+  "added_funding_wei": 0,
+  "topups": 0,
+  "candidate_planned_transactions": 199,
+  "included_repair_transactions": 20,
+  "amendment": "One 80k fixed component for the actual qualified distribution-only proof; otherwise the original candidate actions, actors, endpoint, funding and total limits stay the same. Holder tails use 110k; full/own work 85k; each completed record 22k; pack 325k.",
+  "predicate_effect": "No eligibility predicate, storage, Params or ABI change. Higher proof expense can disqualify marginal distributions; lower cycle quote changes numerical edge/backing floors. Request/deployment/unwind charges are unchanged.",
+  "operating_adapters": "Pin pending timestamp to parent+1; observe genuine zero-offer candidate/preflight decline; log existing snapshots; at most 3 read-only retries for the recorded HTTP2 transport error. No false service answers or send-check overrides.",
+  "limitations": [
+    "Successful foreign paid receipts remain unmeasured.",
+    "Current supported quotes are a candidate, not universal keeper profit or acceptable holder return.",
+    "O2, sustained funding and repeated active-fee harvest expense remain acceptance blockers."
+  ]
+}

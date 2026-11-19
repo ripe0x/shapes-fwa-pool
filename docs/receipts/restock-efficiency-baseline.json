@@ -1,0 +1,152 @@
+{
+  "baseline_revision": "d1b59f11fb74ed6ae9b3841298e70fb189eaaa6f",
+  "isolated_source_sha256": {
+    "src/PackVault.sol": "1dc1ddb5d4c09057f34797efdff5d87929898c51bda671423de23625e7687af2",
+    "src/VaultLib.sol": "51fd0f008b590b9d85a862d0418038b834d31e34c6cab07264600b69c4740498",
+    "test/fork/RestockEfficiency.t.sol": "7a26aad9e27ee1edd7a4487d8873e92d91d63a3b15ea1b7009cd68b8a1bfa3af",
+    "test/fork/ForkBase.sol": "617a9de43d608ee4399647256557d142f573900c9c4a19c52d77b9e02e73e0e5",
+    "test/utils/TestVaultOps.sol": "8e14f307214f04129691f7a38f805f3c24b618ed433969e1839ff62450a2cbc3"
+  },
+  "command": "forge test --root /private/tmp/restock-efficiency-baseline-d1b59f1 --match-path test/fork/RestockEfficiency.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+  "final_exit_status": 0,
+  "final_tests_passed": 7,
+  "profiles": {
+    "funding boundary first pack": {
+      "gross gas": 2839528,
+      "frame refund": 147700,
+      "sample net gas upper bound": 2691828,
+      "keeper pay wei": 581000000000000,
+      "newly paid mints": 1
+    },
+    "four first leftover6": {
+      "gross gas": 2876839,
+      "frame refund": 167600,
+      "sample net gas upper bound": 2709239,
+      "keeper pay wei": 588000000000000,
+      "newly paid mints": 1
+    },
+    "four mixed old6 new10": {
+      "gross gas": 3137797,
+      "frame refund": 235700,
+      "sample net gas upper bound": 2902097,
+      "keeper pay wei": 680000000000000,
+      "newly paid mints": 1
+    },
+    "four leftover only0": {
+      "gross gas": 1227813,
+      "frame refund": 56400,
+      "sample net gas upper bound": 1171413,
+      "keeper pay wei": 240000000000000,
+      "newly paid mints": 0
+    },
+    "large prefix setup": {
+      "gross gas": 2839528,
+      "frame refund": 147700,
+      "sample net gas upper bound": 2691828,
+      "keeper pay wei": 581000000000000,
+      "newly paid mints": 1
+    },
+    "large consumes thirty new leaves old7": {
+      "gross gas": 7848621,
+      "frame refund": 806900,
+      "sample net gas upper bound": 7041721,
+      "keeper pay wei": 1650000000000000,
+      "newly paid mints": 3
+    },
+    "thirty units ten small packs": {
+      "gross gas": 10352610,
+      "frame refund": 880600,
+      "sample net gas upper bound": 9472010,
+      "keeper pay wei": 2226000000000000,
+      "newly paid mints": 3
+    },
+    "thirty units one large pack": {
+      "gross gas": 7855454,
+      "frame refund": 858200,
+      "sample net gas upper bound": 6997254,
+      "keeper pay wei": 1650000000000000,
+      "newly paid mints": 3
+    },
+    "roundtrip two small packs": {
+      "gross gas": 3217746,
+      "frame refund": 210200,
+      "sample net gas upper bound": 3007546,
+      "keeper pay wei": 666000000000000,
+      "newly paid mints": 1
+    },
+    "three first leftover7": {
+      "gross gas": 2839528,
+      "frame refund": 147700,
+      "sample net gas upper bound": 2691828,
+      "keeper pay wei": 581000000000000,
+      "newly paid mints": 1
+    },
+    "three leftover only4": {
+      "gross gas": 651141,
+      "frame refund": 20000,
+      "sample net gas upper bound": 631141,
+      "keeper pay wei": 141000000000000,
+      "newly paid mints": 0
+    },
+    "three mixed old4 new10": {
+      "gross gas": 3441462,
+      "frame refund": 258400,
+      "sample net gas upper bound": 3183062,
+      "keeper pay wei": 751000000000000,
+      "newly paid mints": 1
+    }
+  },
+  "setup_failure": {
+    "log": "restock-efficiency-baseline-fee-assumption-failure.txt",
+    "exit_status": 1,
+    "cause": "Test initially assumed Shapes native balance increases by redeemable principal only. Real mint retains both0.1ETH principal and0.001ETH accrued artist fee; actual balance delta0.101ETH. Corrected assertion and added actual redeemableBacking/pendingFees/feesOwedTo checks."
+  },
+  "subsequent_runs": [
+    {
+      "log": "restock-efficiency-baseline-five-pass.txt",
+      "exit_status": 0,
+      "tests": 5
+    },
+    {
+      "log": "restock-efficiency-baseline-final.txt",
+      "exit_status": 0,
+      "tests": 7,
+      "added": "existing idleFunding capital-boundary refusal and actual principal redemption round trip retaining artist fee"
+    }
+  ],
+  "environment": {
+    "fork_block": 26424971,
+    "rpc": "https://mainnet.gateway.tenderly.co",
+    "base_fee_wei": 150000000,
+    "transaction_gas_price_wei": 200000000,
+    "executed_fee_assertion": true,
+    "cold_addresses_and_all_storage_slots": [
+      "vault",
+      "VaultLib",
+      "keeper policy",
+      "FWA",
+      "ShapePacks",
+      "Shapes",
+      "keeper"
+    ],
+    "counterparty_mocks": false,
+    "protocol_state_fakes": false,
+    "broadcasts": false,
+    "oracle_ask": "Real oracle owner sets ShapePacks ask0.33ETH so3/4/30-unit packs exercise actual allowed economics."
+  },
+  "external_source_identity": {
+    "reference": "audit/release-ba8d26e/external-source-match.json",
+    "Shapes_source_sha256": "f008bf5ddcba042f6a286d4279e34c5b3c1759ec8e21ec6df6826d6aa831ec79",
+    "locally_read_matching_verified_source": "/private/tmp/shapes-release-a-04bc760/lib/shape-packs/lib/shapes/src/Shapes.sol",
+    "behavior": "Each paid primary mint credits0.1ETH redeemable backing and0.001ETH to the fee recipient pending balance; both remain held in Shapes until legitimate redemption/fee withdrawal."
+  },
+  "limits": [
+    "Authentic cold fork execution with measured frame refund counter; no actual billed transaction receipt.",
+    "Shared test setup can affect original-storage/refund context compared with separate signed transactions; net is a sample upper bound within this fixture.",
+    "Each fixed restock quote and work payment is unchanged by optimization; faster execution alone does not change depositor cost or establish O2 acceptance."
+  ],
+  "things_that_do_not_make_sense": [
+    "Comparing gross storage savings while ignoring lost storage refunds would overstate the optimization.",
+    "Mint fee is paid by the vault immediately but held as a separate artist claim inside Shapes; direct recipient balance growth would be the wrong immediate assertion."
+  ]
+}

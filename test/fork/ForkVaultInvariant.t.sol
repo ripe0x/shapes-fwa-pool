@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {TestVaultOps} from "../utils/TestVaultOps.sol";
+
 import {Test} from "forge-std/Test.sol";
 import {ForkBase, ForceSender} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
@@ -64,8 +66,9 @@ contract VaultHandler is Test {
         uint256 start = t - t % INTERVAL + BLACKOUT;
         if (t >= start) start += INTERVAL;
         vm.warp(start + 60);
+        uint256 witness = TestVaultOps.witness(vault);
         vm.prank(keeper);
-        try vault.checkpoint(0) {} catch {}
+        try vault.checkpoint(witness, 0) {} catch {}
         // Leave the blackout so listing-side actions see an open interval next.
         vm.warp(start - BLACKOUT + INTERVAL + 60);
         ++calls;
@@ -76,18 +79,18 @@ contract VaultHandler is Test {
         uint256 loose = vault.looseShapeCount();
         uint256 before = address(vault).balance;
         vm.startPrank(keeper);
-        try vault.restock(n, 3, 0) {
+        try vault.restock(3, TestVaultOps.buildProposals(vault, n, 3), 0) {
             uint256 mints = loose >= 3 * n ? 0 : (3 * n - loose + 9) / 10;
             mintFeesPaid += mints * 0.001 ether;
             before;
         } catch {}
-        try vault.list(n, 0) {} catch {}
+        try vault.list(TestVaultOps.proposals(vault, n, 3), 0) {} catch {}
         vm.stopPrank();
         ++calls;
     }
 
     function unlist() external {
-        uint256[] memory ids = vault.openListings();
+        uint256[] memory ids = TestVaultOps.open(vault);
         if (ids.length == 0) return;
         vm.prank(keeper);
         try vault.unlist(ids, 0) {} catch {}
@@ -115,13 +118,16 @@ contract ForkVaultInvariantTest is ForkBase {
 
     function setUp() public override {
         super.setUp();
+        assertEq(carol.code.length, 0); assertEq(carol.balance, 0);
         vm.deal(carol, 50 ether);
         handler = new VaultHandler(vault, keeper, [alice, bob, carol]);
         targetContract(address(handler));
         // One fresh fuzz sender: the fuzzer otherwise picks addresses it has seen (the holders, the
         // vault itself) as transaction senders, and funding or charging a sender for gas then moves
         // a tracked balance outside the vault's accounting.
-        targetSender(makeAddr("pack-vault-test-fuzz-sender"));
+        address sender = makeAddr("pack-vault-test-fuzz-sender");
+        assertEq(sender.code.length, 0); assertEq(sender.balance, 0);
+        targetSender(sender);
     }
 
     /// INV01: the vault always holds every amount it owes outside the strategy.
@@ -159,10 +165,10 @@ contract ForkVaultInvariantTest is ForkBase {
     ///        everything paid in equals assets held plus those two expenses, to the wei.
     function invariant_valueConserved() public view {
         uint256 assets = address(vault).balance + vault.looseShapeCount() * 0.01 ether
-            + vault.idlePacks().length * 0.03 ether;
-        uint256[] memory ids = vault.openListings();
+            + TestVaultOps.idle(vault).length * 0.03 ether;
+        uint256[] memory ids = TestVaultOps.open(vault);
         for (uint256 i; i < ids.length; ++i) {
-            (,, uint128 backing) = vault.positions(ids[i]);
+            (,, uint128 backing) = TestVaultOps.position(vault, ids[i]);
             assets += backing + 0.03 ether;
         }
         // Paid in: seed, pre-existing dust, holder deposits net of cancels and claims, donations.

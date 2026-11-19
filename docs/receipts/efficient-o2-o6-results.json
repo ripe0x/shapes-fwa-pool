@@ -1,0 +1,71 @@
+{
+  "command": [
+    "forge",
+    "test",
+    "--match-path",
+    "test/scenario/VaultFlow.t.sol",
+    "--match-test",
+    "test_flow_(max_load|gas_spike)",
+    "--rpc-url",
+    "https://mainnet.gateway.tenderly.co",
+    "--fork-retries",
+    "30",
+    "--fork-retry-backoff",
+    "5000",
+    "--compute-units-per-second",
+    "100",
+    "-vv"
+  ],
+  "exit_status": 0,
+  "asset_gate_source_hash": "edd141b12a630af3972cd33d06eb646029d90a662493cea80f44561078930bf1",
+  "scope": "Two affected economic scenarios only, no broad release or full gate",
+  "source_sha256": {
+    "src/PackVault.sol": "448106b8915413badef411355a5cb729ca15046743be768919d74e9349ddcd8b",
+    "src/VaultLib.sol": "1a5407f1044f0e79b874ee77cd6936bb53438b020f4c8e093db200909990490f",
+    "test/scenario/VaultFlow.t.sol": "324d0e538fbb977ae63bd1ff2fe770032d2317a9a05e7b970aaf8e9ac4da75da",
+    "test/utils/FlowBreakdown.sol": "b117b2f334f99676f99b1b582f48a9f0a9f1b22c8bc0da44b31326633969cd3c",
+    "test/utils/TestVaultOps.sol": "f2397c303b8e33b5664efde087a678cc54f3a2c41dc12f4f5f0a25530e10ec9d"
+  },
+  "results": {
+    "max_load.json": {
+      "gas_price": 200000000,
+      "base_fee": 150000000,
+      "fork_block": 26424971,
+      "reached": {
+        "open_listings": 29,
+        "packs_listed": 29,
+        "keeper_gas_per_position": 1919655,
+        "work_fee_per_position_wei": 40000000000000,
+        "_4": 0,
+        "_5": 0
+      },
+      "mismatches": []
+    },
+    "gas_spike.json": {
+      "gas_price": 2000000000,
+      "base_fee": 1950000000,
+      "fork_block": 26424971,
+      "reached": {
+        "open_listings": 3,
+        "gas_price_gwei_x100": 200,
+        "checkpoint_pay_wei": 200000000000000,
+        "build_pay_wei": 0,
+        "_4": 0,
+        "_5": 0
+      },
+      "mismatches": []
+    }
+  },
+  "historical_flow_directory_restored": true,
+  "owner_outcomes_or_signature_changed": false,
+  "preserved_failures": [
+    "Three earlier zero-test attempts: efficient-o2-o6-no-tests-matched.json/.txt, efficient-o2-o6-second-no-tests.txt, efficient-o2-o6-third-no-tests.txt. No source-stamped output was produced; copied old regime data was rejected.",
+    "ABI-only cached VaultFlowPinnedTest artifact lacked bytecode although --list advertised tests. Scoped build reused it. In-scope absolute fee/O6 assertions and quote-comment correction changed the affected test source; no caches were deleted.",
+    "forge test --list | head -40 reported Broken pipe(os error32); pipeline exited0; no test evidence derived.",
+    "forge test --help guard rejected an untargeted test invocation; no guard disabled, no test was run."
+  ],
+  "limitations": [
+    "Balanced buckets do not satisfy O2 quoted compensation bound.",
+    "No new owner signature, full16-regime suite, or annual-return acceptance."
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "base_revision": "a4496adaba9048170ba39f1255783dccf891f163",
+  "execution_exit_status": 0,
+  "output": "/private/tmp/review-forward-funding.json",
+  "source_sha256": {
+    "sim/forward.py": "d129f9cb4a644fcd011825be8b837714ab03d1b341ab2ba022e14010e046c105",
+    "sim/vault.py": "bc3784c2574e1b631b0971974a0913c85a2de691755cfabde1b1dfbee6c0c49a",
+    "sim/reconcile.py": "cbbe9121e1a1bf6c68fb6ef2b8d430a761175d31a2cc727ff2e000a5fce9eaff",
+    "keeper/policy.py": "0658aad4e2f07fe2acc29359c8915a9473bb681f22d65d0c03b212cb4d91d5d4",
+    "deploy/mainnet.json": "bcf29731a40d403a77c8380b3f4b691406995b2182ce42bb90d7d2993f76b489",
+    "deploy/canary.example.json": "f50e7a3dd992c2ff7e155471fbef727ac0ae4e6ffbd0e418bdf8dfd4d3665015",
+    "/Users/dd/CascadeProjects/shapes-fwa-pool/sim/data/fwa.sqlite": "430881b0555cda5c0a6161b7c7be1b973fd58a7a4dd0217a7ccd32d491af7819"
+  },
+  "output_sha256": "66d360b6dc4aabfe69b4b4947458cca01541fad9e96913738602daa71038ed65",
+  "method": {
+    "load": "import forward; set forward.DB to recorded database; POOL=pool_snapshot(); STAGING=staging_delays(30)",
+    "refunds": "Count AcquisitionProcessed status in last30days at max timestamp; (completed-successful)/successful",
+    "matrix": "For (canary.example,27),(mainnet,100), total gas [.2,.5]gwei, successful daily volume [13191/30,71], run(Scenario(volume=const(volume),gwei=total-.05),target,8,days=30,values=deploy values)",
+    "row_count": 8
+  },
+  "limits": [
+    "Single random seed per illustrative30day regime; not a forecast or annual return gate.",
+    "Gas is a fixed keeper quote; actual caller gas beyond explicitly identified proxies is not modeled.",
+    "Holder end value includes independently marked assets and unharvested fees; not realized exit cash.",
+    "Minimum free cash sampled at initialization and after successful keeper calls, not a continuous minimum.",
+    "Exact vault model reconciled with fresh real fork traces; forward stochastic external-event approximations are not fork replay."
+  ]
+}

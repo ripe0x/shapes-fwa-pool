@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
-"""Gas classes (D45), reserve need (D46) and status codes. Pure policy: no chain.
-Run: python3 keeper/test_policy.py"""
+"""Pure economic policy and bounded work tests. No fabricated successful service answers."""
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from policy import ACTIVE, ALLOCATED, SETTLED, STAGED, Listing, State, plan, reserve_need, status  # noqa: E402
+import policy as P
+from policy import ACTIVE, ALLOCATED, SETTLED, Listing, State, plan, reserve_need, status
 
-G = 10**9
-E = 10**18
+G, E = 10**9, 10**18
 
 
 def state(**kw):
-    base = dict(now=10**6, gas_price=int(0.2 * G), base_fee=int(0.15 * G), gas_ceiling=int(0.5 * G),
-                max_tip=int(0.05 * G), markup_bps=1_000, share_bps=2_500, k=int(1.0385 * E), backing=int(0.0363 * E),
-                min_edge_bps=100, mint_fee=10**15, settlement_window=3600, blackout=True, queue_drained=True,
-                checkpoint_done_this_interval=False, max_positions=30, reserve=5 * 10**15)
+    backing = kw.get("backing", 363 * 10**14)
+    base = dict(now=10**6, gas_price=200_000_000, base_fee=150_000_000, gas_ceiling=500_000_000,
+                max_tip=50_000_000, markup_bps=1_000, share_bps=2_500, k=1_038_500_000_000_000_000,
+                backing=backing, min_edge_bps=100, mint_fee=10**15, settlement_window=3600,
+                blackout=True, queue_drained=True, checkpoint_done_this_interval=False, reserve=10**16,
+                backing_proposals=P.propose_backings(backing, 0, 16, lambda _: False),
+                restock_proposals=[-(-backing // 10_000) * 10_000] * 10)
     base.update(kw)
     return State(**base)
 
@@ -26,89 +28,199 @@ def fns(steps):
 
 def main():
     act = [Listing(i, ACTIVE, pending_fees=10**14) for i in range(1, 11)]
-    staged = [Listing(20, STAGED)]
     settled = [Listing(30, SETTLED)]
-
-    # Below the ceiling: building, relisting, activation, harvest and deposit pricing all plan.
-    s = state(listings=act + staged + settled, idle_packs=2, idle_eth=E, free=E, pending_deposits=10**17,
-              open_positions=12, fee_credit=10**16)
+    s = state(listings=act + settled, idle_packs=2, idle_eth=E, free=E, pending_deposits=10**17,
+              open_positions=11, fee_credit=10**16)
     got = fns(plan(s))
-    assert {"sync", "harvest", "activate", "checkpoint", "list"} <= set(got), got
+    assert {"sync", "list"} <= set(got), got
+    assert "harvest" not in got
+    assert "checkpoint" not in got  # terminal work must be reconciled, then re-read before pricing
+    assert "checkpoint" in fns(plan(state(listings=act, free=E, pending_deposits=10**17)))
 
-    # Above the ceiling with nothing owed: nothing at all.
-    spike = dict(gas_price=int(1.05 * G), base_fee=int(1.0 * G))
-    s = state(listings=act + staged + settled, idle_packs=2, idle_eth=E, free=E, pending_deposits=10**17,
-              open_positions=12, fee_credit=10**16, token_pending=10**18, token_ids=[1], burn_tokens=True, **spike)
-    assert plan(s) == [], plan(s)
-    assert status(s)[0][0] == "GAS_ABOVE_CEILING" and status(s)[0][1] == "wait"
-
-    # Above the ceiling with a redemption short of ETH: only liability work, never deployment.
-    s = state(listings=act + staged + settled, idle_packs=2, idle_eth=0, free=0, locked_shares=10**18,
-              owed_estimate=int(0.3 * E), open_positions=12, fee_credit=10**16, token_pending=10**18,
-              token_ids=[1], burn_tokens=True, **spike)
+    spike = dict(gas_price=1_050_000_000, base_fee=G)
+    s = state(listings=act + settled, idle_packs=2, idle_eth=E, free=E, pending_deposits=10**17,
+              open_positions=11, fee_credit=10**16, token_pending=E, token_ids=[1], burn_tokens=True, **spike)
+    assert plan(s) == []
+    assert status(s)[0][:2] == ("GAS_ABOVE_CEILING", "wait")
+    s = state(listings=act + settled, idle_packs=2, idle_value=6 * P.UNIT, free=0, locked_shares=E,
+              owed_estimate=3 * E // 10, open_positions=11, fee_credit=10**16, **spike)
     got = fns(plan(s))
     assert set(got) <= {"sync", "harvest", "liquidate", "unlist", "checkpoint"}, got
-    assert {"sync", "harvest", "unlist", "liquidate", "checkpoint"} <= set(got), got
-    codes = {c for c, _, _ in status(s)}
-    assert {"GAS_ABOVE_CEILING", "REDEMPTION_LIQUIDITY_SHORT", "STAGED_PENDING_ACTIVATION"} <= codes, codes
+    assert {"unlist", "liquidate"} <= set(got)
+    assert "harvest" not in got  # A claim that cannot fund the cash gap would precede the same unlists.
+    assert "sync" not in got
+    assert "checkpoint" not in got
+    assert fns(plan(state(listings=act, free=E, locked_shares=E, owed_estimate=3 * E // 10, **spike))) == ["checkpoint"]
+    assert {"unlist", "liquidate"} <= set(fns(plan(state(listings=act, winding_down=True, idle_packs=1, **spike))))
+    assert plan(state(listings=act, free=E, pending_deposits=10**17, **spike)) == []
 
-    # Above the ceiling with a redemption already covered by free ETH: just the pricing checkpoint.
-    s = state(listings=act, free=E, locked_shares=10**18, owed_estimate=int(0.3 * E), open_positions=10, **spike)
-    assert fns(plan(s)) == ["checkpoint"], plan(s)
+    # Active fee claims are candidates on real bounded maintenance, never a paid recurring job.
+    fees = [Listing(i, ACTIVE, pending_fees=i * 10**15) for i in range(1, 30)]
+    ample = state(listings=fees, free=E, fee_credit=E, blackout=False)
+    assert "harvest" not in fns(plan(ample))
+    funded_sync = state(listings=fees + settled, free=0, completed_prefix=128, open_positions=100)  # journal vault
+    choices = [step for step in plan(funded_sync) if step[0] == "sync"]
+    assert choices[0][1] == [30] and choices[1][1] == [30, 29], choices
+    assert len(choices[-1][1]) == 16
+    funded_sync.free = E
+    assert plan(funded_sync)[0][1] == [30], "already funded jobs do not carry redundant active IDs"
+    funded_sync.free, funded_sync.routine_budget = 0, 0
+    assert plan(funded_sync)[0][1] == [30], "active fees cannot fix exhausted spending permission"
+    one_own = state(listings=[Listing(1, ACTIVE, pending_fees=10**15)], free=0,
+                    own_journal_pending=True, completed_prefix=1, open_positions=100,
+                    routine_budget=150_000_000_000_000, markup_bps=0)
+    assert plan(one_own)[1][1] == [1], "upper16-own bound must not hide a funded one-own job"
+    two_own = state(listings=[Listing(i, ACTIVE, pending_fees=500_000) for i in (1, 2)],
+                    own_journal_pending=True, completed_prefix=2, open_positions=100,
+                    free=0, base_fee=1, max_tip=0, gas_price=1, markup_bps=0, routine_budget=1_000_000)
+    assert [step[1] for step in plan(two_own) if step[0] == "sync"] == [[], [1], [1, 2]], \
+        "exact preflight must reach the funded two-claim alternative"
+    full_terminals = state(listings=[Listing(i, SETTLED) for i in range(30, 46)] + fees,
+                           free=0, routine_budget=E)
+    choices = [step for step in plan(full_terminals) if step[0] == 'sync']
+    assert choices[0][1] == list(range(30, 46))
+    assert choices[1][1] == list(range(30, 45)) + [29]
+    assert all(len(step[1]) <= 16 for step in choices)
+    assert all(any(i >= 30 for i in step[1]) for step in choices), 'fee-only no-op is not an alternative'
+    # A small holder redemption can claim just enough real fees, unpaid, rather than unwind.
+    partial = state(listings=fees, free=0, locked_shares=E, total_shares=3 * E,
+                    owed_estimate=45 * 10**15, blackout=False)
+    assert plan(partial)[0] == ("harvest", [28, 29])
+    assert "unlist" not in fns(plan(partial))
+    partial.total_shares = E + 10**15
+    assert "harvest" not in fns(plan(partial)), "full holder exit collects fees while unlisting"
+    credit_only = state(listings=fees, fee_credit=10**16, free=0, locked_shares=E,
+                        total_shares=3 * E, owed_estimate=10**16)
+    assert fns(plan(credit_only)) == ["checkpoint"], "checkpoint already collects sufficient credit"
 
-    # Above the ceiling while winding down: unwinding continues.
-    s = state(listings=act, free=0, winding_down=True, open_positions=10, idle_packs=1, **spike)
-    assert {"unlist", "liquidate"} <= set(fns(plan(s))), plan(s)
-
-    # Deposits alone above the ceiling wait (depositors can cancel).
-    s = state(listings=act, free=E, pending_deposits=10**17, open_positions=10, **spike)
-    assert plan(s) == []
-
-    # Reserve need at the canary: one 10-pack listing batch at 0.5 gwei with the 10% premium:
-    # (255k + 10 x 530k) quoted gas x 0.55 gwei (checkpoints are paid from request charges).
-    assert reserve_need(state()) == 5_555_000 * int(0.5 * G) * 11_000 // 10_000
-    assert 0.0030 * E < reserve_need(state()) < 0.0031 * E
+    # Absolute envelope cash at0.5gwei: list8=(280k+8*825k)*0.55gwei=0.003784ETH;
+    # routine journal128+prune16=(85k+128*22k+16*45k)*0.55gwei=0.00199155ETH.
+    assert reserve_need(state()) == 5_775_550_000_000_000
+    s = state(essential_ceiling=2 * G, work_fee=20_000_000_000_000)
+    assert reserve_need(s) == 5_935_550_000_000_000
+    unpaid = state(essential_ceiling=2 * G, work_fee=20_000_000_000_000, essential_cap=0)
+    assert reserve_need(unpaid) == 5_935_550_000_000_000  # Sync is routine even with unpaid exits.
     assert "RESERVE_BELOW_NEED" in {c for c, _, _ in status(state(reserve=10**15))}
+    assert P.checkpoint_cost(state(open_positions=301)) == P.checkpoint_cost(state(open_positions=10_000))
+    assert P.request_charge(state(open_positions=1000)) == P.request_charge(state(open_positions=10_000))
+    # O6 retains its existing 0.0002 ETH ceiling in the configured gas-spike regime.
+    spike_checkpoint = state(base_fee=1_950_000_000, gas_price=2 * G,
+                             markup_bps=0, work_fee=20_000_000_000_000)
+    assert P.pay_v1(spike_checkpoint, P.Q["checkpoint"], 1) == 200_000_000_000_000
 
-    # Waiting states.
-    s = state(listings=[Listing(1, ALLOCATED, allocated_at=10**6 - 10)], blackout=False, pending_deposits=1,
-              open_positions=1, free=E)
-    codes = {c for c, _, _ in status(s)}
-    assert {"WAITING_SETTLEMENT", "WAITING_CHECKPOINT_WINDOW"} <= codes, codes
-    assert status(state(backing=0, listings=act, open_positions=10))[0][0] == "QUOTE_UNAVAILABLE"
+    # Global reads and terminal IDs have independent bounds; small unrelated tails wait.
+    s = state(journal_cursor=7, completed_prefix=100_007, open_positions=100, active_count=100)
+    sync = plan(s)[0]
+    assert sync == ("sync", [], 0), sync
+    s = state(journal_cursor=7, completed_prefix=100_007, open_positions=100,
+              listings=[Listing(30 + i, SETTLED) for i in range(20)])
+    sync = plan(s)[0]
+    assert len(sync[1]) == 16
+    assert "sync" not in fns(plan(state(journal_cursor=7, completed_prefix=8, open_positions=1)))
+    assert "sync" in fns(plan(state(journal_cursor=7, completed_prefix=8, open_positions=100, own_journal_pending=True)))
+    assert "sync" in fns(plan(state(journal_cursor=7, completed_prefix=8, open_positions=1, pending_deposits=E)))
+    assert "sync" in fns(plan(state(journal_cursor=7, completed_prefix=8, open_positions=1,
+                                   distribution_bps=5000, distribution_due=False, witness_id=91)))
+    blocked = state(journal_cursor=0, completed_prefix=128, open_positions=100, free=E,
+                    idle_eth=E, idle_packs=1, routine_budget=1, markup_bps=0)
+    assert P.journal_backlog_floor(blocked) == 580_200_000_000_000
+    assert "sync" in fns(plan(blocked))
+    assert not {"restock", "list"} & set(fns(plan(blocked)))
+    assert "MAINTENANCE_UNFUNDED" in {c for c, _, _ in status(blocked)}
+    # Cash shortage, permission shortage and keeper profitability stay distinct, and each clears.
+    detail = lambda st: next(d for c, _, d in status(st) if c == "MAINTENANCE_UNFUNDED")  # noqa: E731
+    assert "routine permission" in detail(blocked) and "routine cash" not in detail(blocked)
+    cash_short = state(journal_cursor=0, completed_prefix=128, open_positions=1, free=1, idle_eth=E, idle_packs=1,
+                       routine_budget=E, markup_bps=0)
+    assert "routine cash" in detail(cash_short) and "routine permission" not in detail(cash_short)
+    assert not {"restock", "list"} & set(fns(plan(cash_short)))
+    resumed = state(journal_cursor=0, completed_prefix=128, open_positions=1, free=E, idle_eth=E, idle_packs=1,
+                    routine_budget=E, markup_bps=0)
+    assert "MAINTENANCE_UNFUNDED" not in {c for c, _, _ in status(resumed)}
+    assert "list" in fns(plan(resumed)) or "restock" in fns(plan(resumed)) or "sync" in fns(plan(resumed))
+    assert "checkpoint" not in fns(plan(state(journal_cursor=7, completed_prefix=8, pending_deposits=E, open_positions=1)))
+
+    # Scan vaults (at most 93 open): FWA's global activity alone never triggers paid work. One scan
+    # selects and resolves each own selection once it settles or expires; other work rides along.
+    scan = dict(journal_cursor=0, completed_prefix=5_000, open_positions=28, active_count=27, free=E)
+    assert P.scan_vault(state(**scan)) and P.scan_proof(state(**scan))
+    assert not P.scan_proof(state(journal_cursor=0, completed_prefix=37, open_positions=28))  # 28*30k > 37*22k
+    assert "sync" not in fns(plan(state(**scan))), "foreign backlog alone is not vault work"
+    inside = Listing(5, ALLOCATED, allocated_at=10**6 - 10, unapplied=True)
+    assert "sync" not in fns(plan(state(listings=[inside], own_journal_pending=True, **scan))), \
+        "a selection inside the window waits for its outcome"
+    settled_own = Listing(5, SETTLED, allocated_at=10**6 - 10, unapplied=True)
+    assert ("sync", [5], 0) in plan(state(listings=[settled_own], own_journal_pending=True, **scan))
+    expired_own = Listing(5, ALLOCATED, allocated_at=10**6 - 3_601, unapplied=True)
+    assert ("sync", [5], 0) in plan(state(listings=[expired_own], own_journal_pending=True, **scan))
+    kicked = Listing(6, P.WITHDRAWN)
+    assert "sync" not in fns(plan(state(listings=[kicked], **scan))), "an unpaid scan waits for a paid one"
+    assert ("sync", [6, 5], 0) in plan(state(listings=[kicked, settled_own], own_journal_pending=True, **scan))
+    assert ("sync", [6], 0) in plan(state(listings=[kicked], locked_shares=E, owed_estimate=E // 10, blackout=False, **scan)), \
+        "holders waiting are served even when the scan is unpaid"
+    assert plan(state(listings=[kicked], pending_deposits=E, **scan))[0] == ("sync", [], 0), \
+        "in a checkpoint window the paid scan runs first, the terminal after it without a scan"
+    assert P.journal_backlog_floor(state(markup_bps=0, routine_budget=1, **scan)) == (120_000 + 28 * 30_000) * 200_000_000
+    assert "checkpoint" in fns(plan(state(journal_cursor=7, completed_prefix=100_007, pending_deposits=E)))
+    assert "sync" not in fns(plan(state(journal_cursor=7, completed_prefix=100_007)))
+    assert "checkpoint" not in fns(plan(state(pending_receipts=1, pending_deposits=E)))
+    assert "checkpoint" not in fns(plan(state(allocation_stale=True, pending_deposits=E)))
+    assert plan(state(journal_cursor=1, completed_prefix=2, **spike)) == []
+    assert "sync" not in fns(plan(state(journal_cursor=1, completed_prefix=2, locked_shares=1, open_positions=1, **spike)))
+
+    s = state(listings=[Listing(1, ALLOCATED, allocated_at=10**6 - 10)], blackout=False, pending_deposits=1, free=E)
+    assert {"WAITING_SETTLEMENT", "WAITING_CHECKPOINT_WINDOW"} <= {c for c, _, _ in status(s)}
+    assert status(state(backing=0, listings=act))[0][0] == "QUOTE_UNAVAILABLE"
     assert ("EDGE_GATE_FAILED", "action") in {(c, k) for c, k, _ in status(state(k=E, listings=act))}
-    assert status(state(listings=act, open_positions=10, free=E, idle_eth=0))[0][0] == "OK"
-    # Audit E5: 100 staged listings activate in batches that fit one transaction.
-    many = [Listing(1000 + i, STAGED) for i in range(100)]
-    acts = [st for st in plan(state(listings=many, open_positions=100, free=E)) if st[0] == "activate"]
-    assert len(acts) == 5 and all(len(st[1]) == 20 and st[2] == 20 for st in acts), acts
-    assert sorted(i for st in acts for i in st[1]) == [l.id for l in many]
-
-    # Audit E2: a due distribution schedules a checkpoint with no holder flows; not above the ceiling.
-    assert "checkpoint" in fns(plan(state(distribution_due=True, listings=act, open_positions=10)))
-    assert "checkpoint" not in fns(plan(state(listings=act, open_positions=10)))
-    assert "checkpoint" not in fns(plan(state(distribution_due=True, listings=act, open_positions=10, **spike)))
-
-    # Audit E11: a mask without 3-unit packs builds nothing (this keeper builds 3-unit packs only).
-    build = dict(listings=act, open_positions=10, idle_eth=E, free=E, loose_shapes=0)
+    assert status(state(listings=act, free=E, idle_eth=0))[0][0] == "OK"
+    assert "checkpoint" in fns(plan(state(distribution_due=True, listings=act)))
+    assert "checkpoint" not in fns(plan(state(distribution_due=True, listings=act, **spike)))
+    build = dict(listings=act, idle_eth=E, free=E)
     assert "restock" in fns(plan(state(**build)))
     assert "restock" not in fns(plan(state(pack_units_mask=1 << 4, **build)))
-
-    # Audit E6: above the ceiling, a redemption checkpoint is preceded by syncing expired allocations.
-    expired = [Listing(5, ALLOCATED, allocated_at=10**6 - 7200)]
-    got = fns(plan(state(listings=expired, locked_shares=10**18, owed_estimate=10**15, free=E, open_positions=1, **spike)))
-    assert got.index("sync") < got.index("checkpoint"), got
-    # Audit E4: with processingPool subtracted, the auditor's fork balances show the real
-    # 0.000624 ETH shortfall and the keeper releases liquidity before the checkpoint.
-    s = state(markup_bps=0, listings=[Listing(1, ACTIVE)], loose_shapes=7, free=873_337_920_659_858_602,
-              owed_estimate=873_961_920_659_858_594, locked_shares=86_597_063_493_129_589, idle_eth=0,
-              open_positions=1, work_fee=20_000_000_000_000)
-    got = fns(plan(s))
-    assert "liquidate" in got and got.index("liquidate") < got.index("checkpoint"), got
-    # Audit E7: no listing or building while FWA's queue is busy (it would stage and cost activation).
+    # Building does not reserve a tag. Listing is replanned from the next fresh inventory state.
+    assert "list" not in fns(plan(state(**build)))
     assert not {"list", "restock"} & set(fns(plan(state(queue_drained=False, **build))))
-    assert "list" in fns(plan(state(idle_packs=2, listings=act, open_positions=10, idle_eth=E, free=E)))
-    print("keeper/test_policy.py: pass")
+    assert "list" in fns(plan(state(idle_packs=2, **build)))
+    # An unlistable larger gift must not bury valid3-unit inventory forever.
+    gift = state(idle_packs=1, idle_value=4 * P.UNIT, backing_proposals=[], **build)
+    assert "restock" in fns(plan(gift))
+    gift.idle_funding = E
+    assert "restock" not in fns(plan(gift))
+    gift.idle_funding = 0
+    gift.backing_proposals = [2 * E]
+    assert "restock" not in fns(plan(gift)), "viable inventory retains cash priority"
+    # Cached usable idle backing, rather than a hypothetical fixed 0.03 pack, covers liquidity.
+    assert "unlist" not in fns(plan(state(idle_packs=1, idle_value=3 * E // 10, locked_shares=1,
+                                          owed_estimate=2 * E // 10, listings=act)))
+    # Audit E4: processingPool remains excluded; the original 0.000624 ETH shortfall liquidates.
+    s = state(markup_bps=0, listings=[Listing(1, ACTIVE)], loose_shapes=7, idle_value=7 * P.UNIT,
+              free=873_337_920_659_858_602, owed_estimate=873_961_920_659_858_594,
+              locked_shares=86_597_063_493_129_589, work_fee=20_000_000_000_000)
+    assert fns(plan(s)).index("liquidate") < fns(plan(s)).index("checkpoint")
+
+    # Identifiers can go on either side, obey the actual interval, and become reusable.
+    target = 10**16 + 1234
+    used = {target // 10_000 * 10_000, (target // 10_000 + 1) * 10_000}
+    probes = []
+    def occupied(b):
+        probes.append(b)
+        return b in used
+    qs = P.propose_backings(target, len(used), 16, occupied)
+    assert len(qs) == len(set(qs)) == 16 and len(probes) <= 64 * 16
+    assert all(b % 10_000 == 0 and abs(b - target) <= (len(used) + i + 1) * 10_000 for i, b in enumerate(qs))
+    below = P.propose_backings(target, 10, 1, lambda _: False, maximum=target - 1)
+    above = P.propose_backings(target, 10, 1, lambda _: False, minimum=target + 1)
+    assert below[0] < target < above[0]
+    assert P.propose_backings(target, 10, 1, lambda _: False, minimum=target, maximum=target) == []
+    assert P.propose_backings(target, 0, 1, lambda _: False)[0] == target // 10_000 * 10_000
+    assert P.propose_backings(target, 0, 1, lambda _: True) == []
+    crowded_target = 36_300_000_000_000_000
+    crowded = {crowded_target - i * 10_000 for i in range(10_000)}
+    edges = P.propose_backings(crowded_target, len(crowded), 8, crowded.__contains__, maximum=crowded_target)
+    assert len(edges) == 8 and len(set(edges)) == 8
+    assert all(b not in crowded and b <= crowded_target for b in edges)
+    print("keeper/test_policy.py: pass (economic gates, constant checkpoint charge, bounded catchup/proposals, reserve amounts)")
 
 
 if __name__ == "__main__":

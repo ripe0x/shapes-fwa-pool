@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
+
+import {TestVaultOps} from "../../utils/TestVaultOps.sol";
 import {ForkBase} from "../../fork/ForkBase.sol";
 import {VaultLib} from "../../../src/VaultLib.sol";
 import {Charges} from "../../utils/Charges.sol";
@@ -13,7 +15,7 @@ contract AuditFreeMismatch is ForkBase {
         this.assertGasContext();
         VaultLib.Params memory p = vault.getParams();
         p.tvlCap = 2 ether;
-        p.maxPositions = 30;
+
         p.gasCeiling = 0.5 gwei;
         p.essentialCeiling = 0.5 gwei;
         p.payMarkupBps = 0;
@@ -27,10 +29,10 @@ contract AuditFreeMismatch is ForkBase {
         checkpoint();
         toOpen();
         vm.prank(keeper);
-        vault.restock(1, 3, 0);
+        TestVaultOps.restock(vault, 1, 3, 0);
         vm.prank(keeper);
-        vault.list(1, 0);
-        assertEq(vault.openListings().length, 1);
+        TestVaultOps.list(vault, 1, 0);
+        assertEq(TestVaultOps.open(vault).length, 1);
         // Repaired (E4 root): a cancel refunds its checkpoint charge, so cycles retain nothing
         // and no reserved ETH builds up for the keeper to misread. The keeper also subtracts the
         // pool now (keeper/test_policy.py replays the audit's balances).

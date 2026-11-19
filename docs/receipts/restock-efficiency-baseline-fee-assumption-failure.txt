@@ -1,0 +1,50 @@
+Compiling 30 files with Solc 0.8.30
+Solc 0.8.30 finished in 8.98s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:178:35:
+    |
+178 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:575:5:
+    |
+575 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/RestockEfficiency.t.sol:26:5:
+   |
+26 |     function assertEnvironment() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Warning: the following cheatcode(s) are deprecated and will be removed in future versions:
+  lastCallGas(): replaced by `lastFrameGas`
+Ran 5 tests for test/fork/RestockEfficiency.t.sol:RestockEfficiencyTest
+[PASS] test_allProposalsValidatedBeforeAnyPaidMint() (gas: 418492)
+[FAIL: redeemable primary backing stays in Shapes: 101000000000000000 != 100000000000000000] test_fourUnitLeftoversAndMixedMintsPreserveExactRecipe() (block: 26424971) (gas: 3260763)
+[FAIL: redeemable primary backing stays in Shapes: 101000000000000000 != 100000000000000000] test_largePackLeavesExistingLoosePrefixUntouched() (block: 26424971) (gas: 3221070)
+[FAIL: redeemable primary backing stays in Shapes: 303000000000000000 != 300000000000000000] test_maximumThirtyUnitNoLeftovers() (block: 26424971) (gas: 11104277)
+[FAIL: redeemable primary backing stays in Shapes: 101000000000000000 != 100000000000000000] test_threeUnitLeftoversAndMixedMintsPreserveExactRecipe() (block: 26424971) (gas: 3221224)
+Suite result: FAILED. 1 passed; 4 failed; 0 skipped; finished in 772.16ms (285.65ms CPU time)
+
+Ran 1 test suite in 1.08s (772.16ms CPU time): 1 tests passed, 4 failed, 0 skipped (5 total tests)
+
+Failing tests:
+Encountered 4 failing tests in test/fork/RestockEfficiency.t.sol:RestockEfficiencyTest
+[FAIL: redeemable primary backing stays in Shapes: 101000000000000000 != 100000000000000000] test_fourUnitLeftoversAndMixedMintsPreserveExactRecipe() (block: 26424971) (gas: 3260763)
+[FAIL: redeemable primary backing stays in Shapes: 101000000000000000 != 100000000000000000] test_largePackLeavesExistingLoosePrefixUntouched() (block: 26424971) (gas: 3221070)
+[FAIL: redeemable primary backing stays in Shapes: 303000000000000000 != 300000000000000000] test_maximumThirtyUnitNoLeftovers() (block: 26424971) (gas: 11104277)
+[FAIL: redeemable primary backing stays in Shapes: 101000000000000000 != 100000000000000000] test_threeUnitLeftoversAndMixedMintsPreserveExactRecipe() (block: 26424971) (gas: 3221224)
+
+Encountered a total of 4 failing tests, 1 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 4 failed tests
+Tip: Run `forge test --debug --match-test <TEST_NAME>` to inspect one failing test in the debugger

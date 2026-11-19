@@ -1,0 +1,15 @@
+local batch evidence directory /var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/efficient-journal-baseline-eqm_12s8
+Traceback (most recent call last):
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_rehearsal.py", line 740, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_rehearsal.py", line 735, in main
+    try:batch.run()
+        ^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_rehearsal.py", line 590, in run
+    self.deploy();self.deploy_greedy();self.fee(200000000)
+    ^^^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_rehearsal.py", line 458, in deploy
+    if result.returncode:raise RuntimeError('normal production deployment failed; preserve receipts before any retry')
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: normal production deployment failed; preserve receipts before any retry

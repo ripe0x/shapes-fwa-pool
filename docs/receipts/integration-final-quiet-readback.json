@@ -1,0 +1,29 @@
+{
+  "endpoint": "http://127.0.0.1:8557",
+  "block": 26418606,
+  "vault": "0xe7709640478bbf1b1d7fc5bac840ba3d657782d1",
+  "balance_wei": 9999815531267492,
+  "calls": {
+    "totals()(uint256,uint256,uint256,uint256,uint256,uint256)": "0\n0\n0\n0\n0\n0",
+    "totalShares()(uint256)": "1000000000000000 [1e15]",
+    "lockedShares()(uint256)": "0",
+    "pendingDepositTotal()(uint256)": "0",
+    "processingPool()(uint256)": "0",
+    "claimableTotal()(uint256)": "0",
+    "redemptionReserve()(uint256)": "2",
+    "distributionReserve()(uint256)": "0",
+    "pendingReceipts()(uint256)": "0",
+    "windingDown()(bool)": "true",
+    "idlePackCount()(uint256)": "0",
+    "looseShapeCount()(uint256)": "0",
+    "recoveryPackCount()(uint256)": "0",
+    "reservedCount()(uint256)": "0",
+    "openListingCount()(uint256)": "0"
+  },
+  "exit_status": 0,
+  "scope": "Independent root pinned readback after final quiet lifecycle; no mutation/broadcast. Protected redemption rounding can remain under preserved rules.",
+  "infrastructure_attempt": {
+    "initial_sandbox_exit": 1,
+    "reason": "Loopback TCP denied (Operation not permitted); same read-only check retried outside sandbox."
+  }
+}

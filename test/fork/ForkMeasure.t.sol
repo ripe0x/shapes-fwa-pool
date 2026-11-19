@@ -31,6 +31,10 @@ contract ForkMeasureTest is Test {
     PoolKey key;
     string json = "gas";
 
+    function assertGasContext() external {
+        assertEq(block.basefee, 0.15 gwei); assertEq(tx.gasprice, 0.2 gwei);
+    }
+
     function setUp() public {
         vm.createSelectFork("mainnet", BLOCK);
         // Real tx economics: nonzero basefee and gas price, so ETH flows match mainnet.
@@ -76,6 +80,7 @@ contract ForkMeasureTest is Test {
     }
 
     function test_measureInventoryAndListing() public {
+        this.assertGasContext();
         assertEq(FWA.unsettledAcquisitionCount(), 0, "pinned block has an empty queue");
         assertFalse(FWA.isPurchaseBlackout(), "pinned block is outside blackout");
         uint256 fee = SHAPES.mintFee();
@@ -204,6 +209,7 @@ contract ForkMeasureTest is Test {
     /// @notice Can a contract with no distributor role sell FWA for ETH through the token's v4 pool,
     ///         and what does a round trip cost at increasing size? Can it transfer FWA directly?
     function test_measureTokenRoute() public {
+        this.assertGasContext();
         IFWAToken token = IFWAToken(key.currency1);
         assertEq(key.currency0, address(0), "currency0 is native ETH");
         assertFalse(token.isDistributor(address(this)));
@@ -234,7 +240,8 @@ contract ForkMeasureTest is Test {
 
         // Direct transfer of FWA from a non-distributor contract to an EOA: expected to be locked.
         uint256 t = this.buyExternal(0.01 ether);
-        address eoa = makeAddr("holder");
+        address eoa = makeAddr("pack-vault-test-measure-holder");
+        assertEq(eoa.code.length, 0); assertEq(eoa.balance, 0);
         bool ok;
         try token.transfer(eoa, t) returns (bool r) {
             ok = r;

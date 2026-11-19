@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {TestVaultOps} from "../utils/TestVaultOps.sol";
+
 import {DeployCore} from "../../script/DeployCore.sol";
 import {Test} from "forge-std/Test.sol";
 import {PackVault} from "../../src/PackVault.sol";
@@ -79,7 +81,7 @@ abstract contract ForkBase is Test {
         p.packUnitsMask = uint64(1) << 3;
         p.gasCeiling = 5 gwei;
         p.essentialCeiling = 5 gwei;
-        p.maxPositions = 150;
+
         p.reserve = 0.05 ether;
         p.tvlCap = 100 ether;
         p.routineCap = 0.3 ether; // bytecode maxima: these suites test mechanics, not budgets
@@ -89,9 +91,9 @@ abstract contract ForkBase is Test {
     }
 
     /// @dev Owner sets caps and pay limits (everything else unchanged); the tip follows a lower ceiling.
-    function lowerTo(uint128 tvl, uint96 maxPos, uint64 ceiling, uint64 fee) internal {
+    function lowerTo(uint128 tvl, uint64 ceiling, uint64 fee) internal {
         VaultLib.Params memory q = vault.getParams();
-        (q.tvlCap, q.maxPositions, q.gasCeiling, q.essentialCeiling, q.workFee) = (tvl, maxPos, ceiling, ceiling, fee);
+        (q.tvlCap, q.gasCeiling, q.essentialCeiling, q.workFee) = (tvl, ceiling, ceiling, fee);
         if (q.maxTip > ceiling) q.maxTip = ceiling;
         vm.prank(owner);
         vault.setParams(q);
@@ -124,7 +126,7 @@ abstract contract ForkBase is Test {
 
     function checkpoint() internal {
         vm.prank(keeper);
-        vault.checkpoint(0);
+        TestVaultOps.checkpoint(vault, 0);
     }
 
     function setPackAsk(uint256 ask) internal {

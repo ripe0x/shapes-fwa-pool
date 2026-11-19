@@ -1,0 +1,96 @@
+Compiling 1 files with Solc 0.8.30
+Solc 0.8.30 finished in 8.68s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:178:35:
+    |
+178 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:575:5:
+    |
+575 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/RestockEfficiency.t.sol:33:5:
+   |
+33 |     function assertEnvironment() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Warning: the following cheatcode(s) are deprecated and will be removed in future versions:
+  lastCallGas(): replaced by `lastFrameGas`
+Ran 5 tests for test/fork/RestockEfficiency.t.sol:RestockEfficiencyTest
+[PASS] test_allProposalsValidatedBeforeAnyPaidMint() (gas: 418901)
+[PASS] test_fourUnitLeftoversAndMixedMintsPreserveExactRecipe() (gas: 9311817)
+Logs:
+  four first leftover6 gross gas: 2876839
+  four first leftover6 frame refund: 167600
+  four first leftover6 sample net gas upper bound: 2709239
+  four first leftover6 keeper pay wei: 588000000000000
+  four first leftover6 newly paid mints: 1
+  four mixed old6 new10 gross gas: 3137809
+  four mixed old6 new10 frame refund: 235700
+  four mixed old6 new10 sample net gas upper bound: 2902109
+  four mixed old6 new10 keeper pay wei: 680000000000000
+  four mixed old6 new10 newly paid mints: 1
+  four leftover only0 gross gas: 1227825
+  four leftover only0 frame refund: 56400
+  four leftover only0 sample net gas upper bound: 1171425
+  four leftover only0 keeper pay wei: 240000000000000
+  four leftover only0 newly paid mints: 0
+
+[PASS] test_largePackLeavesExistingLoosePrefixUntouched() (gas: 12619188)
+Logs:
+  large prefix setup gross gas: 2839528
+  large prefix setup frame refund: 147700
+  large prefix setup sample net gas upper bound: 2691828
+  large prefix setup keeper pay wei: 581000000000000
+  large prefix setup newly paid mints: 1
+  large consumes thirty new leaves old7 gross gas: 7848627
+  large consumes thirty new leaves old7 frame refund: 806900
+  large consumes thirty new leaves old7 sample net gas upper bound: 7041727
+  large consumes thirty new leaves old7 keeper pay wei: 1650000000000000
+  large consumes thirty new leaves old7 newly paid mints: 3
+
+[PASS] test_maximumThirtyUnitNoLeftovers() (gas: 20191293)
+Logs:
+  thirty units ten small packs gross gas: 10352610
+  thirty units ten small packs frame refund: 880600
+  thirty units ten small packs sample net gas upper bound: 9472010
+  thirty units ten small packs keeper pay wei: 2226000000000000
+  thirty units ten small packs newly paid mints: 3
+  thirty units one large pack gross gas: 7855460
+  thirty units one large pack frame refund: 858200
+  thirty units one large pack sample net gas upper bound: 6997260
+  thirty units one large pack keeper pay wei: 1650000000000000
+  thirty units one large pack newly paid mints: 3
+
+[PASS] test_threeUnitLeftoversAndMixedMintsPreserveExactRecipe() (gas: 9152421)
+Logs:
+  three first leftover7 gross gas: 2839528
+  three first leftover7 frame refund: 147700
+  three first leftover7 sample net gas upper bound: 2691828
+  three first leftover7 keeper pay wei: 581000000000000
+  three first leftover7 newly paid mints: 1
+  three leftover only4 gross gas: 651141
+  three leftover only4 frame refund: 20000
+  three leftover only4 sample net gas upper bound: 631141
+  three leftover only4 keeper pay wei: 141000000000000
+  three leftover only4 newly paid mints: 0
+  three mixed old4 new10 gross gas: 3441462
+  three mixed old4 new10 frame refund: 258400
+  three mixed old4 new10 sample net gas upper bound: 3183062
+  three mixed old4 new10 keeper pay wei: 751000000000000
+  three mixed old4 new10 newly paid mints: 1
+
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 2.59s (3.97s CPU time)
+
+Ran 1 test suite in 2.90s (2.59s CPU time): 5 tests passed, 0 failed, 0 skipped (5 total tests)

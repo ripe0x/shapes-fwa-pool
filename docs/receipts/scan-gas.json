@@ -1,0 +1,27 @@
+{
+  "description": "Q_SCAN calibration on mainnet fork (Tenderly gateway). Receipt-equivalent billed gas (intrinsic added, cold state via vm.cool, basefee 0.15 gwei / gasprice 0.2 gwei) of the scan-path sync over N own Active listings with a real 50-entry foreign backlog refunded by FWA's own processAcquisitions. Nothing mocked. Test: test/fork/ScanGas.t.sol.",
+  "block": 26424971,
+  "gasPriceContext": {"basefeeWei": 150000000, "txGasPriceWei": 200000000},
+  "unpaidScanBilledGas": {"N1": 147321, "N8": 352537, "N30": 998107},
+  "marginalGasPerScannedActiveListing": {
+    "N1_to_N8": 29316.57,
+    "N8_to_N30": 29344.09,
+    "N1_to_N30": 29337.45,
+    "chosen": 29337
+  },
+  "fixedOverheadInterceptGas": 117984,
+  "Q_SYNC": 85000,
+  "journalPathBilledGasBacklog1_1own": 136946,
+  "paidScan": {
+    "description": "One real VRF own selection applied by the scan (late() fixture), backlog>=2, basefee/gasprice 0.5 gwei.",
+    "billedGas": 272738,
+    "quotedGasQ": 295000,
+    "quotedGasQBreakdown": "Q_SYNC(85000) + 1*Q_SCAN(30000) + Q_SELECTED(180000)",
+    "payWei": 147500000000000,
+    "profitable": true,
+    "marginGas": 22262
+  },
+  "Q_SCAN_provisional": 30000,
+  "decision": "KEEP Q_SCAN = 30000",
+  "rationale": "Measured marginal 29337 gas is within [26000, 30000] and under the 30000 quote (~663 gas/listing headroom, ~2.2%). The paid scan's fixed quote 295000 covers billed 272738 at 0.5 gwei (7.5% headroom), so a paid scan stays keeper-profitable. No change to keeper/policy.py Q['scan'] or sim/vault.py scan_rebase."
+}

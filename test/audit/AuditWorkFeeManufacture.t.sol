@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {TestVaultOps} from "../utils/TestVaultOps.sol";
+
 import {ForkBase} from "../fork/ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {Charges} from "../utils/Charges.sol";
@@ -26,19 +28,21 @@ contract AuditWorkFeeManufactureTest is ForkBase {
         checkpoint(); // prices alice's deposit: work == true, pays 1 unit
         uint256 pay1 = keeper.balance - b;
         assertGt(pay1, fee, "paid checkpoint includes the work fee plus gas");
+        uint256 planned22 = TestVaultOps.witness(vault);
 
         // Same interval: a second checkpoint is refused outright (no second fee this interval).
         vm.prank(keeper);
         vm.expectRevert(PackVault.AlreadyCheckpointed.selector);
-        vault.checkpoint(0);
+        vault.checkpoint(planned22, 0);
 
         // Next interval with NO holder flow: refused (distributionBps is 0). So the fee cannot be
         // farmed by just calling checkpoint every interval; a real deposit/redeem is required.
         toOpen();
         toBlackout();
+        uint256 planned21 = TestVaultOps.witness(vault);
         vm.prank(keeper);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.checkpoint(0);
+        vault.checkpoint(planned21, 0);
 
         // The cheapest manufacture: the attacker escrows the 0.01 ETH minimum deposit (their own
         // money, recoverable as shares) to force one paid checkpoint. Measure the drain.
@@ -52,7 +56,7 @@ contract AuditWorkFeeManufactureTest is ForkBase {
         toBlackout();
         uint256 kb = keeper.balance;
         vm.prank(keeper);
-        vault.checkpoint(0);
+        TestVaultOps.checkpoint(vault, 0);
         uint256 pay2 = keeper.balance - kb;
         emit log_named_uint("manufactured checkpoint pay (wei)", pay2);
         emit log_named_uint("work-fee portion drained to keeper (wei)", fee);
@@ -76,23 +80,23 @@ contract AuditWorkFeeManufactureTest is ForkBase {
         uint256 fee = vault.getParams().workFee;
         uint256 b = keeper.balance;
         vm.prank(keeper);
-        vault.restock(1, 3, 0); // 0 units, by design
+        TestVaultOps.restock(vault, 1, 3, 0); // 0 units, by design
         uint256 restockPay = keeper.balance - b;
 
         b = keeper.balance;
         vm.prank(keeper);
-        vault.list(1, 0); // 1 unit
+        TestVaultOps.list(vault, 1, 0); // 1 unit
         uint256 listPay = keeper.balance - b;
         assertGt(listPay, fee, "list pays the per-position work fee");
         emit log_named_uint("restock pay (0 units expected)", restockPay);
         emit log_named_uint("list pay (1 unit)", listPay);
 
-        uint256[] memory ids = vault.openListings();
+        uint256[] memory ids = TestVaultOps.open(vault);
         assertEq(ids.length, 1, "one open listing");
 
         // Healthy edge, not winding down, no redemption request: unlist must revert. No fee loop.
         vm.prank(keeper);
         vm.expectRevert(PackVault.UnlistNotAllowed.selector);
-        vault.unlist(ids, 0);
+        TestVaultOps.unlist(vault, ids, 0);
     }
 }

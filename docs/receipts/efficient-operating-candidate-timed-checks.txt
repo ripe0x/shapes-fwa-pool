@@ -1,0 +1,5 @@
+PASS four candidate conditional timed paths and focused clock/expiry/claim/legacy checks. No full matrix or chain calls.
+zero {'exit_complete': True, 'fully_paid_routine': True, 'unpaid_routine_calls': 0, 'holder_calls_harvest': 0, 'fees_received_wei': 0, 'keeper_paid_harvest_wei': 0, 'ledger_gap_wei': 0}
+timely {'exit_complete': True, 'fully_paid_routine': False, 'unpaid_routine_calls': 44, 'holder_calls_harvest': 44, 'fees_received_wei': 1819168941380021572, 'keeper_paid_harvest_wei': 266081233333330390, 'ledger_gap_wei': 0}
+silent {'exit_complete': False, 'fully_paid_routine': False, 'unpaid_routine_calls': 45, 'holder_calls_harvest': 45, 'fees_received_wei': 1916686416113682250, 'keeper_paid_harvest_wei': 270435433333330427, 'ledger_gap_wei': 0}
+late {'exit_complete': True, 'fully_paid_routine': False, 'unpaid_routine_calls': 45, 'holder_calls_harvest': 45, 'fees_received_wei': 1862151985294759769, 'keeper_paid_harvest_wei': 258901433333330410, 'ledger_gap_wei': 0}

@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {TestVaultOps} from "../utils/TestVaultOps.sol";
+
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
+import {ReconcileTrace} from "../utils/ReconcileTrace.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {Charges} from "../utils/Charges.sol";
 import {LISTING_ACTIVE} from "../../src/interfaces/External.sol";
@@ -10,7 +13,7 @@ import {LISTING_ACTIVE} from "../../src/interfaces/External.sol";
 ///         sim/out/reconcile-trace.jsonl. sim/reconcile.py replays the same steps through the
 ///         Python vault model (sim/vault.py, the one the forward simulation uses) and must match
 ///         every vault number to the wei. Inputs the model takes as given: FWA's fee formula
-///         inputs, keeper gas pay (it depends on gasleft), and the live backing on each listing.
+///         inputs, observed fixed-quote keeper payouts, and each listing's live backing.
 contract ForkReconcileTest is SelectionBase {
     string constant OUT = "sim/out/reconcile-trace.jsonl";
     address alice = makeAddr("pack-vault-test-alice");
@@ -19,36 +22,13 @@ contract ForkReconcileTest is SelectionBase {
 
     receive() external payable {}
 
+    function assertGasContext() external {
+        assertEq(block.basefee, 0.4 gwei);
+        assertEq(tx.gasprice, 0.45 gwei);
+    }
+
     function _snap(string memory step) internal {
-        uint256 pay = address(this).balance - lastBal;
-        uint256[] memory open = vault.openListings();
-        uint256 pendingSum;
-        for (uint256 i; i < open.length; ++i) {
-            pendingSum += FWA.pendingFees(open[i]);
-        }
-        (uint128 aLocked,,,) = vault.redemptions(alice);
-        string memory line = string.concat(
-            '{"step":"', step, '","pay":', vm.toString(pay),
-            ',"balance":', vm.toString(address(vault).balance),
-            ',"totalShares":', vm.toString(vault.totalShares()),
-            ',"lastNav":', vm.toString(vault.lastNav()),
-            ',"pendingDepositTotal":', vm.toString(vault.pendingDepositTotal()),
-            ',"redemptionReserve":', vm.toString(vault.redemptionReserve()),
-            ',"lockedShares":', vm.toString(vault.lockedShares())
-        );
-        line = string.concat(
-            line,
-            ',"open":', vm.toString(open.length),
-            ',"idle":', vm.toString(vault.idlePacks().length),
-            ',"loose":', vm.toString(vault.looseShapeCount()),
-            ',"aliceShares":', vm.toString(vault.shareBalance(alice)),
-            ',"bobShares":', vm.toString(vault.shareBalance(bob)),
-            ',"aliceLocked":', vm.toString(uint256(aLocked)),
-            ',"aliceClaimable":', vm.toString(vault.claimableEth(alice)),
-            ',"pendingFeesSum":', vm.toString(pendingSum),
-            ',"feeCredit":', vm.toString(FWA.feeCredit(address(vault))), "}"
-        );
-        vm.writeLine(OUT, line);
+        ReconcileTrace.snapshot(vault, alice, bob, address(this).balance - lastBal, step, OUT);
         lastBal = address(this).balance;
     }
 
@@ -66,6 +46,7 @@ contract ForkReconcileTest is SelectionBase {
         // permissionless processor expires them after their word deadline, draining the queue.
         if (FWA.unsettledAcquisitionCount() != 0) IFwaSettle(address(FWA)).processAcquisitions(50);
         assertEq(FWA.unsettledAcquisitionCount(), 0, "queue drained");
+        if (vault.acquisitionCursor() < FWA.nextSequenceToProcess()) vault.sync(new uint256[](0), 0, 0);
     }
 
     function test_reconcileFullCycle() public {
@@ -77,8 +58,8 @@ contract ForkReconcileTest is SelectionBase {
             string.concat(
                 '{"step":"setup","deployBalance":', vm.toString(deployBalance),
                 ',"selectPay":', vm.toString(selectPay),
-                ',"count":30,"units":3,"backing":', vm.toString(B),
-                ',"acqFee":', vm.toString(acqFee), ',"acqCutBps":', vm.toString(acqCutBps),
+                ',"count":', vm.toString(COUNT), ',"units":3,"backing":', vm.toString(B),
+                ',"activationDebt":', vm.toString(activationDebt), ',"initCursor":', vm.toString(vault.acquisitionCursor()), ',"selectedListing":', vm.toString(selected), ',"backings":[', vm.toString(B), '],"acqFee":', vm.toString(acqFee), ',"acqCutBps":', vm.toString(acqCutBps),
                 ',"acqCrownBps":', vm.toString(acqCrownBps), ',"acqActive":', vm.toString(acqActive),
                 ',"balance":', vm.toString(address(vault).balance), "}"
             )
@@ -87,6 +68,7 @@ contract ForkReconcileTest is SelectionBase {
         // Vault operations at a set fee environment from here on.
         vm.fee(0.4 gwei);
         vm.txGasPrice(0.45 gwei);
+        this.assertGasContext();
         _snap("selected");
 
         vm.prank(c.purchaser);
@@ -116,29 +98,31 @@ contract ForkReconcileTest is SelectionBase {
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
         uint256 g = gasleft();
-        vault.sync(one, 0);
+        TestVaultOps.sync(vault, one, 0);
         uint256 gSync = g - gasleft();
         _snap("sync");
 
         g = gasleft();
-        vault.harvest(vault.openListings(), 0);
+        TestVaultOps.harvest(vault, TestVaultOps.open(vault), 0);
         uint256 gHarvest = g - gasleft();
         _snap("harvest");
+        uint256[] memory planned9 = TestVaultOps.proposals(vault, 1, 3);
 
         // FWA's queue is busy (the forked block's other request): the vault refuses to list into it.
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.list(1, 0);
+        vault.list(planned9, 0);
         _toBlackout(); // FWA's own processor drains the queue
+        _snap("catchup");
         g = gasleft();
-        vault.list(1, 0);
+        TestVaultOps.list(vault, 1, 0);
         uint256 gList = g - gasleft();
-        uint256[] memory open = vault.openListings();
-        (,, uint128 relistBacking) = vault.positions(open[open.length - 1]);
+        uint256[] memory open = TestVaultOps.open(vault);
+        (,, uint128 relistBacking) = TestVaultOps.position(vault, open[open.length - 1]);
         vm.writeLine(OUT, string.concat('{"step":"relistBacking","backing":', vm.toString(relistBacking), "}"));
         _snap("list");
 
         g = gasleft();
-        vault.checkpoint(0);
+        TestVaultOps.checkpoint(vault, 0);
         uint256 gCheckpoint = g - gasleft();
         _snap("checkpoint1");
         vm.writeLine(
@@ -161,7 +145,7 @@ contract ForkReconcileTest is SelectionBase {
         vm.warp(block.timestamp + 12 hours);
         vm.roll(block.number + 3600);
         assertEq(FWA.unsettledAcquisitionCount(), 0);
-        vault.checkpoint(0);
+        TestVaultOps.checkpoint(vault, 0);
         _snap("checkpoint2");
 
         vm.prank(alice);

@@ -1,0 +1,142 @@
+{
+  "revision": "15348d1e89c18eefe00349615a9092911c123d17",
+  "scope": "Opt-in timestamp driver in two simulation files only. No production/client/policy/config/dependency/Vault-core changes, chain mutations or full matrix.",
+  "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python3",
+    "sim/efficient_operating.py",
+    "--db",
+    "/Users/dd/CascadeProjects/shapes-fwa-pool/sim/data/fwa.sqlite",
+    "--timed-checks"
+  ],
+  "exit_status": 0,
+  "source_sha256": {
+    "sim/forward.py": "d34620fcd7932c3eaad03abd78a7f4d806510ca7af442cce7b93d5da43486562",
+    "sim/efficient_operating.py": "027df41dfb2e6d9153c465351863ca4fa3af95afb89a50ac3491e1e847832e90",
+    "sim/vault.py": "e958d86859ff9ddd9e2766459683f77cf9caea9ac87691be6360d2e92614ba7a",
+    "keeper/policy.py": "cba78633858db621b48bf729571673f84693e503d6d49eecda0cb905730703a2"
+  },
+  "artifact_sha256": {
+    "sim/forward.py": "d34620fcd7932c3eaad03abd78a7f4d806510ca7af442cce7b93d5da43486562",
+    "sim/efficient_operating.py": "027df41dfb2e6d9153c465351863ca4fa3af95afb89a50ac3491e1e847832e90",
+    "sim/vault.py": "e958d86859ff9ddd9e2766459683f77cf9caea9ac87691be6360d2e92614ba7a",
+    "keeper/policy.py": "cba78633858db621b48bf729571673f84693e503d6d49eecda0cb905730703a2",
+    "test/fixtures/selection.json": "9d9fe55f7b69ee6b13100ceb48504438735dc32b0c634ca3e11328c0ff75984a",
+    "docs/receipts/current-three-arg-reconcile-trace.jsonl": "4d2869399b6eea132edb2672d40817e7940df3a01f0b6bf1d26b1f7a1308e781",
+    "docs/receipts/efficient-operating-timed-checks.json": "bf860d925beceb90fe5a3198474d15818d31d5342c1d963396f76b87d5c7f481",
+    "docs/receipts/efficient-operating-timed-checks.txt": "824fc4a10de7fedf902eba3900938016352d1b96d1b724025dd5ce7d92c547a4",
+    "docs/receipts/efficient-operating-timed-first-assertion-failure.txt": "94f6db17d337572c73da20ae354b54cbc8bbfb9acd338573155efe722322f4a8"
+  },
+  "evidence": {
+    "conditional_cases": 4,
+    "zero_gap_asset_ledgers": 4,
+    "zero_gap_external_fee_ledgers": 4,
+    "complete_holder_exits": 3,
+    "expiry_backing_reclaim_cases": 2,
+    "late_response_cases": 1,
+    "legacy_archived_fields_exact": 115
+  },
+  "harvest_diagnosis": {
+    "zero": {
+      "harvest_calls": 0,
+      "harvest_paid_wei": 0,
+      "received_fee_wei": 0,
+      "harvested_credit_wei": 0,
+      "membership_harvest_count": 0,
+      "distinct_harvested_memberships": 0,
+      "max_harvests_before_selection": 0,
+      "external_fee_conservation_gap_wei": 0
+    },
+    "timely": {
+      "harvest_calls": 972,
+      "harvest_paid_wei": 264933499999997087,
+      "received_fee_wei": 1796011982853566498,
+      "harvested_credit_wei": 11468796007259911,
+      "membership_harvest_count": 15529,
+      "distinct_harvested_memberships": 110,
+      "max_harvests_before_selection": 195,
+      "external_fee_conservation_gap_wei": 0,
+      "membership8": {
+        "conditional_id": 8,
+        "selection_timestamp": 1794938388,
+        "harvests_before_selection": 195,
+        "received_pending_wei": 15504676819132035,
+        "marginal_quote_gas": 15600000,
+        "marginal_quote_cost_at_point2gwei_wei": 3120000000000000
+      }
+    },
+    "silent": {
+      "harvest_calls": 1099,
+      "harvest_paid_wei": 269266499999997100,
+      "received_fee_wei": 1888010087907315034,
+      "harvested_credit_wei": 15679267601191074,
+      "membership_harvest_count": 15602,
+      "distinct_harvested_memberships": 116,
+      "max_harvests_before_selection": 195,
+      "external_fee_conservation_gap_wei": 0,
+      "membership8": {
+        "conditional_id": 8,
+        "selection_timestamp": 1794942754,
+        "harvests_before_selection": 195,
+        "received_pending_wei": 14875000799502422,
+        "marginal_quote_gas": 15600000,
+        "marginal_quote_cost_at_point2gwei_wei": 3120000000000000
+      }
+    },
+    "late": {
+      "harvest_calls": 948,
+      "harvest_paid_wei": 258243499999997078,
+      "received_fee_wei": 1836258194008872585,
+      "harvested_credit_wei": 14722143929250326,
+      "membership_harvest_count": 15145,
+      "distinct_harvested_memberships": 113,
+      "max_harvests_before_selection": 195,
+      "external_fee_conservation_gap_wei": 0,
+      "membership8": {
+        "conditional_id": 8,
+        "selection_timestamp": 1794942754,
+        "harvests_before_selection": 195,
+        "received_pending_wei": 14875000799502422,
+        "marginal_quote_gas": 15600000,
+        "marginal_quote_cost_at_point2gwei_wei": 3120000000000000
+      }
+    }
+  },
+  "semantic_inputs": {
+    "actual_window_seconds": 3600,
+    "interval_seconds": 43200,
+    "blackout_start_seconds": 42300,
+    "configured_poll_seconds": 60,
+    "max_calls_per_pass": 40,
+    "conditional_receipt_confirmed_read_delay_seconds": 36,
+    "conditional_vrf_delay_seconds": 60,
+    "operating_days": 2,
+    "maximum_exit_days": 2,
+    "initial_cap_model_proposal_wei": 300000000000000000,
+    "daily_refill_model_proposal_wei": 10000000000000000,
+    "cash_source": "Vault ETH only; no sponsor or mint revenue recycling."
+  },
+  "verification": [
+    "Four timed cases pass blackout and one-checkpoint-per-interval checks, cutoff/request/claim accounting, independent actual-modeled fee conservation and holder asset ledger.",
+    "Authentic recorded early/late fulfill timestamps imply1429/37213seconds to next blackout. Real position projection fails expiry scheduling at3599seconds and becomes eligible at3600seconds. No service responses or protocol state were fabricated.",
+    "Timely response/relisting occurs during same calendar day; multiple acquisition events can select new active memberships within a day.",
+    "Legacy half-redemption matches all115archived numeric fields exactly, with two checkpoints and positive caller exit cost.",
+    "python3 -m py_compile sim/forward.py sim/efficient_operating.py and git diff --check passed."
+  ],
+  "preserved_failure": {
+    "file": "efficient-operating-timed-first-assertion-failure.txt",
+    "cause": "The initial proof incorrectly required response and relist to be adjacent trace records. Real modeled synchronization intervenes. The corrected proof allows those required actions while retaining the same-day condition; no source behavior was changed to satisfy adjacency."
+  },
+  "limits": [
+    "Conditional generated request/completion times and purchaser choices are scenario assumptions, not real VRF replay or observed purchaser response behavior.",
+    "Effects occur atomically at the fresh modeled read;36seconds delay the next receipt-confirmed read. This optimistic inclusion assumption does not model fees, reverted races, variable block time or transaction latency across a boundary.",
+    "At exact timestamp ties, market events precede keeper reads. Purchasers may respond after3600seconds until reclaim wins; expiry itself does not transfer assets.",
+    "Static recorded foreign pool and per-completion fee/selection approximation remain. Successful journal compensation and keeper profitability still require separate actual receipts/preflight.",
+    "NFT-reclaim expiry branch is implemented but not reached by these accepted-backing scenarios; no fabricated low-backing protocol fixture is supplied.",
+    "These short conditional paths validate clock/accounting interactions. They do not reproduce the prepriced-holder cash-cycle or establish recommended budget, expected returns or annual acceptance."
+  ],
+  "things_that_do_not_make_sense": [
+    "CYCLE_GAS charges Q_HARVESTED once per own cycle, while ordinary60second polling can harvest the same membership repeatedly. This conditional expense is not covered by once-per-cycle economics.",
+    "The realized-fee quarter cap can still consume more than the net cycle edge because gross fees also compensate backing transferred to purchasers.",
+    "Expense and cash comparisons remain conditional on selection/fee/purchaser/inclusion approximations; none of these paths establish forecast returns or a recommended budget."
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "base_revision": "f75ee770d0f0bce55a5f2607a23a3ee0104d1df1",
+  "date": "2026-11-18",
+  "sha256": {
+    "sim/vault.py": "8d658778f4d8bf9ff48cefd4f2e73272d75b75a25a01da36babe02174b0d4204",
+    "sim/test_vault.py": "1da114086e77f14e5b8819e4419964ea12a7187b758e06a96c3969d94de1fb37",
+    "sim/forward.py": "789e3dac121c14127b41a8c5e47416d799a4af3a32b35b29f9fb59a10ac67fb6",
+    "sim/reconcile.py": "e2921686b19dfa5b05bc9317d5af7b309297369a437c04ff3b3c37cb8b2fa8d4",
+    "sim/maintenance.py": "09359369be7670c22be7bba6d957e75ab381d7423933afe551ab03f6ce47c33f",
+    "keeper/policy.py": "465b208157f761a5ae100a098d998391b75c25236265056ebd0fbb8a14b1ce1c",
+    "sim/out/reconcile-partial-trace.jsonl": "26a079264f244c555f2ec8987cffbd44f1f56515773ddde8bbf76d9b61193c86"
+  },
+  "checks": [
+    {
+      "command": "python3 sim/test_vault.py",
+      "exit_status": 0,
+      "result": "9 tests passed"
+    },
+    {
+      "command": "python3 - <<'PY'\nimport sys\nfrom pathlib import Path\nsys.path.insert(0, str(Path('sim').resolve()))\nimport forward\nforward.DB=Path('/Users/dd/CascadeProjects/shapes-fwa-pool/sim/data/fwa.sqlite')\nsys.argv=['sim/forward.py','--self-check']\nforward.main()\nPY",
+      "exit_status": 0,
+      "result": "7 scenarios passed; zero demand, keeps, at bid ceiling, above bid ceiling, empty budget, depleted budget, partial redemption",
+      "limitation": "Focused model scenarios only; no annual return gate. Read-only historical database end block 26425092."
+    },
+    {
+      "command": "python3 - <<'PY'\nimport sys\nsys.path.insert(0,'sim')\nimport reconcile\nraise SystemExit(reconcile.reconcile_partial())\nPY",
+      "exit_status": 0,
+      "result": "Every financial bucket reconciled; claim 992810771148045042 wei, keeper pay 4356000000000000 wei, mint fees 3000000000000000 wei, remaining redemption reserve 9 wei",
+      "limitation": "Partial trace from earlier identical financial source; final candidate trace and complete cycle remain to run."
+    },
+    {
+      "command": "git diff --check && python3 -m py_compile sim/vault.py sim/reconcile.py sim/forward.py sim/maintenance.py sim/test_vault.py",
+      "exit_status": 0,
+      "result": "Passed"
+    }
+  ]
+}

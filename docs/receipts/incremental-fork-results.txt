@@ -1,0 +1,75 @@
+Incremental FWA adapter integration tests
+Run date: 2026-11-18
+Research only. Actual deployed FWA and shape packs on historical mainnet forks.
+Command:
+forge test --rpc-url https://mainnet.gateway.tenderly.co --match-path test/research/IncrementalFWAFork.t.sol --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv
+
+
+Ran 20 tests for test/research/IncrementalFWAFork.t.sol:IncrementalFWAForkTest
+[PASS] test_bidReturnNeedsNoValueRefreshThenCanRedeemAndReuseBacking() (gas: 46687286)
+[PASS] test_checkpointReadsNoPortfolioArray() (gas: 5210304)
+Logs:
+  real FWA cold checkpoint valuation gas: 82918
+
+[PASS] test_checkpointWindowAndExpiredAllocationRemainEnforced() (gas: 44192730)
+[PASS] test_controlledFeeCreditHarvestDoesNotCreateAsyncReceipt() (gas: 43111962)
+[PASS] test_controlledWithdrawalAndSamePackRelistKeepExactValue() (gas: 7804282)
+[PASS] test_controlledWithdrawalDoesNotCreateAsyncReceipt() (gas: 5278665)
+[PASS] test_directKickUpdatesLedgerWithoutAnAcquisitionEntry() (gas: 46754966)
+[PASS] test_journalBeforeReceiptAndOmittedReceiptBlocksPricing() (gas: 44110485)
+[PASS] test_lowGasKeepNeverCommitsAnUnrecordedPayment() (gas: 50876312)
+Logs:
+  failed gas limits: 22
+  successful gas limits: 18
+  first successful gas limit: 460000
+
+[PASS] test_lowGasKickNeverCommitsAnUnrecordedPayment() (gas: 63597284)
+Logs:
+  failed kick gas limits: 40
+  successful kick gas limits: 19
+  successful kicks with stuck NFT: 0
+  first successful kick gas limit: 420000
+
+[PASS] test_protocolAndStrangerGiftsDoNotDuplicateTerminalReceipt() (gas: 43496962)
+[PASS] test_realCashBidDoesNotInventETHReceipt() (gas: 43260250)
+[PASS] test_realFeeIndexAndHarvestMatchFullReference() (gas: 45634724)
+[PASS] test_realKeepAtDefaultFee() (gas: 43290414)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_realKeepAtMaximumFee() (gas: 43293490)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_realKeepAtZeroFee() (gas: 43280567)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_realKickChecksSettledBidDecoyAndRecordsCorrectID() (gas: 45442291)
+Logs:
+  receiver logic gas: 67992
+  receiver gas bound including instrumentation: 70992
+
+[PASS] test_realRelistIdentifiesReceiptWithoutNFTTransfer() (gas: 43527330)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_realSilentPurchaserReclaimIdentifiesReceipt() (gas: 43262420)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_receiptBeforeJournalCannotPriceOrRetireEarly() (gas: 44166606)
+Suite result: ok. 20 passed; 0 failed; 0 skipped; finished in 17.95s (102.39s CPU time)
+
+Ran 1 test suite in 17.95s (17.95s CPU time): 20 tests passed, 0 failed, 0 skipped (20 total tests)
+
+Whole test gas includes fixture construction and sometimes dozens of snapshot attempts.
+Receiver figures include a conservative 3,000 gas instrumentation allowance.
+The 82,918 gas checkpoint measurement is the prototype's complete NAV/guard path,
+not the production vault's share issuance, keeper payout, or redemption processing.
+Large position counts are tested separately in the pure accounting model.

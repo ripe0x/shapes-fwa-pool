@@ -1,0 +1,1506 @@
+Compiling 25 files with Solc 0.8.30
+Solc 0.8.30 finished in 55.75s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:177:35:
+    |
+177 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:574:5:
+    |
+574 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditActivationGas.t.sol:12:5:
+   |
+12 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditAllocatedValuation.t.sol:29:5:
+   |
+29 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditDistribution.t.sol:10:5:
+   |
+10 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditFreeMismatch.t.sol:10:5:
+   |
+10 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditMaliciousPolicy.t.sol:19:5:
+   |
+19 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditMaxPackGas.t.sol:13:5:
+   |
+13 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditOracleGas.t.sol:11:5:
+   |
+11 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkJournalGas.t.sol:12:5:
+   |
+12 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkMaxBatchGas.t.sol:16:5:
+   |
+16 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkPartialReconcile.t.sol:35:5:
+   |
+35 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkPartialReconcile.t.sol:44:5:
+   |
+44 |     function _listedIds(uint256 count) private returns (uint256[] memory ids) {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkTokens.t.sol:80:5:
+   |
+80 |     function assertTokenGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Ran 1 test for test/audit/release/AuditAllocatedValuation.t.sol:AuditAllocatedValuation
+[PASS] test_expiredAllocationMustSyncBeforePricing() (gas: 48700979)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.71s (2.28s CPU time)
+
+Ran 1 test for test/fork/ForkReconcile.t.sol:ForkReconcileTest
+[PASS] test_reconcileFullCycle() (gas: 54974399)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.73s (2.30s CPU time)
+
+Ran 1 test for test/audit/release/AuditActivationGas.t.sol:AuditActivationGas
+[FAIL: Error != expected error: Amount() != Nothing()] test_busyQueueRefusesListing() (block: 26417086) (gas: 60206722)
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 2.91s (2.48s CPU time)
+
+Ran 2 tests for test/audit/release-b/AuditB.t.sol:AuditBSelection
+[PASS] test_harvestRefusesRepeatedIds() (gas: 47685805)
+[PASS] test_noListingIntoBusyQueue() (gas: 49707587)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 3.69s (3.26s CPU time)
+
+Ran 2 tests for test/fork/ForkIncrementalProduction.t.sol:ForkProductionStagingTest
+[PASS] test_foreignAutoactivationRejectedWithBoundedGasEvenWhenOurListingWouldBeActive() (gas: 76467526)
+Logs:
+  real FWA one admission with fifteen foreign activations gross gas: 5227714
+  bounded rejected maximum-eight admission gross gas: 1409430
+
+[PASS] test_stagedAdmissionAfterDrainedPrecheckRevertsAtomically() (gas: 65965541)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 3.71s (3.29s CPU time)
+
+Ran 1 test for test/audit/release/AuditDistribution.t.sol:AuditDistribution
+[PASS] test_distributionDueWithoutFlowsNeedsKeeperCheckpoint() (gas: 911083)
+Logs:
+  distribution reserve wei: 20000000000000000
+  checkpoint pay wei: 100000000000000
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 5.93s (3.86s CPU time)
+
+Ran 1 test for test/audit/release/AuditMaliciousPolicy.t.sol:AuditMaliciousPolicy
+[PASS] test_policyQuotesForSimulationThenZeroesPaidTransaction() (gas: 1147842)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 5.93s (3.86s CPU time)
+
+Ran 1 test for test/fork/ForkJournalGas.t.sol:ForkJournalGasTest
+[PASS] test_realForeignHistoryOneVersusSixteenEntriesAndSplitPay() (gas: 4510444)
+Logs:
+  actual fulfilled foreign entries: 16
+  actual refunded entries: 0
+  startup one entry gross complete gas: 158812
+  startup one entry pay wei: 23000000000000
+  steady one entry gross complete gas: 138930
+  steady sixteen entries gross complete gas: 420622
+  steady sixteen split calls gross complete gas: 2181216
+  one entry pay wei: 23000000000000
+  sixteen entries pay wei: 113000000000000
+  sixteen split calls pay wei: 368000000000000
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.23s (894.05ms CPU time)
+
+Ran 3 tests for test/fork/ForkIncrementalProduction.t.sol:ForkProductionInventoryTest
+[PASS] test_paidMintSplitLooseAssemblyListingWithdrawalAndRedemptionMatchFullReference() (gas: 10921189)
+[FAIL: next-block economics moved beyond the outstanding-count tag window: 0 <= 10000] test_pendingBlockBasefeeNeedsFreshEconomicProposal() (block: 26424971) (gas: 861287)
+[PASS] test_pendingEscrowProcessingClaimsAndCancellationExcludedFromNAV() (gas: 1348441)
+Suite result: FAILED. 2 passed; 1 failed; 0 skipped; finished in 5.97s (3.91s CPU time)
+
+Ran 2 tests for test/audit/AuditRoleAndKeeper.t.sol:AuditRoleAndKeeperTest
+[PASS] test_adminMaxParamsSelfKeepExtraction() (gas: 941499)
+Logs:
+  charge paid (wei): 20050000000000000
+  checkpoint pay (wei): 20050000000000000
+
+[PASS] test_guardianZeroCeilingDoesNotTrapHolderFunds() (gas: 997814)
+Logs:
+  alice redemption claimed under zero ceiling (wei): 999844035200488527
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 6.00s (3.93s CPU time)
+
+Ran 1 test for test/audit/release/AuditFreeMismatch.t.sol:AuditFreeMismatch
+[PASS] test_cancelCyclesRetainNothing() (gas: 9267962)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 6.02s (3.95s CPU time)
+
+Ran 1 test for test/fork/ForkPartialReconcile.t.sol:ForkPartialReconcileTest
+[PASS] test_reconcilePartialRedemptionAndWindDown() (gas: 31926518)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.35s (1.98s CPU time)
+
+Ran 2 tests for test/audit/release-b/AuditB.t.sol:AuditBBudget
+[FAIL: UnlistNotAllowed()] test_oneExitEmptiesEssentialBudget() (block: 26424971) (gas: 23702022)
+Logs:
+  built, listed 20 0
+  routine paid for the build, routine budget left 4452000000000000 25548000000000000
+  idle packs, idle ETH 20 1344548000000000001
+  alice's redeem charge (checkpoint + unwind) wei 15419189719642996
+
+[PASS] test_ownerKeyFirstDay() (gas: 13560422)
+Logs:
+  t0: unlist 1 at maxima, routine pay 27364000000000000
+  t0: wind-down unlist 1, essential pay 10000000000000000
+  t+24h: liquidate 1, essential pay 5000000000000000
+  t+24h budgets routine (not reachable in wind-down?), essential 10000000000000000 0
+  owner took in ~24 h 42364000000000000
+
+Suite result: FAILED. 1 passed; 1 failed; 0 skipped; finished in 6.04s (4.02s CPU time)
+
+Ran 3 tests for test/audit/release-b/AuditB.t.sol:AuditBPinned
+[PASS] test_hugeSurchargeDoesNotBlockUnlist() (gas: 7831319)
+[PASS] test_maximumRealOracleAskDoesNotBlockExit() (gas: 8909792)
+[PASS] test_measureOps() (gas: 25308880)
+Logs:
+  checkpoint(0 pos): gas, pay 238919 100000000000000
+  restock(1, mint): gas, pay 2972512 581000000000000
+  restock(3, 1 mint): gas, pay 3607428 751000000000000
+  restock(6, 2 mints): gas, pay 4941124 1006000000000000
+  list(1): gas, pay 1396514 265000000000000
+  backing of first listing 36300000000000000
+  list(9): gas, pay 8409282 1825000000000000
+  backing of last listing, idle after 36299999999910000 1234572000000450001
+  redeem charge wei 3939907795339893
+  unlist(n): n 10
+  unlist: gas, pay 2799366 838000000000000
+  liquidate: gas, pay 1763781 585000000000000
+  left: open, idle packs, loose 0 0 0
+  checkpoint(redeem): gas, pay 259913 100000000000000
+  alice claim wei (deposited 1.9 + charges) 1894910098047828532 1904039907795339893
+  budgets left routine, essential 25963666666666666 8674916666666666
+  vault balance, lastNav 10078809747511362 10078809747511361
+
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 6.06s (5.25s CPU time)
+
+Ran 2 tests for test/audit/release/AuditOracleGas.t.sol:AuditOracleGas
+[FAIL: custom error 0x35be3ac8] test_emptyOracleAddressDoesNotBlockWindDownExit() (block: 26424971) (gas: 7347827)
+[PASS] test_wrongOracleAbiDoesNotBlockRedemption() (gas: 6535069)
+Logs:
+  locked shares after first checkpoint: 12486272876504710
+  holder claimed wei: 999653550340478135
+
+Suite result: FAILED. 1 passed; 1 failed; 0 skipped; finished in 3.23s (1.09s CPU time)
+
+Ran 15 tests for test/fork/ForkKeeperPay.t.sol:ForkKeeperPayTest
+[PASS] test_budgetsBoundSpendingOverTime() (gas: 8077983)
+[PASS] test_cancelKeepsPoolForOtherFlows() (gas: 495890)
+[PASS] test_dustDepositCannotManufacturePay() (gas: 797410)
+[PASS] test_essentialCeilingPaysExitsInSpikes() (gas: 9079171)
+[FAIL: UnlistNotAllowed()] test_manufacturedCycleLosesAtMaxima() (block: 26424971) (gas: 66289848)
+[PASS] test_minPayIsAllOrNothing() (gas: 6027643)
+[PASS] test_payIgnoresCallerGasAndTip() (gas: 9638637)
+[PASS] test_payNeverUsesLiabilities() (gas: 5442370)
+[PASS] test_repeatedWorkPaysNothing() (gas: 7021928)
+[PASS] test_requestChargeTopsUpOnce() (gas: 672597)
+[PASS] test_routineCannotDrainEssential() (gas: 10626649)
+[PASS] test_selfServeExitWithoutEssentialBudget() (gas: 8672699)
+[FAIL: the extra calls cost more gas than they earn: 140622200000000 <= 160000000000000] test_splittingDoesNotPay() (block: 26424971) (gas: 10640479)
+[PASS] test_tinyRedemptionCannotManufacturePay() (gas: 894515)
+[PASS] test_unpaidWorkWhenBudgetsAreEmpty() (gas: 7561351)
+Suite result: FAILED. 13 passed; 2 failed; 0 skipped; finished in 6.39s (4.47s CPU time)
+
+Ran 1 test for test/audit/release/AuditMaxPackGas.t.sol:AuditMaxPackGas
+[PASS] test_maxPackFitsTransactionCap() (gas: 30171)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.23s (367.67µs CPU time)
+
+Ran 2 tests for test/audit/AuditWorkFeeManufacture.t.sol:AuditWorkFeeManufactureTest
+[PASS] test_checkpointFeeIsOnePerIntervalAndNeedsAFlow() (gas: 970329)
+Logs:
+  manufactured checkpoint pay (wei): 100000000000000
+  work-fee portion drained to keeper (wei): 20000000000000
+  max work-fee drain/yr via checkpoint (wei): 14600000000000000
+
+[PASS] test_listUnlistLoopIsGated() (gas: 4799479)
+Logs:
+  restock pay (0 units expected): 581000000000000
+  list pay (1 unit): 265000000000000
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.59s (16.97ms CPU time)
+
+Ran 1 test for test/audit/release/AuditOwnerExtraction.t.sol:AuditOwnerExtraction
+[PASS] test_compromisedOwnerRaisesCanaryCapsImmediatelyAndCollectsPay() (gas: 8410782)
+Logs:
+  canary routine remaining before extraction: 28614000000000000
+  owner keeper pay extracted wei: 38614000000000000
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.55s (25.09ms CPU time)
+
+Ran 7 tests for test/fork/ForkKeeperPolicy.t.sol:ForkKeeperPolicyTest
+[PASS] test_failingPolicyNeverBlocksWork() (gas: 16689766)
+[PASS] test_greedyPolicyCappedAtEnvelope() (gas: 9947616)
+[PASS] test_invalidPolicyRejected() (gas: 1137143)
+[PASS] test_largeDepositChargeNotTruncated() (gas: 6580311)
+[PASS] test_ownerDisablesPayImmediately() (gas: 10316304)
+[PASS] test_ownerPauses() (gas: 68917)
+[PASS] test_swapToDifferentFormulaPreservesAccounting() (gas: 13208646)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 1.69s (162.42ms CPU time)
+
+Ran 3 tests for test/fork/ForkBacking.t.sol:ForkBackingTest
+[FAIL: quantized proposal stays near target: 16302663408916666 >= 30000] test_exemptListsAtFloor() (block: 26424971) (gas: 6012376)
+[FAIL: assertion failed: 86946972418355169 > 66666666666666668] test_gasOptimalAboveFloorAtHighCeiling() (block: 26424971) (gas: 687610)
+[PASS] test_targetIndependentOfPortfolioRoom() (gas: 1103400)
+Suite result: FAILED. 1 passed; 2 failed; 0 skipped; finished in 2.47s (18.73ms CPU time)
+
+Ran 1 test for test/fork/ForkIncrementalProduction.t.sol:ForkProductionAdmissionTest
+[PASS] test_quantizedIntervalBothSidesCollisionsAndHardBounds() (gas: 8503035)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.47s (25.30ms CPU time)
+
+Ran 3 tests for test/fork/ForkTokens.t.sol:ForkTokensTest
+[PASS] test_burnClaimsActiveRewards() (gas: 1172647)
+Logs:
+  burn maximum sixteen real token rewards gross complete gas: 285916
+
+[PASS] test_staleIdDoesNotBlockCredit() (gas: 2107548)
+[PASS] test_zeroRewards() (gas: 48715)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 6.11s (78.58ms CPU time)
+
+Ran 1 test for test/audit/release/IndependentChallenge.t.sol:IndependentChallenge
+[PASS] test_emptyCheckpointRevertsAndLeavesSlotFree() (gas: 1618076)
+Logs:
+  request charge wei: 100000000000000
+  unwind charge wei: 2020598804492950
+  exact redemption charge wei: 2120598804492950
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.23s (1.63ms CPU time)
+
+Ran 13 tests for test/fork/ForkVaultLifecycle.t.sol:ForkVaultLifecycleTest
+[PASS] test_cancelDepositBeforePricing() (gas: 280352)
+[FAIL: assertion failed: 5859000000000000 >= 5800000000000000] test_depositListRedeem_roundTrip() (block: 26424971) (gas: 26347242)
+[PASS] test_edgeGateStopsListingWhenCrownShareRaised() (gas: 6870366)
+[PASS] test_edgeMatchesLiveFwa() (gas: 87811)
+[PASS] test_kickReturnsFullBackingAndPack() (gas: 6595896)
+[PASS] test_ownerStopsCannotMoveAssets() (gas: 5910441)
+[PASS] test_paddedSyncPaysOnlyForWorkDone() (gas: 6889646)
+[PASS] test_paramsBoundsAppliedAtOnce() (gas: 184733)
+[PASS] test_proRataRedemptionAcrossCheckpoints() (gas: 40311871)
+[PASS] test_staleQuoteDoesNotUnlockUnlisting() (gas: 5934323)
+[PASS] test_staleQuoteStopsListing() (gas: 79582)
+[PASS] test_windDownCompletesWithNoAcquisitions() (gas: 20469972)
+[PASS] test_windDownSurvivesBrokenOracle() (gas: 8629941)
+Suite result: FAILED. 12 passed; 1 failed; 0 skipped; finished in 1.85s (560.21ms CPU time)
+
+Ran 3 tests for test/fork/ForkMaxBatchGas.t.sol:ForkMaxBatchGasTest
+[PASS] test_checkpointFullHolderMixCompleteGas() (gas: 86705198)
+Logs:
+  checkpoint redemption index distribution deposit payment complete gas: 370178
+  checkpoint redemption index distribution deposit payment complete gas pay wei: 100000000000000
+
+[PASS] test_maximumEightMixedPacksWithRealCrownTakeoversFitTransactionCap() (gas: 49322923)
+Logs:
+  list maximum eight mixed packs with crown takeovers complete gas: 6527313
+  list maximum eight mixed packs with crown takeovers complete gas pay wei: 1560000000000000
+
+[PASS] test_maximumLargePackOperationsFitTransactionCap() (gas: 159684337)
+Logs:
+  restock ten small packs thirty total units complete gas: 10357047
+  restock ten small packs thirty total units complete gas pay wei: 2226000000000000
+  liquidate ten small packs thirty total units complete gas: 1771562
+  liquidate ten small packs thirty total units complete gas pay wei: 585000000000000
+  restock one largest 30-unit pack complete gas: 7958318
+  restock one largest 30-unit pack complete gas pay wei: 1650000000000000
+  list single largest pack complete gas: 1223942
+  list single largest pack complete gas pay wei: 265000000000000
+  list maximum eight largest packs complete gas: 6554114
+  list maximum eight largest packs complete gas pay wei: 1560000000000000
+  harvest single active debt complete gas: 200770
+  harvest single active debt complete gas pay wei: 0
+  harvest maximum sixteen active debts complete gas: 1069551
+  harvest maximum sixteen active debts complete gas pay wei: 0
+  unlist single largest pack complete gas: 616905
+  unlist single largest pack complete gas pay wei: 145000000000000
+  unlist maximum sixteen largest packs complete gas: 4113806
+  unlist maximum sixteen largest packs complete gas pay wei: 1300000000000000
+  liquidate maximum units from largest pack complete gas: 1155583
+  liquidate maximum units from largest pack complete gas pay wei: 261000000000000
+  sync maximum sixteen kicked receipts complete gas: 2095652
+  sync maximum sixteen kicked receipts complete gas pay wei: 721000000000000
+
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 11.59s (12.71s CPU time)
+
+Ran 4 tests for test/fork/ForkSelection.t.sol:ForkSelectionTest
+[PASS] test_bidOutcome_packReturnsBackingSpent() (gas: 47980108)
+[PASS] test_earlyCandidate_afterRealAdmissionCalls() (gas: 49067093)
+[PASS] test_keepOutcome_backingBackLessFee() (gas: 47898485)
+[PASS] test_silentPurchaser_vaultReclaimsBacking() (gas: 48033671)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 10.53s (7.88s CPU time)
+
+Ran 18 tests for test/fork/ForkVaultAdversarial.t.sol:ForkVaultAdversarialTest
+[FAIL: quote at the ceiling price + one pack's work fee: 861500000000000 != 824000000000000] test_buildAboveCeilingPaidAtCeilingPrice() (block: 26424971) (gas: 3583919)
+[PASS] test_checkpointAfterAllHoldersExitAndGain() (gas: 7412335)
+[FAIL: EvmError: OutOfGas] test_checkpointGasWith301RealListings() (block: 26424971) (gas: 1073720760)
+[PASS] test_checkpointWindowRules() (gas: 537329)
+[PASS] test_depositAboveTvlCapReverts() (gas: 164956)
+[PASS] test_distributionPaysGainsOnce() (gas: 7194114)
+[PASS] test_forcedEthAccruesToHolders_firstDepositorCannotInflate() (gas: 1014088)
+[PASS] test_hostileNftRejected() (gas: 663514)
+[PASS] test_idleCheckpointUnpaid() (gas: 550359)
+[FAIL: InvalidBacking()] test_keeperBatchesFitTxCap() (block: 26424971) (gas: 7107617)
+[PASS] test_kickedReceiptsBlockPricingUntilReconciled() (gas: 24048100)
+[PASS] test_liquidateOnlyWhenNeeded() (gas: 3959289)
+[PASS] test_noFeeSkimOnHarvest() (gas: 476701)
+[PASS] test_reentrantHolderClaimsOnce() (gas: 1296642)
+[PASS] test_restockGated() (gas: 4199690)
+[PASS] test_settledUnclaimedEthIsNotDeployable() (gas: 20976476)
+[PASS] test_unlistListLoopClosed() (gas: 14183295)
+[PASS] test_workFeeBounded() (gas: 266010)
+Suite result: FAILED. 15 passed; 3 failed; 0 skipped; finished in 7.21s (4.78s CPU time)
+
+Ran 11 tests for test/scenario/VaultFlow.t.sol:VaultFlowPinnedTest
+[PASS] test_flow_distributions() (gas: 9575194)
+Logs:
+  
+  FLOW BREAKDOWN  distributions   gas 200000000 / basefee 150000000 wei, fork block 26424971
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           1.0001    50.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    1.0000    49.99%
+    paid to keepers (gas + premium)                                               0.0002     0.00%
+    Shapes mint fees                                                              0.0000     0.00%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.1999     9.99%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.0000     0.00%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              1.7999    89.99%
+    held in backing held by FWA (active listings) (change)                        0.0000     0.00%
+    held in pack value in FWA custody (listed) (change)                           0.0000     0.00%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0000     0.00%
+    held in FWA fees uncollected (pending + credit) (change)                      0.0000     0.00%
+    held in request charges held for the next checkpoint (change)                 0.0000     0.00%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         1.8099    90.49%
+      stated need                                                                 0.0050     0.24%
+      ABOVE its need                                                              1.8049    90.24%
+    backing held by FWA (active listings): held                                   0.0000     0.00%
+      counters imply                                                              0.0000     0.00%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.0000     0.00%
+    pack value in FWA custody (listed): held                                      0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               1.0001    50.00%  | returned 0.1999
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.0000     0.00%  | returned 0.0000
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.0000     0.00%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0002     0.00%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[FAIL: InvalidBacking()] test_flow_gas_spike() (block: 26424971) (gas: 14839691)
+[PASS] test_flow_inactive_long() (gas: 20399401)
+Logs:
+  
+  FLOW BREAKDOWN  inactive_long   gas 200000000 / basefee 150000000 wei, fork block 26424971
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           1.0001   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0024     0.24%
+    Shapes mint fees                                                              0.0020     0.19%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.0000     0.00%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.6141    61.40%
+    held in backing held by FWA (active listings) (change)                        0.1814    18.14%
+    held in pack value in FWA custody (listed) (change)                           0.1500    14.99%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0500     4.99%
+    held in FWA fees uncollected (pending + credit) (change)                      0.0000     0.00%
+    held in request charges held for the next checkpoint (change)                 0.0000     0.00%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         0.6241    62.40%
+      stated need                                                                 0.0050     0.49%
+      ABOVE its need                                                              0.6191    61.90%
+    backing held by FWA (active listings): held                                   0.1814    18.14%
+      counters imply                                                              0.1814    18.14%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.1814    18.14%
+    pack value in FWA custody (listed): held                                      0.1500    14.99%
+      ABOVE (states no need)                                                      0.1500    14.99%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0500     4.99%
+      ABOVE (states no need)                                                      0.0500     4.99%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               1.0001   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.1814    18.14%  | returned 0.0000
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.2000    19.99%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0024     0.24%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_inactive_short() (gas: 20378812)
+Logs:
+  
+  FLOW BREAKDOWN  inactive_short   gas 200000000 / basefee 150000000 wei, fork block 26424971
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           1.0001   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0024     0.24%
+    Shapes mint fees                                                              0.0020     0.19%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.0000     0.00%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.6141    61.40%
+    held in backing held by FWA (active listings) (change)                        0.1814    18.14%
+    held in pack value in FWA custody (listed) (change)                           0.1500    14.99%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0500     4.99%
+    held in FWA fees uncollected (pending + credit) (change)                      0.0000     0.00%
+    held in request charges held for the next checkpoint (change)                 0.0000     0.00%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         0.6241    62.40%
+      stated need                                                                 0.0050     0.49%
+      ABOVE its need                                                              0.6191    61.90%
+    backing held by FWA (active listings): held                                   0.1814    18.14%
+      counters imply                                                              0.1814    18.14%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.1814    18.14%
+    pack value in FWA custody (listed): held                                      0.1500    14.99%
+      ABOVE (states no need)                                                      0.1500    14.99%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0500     4.99%
+      ABOVE (states no need)                                                      0.0500     4.99%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               1.0001   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.1814    18.14%  | returned 0.0000
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.2000    19.99%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0024     0.24%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_init() (gas: 8982663)
+Logs:
+  
+  FLOW BREAKDOWN  init   gas 200000000 / basefee 150000000 wei, fork block 26424971
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           1.0001   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0001     0.00%
+    Shapes mint fees                                                              0.0000     0.00%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.0000     0.00%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              1.0000    99.99%
+    held in backing held by FWA (active listings) (change)                        0.0000     0.00%
+    held in pack value in FWA custody (listed) (change)                           0.0000     0.00%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0000     0.00%
+    held in FWA fees uncollected (pending + credit) (change)                      0.0000     0.00%
+    held in request charges held for the next checkpoint (change)                 0.0000     0.00%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         1.0100   100.98%
+      stated need                                                                 0.0050     0.49%
+      ABOVE its need                                                              1.0050   100.48%
+    backing held by FWA (active listings): held                                   0.0000     0.00%
+      counters imply                                                              0.0000     0.00%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.0000     0.00%
+    pack value in FWA custody (listed): held                                      0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               1.0001   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.0000     0.00%  | returned 0.0000
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.0000     0.00%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0001     0.00%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_keeper_delay() (gas: 19484171)
+Logs:
+  
+  FLOW BREAKDOWN  keeper_delay   gas 200000000 / basefee 150000000 wei, fork block 26424971
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           1.0001   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0021     0.21%
+    Shapes mint fees                                                              0.0020     0.19%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.0000     0.00%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.6507    65.06%
+    held in backing held by FWA (active listings) (change)                        0.1451    14.51%
+    held in pack value in FWA custody (listed) (change)                           0.1200    11.99%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0800     7.99%
+    held in FWA fees uncollected (pending + credit) (change)                      0.0000     0.00%
+    held in request charges held for the next checkpoint (change)                 0.0000     0.00%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         0.6607    66.06%
+      stated need                                                                 0.0050     0.49%
+      ABOVE its need                                                              0.6557    65.56%
+    backing held by FWA (active listings): held                                   0.1451    14.51%
+      counters imply                                                              0.1451    14.51%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.1451    14.51%
+    pack value in FWA custody (listed): held                                      0.1200    11.99%
+      ABOVE (states no need)                                                      0.1200    11.99%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0800     7.99%
+      ABOVE (states no need)                                                      0.0800     7.99%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               1.0001   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.1451    14.51%  | returned 0.0000
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.2000    19.99%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0021     0.21%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_max_load() (gas: 81611613)
+Logs:
+  
+  FLOW BREAKDOWN  max_load   gas 200000000 / basefee 150000000 wei, fork block 26424971
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           1.9801   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0125     0.63%
+    Shapes mint fees                                                              0.0090     0.45%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.0000     0.00%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.0058     0.29%
+    held in backing held by FWA (active listings) (change)                        1.0526    53.16%
+    held in pack value in FWA custody (listed) (change)                           0.8700    43.93%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0300     1.51%
+    held in FWA fees uncollected (pending + credit) (change)                      0.0000     0.00%
+    held in request charges held for the next checkpoint (change)                 0.0000     0.00%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         0.0158     0.80%
+      stated need                                                                 0.0050     0.25%
+      ABOVE its need                                                              0.0108     0.54%
+    backing held by FWA (active listings): held                                   1.0526    53.16%
+      counters imply                                                              1.0526    53.16%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      1.0526    53.16%
+    pack value in FWA custody (listed): held                                      0.8700    43.93%
+      ABOVE (states no need)                                                      0.8700    43.93%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0300     1.51%
+      ABOVE (states no need)                                                      0.0300     1.51%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               1.9801   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        1.0526    53.16%  | returned 0.0000
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.9000    45.45%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0125     0.63%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_oracle_change() (gas: 18474408)
+Logs:
+  
+  FLOW BREAKDOWN  oracle_change   gas 200000000 / basefee 150000000 wei, fork block 26424971
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           1.0002   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0016     0.16%
+    Shapes mint fees                                                              0.0010     0.09%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.9974    99.72%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.0000     0.00%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.0000     0.00%
+    held in backing held by FWA (active listings) (change)                        0.0000     0.00%
+    held in pack value in FWA custody (listed) (change)                           0.0000     0.00%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0000     0.00%
+    held in FWA fees uncollected (pending + credit) (change)                      0.0000     0.00%
+    held in request charges held for the next checkpoint (change)                 0.0000     0.00%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         0.0100     1.00%
+      stated need                                                                 0.0050     0.49%
+      ABOVE its need                                                              0.0050     0.50%
+    backing held by FWA (active listings): held                                   0.0000     0.00%
+      counters imply                                                              0.0000     0.00%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.0000     0.00%
+    pack value in FWA custody (listed): held                                      0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               1.0002   100.00%  | returned 0.9974
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.1088    10.88%  | returned 0.1088
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.1000     9.99%  | returned 0.1000
+    vault -> keepers: pay | fees harvested back                             0.0016     0.16%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_settled_unclaimed() (gas: 30112434)
+Logs:
+  
+  FLOW BREAKDOWN  settled_unclaimed   gas 200000000 / basefee 150000000 wei, fork block 26424971
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           2.0103   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0044     0.22%
+    Shapes mint fees                                                              0.0030     0.14%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.9999    49.74%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.0100     0.49%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.3298    16.40%
+    held in backing held by FWA (active listings) (change)                        0.3629    18.05%
+    held in pack value in FWA custody (listed) (change)                           0.3000    14.92%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0000     0.00%
+    held in FWA fees uncollected (pending + credit) (change)                      0.0000     0.00%
+    held in request charges held for the next checkpoint (change)                 0.0001     0.00%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.0100     0.49%
+      stated need                                                                 0.0100     0.49%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         0.3398    16.90%
+      stated need                                                                 0.0050     0.24%
+      ABOVE its need                                                              0.3348    16.65%
+    backing held by FWA (active listings): held                                   0.3629    18.05%
+      counters imply                                                              0.3629    18.05%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.3629    18.05%
+    pack value in FWA custody (listed): held                                      0.3000    14.92%
+      ABOVE (states no need)                                                      0.3000    14.92%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0001     0.00%
+      stated need                                                                 0.0001     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               2.0103   100.00%  | returned 0.9999
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.3629    18.05%  | returned 0.0000
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.3000    14.92%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0044     0.22%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_wind_down() (gas: 29372609)
+Logs:
+  
+  FLOW BREAKDOWN  wind_down   gas 200000000 / basefee 150000000 wei, fork block 26424971
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           1.5002   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0038     0.25%
+    Shapes mint fees                                                              0.0030     0.19%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         1.4933    99.54%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.0000     0.00%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.0000     0.00%
+    held in backing held by FWA (active listings) (change)                        0.0000     0.00%
+    held in pack value in FWA custody (listed) (change)                           0.0000     0.00%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0000     0.00%
+    held in FWA fees uncollected (pending + credit) (change)                      0.0000     0.00%
+    held in request charges held for the next checkpoint (change)                 0.0000     0.00%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         0.0100     0.67%
+      stated need                                                                 0.0050     0.33%
+      ABOVE its need                                                              0.0050     0.33%
+    backing held by FWA (active listings): held                                   0.0000     0.00%
+      counters imply                                                              0.0000     0.00%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.0000     0.00%
+    pack value in FWA custody (listed): held                                      0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               1.5002   100.00%  | returned 1.4933
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.2903    19.35%  | returned 0.2903
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.3000    19.99%  | returned 0.3000
+    vault -> keepers: pay | fees harvested back                             0.0038     0.25%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_withdrawals() (gas: 32346774)
+Logs:
+  
+  FLOW BREAKDOWN  withdrawals   gas 200000000 / basefee 150000000 wei, fork block 26424971
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           2.0002   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0044     0.22%
+    Shapes mint fees                                                              0.0030     0.14%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         1.4945    74.71%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.0000     0.00%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.0041     0.20%
+    held in backing held by FWA (active listings) (change)                        0.2540    12.70%
+    held in pack value in FWA custody (listed) (change)                           0.2100    10.49%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0300     1.49%
+    held in FWA fees uncollected (pending + credit) (change)                      0.0000     0.00%
+    held in request charges held for the next checkpoint (change)                 0.0000     0.00%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         0.0141     0.70%
+      stated need                                                                 0.0050     0.24%
+      ABOVE its need                                                              0.0091     0.45%
+    backing held by FWA (active listings): held                                   0.2540    12.70%
+      counters imply                                                              0.2540    12.70%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.2540    12.70%
+    pack value in FWA custody (listed): held                                      0.2100    10.49%
+      ABOVE (states no need)                                                      0.2100    10.49%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0300     1.49%
+      ABOVE (states no need)                                                      0.0300     1.49%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               2.0002   100.00%  | returned 1.4945
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.3629    18.14%  | returned 0.1088
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.3000    14.99%  | returned 0.0600
+    vault -> keepers: pay | fees harvested back                             0.0044     0.22%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+Suite result: FAILED. 10 passed; 1 failed; 0 skipped; finished in 4.58s (10.16s CPU time)
+
+Ran 5 tests for test/scenario/VaultFlow.t.sol:VaultFlowSelectionTest
+[PASS] test_flow_acquire_bid() (gas: 50988735)
+Logs:
+  
+  FLOW BREAKDOWN  acquire_bid   gas 450000000 / basefee 400000000 wei, fork block 26417086
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           0.2001   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0001     0.09%
+    Shapes mint fees                                                              0.0000     0.00%
+    backing to purchaser and FWA on a bid                                         0.0363    18.13%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.2000    99.91%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                             -0.0001    -0.08%
+    held in backing held by FWA (active listings) (change)                       -0.0363   -18.13%
+    held in pack value in FWA custody (listed) (change)                          -0.0300   -14.98%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0300    14.98%
+    held in FWA fees uncollected (pending + credit) (change)                     -0.0000    -0.01%
+    held in request charges held for the next checkpoint (change)                 0.0001     0.08%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.2000    99.91%
+      stated need                                                                 0.2000    99.91%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         2.8617  1429.57%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              2.8617  1429.57%
+    backing held by FWA (active listings): held                                   0.0000     0.00%
+      counters imply                                                              0.0000     0.00%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.0000     0.00%
+    pack value in FWA custody (listed): held                                      0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    inventory held by vault (idle packs + loose Shapes): held                     0.1000    49.95%
+      ABOVE (states no need)                                                      0.1000    49.95%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0001     0.08%
+      stated need                                                                 0.0001     0.08%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               0.2001   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.0000     0.00%  | returned 0.0000
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.0000     0.00%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0001     0.09%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_acquire_keep() (gas: 50972107)
+Logs:
+  
+  FLOW BREAKDOWN  acquire_keep   gas 450000000 / basefee 400000000 wei, fork block 26417086
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           0.2001   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0001     0.09%
+    Shapes mint fees                                                              0.0000     0.00%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0003     0.18%
+    pack value delivered to purchasers                                            0.0300    14.98%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.2000    99.91%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.0357    17.86%
+    held in backing held by FWA (active listings) (change)                       -0.0363   -18.13%
+    held in pack value in FWA custody (listed) (change)                          -0.0300   -14.98%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0000     0.00%
+    held in FWA fees uncollected (pending + credit) (change)                     -0.0000    -0.01%
+    held in request charges held for the next checkpoint (change)                 0.0001     0.08%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.2000    99.91%
+      stated need                                                                 0.2000    99.91%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         2.8976  1447.52%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              2.8976  1447.52%
+    backing held by FWA (active listings): held                                   0.0000     0.00%
+      counters imply                                                              0.0000     0.00%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.0000     0.00%
+    pack value in FWA custody (listed): held                                      0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0700    34.96%
+      ABOVE (states no need)                                                      0.0700    34.96%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0001     0.08%
+      stated need                                                                 0.0001     0.08%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               0.2001   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.0000     0.00%  | returned 0.0359
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.0000     0.00%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0001     0.09%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_acquire_silent() (gas: 50797276)
+Logs:
+  
+  FLOW BREAKDOWN  acquire_silent   gas 450000000 / basefee 400000000 wei, fork block 26417086
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           0.2001   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0001     0.09%
+    Shapes mint fees                                                              0.0000     0.00%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0003     0.18%
+    pack value delivered to purchasers                                            0.0300    14.98%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.2000    99.91%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.0357    17.86%
+    held in backing held by FWA (active listings) (change)                       -0.0363   -18.13%
+    held in pack value in FWA custody (listed) (change)                          -0.0300   -14.98%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0000     0.00%
+    held in FWA fees uncollected (pending + credit) (change)                     -0.0000    -0.01%
+    held in request charges held for the next checkpoint (change)                 0.0001     0.08%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.2000    99.91%
+      stated need                                                                 0.2000    99.91%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         2.8976  1447.52%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              2.8976  1447.52%
+    backing held by FWA (active listings): held                                   0.0000     0.00%
+      counters imply                                                              0.0000     0.00%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.0000     0.00%
+    pack value in FWA custody (listed): held                                      0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0700    34.96%
+      ABOVE (states no need)                                                      0.0700    34.96%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0001     0.08%
+      stated need                                                                 0.0001     0.08%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               0.2001   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.0000     0.00%  | returned 0.0359
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.0000     0.00%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0001     0.09%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_staged_activation() (gas: 52914187)
+Logs:
+  
+  FLOW BREAKDOWN  staged_activation   gas 450000000 / basefee 400000000 wei, fork block 26417086
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           0.2001   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0007     0.37%
+    Shapes mint fees                                                              0.0000     0.00%
+    backing to purchaser and FWA on a bid                                         0.0363    18.13%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.2000    99.91%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                             -0.0370   -18.49%
+    held in backing held by FWA (active listings) (change)                        0.0000     0.00%
+    held in pack value in FWA custody (listed) (change)                           0.0000     0.00%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0000     0.00%
+    held in FWA fees uncollected (pending + credit) (change)                     -0.0000    -0.01%
+    held in request charges held for the next checkpoint (change)                 0.0001     0.08%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.2000    99.91%
+      stated need                                                                 0.2000    99.91%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         2.8248  1411.16%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              2.8248  1411.16%
+    backing held by FWA (active listings): held                                   0.0363    18.13%
+      counters imply                                                              0.0363    18.13%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.0363    18.13%
+    pack value in FWA custody (listed): held                                      0.0300    14.98%
+      ABOVE (states no need)                                                      0.0300    14.98%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0700    34.96%
+      ABOVE (states no need)                                                      0.0700    34.96%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0001     0.08%
+      stated need                                                                 0.0001     0.08%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               0.2001   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.0363    18.13%  | returned 0.0000
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.0000     0.00%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0007     0.37%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_tokens() (gas: 56267593)
+Logs:
+  
+  FLOW BREAKDOWN  tokens   gas 150000000 / basefee 100000000 wei, fork block 26423454
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           0.1000   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0000     0.00%
+    Shapes mint fees                                                              0.0000     0.00%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.1000    99.92%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.0000     0.00%
+    held in backing held by FWA (active listings) (change)                        0.0000     0.00%
+    held in pack value in FWA custody (listed) (change)                           0.0000     0.00%
+    held in inventory held by vault (idle packs + loose Shapes) (change)          0.0000     0.00%
+    held in FWA fees uncollected (pending + credit) (change)                      0.0000     0.00%
+    held in request charges held for the next checkpoint (change)                 0.0000     0.07%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.1000    99.92%
+      stated need                                                                 0.1000    99.92%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         0.6615   660.97%
+      stated need                                                                 0.0050     4.99%
+      ABOVE its need                                                              0.6565   655.98%
+    backing held by FWA (active listings): held                                   0.7259   725.41%
+      counters imply                                                              0.7259   725.41%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.7259   725.41%
+    pack value in FWA custody (listed): held                                      0.6000   599.52%
+      ABOVE (states no need)                                                      0.6000   599.52%
+    inventory held by vault (idle packs + loose Shapes): held                     0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0000     0.07%
+      stated need                                                                 0.0000     0.07%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               0.1000   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.0000     0.00%  | returned 0.0000
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.0000     0.00%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0000     0.00%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             1.5586  1557.39%  | returned 1.5586
+
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 4.58s (11.30s CPU time)
+
+Ran 15 tests for test/fork/ForkIncrementalProduction.t.sol:ForkProductionReceiptsTest
+[PASS] test_bidReturnPreservesFloorBeforeInventorySyncAndReusesIdentifierAfterRetirement() (gas: 49559377)
+[PASS] test_burnedKeptPackCanStillConsumeReceipt() (gas: 48324717)
+Logs:
+  production vault runtime bytes: 24549
+
+[PASS] test_extendedKeptGiftAdoptsActualBackingOnce() (gas: 48741888)
+Logs:
+  production vault runtime bytes: 24549
+
+[PASS] test_feeChangeDoesNotReinterpretReceipt() (gas: 48331272)
+Logs:
+  production vault runtime bytes: 24549
+
+[PASS] test_oversizedKeptGiftRecoversInBoundedChunksWithoutBlockingNormalInventory() (gas: 55477455)
+Logs:
+  production vault runtime bytes: 24549
+  recovery first 30 Shapes complete gas: 1095176
+  recovery first 30 Shapes pay wei: 259000000000000
+  recovery final one Shape complete gas: 195629
+  recovery final one Shape pay wei: 42000000000000
+
+[PASS] test_productionColdKeepFee0() (gas: 47713657)
+Logs:
+  production vault runtime bytes: 24549
+
+[PASS] test_productionColdKeepFee100() (gas: 47728328)
+Logs:
+  production vault runtime bytes: 24549
+
+[PASS] test_productionColdKeepFee500() (gas: 47734023)
+Logs:
+  production vault runtime bytes: 24549
+
+[PASS] test_productionColdKickAfterFalseSettledBidCandidate() (gas: 51230795)
+[PASS] test_productionLowGasKeepRecordsOrFailsAtomically() (gas: 54913446)
+Logs:
+  keep atomic failures: 22
+  keep recorded successes: 18
+
+[PASS] test_productionLowGasKickRecordsOrFailsAtomically() (gas: 67881808)
+Logs:
+  kick atomic failures: 40
+  kick recorded successes: 19
+
+[PASS] test_realRefundedJournalEntryGasAndVerifiedPay() (gas: 48047723)
+Logs:
+  one refunded entry complete gas: 131833
+  one refunded entry pay wei: 23000000000000
+
+[PASS] test_realTokenBidReturnsPackPreservesPrincipalAndCreatesNoEthReceipt() (gas: 48477182)
+Logs:
+  token bid actual ETH input wei: 33214500000000000
+  token bid actual FWA tokens out raw: 17765302931398471378330
+
+[PASS] test_receiptBeforeJournalBlocksPricingAndCannotRetireEarly() (gas: 48447790)
+Logs:
+  production vault runtime bytes: 24549
+
+[PASS] test_staleAllocationHeadNeedsBoundedPruneAndCannotUseProcessingPool() (gas: 48887698)
+Logs:
+  one resolved allocation head prune gross complete gas: 136137
+  one resolved allocation head prune pay wei: 26000000000000
+
+Suite result: ok. 15 passed; 0 failed; 0 skipped; finished in 13.47s (35.48s CPU time)
+
+Ran 3 tests for test/fork/ForkIncrementalProduction.t.sol:ForkProductionFeeWitnessTest
+[PASS] test_duplicateHarvestRejectedWithoutDebtChangeOrPay() (gas: 47278215)
+[PASS] test_liveDebtWitnessAndHarvestMatchIndividualFeeSum() (gas: 48173888)
+[PASS] test_realFailedHarvestPreservesDebtAndPaysNothing() (gas: 47510862)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 6.09s (7.95s CPU time)
+
+Ran 1 test for test/fork/ForkVaultInvariant.t.sol:ForkVaultInvariantTest
+[PASS]
+ForkVaultInvariantTest invariants:
+[PASS] invariant_claimsWithinReserves
+[PASS] invariant_reservesCovered
+[PASS] invariant_sharesConserved
+[PASS] invariant_valueConserved
+ ForkVaultInvariantTest invariants (runs: 16, calls: 400, reverts: 0)
+
+╭--------------+----------------+-------+---------+----------╮
+| Contract     | Selector       | Calls | Reverts | Discards |
++============================================================+
+| VaultHandler | cancel         | 41    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | checkpoint     | 45    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | claim          | 47    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | deposit        | 41    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | donate         | 46    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | liquidate      | 42    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | requestRedeem  | 42    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | restockAndList | 51    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | unlist         | 45    | 0       | 0        |
+╰--------------+----------------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 16.96s (14.89s CPU time)
+
+Ran 2 tests for test/audit/release/AuditInvariantHarness.t.sol:AuditInvariantHarness
+[PASS]
+AuditInvariantHarness invariants:
+[PASS] invariant_claimsWithinReserves
+[PASS] invariant_reservesCovered
+[PASS] invariant_sharesConserved
+[PASS] invariant_valueConserved
+ AuditInvariantHarness invariants (runs: 16, calls: 400, reverts: 0)
+
+╭--------------+----------------+-------+---------+----------╮
+| Contract     | Selector       | Calls | Reverts | Discards |
++============================================================+
+| VaultHandler | cancel         | 41    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | checkpoint     | 45    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | claim          | 47    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | deposit        | 41    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | donate         | 46    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | liquidate      | 42    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | requestRedeem  | 42    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | restockAndList | 51    | 0       | 0        |
+|--------------+----------------+-------+---------+----------|
+| VaultHandler | unlist         | 45    | 0       | 0        |
+╰--------------+----------------+-------+---------+----------╯
+
+[PASS] test_profitableHolderKeepsValueConserved() (gas: 1199892)
+Logs:
+  bob balance after donated gain: 50497935255155551780
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 10.97s (9.42s CPU time)
+
+Ran 34 test suites in 17.46s (177.05s CPU time): 120 tests passed, 13 failed, 0 skipped (133 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/audit/release-b/AuditB.t.sol:AuditBBudget
+[FAIL: UnlistNotAllowed()] test_oneExitEmptiesEssentialBudget() (block: 26424971) (gas: 23702022)
+
+Encountered 1 failing test in test/audit/release/AuditActivationGas.t.sol:AuditActivationGas
+[FAIL: Error != expected error: Amount() != Nothing()] test_busyQueueRefusesListing() (block: 26417086) (gas: 60206722)
+
+Encountered 1 failing test in test/audit/release/AuditOracleGas.t.sol:AuditOracleGas
+[FAIL: custom error 0x35be3ac8] test_emptyOracleAddressDoesNotBlockWindDownExit() (block: 26424971) (gas: 7347827)
+
+Encountered 2 failing tests in test/fork/ForkBacking.t.sol:ForkBackingTest
+[FAIL: quantized proposal stays near target: 16302663408916666 >= 30000] test_exemptListsAtFloor() (block: 26424971) (gas: 6012376)
+[FAIL: assertion failed: 86946972418355169 > 66666666666666668] test_gasOptimalAboveFloorAtHighCeiling() (block: 26424971) (gas: 687610)
+
+Encountered 1 failing test in test/fork/ForkIncrementalProduction.t.sol:ForkProductionInventoryTest
+[FAIL: next-block economics moved beyond the outstanding-count tag window: 0 <= 10000] test_pendingBlockBasefeeNeedsFreshEconomicProposal() (block: 26424971) (gas: 861287)
+
+Encountered 2 failing tests in test/fork/ForkKeeperPay.t.sol:ForkKeeperPayTest
+[FAIL: UnlistNotAllowed()] test_manufacturedCycleLosesAtMaxima() (block: 26424971) (gas: 66289848)
+[FAIL: the extra calls cost more gas than they earn: 140622200000000 <= 160000000000000] test_splittingDoesNotPay() (block: 26424971) (gas: 10640479)
+
+Encountered 3 failing tests in test/fork/ForkVaultAdversarial.t.sol:ForkVaultAdversarialTest
+[FAIL: quote at the ceiling price + one pack's work fee: 861500000000000 != 824000000000000] test_buildAboveCeilingPaidAtCeilingPrice() (block: 26424971) (gas: 3583919)
+[FAIL: EvmError: OutOfGas] test_checkpointGasWith301RealListings() (block: 26424971) (gas: 1073720760)
+[FAIL: InvalidBacking()] test_keeperBatchesFitTxCap() (block: 26424971) (gas: 7107617)
+
+Encountered 1 failing test in test/fork/ForkVaultLifecycle.t.sol:ForkVaultLifecycleTest
+[FAIL: assertion failed: 5859000000000000 >= 5800000000000000] test_depositListRedeem_roundTrip() (block: 26424971) (gas: 26347242)
+
+Encountered 1 failing test in test/scenario/VaultFlow.t.sol:VaultFlowPinnedTest
+[FAIL: InvalidBacking()] test_flow_gas_spike() (block: 26424971) (gas: 14839691)
+
+Encountered a total of 13 failing tests, 120 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 13 failed tests
+Tip: Run `forge test --debug --match-test <TEST_NAME>` to inspect one failing test in the debugger

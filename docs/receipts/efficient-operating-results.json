@@ -1,0 +1,114 @@
+{
+  "revision": "d1b59f11fb74ed6ae9b3841298e70fb189eaaa6f",
+  "scope": "Uncommitted bounded operating/actual-claim model and owned forward caller changes; no deployed setting changes or chain transactions.",
+  "command": "python3 sim/efficient_operating.py --db /Users/dd/CascadeProjects/shapes-fwa-pool/sim/data/fwa.sqlite --label baseline",
+  "exit_status": 0,
+  "source_freeze": {
+    "sim/forward.py": "9942b0787407a3359a7f47147a8426c1161fed5f37501dafcb942c78c502736b",
+    "sim/vault.py": "e958d86859ff9ddd9e2766459683f77cf9caea9ac87691be6360d2e92614ba7a",
+    "sim/efficient_operating.py": "6539f05c87c8067dd7a06dc7159343b3ade148dea35574f72a61361a0b78a6aa",
+    "keeper/policy.py": "cba78633858db621b48bf729571673f84693e503d6d49eecda0cb905730703a2",
+    "src/PackVault.sol": "448106b8915413badef411355a5cb729ca15046743be768919d74e9349ddcd8b",
+    "src/VaultLib.sol": "1a5407f1044f0e79b874ee77cd6936bb53438b020f4c8e093db200909990490f",
+    "deploy/mainnet.json": "bcf29731a40d403a77c8380b3f4b691406995b2182ce42bb90d7d2993f76b489",
+    "deploy/canary.example.json": "f50e7a3dd992c2ff7e155471fbef727ac0ae4e6ffbd0e418bdf8dfd4d3665015"
+  },
+  "source_unchanged_after_batch": {
+    "sim/forward.py": true,
+    "sim/vault.py": true,
+    "sim/efficient_operating.py": true,
+    "keeper/policy.py": true,
+    "src/PackVault.sol": true,
+    "src/VaultLib.sol": true,
+    "deploy/mainnet.json": true,
+    "deploy/canary.example.json": true
+  },
+  "sha256": {
+    "sim/forward.py": "9942b0787407a3359a7f47147a8426c1161fed5f37501dafcb942c78c502736b",
+    "sim/efficient_operating.py": "6539f05c87c8067dd7a06dc7159343b3ade148dea35574f72a61361a0b78a6aa",
+    "docs/receipts/efficient-operating-baseline.json": "97099bd5539194e88d13109a37a09a44032572e781f4b5b53a031eca909e434a",
+    "docs/receipts/efficient-operating-baseline.md": "eff124f22c913f66dedc3393c70d99606421cb10b6e2e268e12487ddd512936f",
+    "docs/receipts/efficient-operating-baseline-run.txt": "865365f8d5fe7e8edad6f5c3e0b96ee84af48cc7814c2d234af10cb66f2eddd0",
+    "docs/receipts/efficient-operating-partial-regression.json": "693911f662f0a6af57d7481c38d056d2fb29fa9fac95018084385ea0998fc1f9",
+    "docs/receipts/efficient-operating-first-selfcheck.txt": "8089c494005f93022ccb1810622a712f90f219d9e35a136ae8354869ac36706f",
+    "docs/receipts/efficient-operating-first-full-exit.txt": "ff63f0398c37f5701a3dd0000a2aab7e0ad6ec67786922a6f7fd718509f5d9a0",
+    "docs/receipts/efficient-operating-recorded-selfcheck.txt": "8d13d645874f73189303006ed6e9f2879417f68bbb1a599946f449931f28172f",
+    "docs/receipts/efficient-operating-attribution-selfcheck.txt": "1a252b001e5614f71cd3eccb3841e6f58f2b087795270f8c3694180741644bed",
+    "docs/receipts/efficient-operating-rescue-selfcheck.txt": "1a252b001e5614f71cd3eccb3841e6f58f2b087795270f8c3694180741644bed"
+  },
+  "results": {
+    "primary_cases": 84,
+    "primary_complete": 56,
+    "primary_fully_paid_routine": 40,
+    "separate_holder_rescue_cases": 28,
+    "separate_holder_rescue_complete": 28,
+    "zero_gap_ledgers": 112,
+    "creator_subsidy_wei": 0
+  },
+  "affected_checks": [
+    {
+      "command": "Focused legacy partial-redemption run with recorded snapshot/refund context;30positions,seed8,20days,half redeemed day10",
+      "exit_status": 0,
+      "assertions": [
+        "exactly2 checkpoints",
+        "positive caller exit cost",
+        "nonnegative remaining holder shares",
+        "asset ledger gap0"
+      ]
+    },
+    {
+      "command": "python3 -m py_compile sim/forward.py sim/efficient_operating.py",
+      "exit_status": 0
+    },
+    {
+      "command": "git diff --check -- sim/forward.py sim/efficient_operating.py keeper/index.py keeper/test_index.py",
+      "exit_status": 0
+    }
+  ],
+  "preserved_failures": [
+    {
+      "file": "docs/receipts/efficient-operating-first-selfcheck.txt",
+      "cause": "Initial context omitted recorded refund ratio; restored actual historical context before acceptance."
+    },
+    {
+      "file": "docs/receipts/efficient-operating-first-full-exit.txt",
+      "cause": "Floating-point full-redemption fraction rounded integer shares upward; corrected fraction multiplication to exact rational integer arithmetic and reran all affected cases."
+    }
+  ],
+  "limits": [
+    "Stochastic external events approximate daily timing and are not fork replay or a forecast. Current core must separately reconcile to fresh fork traces before interpreting these scenarios.",
+    "Primary comparison requires full quoted routine sync pay. Other necessary exit calls may be holder-executed with explicit gas cost and actual clipped pay. Real keeper can sometimes accept clipped pay if its actual preflight costs remain covered. This conservative quote model is not an exact availability forecast.",
+    "Only primary incomplete cases receive a separate opt-in final-holder minPay0 sync rescue diagnostic. Rescued exits are not reported as fully funded routine operation; the prior operating prefix is asserted identical.",
+    "User deposit/request/claim and any unpaid checkpoint gas use historical Q400 actual billed-gas counts scaled to matched scenario prices; unexposed sync uses historical caller-meter-plus-intrinsic121884gas proxy, not true gross or billed gas. Other unpaid variable-size maintenance uses its gas-component quote as a proxy. No25percent gas-limit padding is treated as billed gas.",
+    "D64 unlist/liquidate caller costs reduce holder cash return. Creator mint fees remain separate expenses and are never treated as operating subsidies.",
+    "Reported complete exits actually claim and clear their last modeled backlog; blocked cases retain explicit entitlements and are not realized return observations.",
+    "Three fixed seeds are illustrative sensitivity, not confidence intervals or the signed annual-return hurdle.",
+    "The cash/reconciliation cycle is not a genuine-fork reproduction: available authentic fixtures did not reach its required timing. See efficient-exit-cash-reachability.md.",
+    "Historical gas inputs refer to earlier Q400 receipts and caller-meter proxies; no current Q360 full-holder billed receipt or successful-foreign real keeper preflight is established here.",
+    "Model claims pay actual modeled holder entitlements. Residual rounding reserve is not credited as realized holder return.",
+    "Foreign events continue during exit days; termination occurs immediately after the actual final claim while required journal/receipt work is caught up.",
+    "Settlement/window timing surrogate: policy sees10**12seconds rather than authentic fixture3600seconds; both phase clocks use day start, own bids settle next day outside real expiry scheduling. This materially limits exit counts and return/budget interpretation. See post_batch_timing_disclosure."
+  ],
+  "things_that_do_not_make_sense": [
+    "More budget permission cannot provide liquid ETH; small-vault inventory/relisting cash and partial-redemption synchronization can still stall.",
+    "An economically negative fully accounted roundtrip remains an economic failure.",
+    "Three random seeds and historical gas proxies cannot establish expected returns, an annual hurdle or deployment readiness.",
+    "A one-hour external settlement window cannot be represented by a10**12second sentinel plus same-clock daily phases when claiming authentic terminal timing or achievable holder exits."
+  ],
+  "post_batch_timing_disclosure": {
+    "executable_or_raw_matrix_changed": false,
+    "baseline_provenance": "d1b59f1:sim/forward.py already uses settlement_window=10**12, now=d*DAY in both open/blackout phases, and next-day sampled own settlement.",
+    "model_settlement_window_seconds": 1000000000000,
+    "authentic_fixture_settlement_window_seconds": 3600,
+    "model_phase_clock": "now=d*86400 for both open and blackout phases; no intra-day checkpoint/window clock",
+    "inferred_purpose": "Suppress automatic policy expiry before the coarse synthetic next-day purchaser response. Inference from code, not an approved integration assumption.",
+    "material_effects": [
+      "real allocation expiry and terminal work are suppressed",
+      "backing disposition and available cash can differ",
+      "checkpoint and cash-return timing can differ",
+      "modeled exit completion/rescue counts, total expenses and returns may differ"
+    ],
+    "scope": "112zero-gap asset ledgers apply only to their hypothetical modeled paths. Neither exit completion nor returns prove real expiry, continuous availability, achievable exits, appropriate budget or economic acceptance.",
+    "required_separate_evidence": "A faithful event/window timing model or authentic real-path rehearsal is needed before using these figures for operating budget or return acceptance. No timing rewrite or matrix rerun was performed."
+  }
+}

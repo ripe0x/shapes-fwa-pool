@@ -1,0 +1,61 @@
+{
+  "source_revision": "d1b59f1",
+  "source_sha256": "df14148c2626e7bc58d4728ce6e66a9d3ff8466475625813d363c66cc77fa6a9",
+  "fixture_sha256": "3e2f5ff923f3d3f260def7445d5860440046487c0c9d988c1822c91bd4264a10",
+  "rows": [
+    {
+      "bid_type": "DepositorBidAccepted",
+      "actual_depositor": "0xcc75b6f910076f3675e8741a65645d3eda4463c3",
+      "actual_listing_id": 97182,
+      "actual_older_allocation_count": 17,
+      "indexed_book_states": "synthetic cached serialization states only; allFWAeventpayloadsactual",
+      "legacy_terminal_candidates": [
+        98484,
+        98652,
+        96760,
+        97312,
+        99033,
+        96894,
+        98483,
+        96854,
+        97148,
+        97149,
+        99904,
+        100238,
+        96327,
+        97467,
+        97155,
+        99824
+      ],
+      "returned_pack_discovered": false
+    },
+    {
+      "bid_type": "DepositorBidAcceptedAsTokens",
+      "actual_depositor": "0xa89c876be69223295a0925d7a62cb6868dec4ac8",
+      "actual_listing_id": 18711,
+      "actual_older_allocation_count": 17,
+      "indexed_book_states": "synthetic cached serialization states only; allFWAeventpayloadsactual",
+      "legacy_terminal_candidates": [
+        13579,
+        14226,
+        14069,
+        14372,
+        14223,
+        14373,
+        16328,
+        16329,
+        16331,
+        16508,
+        16324,
+        16510,
+        18723,
+        18704,
+        18708,
+        18707
+      ],
+      "returned_pack_discovered": false
+    }
+  ],
+  "expected_assertion": "returned actual listing should appear in bounded terminal candidates",
+  "result": "FAIL: both newer returns omitted behind17older allocated cache slots"
+}

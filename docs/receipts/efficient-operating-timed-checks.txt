@@ -1,0 +1,1 @@
+PASS four conditional timed scenarios, exact fixture expiry boundary, blackout/interval/claim checks and legacy partial-redemption compatibility

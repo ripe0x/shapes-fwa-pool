@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {TestVaultOps} from "../../utils/TestVaultOps.sol";
+
 import {ForkBase} from "../../fork/ForkBase.sol";
 import {VaultLib} from "../../../src/VaultLib.sol";
 
@@ -14,7 +16,7 @@ contract AuditDistribution is ForkBase {
         this.assertGasContext();
         VaultLib.Params memory p = vault.getParams();
         p.tvlCap = 2 ether;
-        p.maxPositions = 30;
+
         p.gasCeiling = 0.5 gwei;
         p.essentialCeiling = 0.5 gwei;
         p.payMarkupBps = 0;
@@ -40,7 +42,7 @@ contract AuditDistribution is ForkBase {
         assertEq(vault.distributionReserve(), 0);
         uint256 before = address(vault).balance;
         vm.prank(keeper);
-        uint256 pay = vault.checkpoint(0);
+        uint256 pay = TestVaultOps.checkpoint(vault, 0);
         uint256 reserve = vault.distributionReserve();
         assertGe(reserve, 0.019 ether, "distribution was due and funded");
         assertLe(reserve, 0.021 ether);

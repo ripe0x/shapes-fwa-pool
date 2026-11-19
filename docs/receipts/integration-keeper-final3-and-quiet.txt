@@ -1,0 +1,19 @@
+loaded recovery client {"test_tx": {"source_sha256_at_import": "737b3df7e1ddb641928188f137097fc9ab63c0a5eca21069e57b81d843a02a58", "loaded_code_sha256": "8ac61cc17c5e6be4a1d06872756eccca357789a83024139f704722158c4eb939"}, "keeper": {"source_sha256_at_import": "a4f017ba65715a1dcc6b942ae47ecb6cef82f95e2ab19449df50ab0f9d94a3d1", "loaded_code_sha256": "11aa99de226ad667fc06175f0e1068ee62833589c2bd240cf30a7e4b86e67579"}, "tx": {"source_sha256_at_import": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230", "loaded_code_sha256": "4b64b57ba9cae304c4785c8b8cc6c5ec76b8920af46b6a1abba0844512dbcd41"}, "rehearse_canary": {"source_sha256_at_import": "938d36abab224d1b09032b30afda2041b51d0993505274da3ebe983a95686888", "loaded_code_sha256": "7ca31e0e47c0969399ac36ee5e837ed510fa61308dc328108c3027242b3ce5fb"}}
+error: broadcast of burnTokens uncertain (nonce 21 kept pending): test lost response after real node acceptance
+mined burnTokens gas 184132 (est 211824) cost 9739834119288 pay 0 net -9739834119288 wei
+error: reorg: burnTokens 0x8fd23bb3163b5846dd025c5f92839674def316c31860b240ae3af83d589fa104 no longer in block 26418574; chain state is re-read
+sent burnTokens nonce 21 hash 0x8fd23bb3163b5846dd025c5f92839674def316c31860b240ae3af83d589fa104
+mined burnTokens gas 184132 (est 211824) cost 9739834119288 pay 0 net -9739834119288 wei
+sent burnTokens nonce 22 hash 0x5ab34cb0c8462687bcb104b07071e3ca851aeab2fa48f2c5ca688a5ac5f08b9a
+REVERTED burnTokens gas 118057 (est 211824) cost 6202262031405 pay 0 net -6202262031405 wei
+error: burnTokens reverted on chain: 0x5ab34cb0c8462687bcb104b07071e3ca851aeab2fa48f2c5ca688a5ac5f08b9a
+error: reorg: burnTokens 0x8fd23bb3163b5846dd025c5f92839674def316c31860b240ae3af83d589fa104 no longer in block 26418574; chain state is re-read
+error: reorg: burnTokens 0x5ab34cb0c8462687bcb104b07071e3ca851aeab2fa48f2c5ca688a5ac5f08b9a no longer in block 26418575; chain state is re-read
+sent burnTokens nonce 21 hash 0x8fd23bb3163b5846dd025c5f92839674def316c31860b240ae3af83d589fa104
+error: replacement of burnTokens failed: test lost accepted replacement response
+error: burnTokens nonce 21 still pending after 1 replacements
+mined burnTokens gas 184132 (est 211824) cost 134862304871632 pay 0 net -134862304871632 wei
+error: reorg: burnTokens 0x40e88a5c1507a93adfd6006c18bbbaa8f16573e635c818b56490ff9d7694e405 no longer in block 26418577; chain state is re-read
+FINAL_RECOVERY {"lost_response": true, "restart": true, "actual_receipt": "0x8fd23bb3163b5846dd025c5f92839674def316c31860b240ae3af83d589fa104", "reorg": true, "canonical_hash_unique": true, "token_supply_restored": true, "receipt_status": true, "same_nonce_replacement": true, "uncertain_replacement_attempt_cap": true, "index_reorg": {"vault": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6", "deployment_block": 26418542, "real_withdrawal": true, "durable_restart": true, "canonical_projection_restore": true}}
+START final quiet child /var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/pack-vault-integration-batch-77gnn3vj/final-quiet-repaired-client.log
+FINAL_QUIET_EXIT 0 node preserved 10583

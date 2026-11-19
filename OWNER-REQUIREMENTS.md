@@ -1,7 +1,7 @@
 # Owner requirements
 
 The owner's own words, numbered and dated. Later decisions are appended, never rewritten.
-Section B2 lists the outcomes; the owner signed the current asset-flow outcomes on 2026-11-17 (approval hash 452c764d…f5d2 in `asset-flow.json`; the gate passes).
+Section B2 records the prior outcomes. The 2026-11-17 asset-flow signature applies to that older candidate, not to the position-accounting integration. New evidence and any changed outcomes require review before launch.
 
 ## A. Requirements (owner's words)
 
@@ -70,7 +70,7 @@ block 26,424,971 unless stated; P = 0.03 ETH pack, B = 0.0363 ETH backing, k = 1
 | O6 | New packs | built only when one bid cycle repays the build (1.39M quoted gas + 0.0003 ETH + 1 work fee): quoted price below ~0.52 gwei | D20, test_restockGated |
 | O7 | User pays | mint fee 0.001 ETH per 0.1 ETH of Shapes; keeper gas; no vault fee | lifecycle round trip (absolute, every wei) |
 | O8 | End state | wind-down returns every holder's NAV share; only the seed's dead-share slice remains | lifecycle wind-down test, keeper rehearsal |
-| O9 | Size | at most 300 positions (about 20 ETH); worst-case checkpoint 10.17M gas; the 2 ETH canary holds 28 positions | checkpoint gas tests, canary rehearsal |
+| O9 | Historical size (superseded by A2.15) | at most 300 positions (about 20 ETH); worst-case checkpoint 10.17M gas; the 2 ETH canary holds 28 positions | checkpoint gas tests, canary rehearsal |
 | O10 | Liabilities | escrow, redemption and distribution reserves and settled claimables are never deployable or payable to keepers | test_settledUnclaimedEthIsNotDeployable, invariants |
 | O11 | Token rewards | claimed and burned (supply falls by exactly the claimed amount); never sold; holders pay no gas for it | ForkTokens, canary rehearsal |
 
@@ -83,3 +83,69 @@ after** at canary budgets (routine 0.03 ETH; no essential budget, D64) (measured
 `test/audit/release/AuditOwnerExtraction.t.sol`). Raising `tvlCap` exposes more holders to bad
 settings but does not raise that rate. Mitigation: the owner key is a multisig or hardware wallet.
 
+
+## A2. Position accounting integration (owner, 2026-11-18)
+
+Source: the owner's “Remove the position ceiling from shapes-fwa-pool” implementation brief,
+retained in `docs/CODEX-POSITION-ACCOUNTING-IMPLEMENTATION.md`.
+
+15. One production vault, one capital pool, one authoritative accounting book. Remove the arbitrary
+    position ceiling, required full portfolio valuation, and ordinary keeper inventory scans.
+16. Preserve paid primary Shapes mints, their fees, existing splitting/packing behavior and allowed
+    pack sizing. The research fixture's 0.03 ETH packs do not set production size policy.
+17. Preserve share pricing order, partial redemptions, holder liabilities, claims, cancellation,
+    dead shares, high-water marks, distributions and wind-down. Token rewards stay claim-and-burn,
+    valued at zero.
+18. Use bounded ordered global acquisition processing, authenticated keep/kick receipts, exact
+    active fee aggregation, bounded allocation recovery and unique 10,000 wei backing identifiers.
+19. Keep admission economics, oracle constraints, capital and liquidity reserves, allocated exposure,
+    permissionless maintenance and the replaceable keeper policy with its vault-enforced caps.
+20. No factory, sharding, shared exposure contract, adaptive sizing, new mint/coin strategy, or
+    weakened valuation. No merge to main, mainnet deployment, real-fund transaction or owner signature.
+
+B2 O9's 300-position limit is superseded by item 15. Its replacement is constant valuation work
+and measured per-call gas bounds, with finite capital and external protocol capacity. The remaining
+B2 amounts are historical measurements until the integrated candidate is measured. Maintenance of
+new global FWA acquisitions is a new explicit cost borne by free vault ETH inside existing budgets;
+no new holder charge or reserve/budget change is authorized by this requirement.
+
+Current risk clarification (engineering, 2026-11-18): B3's budget amounts bound maintenance paid
+from free vault ETH, not separately request-funded checkpoint payments. A checkpoint can pay from
+`processingPool` at most its fixed 400,000-gas quote plus one work fee, once per 12-hour interval.
+At the existing bytecode maxima of 50 gwei and 0.00005 ETH work fee that is 0.02005 ETH per
+checkpoint, limited to the charge pool actually funded by requests. This route already existed;
+the portfolio-dependent charge is removed. No other holder liability can fund it. B3 is therefore
+not a bound on all gross ETH an owner acting as keeper can receive. The candidate's new measured
+outcomes and funding shortfall are in `docs/POSITION-INTEGRATION-ACCEPTANCE.md`; no new approval is
+recorded here.
+
+21. (2026-11-18, review repair) Owner approved: "Approve provably unexposed cursor advance".
+    This refines the requirement to inspect every global entry: a constant-work, unpaid advance
+    is allowed only when onchain state proves no outstanding FWA position/identifier, active or
+    allocated membership, or pending receipt can hide relevant work. Any exposure retains strict
+    ordered journal processing. Idle inventory held by the vault is not FWA exposure. Checkpoint
+    may apply the same proof so an empty seed vault can price its first deposit without rescue ETH.
+
+22. (2026-11-18) Efficient-journal revision: "Separate cheap reads from expensive changes." Global
+    journal reads have an independent bounded batch; terminal IDs must not shrink it. Stop before
+    exceeding actual own-transition limits. Compensate full jobs, verified own selections/returns,
+    and necessary residual tails at FWA's checkpoint window with its request queue drained.
+    Unexposed cursor advances remain unpaid. Enforce eligibility onchain and schedule it efficiently.
+23. (2026-11-18) "Keep the current journal base until the new job boundaries are measured."
+    No completion bonus. Measure32/64/128; finish actual successful-foreign and standaloneQ360
+    full-holder receipts at matched0.2/0.5gwei, default policy and maximum markup, and ordinary
+    keeper profitability preflight. Gas-limit padding is separate from billed expense.
+24. (2026-11-18) "Use vault operating expenses as the default funding model." Measure optimized
+    costs, pay required work when needed, clear the backlog, finish exits, and assess holder returns
+    before proposing allowances. No assumed recurring mint-revenue sponsorship or silent minimumTVL.
+25. (2026-11-18) Profile memory use for newly minted IDs and shared restock economics once per
+    validation batch. Preserve the paid primary mint, ten-way split, pack recipe and creator fee.
+    "Treat O2 as a bounded expense decision after one focused optimization pass." No revised O2
+    number is approved by this request.
+26. (2026-11-18) "keep ordinary synchronization funded as routine upkeep while preserving caller
+    funded unlisting and liquidation." Mixed sync calls and gas ceilings follow the same class.
+    Display known backlog cost, available cash and permission separately; reversibly stop new
+    exposure when mandatory work is unaffordable. No automatic permanent wind-down/reserve system.
+27. (2026-11-18) Complete event-based returned-pack discovery: authenticate both actual bid events,
+    retain unreconciled own selections, discover expiry independently, replay missing history on
+    existing-index upgrade, and verify more than16allocations with restart/reorg behavior.

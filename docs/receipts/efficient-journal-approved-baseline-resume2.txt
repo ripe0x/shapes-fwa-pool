@@ -1,0 +1,52 @@
+Resuming remaining approved actions on same node; six receipts reconciled; parent+1 pending timestamp
+{"label": "stock/one new primary mint/price200000000", "estimate": 2871213, "billed_gas": 2754533, "keeper_paid_wei": 581000000000000, "actual_cost_wei": 550906600000000}
+{"label": "stock/one from leftovers/price200000000", "estimate": 621937, "billed_gas": 599757, "keeper_paid_wei": 141000000000000, "actual_cost_wei": 119951400000000}
+{"label": "stock/two with four old plus new ten/price200000000", "estimate": 3029678, "billed_gas": 2928345, "keeper_paid_wei": 666000000000000, "actual_cost_wei": 585669000000000}
+{"label": "controlled setup restock10", "estimate": 10032669, "billed_gas": 9621970, "keeper_paid_wei": 2226000000000000, "actual_cost_wei": 1924394000000000}
+{"label": "controlled setup listing8", "estimate": 6540829, "billed_gas": 6359849, "keeper_paid_wei": 1536000000000000, "actual_cost_wei": 1271969800000000}
+{"label": "controlled setup listing2", "estimate": 1802871, "billed_gas": 1734691, "keeper_paid_wei": 426000000000000, "actual_cost_wei": 346938200000000}
+{"label": "controlled setup restock10", "estimate": 9999407, "billed_gas": 9599027, "keeper_paid_wei": 2226000000000000, "actual_cost_wei": 1919805400000000}
+{"label": "controlled setup listing8", "estimate": 6368171, "billed_gas": 6187191, "keeper_paid_wei": 1536000000000000, "actual_cost_wei": 1237438200000000}
+{"label": "controlled setup listing2", "estimate": 1814571, "billed_gas": 1746391, "keeper_paid_wei": 426000000000000, "actual_cost_wei": 349278200000000}
+{"label": "controlled setup restock10", "estimate": 9987219, "billed_gas": 9600553, "keeper_paid_wei": 2226000000000000, "actual_cost_wei": 1920110600000000}
+{"label": "controlled setup listing8", "estimate": 6341495, "billed_gas": 6160515, "keeper_paid_wei": 1536000000000000, "actual_cost_wei": 1232103000000000}
+{"label": "controlled setup listing2", "estimate": 1831671, "billed_gas": 1763491, "keeper_paid_wei": 426000000000000, "actual_cost_wei": 352698200000000}
+{"label": "controlled setup restock10", "estimate": 9995991, "billed_gas": 9592719, "keeper_paid_wei": 2226000000000000, "actual_cost_wei": 1918543800000000}
+{"label": "controlled setup listing8", "estimate": 6324383, "billed_gas": 6143403, "keeper_paid_wei": 1536000000000000, "actual_cost_wei": 1228680600000000}
+{"label": "controlled setup listing2", "estimate": 1822071, "billed_gas": 1753891, "keeper_paid_wei": 426000000000000, "actual_cost_wei": 350778200000000}
+{"label": "holder journal128/markup0/price200000000", "estimate": 2238040, "billed_gas": 2233060, "keeper_paid_wei": 785000000000000, "actual_cost_wei": 446612000000000}
+{"label": "holder journal128/markup0/price500000000", "estimate": 2238040, "billed_gas": 2233060, "keeper_paid_wei": 1962500000000000, "actual_cost_wei": 1116530000000000}
+{"label": "holder journal128/markup1000/price200000000", "estimate": 2237703, "billed_gas": 2232723, "keeper_paid_wei": 863500000000000, "actual_cost_wei": 446544600000000}
+{"label": "holder journal128/markup1000/price500000000", "estimate": 2237703, "billed_gas": 2232723, "keeper_paid_wei": 2158750000000000, "actual_cost_wei": 1116361500000000}
+{"label": "holder journal127/markup0/price200000000", "estimate": 2226039, "billed_gas": 2221059, "keeper_paid_wei": 779000000000000, "actual_cost_wei": 444211800000000}
+{"label": "holder journal127/markup0/price500000000", "estimate": 2226039, "billed_gas": 2221059, "keeper_paid_wei": 1947500000000000, "actual_cost_wei": 1110529500000000}
+{"label": "holder journal127/markup1000/price200000000", "estimate": 2225702, "billed_gas": 2220722, "keeper_paid_wei": 856900000000000, "actual_cost_wei": 444144400000000}
+{"label": "holder journal127/markup1000/price500000000", "estimate": 2225702, "billed_gas": 2220722, "keeper_paid_wei": 2142250000000000, "actual_cost_wei": 1110361000000000}
+{"label": "holder journal65/markup0/price200000000", "estimate": 1192433, "billed_gas": 1187453, "keeper_paid_wei": 407000000000000, "actual_cost_wei": 237490600000000}
+{"label": "holder journal65/markup0/price500000000", "estimate": 1192433, "billed_gas": 1187453, "keeper_paid_wei": 1017500000000000, "actual_cost_wei": 593726500000000}
+{"label": "holder journal65/markup1000/price200000000", "estimate": 1192096, "billed_gas": 1187116, "keeper_paid_wei": 447700000000000, "actual_cost_wei": 237423200000000}
+{"label": "holder journal65/markup1000/price500000000", "estimate": 1192096, "billed_gas": 1187116, "keeper_paid_wei": 1119250000000000, "actual_cost_wei": 593558000000000}
+{"label": "holder journal64/markup0/price200000000", "estimate": 1175777, "billed_gas": 1170797, "keeper_paid_wei": 401000000000000, "actual_cost_wei": 234159400000000}
+{"label": "holder journal64/markup0/price500000000", "estimate": 1175777, "billed_gas": 1170797, "keeper_paid_wei": 1002500000000000, "actual_cost_wei": 585398500000000}
+{"label": "holder journal64/markup1000/price200000000", "estimate": 1175440, "billed_gas": 1170460, "keeper_paid_wei": 441100000000000, "actual_cost_wei": 234092000000000}
+{"label": "holder journal64/markup1000/price500000000", "estimate": 1175440, "billed_gas": 1170460, "keeper_paid_wei": 1102750000000000, "actual_cost_wei": 585230000000000}
+{"label": "holder journal63/markup0/price200000000", "estimate": 1159121, "billed_gas": 1154141, "keeper_paid_wei": 395000000000000, "actual_cost_wei": 230828200000000}
+{"label": "holder journal63/markup0/price500000000", "estimate": 1159121, "billed_gas": 1154141, "keeper_paid_wei": 987500000000000, "actual_cost_wei": 577070500000000}
+{"label": "holder journal63/markup1000/price200000000", "estimate": 1158784, "billed_gas": 1153804, "keeper_paid_wei": 434500000000000, "actual_cost_wei": 230760800000000}
+{"label": "holder journal63/markup1000/price500000000", "estimate": 1158784, "billed_gas": 1153804, "keeper_paid_wei": 1086250000000000, "actual_cost_wei": 576902000000000}
+{"label": "holder journal33/markup0/price200000000", "estimate": 659670, "billed_gas": 654690, "keeper_paid_wei": 215000000000000, "actual_cost_wei": 130938000000000}
+{"label": "holder journal33/markup0/price500000000", "estimate": 659670, "billed_gas": 654690, "keeper_paid_wei": 537500000000000, "actual_cost_wei": 327345000000000}
+{"label": "holder journal33/markup1000/price200000000", "estimate": 659333, "billed_gas": 654353, "keeper_paid_wei": 236500000000000, "actual_cost_wei": 130870600000000}
+{"label": "holder journal33/markup1000/price500000000", "estimate": 659333, "billed_gas": 654353, "keeper_paid_wei": 591250000000000, "actual_cost_wei": 327176500000000}
+Traceback (most recent call last):
+  File "/private/tmp/efficient-journal-resume2.py", line 30, in <module>
+    try:ns['resume_remaining'](b,entry)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 23, in resume_remaining
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_rehearsal.py", line 568, in distribution_cases
+    dispatch=self.ordinary_dispatch('sync(uint256[],uint256,uint256)',('[]',witness,0),absent=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_rehearsal.py", line 319, in ordinary_dispatch
+    if any(parts and parts[0].split('(')[0]=='sync' for parts in parsed):raise RuntimeError('ordinary keeper chose sync for no-gain zero-pay tail')
+                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: ordinary keeper chose sync for no-gain zero-pay tail

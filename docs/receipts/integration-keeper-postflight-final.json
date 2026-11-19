@@ -1,0 +1,28 @@
+{
+  "endpoint": "http://127.0.0.1:8557",
+  "node_pid": 10583,
+  "old_paused_driver_pid": 10551,
+  "head": 26418606,
+  "automine": true,
+  "pool": {
+    "pending": "0x0",
+    "queued": "0x0"
+  },
+  "funding_wei": 60000000000000000000,
+  "actors_funded": 6,
+  "vault": "0xe7709640478bbf1b1d7fc5bac840ba3d657782d1",
+  "owner": "0x37Dcd875c4E367e080f1e05F18F10dB0D45a65B5",
+  "winding_down": "true",
+  "open": "0",
+  "idle": "0",
+  "recovery": "0",
+  "loose": "0",
+  "runtime_bytes": 24549,
+  "runtime_sha256": "81066a9b2cbdfcb1c2af4dacdb906732f6c760f13a50649529d1a2f8340d91e2",
+  "source_sha256": {
+    "src/PackVault.sol": "798e7ea0fc9968f8fe4d1ec14ce40275f47b5a10fb16872c73295929fc204fe9",
+    "src/VaultLib.sol": "a13b42c4ce02aebfa5e19e5fd3536c6c3da4caa2965f2e11d5952ed82bc158d9",
+    "src/interfaces/External.sol": "d50229cf80a4a036c9ba3f4f8bb60452129ee51dc7ca0263ad612b2ea76e499d",
+    "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a"
+  }
+}

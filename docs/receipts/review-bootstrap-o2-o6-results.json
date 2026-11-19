@@ -1,0 +1,95 @@
+{
+  "base_revision": "2f3ca40023c001f7c65b8ecb16d54d106962ec2e",
+  "source_sha256": {
+    "src/PackVault.sol": "1dc1ddb5d4c09057f34797efdff5d87929898c51bda671423de23625e7687af2",
+    "src/VaultLib.sol": "259d85003ff2392be404ead8d067edc92b1277044ee905e4f3640235bc760aae",
+    "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a",
+    "test/scenario/VaultFlow.t.sol": "b6ca4a7885d7d74c703c1ef42a89274aac614c64e9a848d946432d39750c16e0",
+    "test/utils/FlowBreakdown.sol": "b117b2f334f99676f99b1b582f48a9f0a9f1b22c8bc0da44b31326633969cd3c",
+    "test/fork/ForkMaxBatchGas.t.sol": "6922f27c559d6cab23e7df95c7788140591b86bdc8aed611146911c8cf9602d6",
+    "test/utils/TestVaultOps.sol": "8e14f307214f04129691f7a38f805f3c24b618ed433969e1839ff62450a2cbc3",
+    "asset-flow.json": "a294d45e3b5c1f1badf291ac0cb9b134421de4bac2f127fd68482b00f0c8b729",
+    "docs/receipts/flow/max_load.json": "75317318ac5a9cea584474cd429c1eb68305afe965f9c789d89481d0a9fce69a",
+    "docs/receipts/flow/gas_spike.json": "9e0fca8c41091b6a31c77ea43c6133ab6bc94912c7b1f96ed5c6e4c1a86b500e",
+    "docs/receipts/integration-final-max8-journal.txt": "9383a99bbb111fc1153873afc11f562e9344831a889c8c188995ff8205ac41a2"
+  },
+  "asset_gate_source_hash": "31ce8de4f1babf5f6a38de98d9403298bf4389b10477a7d91b4e706ca0b3dfa3",
+  "command": "SOURCE_HASH=$(python3 /Users/dd/.agents/guidance/asset-flow-kit/asset_gate.py . --print-source-hash) forge test --match-path test/scenario/VaultFlow.t.sol --match-test 'test_flow_(max_load|gas_spike)' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+  "exit_status": 0,
+  "test_count": 2,
+  "scope": "Only current-source max_load and gas_spike real-fork asset scenarios; no quote/source edits, no full16-regime suite and no broadcasts.",
+  "prior_attempt": {
+    "log": "review-bootstrap-o2-o6-unbound.txt",
+    "exit_status": 0,
+    "tests": 2,
+    "limitation": "SOURCE_HASH was absent from shell, leaving generated scorecards unbound. Corrected once with the exact source hash and warm fork cache."
+  },
+  "final_log": "review-bootstrap-o2-o6-bound.txt",
+  "outcomes": [
+    {
+      "id": "O2",
+      "actual_quoted_gas_per_position": 1919655,
+      "unchanged_max": 1750000,
+      "outcome_pass": false,
+      "accounting_mismatches": []
+    },
+    {
+      "id": "O6",
+      "actual_payment_wei": 220000000000000,
+      "unchanged_max_wei": 200000000000000,
+      "outcome_pass": false,
+      "accounting_mismatches": []
+    }
+  ],
+  "o2_breakdown": {
+    "positions": 29,
+    "restock_calls": 3,
+    "list_calls": 6,
+    "primary_mints": 9,
+    "primary_mint_quote_total": 19800000,
+    "assembly_quote_total": 9425000,
+    "listing_marginal_quote_total": 23925000,
+    "call_base_quote_total": 2520000,
+    "quoted_gas_total": 55670000,
+    "quoted_gas_per_position_floor": 1919655,
+    "quoted_gas_price_wei": 200000000,
+    "two_work_fees_per_position_wei": 40000000000000,
+    "construction_and_listing_keeper_payment_total_wei": 12294000000000000,
+    "initial_checkpoint_payment_wei": 100000000000000,
+    "scenario_keeper_payment_total_wei": 12394000000000000,
+    "paid_mint_fee_total_wei": 9000000000000000,
+    "minted_value_wei": 900000000000000000,
+    "remaining_idle_inventory_value_wei": 30000000000000000,
+    "ideal_three_shape_marginal_quote_without_bases_or_rounding": 1810000
+  },
+  "o6_context": {
+    "base_fee_wei": 1950000000,
+    "tx_gas_price_wei": 2000000000,
+    "routine_ceiling_wei": 500000000,
+    "checkpoint_fixed_quote": 400000,
+    "work_fee_wei": 20000000000000,
+    "formula": "400000 * min(1.95gwei +0.05gwei,0.5gwei) +0.00002ETH =0.00022ETH",
+    "largest_quote_meeting_existing_O6_limit_with_unchanged_work_fee": 360000,
+    "spike_build_payment_wei": 0
+  },
+  "historical_checkpoint_margin": {
+    "source": "docs/receipts/integration-final-max8-journal.txt",
+    "historical_complete_holder_checkpoint_gross_gas": 370178,
+    "gross_measure_definition": "gasleft delta plus21000 intrinsic and4/16gas per calldata byte, before transaction refunds; cold vault/library/policy/counterparties",
+    "fixed_quote": 400000,
+    "quote_minus_historical_gross_gas": 29822,
+    "quote_margin_over_historical_gross_percent": 8.056124350987904,
+    "gross_above_360000_target_quote": 10178,
+    "limits": "Historical prior candidate, not rerun on repaired source; distinct full redemption+distribution+deposit holder mix, not spike scenario. Gross gas is not billed gas or a profitability bound."
+  },
+  "things_that_do_not_make_sense": [
+    "Both focused accounting tests pass while the owner economic outcomes fail; passing test status cannot accept these outcomes.",
+    "O2 cannot meet1.75M under current marginal quotes even with perfect batching:1.81M precedes call bases and indivisible ten-Shape mint rounding.",
+    "Reducing checkpoint quote to360k to fit O6 would fall10178 below the existing full-holder gross measurement and conflict with a quote-at-measured-gas rationale until fresh billed-receipt calibration and full affected-path evidence support it.",
+    "The spike scenario intentionally pays only the routine ceiling, below the caller actual2gwei gas price; it establishes flow behavior, not willingness of a keeper to execute."
+  ],
+  "follow_up_refund_analysis": {
+    "evidence": "docs/receipts/review-bootstrap-checkpoint-refund-results.json",
+    "result": "Current-source full-holder sample gross372366, frame refund29600, sample net upper bound342766. This refines the earlier gross-only caution:360000 gas can cover this refund-adjusted sample. No actual billed receipt, universal bound, quote edit orO6 acceptance is established."
+  }
+}

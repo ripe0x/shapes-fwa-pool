@@ -1,0 +1,66 @@
+{
+  "function": "restock(uint256,uint256[],uint256)",
+  "args": [
+    3,
+    "[36300000000000000]",
+    0
+  ],
+  "rows": [
+    {
+      "base": 150000000,
+      "fees": [
+        "--gas-price",
+        "350000000",
+        "--priority-gas-price",
+        "50000000"
+      ],
+      "head_number": "0x1931d77",
+      "timestamp": "0x6af99f3f",
+      "with_explicit_zero_value": 2865411,
+      "ordinary_keeper_estimate": 2865411,
+      "reason": ""
+    },
+    {
+      "base": 150000000,
+      "fees": [
+        "--gas-price",
+        "350000000",
+        "--priority-gas-price",
+        "50000000"
+      ],
+      "head_number": "0x1931d77",
+      "timestamp": "0x6af99f40",
+      "with_explicit_zero_value": 2868344,
+      "ordinary_keeper_estimate": 2868344,
+      "reason": ""
+    },
+    {
+      "base": 150000000,
+      "fees": [
+        "--gas-price",
+        "350000000",
+        "--priority-gas-price",
+        "50000000"
+      ],
+      "head_number": "0x1931d77",
+      "timestamp": "0x6af99f40",
+      "with_explicit_zero_value": 2868344,
+      "ordinary_keeper_estimate": 2868344,
+      "reason": ""
+    },
+    {
+      "base": 150000000,
+      "fees": [
+        "--gas-price",
+        "350000000",
+        "--priority-gas-price",
+        "50000000"
+      ],
+      "head_number": "0x1931d77",
+      "timestamp": "0x6af99f40",
+      "with_explicit_zero_value": 2868344,
+      "ordinary_keeper_estimate": 2868344,
+      "reason": ""
+    }
+  ]
+}

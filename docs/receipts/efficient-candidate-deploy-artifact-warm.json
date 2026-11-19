@@ -1,0 +1,40 @@
+{
+  "scope": "Warm exact production Deploy from current source with installed pinned compiler; no cache deletion, source changes or broadcasts",
+  "compiler": "/Users/dd/.svm/0.8.30/solc-0.8.30",
+  "settings": {
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "viaIR": true,
+    "evmVersion": "cancun",
+    "metadata": {
+      "bytecodeHash": "none",
+      "appendCBOR": false
+    },
+    "remappings": [
+      "forge-std/=lib/forge-std/src/",
+      "solady/=lib/solady/src/"
+    ],
+    "outputSelection": {
+      "script/Deploy.s.sol": {
+        "Deploy": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata"
+        ]
+      }
+    }
+  },
+  "source_sha256": {
+    "src/PackVault.sol": "448106b8915413badef411355a5cb729ca15046743be768919d74e9349ddcd8b",
+    "src/VaultLib.sol": "8223991816433e0aff0b50253d6daa212d822f5545ad53ca04482efbf94d5252",
+    "script/Deploy.s.sol": "2a059502479a22360346994c7e5246fff96db98bff3f03a8586b610f0ac23d36",
+    "script/DeployCore.sol": "9246881b6c6fe32325ce1af731e083f5ed68a79b95f170f8db0cc93fa4e7d2b3"
+  },
+  "artifact_sha256": "54f292e310533a3c3e2b2220f6790fee39e8f4cfd912b16710a65c67e9b10c5a",
+  "creation_bytes": 34117,
+  "exit_status": 0
+}

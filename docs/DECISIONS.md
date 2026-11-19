@@ -845,3 +845,235 @@ from about 0.055 to 0.045 ETH. Supersedes the essential-budget sizing question i
 **Evidence:** `test_selfServeExitWithoutEssentialBudget`; 106 fork, audit and scenario tests;
 rehearsals at the pinned and current block, where the withdrawer and owner run the exit steps
 (ledgers exact; current-block holder round trip -0.0151 ETH, was -0.0169).
+
+
+## D65. Incremental production position accounting (owner, 2026-11-18)
+
+The owner accepted the accounting design in `POSITION-ACCOUNTING-PLAN.md` and requested integration
+from research proof `3b9cd65`, preserving the newer documentation handoff `f75ee77`.
+One vault retains all holder and mint behavior. Exact running Shapes backing, active FWA backing,
+a fee-debt histogram, ordered acquisition cursor, authenticated payment receipts and an allocation
+queue replace valuation scans. This supersedes D6/D24's count cap and D62's spare-slot spread and
+no-list-argument instruction. Backing proposals are offchain, quantized to 10,000 wei, unique among
+outstanding identifiers, and authenticated against current economics and capital onchain. The max
+ordinary 5% keep fee requires B >= ceil(P * 10000 / 9500).
+
+Staged listing admission is rejected atomically, so D36's production activation operation is
+retired. Operation identifier 4 is left unused; other keeper operation identifiers retain meaning.
+D61's shared checkpoint charge remains, with fixed measured work replacing the portfolio component.
+New global journal work is funded only from actual free ETH within existing budgets; foreign and
+refunded entries earn only their completed-work gas component, without a per-entry flat fee.
+
+Implementation API intentionally changes. Operational callers migrate together; no permanent unused
+full-array getters or compatibility wrapper remains in production. Bounded test-only enumeration
+remains an independent reference. The existing signature and historical audit evidence do not approve
+this candidate. Final measurements, fork reconciliation, independent review and outcome approval
+remain separate gates. No production broadcast or remote publication is authorized.
+
+## D66. Measured work quotes and prospective keeper context (engineering, 2026-11-18)
+
+Production bookkeeping adds real work to listing, fee harvesting, withdrawal and redemption.
+Update the measured cost inputs while retaining the entry build/list charge, exit unlist/liquidate
+charge, shared checkpoint charge and recurring-maintenance funding policies. No budget maximum,
+refill, reserve, mint fee, pack mask or allocated exposure limit is loosened by this decision.
+
+Ordinary pack redemption and oversized gift claims authenticate actual burned Shape count through
+`Shapes.totalSupply()` immediately before/after the immutable redemption path. The path burns
+exactly its actual batch before its sole ETH callback, and the guarded vault cannot interleave a
+second supply mutation. Recovery pays an unseal component once, then components for completed
+actual work; a final one-Shape claim no longer receives a thirty-Shape quote. No unbounded pack
+contents getter is used onchain or required by the normal keeper.
+
+Both the ordinary keeper and production list at most eight packs per transaction. The other
+sixteen-item work limits remain. The local event index bounds RPC candidate hydration independently
+of total unchanged inventory. Reserve analysis distinguishes funded essential work from D64's unpaid
+self-serve exits and includes global work that returns no backing.
+
+A proposal within a few 10,000 wei tags of a live target is sensitive to basefee when the build
+repayment term binds. The keeper authenticates a prospective pending header against the pinned
+parent's deterministic next basefee and uses explicit fee fields for price and pay simulations.
+Actual Tenderly reads showed that omitting fees could execute `BASEFEE` as zero despite a nonzero
+pending header. The parent hash is checked before submission; later state/head changes can still
+reject a transaction atomically. No admission tolerance or economic gate is relaxed.
+
+The owner explicitly approved the isolated local batch in `receipts/position-local-batch-plan.json`:
+127.0.0.1:8557, fork 26,418,539, six named fresh test signers, 60 simulated ETH total, normal code
+and transaction limits, plus the named oracle owner's local calls with zero added funding. This
+approval authorizes no public-network transaction, merge, owner signature or real-fund spending.
+
+Gas setup correction: the inherited 8,000-block expiry wait was unnecessary for the deployed
+30-block word timeout. Rehearsal helpers now use each request's actual snapshotted deadline. The
+already-started mining operation and its node were preserved; no protocol state was fabricated.
+Final receipts, quote calibration and funding conclusions belong in the acceptance report.
+
+FWA's acquisition queue can be drained while its private staging FIFO still contains foreign
+listings. FWA exposes no public staging-head getter. Each production admission forwards at most
+1.2 million gas to `listNFT` and requires the active count to increase by exactly one, alongside
+the ordinary Active identity checks. Incidental foreign activation or a staged result reverts the
+whole vault transaction, including earlier batch work. The eight-listing limit reserves transaction
+headroom for this bounded external work; the vault does not pay to drain foreign staging. This can
+leave admission waiting for FWA's permissionless activation to be performed by another actor.
+Journal processing, pricing eligibility and exits do not depend on a staging-head read.
+
+The broad integration run exposed profitable splitting of the 400,000-gas listing base. Actual
+matched-fee receipts measured 650,969 additional billed gas for three singleton calls versus the
+same three listings in one batch. The base is now 280,000, leaving 6.9938 microETH of loss for the
+split at 0.2 gwei even at the maximum 10% markup. Per-listing gas and work fees are unchanged.
+This is measured sample evidence, not a universal future gas guarantee. The final O2 build/list
+cost and O6 checkpoint cost exceed their historical signed amounts; those bounds and the signature
+are retained, with gate failure reported rather than changing them without owner approval.
+
+## D67. Unpaid cursor advance with no FWA exposure (owner, 2026-11-18)
+
+The owner approved refining D65's requirement to process every completed entry. The book may
+advance directly to FWA's completed prefix only when it has no open position, reserved identifier,
+active membership or backing, allocated value, or pending receipt. An OWED position still counts
+as open. Idle inventory alone is not FWA exposure. An unseen own allocation therefore cannot be
+skipped, and outstanding receipts must still be reconciled in order.
+
+This constant-work advance earns zero gas quote and zero work units. It is available during sync,
+checkpoint, and immediately before first admission. Checkpoint and admission can include it in
+their existing funded operation; the keeper need not execute a separate unpaid catchup call.
+Empty tracked inventory cannot earn keeper pay for stale allocation-head cleanup either. Positive
+`minPay` still reverts the whole operation if its payment is unavailable.
+
+The change protects the minimum seed from unrelated history and preserves first-deposit pricing.
+It does not protect exposed capital from its existing maintenance costs, change the reserve or
+budgets, fund essential exits, or approve revised O2/O6 outcomes. The strict public valuation view
+still requires an up-to-date cursor; checkpoint establishes the approved proof before pricing.
+
+## D68. Checkpoint compensation calibration within O6 (engineering, 2026-11-18)
+
+Reduce the fixed checkpoint gas component from 400,000 to 360,000. Keep one work unit, the
+configured work fee, gas ceilings, budgets, processing-pool funding and the owner's 0.0002 ETH
+O6 limit. At the configured 0.5 gwei routine ceiling and 0.00002 ETH work fee, checkpoint pay is
+0.0002 ETH. Shared request charges use the reduced component as well.
+
+The current full-holder fixture combines a redemption remainder, distribution and new deposit.
+The original interpretation of 372,366 caller-meter gas minus a 29,600 refund as a
+342,766 upper bound was incorrect: isolated Foundry calls had already finalized refunds.
+That derived bound is withdrawn, with raw evidence preserved. The current direct finalized
+meter is 345,937 gas, below 360,000 by 14,063 (4.07%). See
+`receipts/restock-efficiency-meter-correction.json` for installed Foundry source and meter
+provenance. Actual signed full-holder receipts remain separate required evidence.
+
+This is a bounded sample, not a universal keeper profit guarantee. Foundry original-slot/refund
+context can differ from a standalone transaction. Actual billed full-holder receipts remain a
+release evidence gap. Above-ceiling caller gas can still exceed capped compensation. Journal
+quotes are unchanged: new real refund receipts show that raising their call base can reward
+splitting even when an older successful-foreign gross series suggested otherwise. O2 and exposed
+global funding remain acceptance blockers.
+
+
+## D69. Enforce efficient journal jobs and fund sync as routine upkeep (owner, 2026-11-18)
+
+The owner's detailed seven-item next revision request is recorded in
+`EFFICIENT-JOURNAL-REVISION.md` and OWNER-REQUIREMENTS items22–27. The global read job has its
+own128-record bound; actual own transitions, supplied terminal IDs and head pruning each retain
+independent16-item bounds. A seventeenth own transition remains unconsumed. Callers cannot select
+a smaller paid prefix or reduce the journal with irrelevant terminal IDs. Full jobs and verified
+own work qualify; residual foreign work qualifies only for a fresh, drained checkpoint window
+with actual holder flows or an authenticated post-cost distribution. Unexposed advance remains
+unpaid. Optional unqualified tails can advance unpaid. No completion bonus is introduced.
+
+`sync(ids,witnessId,minPay)` intentionally replaces the earlier four-argument interface. Normal
+keeper/test callers migrate together. Historical receipt drivers remain tied to their old ABI.
+All sync uses routine cash and spending permission, including during redemption and wind-down.
+D64's caller-funded unlisting/liquidation remains. The keeper reversibly pauses new exposure if
+the known journal quote exceeds free cash or routine permission. Reconciliation and holder paths
+remain permissionless. No reserve, budget, cap, refill or permanent wind-down policy changes.
+
+Default funding is vault operating cash, reducing holder returns. Mint revenue is not an assumed
+subsidy, principal movements are not income, and no minimum TVL is introduced. Any allowance
+proposal must show ETH/day, actual vault cash, all remaining work, completed exits and net holder
+returns. A separately approved capped experiment subsidy must be excluded from earned return.
+O2 and other accepted outcome numbers and the existing signature are unchanged.
+
+Keep the85,000 ordinary base while measuring the new boundaries. `Q_REQUIRED_TAIL` initially
+names the same85,000 base for qualified foreign tails, replacing rather than adding the base.
+Numerical calibration must follow real estimates/bills, including keeper willingness. The
+memory-only consumed mint IDs and shared pre-mutation restock context preserve paid mints,
+ten-way splitting, recipes and creator fees; execution savings alone do not reduce holder pay.
+
+Bid settlement events now independently identify returned packs, with historical upgrade replay,
+retained unseen selections, independent expiry/OWED discovery and canonical rollback checks.
+This index supplies candidates, not completeness or accounting authority.
+
+
+## D70. Fee collection follows verified work (engineering, 2026-11-18)
+
+The owner asked to finish the remaining design and implementation autonomously in one integrated pass. Keep one vault and the incremental book, preserve primary mint revenue, and resolve harvesting, recurring funding and verification together.
+
+Standalone harvesting is now caller funded. Positive minimum payment reverts, while zero retains manual fee collection. Verified paid sync may sweep economical credit and, only if its actual protected free cash remains insufficient, collect the first distinct active fee prefix that funds the completed job. The incremental fee collection quote must fit the existing fee share restraint and the whole payment must fit routine permission. Terminal proceeds arrive first. Distribution eligibility uses the full combined cost. No optional tail, duplicate, padding or empty call can create compensated collection.
+
+The keeper tries the ordinary sync and bounded funding alternatives through the contract's exact preflight. It sends the shortest profitable call and replans after the receipt. This avoids maintaining a separate approximate eligibility formula. Full exits collect fees through unlisting and checkpoint. A cheap manual partial redemption claim remains available.
+
+Required tail and own selection quotes become 120,000 and 180,000 after measurement. The ordinary base remains 85,000 and each journal record remains 22,000. New collection components are 40,000 for credit and 40,000 plus 80,000 per actual active fee claim. The extra shape slope becomes 100,000 after a signed four shape leftover receipt exposed underpayment. Three shape construction, mint, listing and checkpoint quotes remain unchanged. The original O2 failure remains explicit.
+
+## D71. Refill operating permission at the measured spending rate (engineering, 2026-11-18)
+
+The completed operation and exit model separates actual cash from permission. Larger initial buckets concealed a recurring deficit. The mainnet high activity case spends about 0.0155 ETH per day in the thirty day test, while the old hard maximum replenished 0.01 ETH per day. Raising capacity alone is temporary.
+
+Choose mainnet capacity 0.1 ETH with 0.02 ETH per day refill, and canary capacity 0.03 ETH with 0.01 ETH per day refill. Raise only the routine refill hard maximum from 0.01 to 0.02 ETH per day. Other hard caps, protected liabilities, mint fees and the routine gas ceiling remain unchanged. There is no minimum TVL or recurring creator subsidy.
+
+These are spending permissions, funded only by real unencumbered vault cash. They increase authorized maintenance outflow over time and do not create operating income. The larger vault's ninety day stress case pays every routine job, keeps permission near capacity at each monthly observation and completes the holder exit. Small vault losses and zero demand remain visible. Results are conditional engineering scenarios with explicit pool, volume, purchaser timing and caller gas inputs.
+
+No original acceptance threshold or outcome signature is silently changed. Current evidence and limits are in `COMPLETE-OPERATING-PASS.md`. PR 2 remains draft; this decision records implementation work, not a public deployment or merge.
+
+
+## D72. Formal holder-return assessment replays the actual window (engineering, 2026-11-19)
+
+The owner's gate (A.3, A.8, A.10) is measured by `sim/formal.py`: the actual trailing 30 days at a
+pinned block, replayed for 360 days plus exit through the timed model, 16 seeds, complete claims
+only, no annualization. Purchasers respond at recorded delays but bid inside the settlement window,
+because a vault pack's bid beats keeping it and the vault reclaims at expiry; recorded late answers
+and keeps are diagnostics that show a large upside the gate does not count. Result at 26,450,200:
+fails at the 2 ETH canary (median −5.3%), passes at 6.8 and 20 ETH. Shared journal cost is the cause.
+
+## D73. One release identity and a signed gate before any public broadcast (engineering, 2026-11-19)
+
+`deploy/release-manifest.json` binds sources, toolchain, normalized runtimes (with the library's
+CREATE2 address), values, keeper image inputs and evidence. `script/deploy.sh` simulates freely and
+broadcasts to anything but a local Anvil only when `script/release.py check --broadcast` passes,
+including the owner's ssh signature over `docs/release/acceptance.json`; it then runs the onchain
+postflight. This replaces `I_AM_THE_OWNER=yes`. Keeper configs keep a zero VAULT that the
+entrypoint refuses until `release.py keeper-config` writes a postflight-checked address.
+
+## D74. Keeper image toolchain stays Foundry 1.8.1 (engineering, 2026-11-19)
+
+All tests and rehearsals of this candidate ran with Foundry 1.8.1, the version the image installs;
+the image itself passed the fork rehearsal in CI. Earlier 1.9.0 receipts remain valid for their
+contract gas: bytecode depends on solc settings, not on the Foundry version. `FOUNDRY_DIR` is pinned
+because the current installer otherwise writes to `~/.config/.foundry`.
+
+## D75. A scan of the vault's own positions replaces the global journal for small vaults (engineering, 2026-11-19)
+
+The D72 gate failed at the 2 ETH canary (median −5.3%, 9 of 16 seeds lose). Root cause, reproduced
+exactly from `sim/formal.py`: 1.203 of the 1.525 ETH a year of routine keeper pay bought on-chain
+reads of FWA's global acquisition journal: 92,120 records a year were read at the 22,000 quoted gas
+each (16.6k marginal measured), whatever the vault's size. The journal proves that no own selection
+was missed, but it costs in proportion to FWA's global activity, not to the vault's own work.
+
+`src/ScanLib.sol` `rebase` proves the same completeness by reading `listings(id)` for every open
+position the book holds Active (29,337 gas each, measured, `docs/receipts/scan-gas.json`), selecting
+in allocation order each one FWA shows Allocated or Settled (at most 16; otherwise no state change and
+the journal runs), then moving the cursor to `nextSequenceToProcess`. It is sound because FWA allocates
+a listing only inside `processAcquisitions` while advancing that counter, and an Allocated listing can
+only become Settled. VaultLib takes it automatically whenever `open * Q_SCAN <= min(backlog, 128) *
+Q_JOURNAL`, so it never costs more than the next journal batch and stays inside that batch's gas
+envelope; vaults with more than 93 open positions keep the journal. `Q_SCAN = 30,000`. The scan
+component is paid only when the call applied an own selection or is the required checkpoint tail, so
+a cycle's terminal work split into later calls cannot earn a second scan. PackVault is unchanged; the
+read loop lives in a second library only for EIP-170 size (VaultLib 24,440 bytes, ScanLib 1,935).
+`script/release.py` derives both CREATE2 addresses and checks the VaultLib→ScanLib link.
+
+Keeper (`keeper/policy.py`): a scan vault does no work for FWA's global activity alone. It waits for
+each own selection to settle or expire and then selects and resolves it in one paid call; other
+terminal and cleanup work rides along with the next paid scan unless holders are waiting, a checkpoint
+is due or the vault is winding down. In a checkpoint window the paid scan runs first and terminals
+follow without a scan.
+
+Unchanged: the payment formula (quoted gas x min(basefee + 0.05 gwei, 0.5 gwei) + 0.00002 ETH per
+work unit, no premium), ceilings, budgets, the canary's D71 refill (0.01 ETH a day; main's 0.0008 is
+assessed as an alternative), essential pay disabled (D64), liabilities, the trailing-30-day gate.
+Results and limits: `docs/KEEPER-ECONOMICS.md`.

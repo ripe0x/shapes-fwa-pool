@@ -1,0 +1,125 @@
+Compiling 1 files with Solc 0.8.30
+Solc 0.8.30 finished in 9.27s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:193:35:
+    |
+193 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:598:5:
+    |
+598 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/RestockEfficiency.t.sol:37:5:
+   |
+37 |     function assertEnvironment() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Warning: the following cheatcode(s) are deprecated and will be removed in future versions:
+  lastCallGas(): replaced by `lastFrameGas`
+Ran 8 tests for test/fork/RestockEfficiency.t.sol:RestockEfficiencyTest
+[PASS] test_allProposalsValidatedBeforeAnyPaidMint() (gas: 360569)
+[PASS] test_existingIdleFundingPreventsUnfundedLeftoverPack() (gas: 10317964)
+Logs:
+  funding boundary first pack call meter plus intrinsic: 2803509
+  funding boundary first pack isolated receipt-equivalent gas: 2776619
+  funding boundary first pack finalized frame refund: 88000
+  funding boundary first pack isolated gross before refund: 2864619
+  funding boundary first pack keeper pay wei: 581000000000000
+  funding boundary first pack newly paid mints: 1
+
+[PASS] test_fourUnitLeftoversAndMixedMintsPreserveExactRecipe() (gas: 9307584)
+Logs:
+  four first leftover6 call meter plus intrinsic: 2836859
+  four first leftover6 isolated receipt-equivalent gas: 2809957
+  four first leftover6 finalized frame refund: 88000
+  four first leftover6 isolated gross before refund: 2897957
+  four first leftover6 keeper pay wei: 588000000000000
+  four first leftover6 newly paid mints: 1
+  four mixed old6 new10 call meter plus intrinsic: 3022237
+  four mixed old6 new10 isolated receipt-equivalent gas: 2995132
+  four mixed old6 new10 finalized frame refund: 76500
+  four mixed old6 new10 isolated gross before refund: 3071632
+  four mixed old6 new10 keeper pay wei: 680000000000000
+  four mixed old6 new10 newly paid mints: 1
+  four leftover only0 call meter plus intrinsic: 1140823
+  four leftover only0 isolated receipt-equivalent gas: 1113721
+  four leftover only0 finalized frame refund: 56400
+  four leftover only0 isolated gross before refund: 1170121
+  four leftover only0 keeper pay wei: 240000000000000
+  four leftover only0 newly paid mints: 0
+
+[PASS] test_largePackLeavesExistingLoosePrefixUntouched() (gas: 13116115)
+Logs:
+  large prefix setup call meter plus intrinsic: 2803503
+  large prefix setup isolated receipt-equivalent gas: 2776619
+  large prefix setup finalized frame refund: 88000
+  large prefix setup isolated gross before refund: 2864619
+  large prefix setup keeper pay wei: 581000000000000
+  large prefix setup newly paid mints: 1
+  large consumes thirty new leaves old7 call meter plus intrinsic: 7712281
+  large consumes thirty new leaves old7 isolated receipt-equivalent gas: 7685373
+  large consumes thirty new leaves old7 finalized frame refund: 207100
+  large consumes thirty new leaves old7 isolated gross before refund: 7892473
+  large consumes thirty new leaves old7 keeper pay wei: 1650000000000000
+  large consumes thirty new leaves old7 newly paid mints: 3
+
+[PASS] test_maximumThirtyUnitNoLeftovers() (gas: 20623861)
+Logs:
+  thirty units ten small packs call meter plus intrinsic: 9678225
+  thirty units ten small packs isolated receipt-equivalent gas: 9649541
+  thirty units ten small packs finalized frame refund: 263700
+  thirty units ten small packs isolated gross before refund: 9913241
+  thirty units ten small packs keeper pay wei: 2226000000000000
+  thirty units ten small packs newly paid mints: 3
+  thirty units one large pack call meter plus intrinsic: 7719114
+  thirty units one large pack isolated receipt-equivalent gas: 7692206
+  thirty units one large pack finalized frame refund: 241300
+  thirty units one large pack isolated gross before refund: 7933506
+  thirty units one large pack keeper pay wei: 1650000000000000
+  thirty units one large pack newly paid mints: 3
+
+[PASS] test_mintedPrincipalRoundTripRetainsArtistFeeRevenue() (gas: 4604240)
+Logs:
+  roundtrip two small packs call meter plus intrinsic: 3110099
+  roundtrip two small packs isolated receipt-equivalent gas: 3083015
+  roundtrip two small packs finalized frame refund: 90800
+  roundtrip two small packs isolated gross before refund: 3173815
+  roundtrip two small packs keeper pay wei: 666000000000000
+  roundtrip two small packs newly paid mints: 1
+
+[SKIP] test_recentHeadSmallRestock() (gas: 0)
+[PASS] test_threeUnitLeftoversAndMixedMintsPreserveExactRecipe() (gas: 9154166)
+Logs:
+  three first leftover7 call meter plus intrinsic: 2803509
+  three first leftover7 isolated receipt-equivalent gas: 2776619
+  three first leftover7 finalized frame refund: 88000
+  three first leftover7 isolated gross before refund: 2864619
+  three first leftover7 keeper pay wei: 581000000000000
+  three first leftover7 newly paid mints: 1
+  three leftover only4 call meter plus intrinsic: 623803
+  three leftover only4 isolated receipt-equivalent gas: 596919
+  three leftover only4 finalized frame refund: 20000
+  three leftover only4 isolated gross before refund: 616919
+  three leftover only4 keeper pay wei: 141000000000000
+  three leftover only4 newly paid mints: 0
+  three mixed old4 new10 call meter plus intrinsic: 3262186
+  three mixed old4 new10 isolated receipt-equivalent gas: 3234902
+  three mixed old4 new10 finalized frame refund: 79300
+  three mixed old4 new10 isolated gross before refund: 3314202
+  three mixed old4 new10 keeper pay wei: 751000000000000
+  three mixed old4 new10 newly paid mints: 1
+
+Suite result: ok. 7 passed; 0 failed; 1 skipped; finished in 831.33ms (668.84ms CPU time)
+
+Ran 1 test suite in 1.20s (831.33ms CPU time): 7 tests passed, 0 failed, 1 skipped (8 total tests)

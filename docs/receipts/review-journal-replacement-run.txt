@@ -1,0 +1,56 @@
+REPLACEMENT_STARTED {"pid": 98279, "manifest": "/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/pack-vault-review-journal-replacement-m_lz3n75/manifest.json", "funding_wei": 3000000000000000000}
+{"label": "price first deposit", "estimate": 261020, "billed_gas": 238834, "keeper_paid_wei": 87699000000000}
+{"label": "real three-unit restock", "estimate": 2954797, "billed_gas": 2793455, "keeper_paid_wei": 581000000000000}
+{"label": "real active listing", "estimate": 1236439, "billed_gas": 1195059, "keeper_paid_wei": 241000000000000}
+{"label": "prefix 1", "estimate": 117495, "billed_gas": 112515, "keeper_paid_wei": 23000000000000}
+{"label": "prefix 2", "estimate": 134101, "billed_gas": 129121, "keeper_paid_wei": 29000000000000}
+{"label": "prefix 3", "estimate": 150708, "billed_gas": 145728, "keeper_paid_wei": 35000000000000}
+{"label": "prefix 4", "estimate": 167315, "billed_gas": 162335, "keeper_paid_wei": 41000000000000}
+{"label": "prefix 5", "estimate": 183923, "billed_gas": 178943, "keeper_paid_wei": 47000000000000}
+{"label": "prefix 6", "estimate": 200531, "billed_gas": 195551, "keeper_paid_wei": 53000000000000}
+{"label": "prefix 7", "estimate": 217139, "billed_gas": 212159, "keeper_paid_wei": 59000000000000}
+{"label": "prefix 8", "estimate": 233748, "billed_gas": 228768, "keeper_paid_wei": 65000000000000}
+{"label": "prefix 9", "estimate": 250358, "billed_gas": 245378, "keeper_paid_wei": 71000000000000}
+{"label": "prefix 10", "estimate": 266968, "billed_gas": 261988, "keeper_paid_wei": 77000000000000}
+{"label": "prefix 11", "estimate": 283579, "billed_gas": 278599, "keeper_paid_wei": 83000000000000}
+{"label": "prefix 12", "estimate": 300190, "billed_gas": 295210, "keeper_paid_wei": 89000000000000}
+{"label": "prefix 13", "estimate": 316801, "billed_gas": 311821, "keeper_paid_wei": 95000000000000}
+{"label": "prefix 14", "estimate": 333413, "billed_gas": 328433, "keeper_paid_wei": 101000000000000}
+{"label": "prefix 15", "estimate": 350025, "billed_gas": 345045, "keeper_paid_wei": 107000000000000}
+{"label": "prefix 16", "estimate": 366612, "billed_gas": 361632, "keeper_paid_wei": 113000000000000}
+{"label": "tail 1 preparation", "estimate": 350025, "billed_gas": 345045, "keeper_paid_wei": 107000000000000}
+{"label": "tail 1 completion", "estimate": 117469, "billed_gas": 112489, "keeper_paid_wei": 23000000000000}
+{"label": "tail 2 preparation", "estimate": 333413, "billed_gas": 328433, "keeper_paid_wei": 101000000000000}
+{"label": "tail 2 completion", "estimate": 131275, "billed_gas": 129095, "keeper_paid_wei": 29000000000000}
+{"label": "tail 3 preparation", "estimate": 316801, "billed_gas": 311821, "keeper_paid_wei": 95000000000000}
+{"label": "tail 3 completion", "estimate": 150682, "billed_gas": 145702, "keeper_paid_wei": 35000000000000}
+{"label": "tail 4 preparation", "estimate": 300190, "billed_gas": 295210, "keeper_paid_wei": 89000000000000}
+{"label": "tail 4 completion", "estimate": 167289, "billed_gas": 162309, "keeper_paid_wei": 41000000000000}
+{"label": "tail 5 preparation", "estimate": 283579, "billed_gas": 278599, "keeper_paid_wei": 83000000000000}
+{"label": "tail 5 completion", "estimate": 183897, "billed_gas": 178917, "keeper_paid_wei": 47000000000000}
+{"label": "tail 6 preparation", "estimate": 266968, "billed_gas": 261988, "keeper_paid_wei": 77000000000000}
+{"label": "tail 6 completion", "estimate": 200505, "billed_gas": 195525, "keeper_paid_wei": 53000000000000}
+{"label": "tail 7 preparation", "estimate": 250358, "billed_gas": 245378, "keeper_paid_wei": 71000000000000}
+{"label": "tail 7 completion", "estimate": 217113, "billed_gas": 212133, "keeper_paid_wei": 59000000000000}
+{"label": "tail 8 preparation", "estimate": 233748, "billed_gas": 228768, "keeper_paid_wei": 65000000000000}
+{"label": "tail 8 completion", "estimate": 233722, "billed_gas": 228742, "keeper_paid_wei": 65000000000000}
+{"label": "tail 9 preparation", "estimate": 217139, "billed_gas": 212159, "keeper_paid_wei": 59000000000000}
+{"label": "tail 9 completion", "estimate": 247532, "billed_gas": 245352, "keeper_paid_wei": 71000000000000}
+{"label": "tail 10 preparation", "estimate": 200531, "billed_gas": 195551, "keeper_paid_wei": 53000000000000}
+{"label": "tail 10 completion", "estimate": 264142, "billed_gas": 261962, "keeper_paid_wei": 77000000000000}
+{"label": "tail 11 preparation", "estimate": 183923, "billed_gas": 178943, "keeper_paid_wei": 47000000000000}
+{"label": "tail 11 completion", "estimate": 280753, "billed_gas": 278573, "keeper_paid_wei": 83000000000000}
+{"label": "tail 12 preparation", "estimate": 167315, "billed_gas": 162335, "keeper_paid_wei": 41000000000000}
+{"label": "tail 12 completion", "estimate": 300164, "billed_gas": 295184, "keeper_paid_wei": 89000000000000}
+{"label": "tail 13 preparation", "estimate": 150708, "billed_gas": 145728, "keeper_paid_wei": 35000000000000}
+{"label": "tail 13 completion", "estimate": 316775, "billed_gas": 311795, "keeper_paid_wei": 95000000000000}
+{"label": "tail 14 preparation", "estimate": 134101, "billed_gas": 129121, "keeper_paid_wei": 29000000000000}
+{"label": "tail 14 completion", "estimate": 333387, "billed_gas": 328407, "keeper_paid_wei": 101000000000000}
+{"label": "tail 15 preparation", "estimate": 117495, "billed_gas": 112515, "keeper_paid_wei": 23000000000000}
+{"label": "tail 15 completion", "estimate": 347199, "billed_gas": 345019, "keeper_paid_wei": 107000000000000}
+{"label": "exit request all holder shares", "estimate": 166301, "billed_gas": 136609, "keeper_paid_wei": 0}
+{"label": "exit unpaid sixteen-record backlog", "estimate": 355866, "billed_gas": 350886, "keeper_paid_wei": 0}
+{"label": "exit unlist real position", "estimate": 632490, "billed_gas": 525910, "keeper_paid_wei": 0}
+{"label": "exit liquidate real pack and loose Shapes", "estimate": 701660, "billed_gas": 559584, "keeper_paid_wei": 0}
+{"label": "exit checkpoint", "estimate": 292721, "billed_gas": 255435, "keeper_paid_wei": 100000000000000}
+{"label": "exit claim", "estimate": 115540, "billed_gas": 90679, "keeper_paid_wei": 0}

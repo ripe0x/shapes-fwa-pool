@@ -1,0 +1,12 @@
+{
+  "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python3",
+    "-O",
+    "keeper/efficient_journal_candidate.py",
+    "--prepare"
+  ],
+  "exit_status": 1,
+  "stderr": "Traceback (most recent call last):\n  File \"/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_candidate.py\", line 12, in <module>\n    raise RuntimeError('Optimized Python disables the batch assertions; refuse preparation or execution')\nRuntimeError: Optimized Python disables the batch assertions; refuse preparation or execution\n",
+  "descriptor_unchanged_by_optimized_invocation": true,
+  "no_rpc_or_broadcast": true
+}

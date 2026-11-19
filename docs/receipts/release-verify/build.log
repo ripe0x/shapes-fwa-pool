@@ -1,0 +1,7 @@
+Compiling 76 files with Solc 0.8.30
+Solc 0.8.30 finished in 144.29s
+Compiler run successful with warnings:
+| Contract                    | Runtime Size (B) | Initcode Size (B) | Runtime Margin (B) | Initcode Margin (B) |
+| KeeperPolicyV1              | 216              | 240               | 24,360             | 48,912              |
+| PackVault                   | 24,136           | 26,904            | 440                | 22,248              |
+| VaultLib                    | 24,304           | 24,336            | 272                | 24,816              |

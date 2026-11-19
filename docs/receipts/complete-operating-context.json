@@ -1,0 +1,53 @@
+{
+  "rpc": "https://mainnet.gateway.tenderly.co",
+  "snapshots": {
+    "recorded": {
+      "block": 26425092,
+      "block_hash": "0xe8f00034013c690eaeec617b5054c1434b0a96961e8f3fa101c9f69eda8b105e",
+      "timestamp": 1794802079,
+      "fwa": "0x958C41181182e76F221331b2755b77D9e1426A98",
+      "totalWeight": 50288308259889882330972,
+      "activeListingCount": 2584,
+      "weightedBackingTotal": 2583999999999999999893898787194291546493,
+      "nextSequenceToProcess": 96802,
+      "settlementWindow": 3600,
+      "ownerAcquisitionFeeBps": 100,
+      "topListingShareBps": 10,
+      "settlementDiscountBps": 9000,
+      "oracleExemptPacks": false,
+      "ownerSettlementFeeBps": 100,
+      "oracleCeilingPremiumBps": 1000,
+      "floorOracle": "0xaa4d9009a4664604b57644bf13e447e9036727dc",
+      "floorRange": [
+        29700000000000000,
+        33000000000000000,
+        1794689375,
+        281474976710655
+      ]
+    },
+    "current": {
+      "block": 26446755,
+      "block_hash": "0x9c00f5388f89dbf54915098c83e483ad61a2a115702ef7215e49df96dba010b6",
+      "timestamp": 1795062743,
+      "fwa": "0x958C41181182e76F221331b2755b77D9e1426A98",
+      "totalWeight": 50605477208603984172848,
+      "activeListingCount": 2523,
+      "weightedBackingTotal": 2522999999999999999898521515809019653078,
+      "nextSequenceToProcess": 97599,
+      "settlementWindow": 3600,
+      "ownerAcquisitionFeeBps": 100,
+      "topListingShareBps": 10,
+      "settlementDiscountBps": 9000,
+      "oracleExemptPacks": true,
+      "ownerSettlementFeeBps": 100,
+      "oracleCeilingPremiumBps": 1000,
+      "floorOracle": "0xaa4d9009a4664604b57644bf13e447e9036727dc",
+      "floorRange": [
+        29700000000000000,
+        33000000000000000,
+        1794689375,
+        281474976710655
+      ]
+    }
+  }
+}

@@ -1,0 +1,5 @@
+steps: setup, selected, bid, charges, deposits, sync, harvest, catchup, relistBacking, list, checkpoint1, gas, redeemCharge, redeem, checkpoint2, claim, aliceReceived
+ledger: fees received 24976235593068, keeper paid 1801250000000000, mint fees 1000000000000000, backing lost 36300000000000000
+reconciled: every vault number matches the fork run to the wei
+partial/wind-down: claim 992779091300853720, keeper pay 4372000000000000, mint fees 3000000000000000, remaining redemption-rounding reserve 6 wei
+reconciled: partial fill, wind-down, full exit and every bucket match to the wei

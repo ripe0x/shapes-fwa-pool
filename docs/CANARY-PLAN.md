@@ -1,4 +1,12 @@
-# Mainnet canary plan (launch step E) — DRAFT for owner approval
+> **Current release instructions: [docs/release/RUNBOOK.md](release/RUNBOOK.md)** (2026-11-19). This document is history for the candidate it names; where it gives current instructions, the runbook replaces them.
+
+# Historical mainnet canary plan (launch step E)
+
+This pre-integration draft is retained as history. Its position caps, backing bands, gas,
+keeper-payment bands and economic evidence do not approve the new candidate. The position cap is
+removed, request-funded checkpoint payments are separate from free-cash budgets, and continuous
+journal funding is blocked under the current values. Use `POSITION-INTEGRATION-ACCEPTANCE.md`
+for current evidence and remaining owner outcomes. No mainnet launch is authorized by this task.
 
 Nothing here is authorized until the owner approves it in writing. Every broadcast below needs its
 own confirmation immediately before sending: chain, signer, target, decoded arguments, value and

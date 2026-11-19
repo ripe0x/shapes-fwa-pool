@@ -1,27 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {TestVaultOps} from "../../utils/TestVaultOps.sol";
+
 import {ForkBase, IOwnable, IFwaAdmin} from "../../fork/ForkBase.sol";
 import {VaultLib} from "../../../src/VaultLib.sol";
 import {Charges} from "../../utils/Charges.sol";
-
-contract GasBurningOracle {
-    fallback() external {
-        assembly { for {} 1 {} {} }
-    }
-}
-
-contract MalformedOracle {
-    fallback() external {
-        assembly {
-            mstore(0x00, 1)
-            mstore(0x20, 2)
-            mstore(0x40, not(0)) // invalid uint48 encoding
-            mstore(0x60, 1)
-            return(0x00, 0x80)
-        }
-    }
-}
 
 contract AuditOracleGas is ForkBase {
     function assertGasContext() external {
@@ -29,11 +13,11 @@ contract AuditOracleGas is ForkBase {
         assertEq(tx.gasprice, 0.2 gwei);
     }
 
-    function test_gasBurningOracleDoesNotBlockWindDownExit() public {
+    function test_emptyOracleAddressRejectedBeforeWindDownExit() public {
         this.assertGasContext();
         VaultLib.Params memory p = vault.getParams();
         p.tvlCap = 2 ether;
-        p.maxPositions = 30;
+
         p.gasCeiling = 0.5 gwei;
         p.essentialCeiling = 0.5 gwei;
         p.payMarkupBps = 0;
@@ -48,34 +32,37 @@ contract AuditOracleGas is ForkBase {
         checkpoint();
         toOpen();
         vm.prank(keeper);
-        vault.restock(3, 3, 0);
+        TestVaultOps.restock(vault, 3, 3, 0);
         vm.prank(keeper);
-        vault.list(3, 0);
-        uint256[] memory ids = vault.openListings();
+        TestVaultOps.list(vault, 3, 0);
+        uint256[] memory ids = TestVaultOps.open(vault);
         assertEq(ids.length, 3);
         address originalOracle = FWA.floorOracle();
-        GasBurningOracle hostile = new GasBurningOracle();
+        address wrongOracle = makeAddr("pack-vault-test-misconfigured-oracle");
+        assertEq(wrongOracle.code.length, 0); assertEq(wrongOracle.balance, 0);
         vm.prank(IOwnable(address(FWA)).owner());
-        IFwaAdmin(address(FWA)).setAddr(64, address(hostile));
+        vm.expectRevert(bytes4(keccak256("InvalidConfig()")));
+        IFwaAdmin(address(FWA)).setAddr(64, wrongOracle);
+        assertEq(FWA.floorOracle(), originalOracle, "real FWA rejects an oracle with no code");
         vm.prank(owner);
         vault.startWindDown();
 
-        // Repaired (S1): the oracle read is capped at 100k gas, so all three exit in one call.
+        // The rejected configuration cannot prevent a subsequent wind-down.
         uint256 g = gasleft();
         vm.prank(keeper);
         (bool succeeded,) = address(vault).call{gas: 16_000_000}(abi.encodeCall(vault.unlist, (ids, 0)));
         g -= gasleft();
-        assertTrue(succeeded, "gas-burning oracle no longer blocks the exit");
-        assertEq(vault.openListings().length, 0, "every position unlisted");
+        assertTrue(succeeded, "empty oracle configuration cannot block the exit");
+        assertEq(TestVaultOps.open(vault).length, 0, "every position unlisted");
         assertLt(g, 3_000_000, "well inside one transaction");
-        originalOracle; // the hostile oracle stays installed throughout
+        assertEq(FWA.floorOracle(), originalOracle);
     }
 
-    function test_malformedOracleDoesNotBlockExit() public {
+    function test_wrongOracleAbiDoesNotBlockRedemption() public {
         this.assertGasContext();
         VaultLib.Params memory p = vault.getParams();
         p.tvlCap = 2 ether;
-        p.maxPositions = 30;
+
         p.gasCeiling = 0.5 gwei;
         p.essentialCeiling = 0.5 gwei;
         p.payMarkupBps = 0;
@@ -90,10 +77,10 @@ contract AuditOracleGas is ForkBase {
         checkpoint();
         toOpen();
         vm.prank(keeper);
-        vault.restock(1, 3, 0);
+        TestVaultOps.restock(vault, 1, 3, 0);
         vm.prank(keeper);
-        vault.list(1, 0);
-        uint256[] memory ids = vault.openListings();
+        TestVaultOps.list(vault, 1, 0);
+        uint256[] memory ids = TestVaultOps.open(vault);
         assertEq(ids.length, 1);
         uint256 shares = vault.shareBalance(alice);
         uint256 redeemCharge = Charges.redeemCharge(vault, shares);
@@ -104,25 +91,24 @@ contract AuditOracleGas is ForkBase {
         assertGt(vault.lockedShares(), 0, "listed pack leaves a holder exit shortfall");
         emit log_named_uint("locked shares after first checkpoint", vault.lockedShares());
         address originalOracle = FWA.floorOracle();
-        MalformedOracle hostile = new MalformedOracle();
+        address wrongOracle = address(PACKS); // Real deployed contract with an unrelated ABI.
         vm.prank(IOwnable(address(FWA)).owner());
-        IFwaAdmin(address(FWA)).setAddr(64, address(hostile));
+        IFwaAdmin(address(FWA)).setAddr(64, wrongOracle);
         vm.prank(owner);
         vault.startWindDown();
 
-        // Repaired (S1): malformed words mean "no cap", so the exit runs with the hostile oracle
-        // still installed; the oracle is never restored in this test.
+        // The real pack contract rejects the unknown oracle call and remains configured throughout.
         vm.prank(keeper);
         (bool succeeded,) = address(vault).call{gas: 16_000_000}(abi.encodeCall(vault.unlist, (ids, 0)));
-        assertTrue(succeeded, "malformed oracle no longer blocks the exit");
-        assertEq(vault.openListings().length, 0);
-        assertEq(FWA.floorOracle(), address(hostile));
+        assertTrue(succeeded, "wrong oracle ABI cannot block the exit");
+        assertEq(TestVaultOps.open(vault).length, 0);
+        assertEq(FWA.floorOracle(), wrongOracle);
         originalOracle;
         vm.prank(keeper);
         vault.liquidate(40, 0);
         toBlackout();
         checkpoint();
-        assertEq(vault.lockedShares(), 0, "redemption filled under the malformed oracle");
+        assertEq(vault.lockedShares(), 0, "redemption filled with the wrong oracle ABI");
         uint256 beforeClaim = alice.balance;
         vm.prank(alice);
         vault.claim();

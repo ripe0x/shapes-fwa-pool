@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {TestVaultOps} from "../utils/TestVaultOps.sol";
+
 import {ForkBase, IOwnable} from "./ForkBase.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 
@@ -8,9 +10,8 @@ interface IFwaExempt {
     function setOracleExemptCollection(address collection, bool exempt) external;
 }
 
-/// @notice Backing rule (D62) on the real FWA, Shapes and ShapePacks: floor max(P / d, P / (1 - s)),
-///         build repayment at the current price, gas-optimal above it only at high ceilings, spare capital spread when the position
-///         count binds, FWA's oracle cap unless the collection is exempt. No mocks.
+/// @notice Live backing economics with paid mint payback, economic floors, a bounded gas-optimal
+///         target, and the real oracle ceiling. No fixed position count or spare-capital spread.
 contract ForkBackingTest is ForkBase {
     uint256 constant FLOOR = 33_333_333_333_333_334; // ceil(0.03 ETH x 10,000 / 9,000): purchasers prefer the bid
 
@@ -29,58 +30,75 @@ contract ForkBackingTest is ForkBase {
         toOpen();
     }
 
-    function _setPositions(uint96 maxPositions, uint64 ceiling) internal {
+    function _setCeiling(uint64 ceiling) internal {
         VaultLib.Params memory p = vault.getParams();
-        (p.maxPositions, p.gasCeiling, p.maxTip) = (maxPositions, ceiling, ceiling < p.maxTip ? ceiling : p.maxTip);
+        (p.gasCeiling, p.maxTip) = (ceiling, ceiling < p.maxTip ? ceiling : p.maxTip);
         vm.prank(owner);
         vault.setParams(p);
     }
 
-    /// Capital binds (150 slots, 1 ETH): exempt, the vault lists at the floor without any oracle.
+    function _sqrt(uint256 x) private pure returns (uint256) {
+        uint256 low; uint256 high = uint256(1) << 128;
+        while (high - low > 1) {
+            uint256 middle = (low + high) / 2;
+            if (middle <= x / middle) low = middle; else high = middle;
+        }
+        return low;
+    }
+
+    /// An exempt collection uses the live economic target without an oracle ceiling.
     function test_exemptListsAtFloor() public {
-        _setPositions(150, 0.5 gwei);
+        _setCeiling(0.5 gwei);
         _exempt(true);
         _priced(1 ether);
         (, uint256 backing, bool ok) = vault.edge(3);
         assertTrue(ok);
-        assertEq(backing, FLOOR, "floor: a purchaser takes the bid, so the pack keeps cycling");
+        assertGe(backing, FLOOR, "cash bid coverage floor");
         vm.startPrank(keeper);
-        vault.restock(2, 3, 0);
-        vault.list(2, 0);
+        TestVaultOps.restock(vault, 2, 3, 0);
+        TestVaultOps.list(vault, 2, 0);
         vm.stopPrank();
-        uint256[] memory ids = vault.openListings();
-        (,, uint128 posted) = vault.positions(ids[0]);
-        assertEq(posted, FLOOR);
+        uint256[] memory ids = TestVaultOps.open(vault);
+        (,, uint128 posted) = TestVaultOps.position(vault, ids[0]);
+        assertGe(posted, FLOOR);
+        uint256 distance = posted > backing ? posted - backing : backing - posted;
+        assertLt(distance, 30_000, "quantized proposal stays near the economic target");
     }
 
-    /// The position count binds (3 slots, 1 ETH): spare capital is spread as backing; exempt,
-    /// no cap applies. With the oracle in force, the cap less the buffer limits it.
-    function test_spareCapitalSpreadAndCapped() public {
-        _setPositions(3, 0.5 gwei);
-        _priced(1 ether);
-        (, uint256 capped,) = vault.edge(3);
-        assertEq(capped, 0.0363 ether, "oracle cap 0.033 x 1.10 binds when not exempt");
+    /// More available capital does not spread it over a fixed slot count.
+    function test_targetIndependentOfPortfolioRoom() public {
+        _setCeiling(0.5 gwei);
         _exempt(true);
-        (, uint256 spread, bool ok) = vault.edge(3);
+        _priced(1 ether);
+        (, uint256 before,) = vault.edge(3);
+        _priced(5 ether);
+        (, uint256 afterTarget, bool ok) = vault.edge(3);
         assertTrue(ok);
-        // Spare capital (about 0.29 ETH a slot) raises backing only to twice the floor (audit B).
-        assertEq(spread, 2 * FLOOR, "spread bounded at twice the floor");
-        vm.startPrank(keeper);
-        vault.restock(3, 3, 0);
-        vault.list(3, 0);
-        vm.stopPrank();
-        assertEq(vault.openListings().length, 3, "all three listed at the spread backing");
+        assertEq(before, afterTarget, "target depends on economics, not spare capital slots");
     }
 
     /// A high routine ceiling raises backing above the floor: fewer cycles, less gas per ETH.
     function test_gasOptimalAboveFloorAtHighCeiling() public {
-        _setPositions(150, 1 gwei);
+        _setCeiling(1 gwei);
         _exempt(true);
         _priced(1 ether);
-        (, uint256 backing, bool ok) = vault.edge(3);
+        (uint256 k, uint256 backing, bool ok) = vault.edge(3);
         assertTrue(ok);
-        // (c + sqrt(c^2 + a c P)) / a, c = 620k x 1 gwei x 1.10 + 2 x 0.00002, a = k - 1.
-        assertGt(backing, 0.045 ether);
-        assertLt(backing, 0.05 ether);
+        // The build repayment target can dominate the gas optimum after gas calibration.
+        assertGt(backing, FLOOR);
+        VaultLib.Params memory p = vault.getParams();
+        uint256 a = k - 1e18;
+        uint256 c = (VaultLib.Q_POSITION_SYNC + VaultLib.Q_LISTED + VaultLib.Q_HARVESTED)
+            * uint256(p.gasCeiling) * (10_000 + p.payMarkupBps) / 10_000 + 2 * p.workFee;
+        uint256 expected = (c + _sqrt(c * c + a * c / 1e18 * 0.03 ether)) * 1e18 / a;
+        uint256 price = block.basefee + p.maxTip;
+        uint256 build = (VaultLib.Q_PACK + VaultLib.Q_MINT * 3 / 10 + VaultLib.Q_LISTED)
+            * price * (10_000 + p.payMarkupBps) / 10_000 + 2 * p.workFee + SHAPES.mintFee() * 3 / 10;
+        uint256 cycle = (VaultLib.Q_POSITION_SYNC + VaultLib.Q_LISTED + VaultLib.Q_HARVESTED)
+            * price * (10_000 + p.payMarkupBps) / 10_000 + 2 * p.workFee;
+        uint256 payback = ((build + cycle) * 1e18 + a - 1) / a;
+        if (payback > expected) expected = payback;
+        if (FLOOR > expected) expected = FLOOR;
+        assertEq(backing, expected, "independent integer optimum and build-payback target");
     }
 }

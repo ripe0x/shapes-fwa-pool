@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/sim/efficient_operating.py", line 237, in <module>
+    main()
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/sim/efficient_operating.py", line 151, in main
+    result = timed_checks(history, gas)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/sim/efficient_operating.py", line 104, in timed_checks
+    assert any(a['action'] == 'purchaser-response' and b['action'] == 'list'
+AssertionError

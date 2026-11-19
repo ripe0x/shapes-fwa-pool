@@ -2,13 +2,15 @@
  "source_paths": [
   "src",
   "script",
-  "foundry.toml"
+  "foundry.toml",
+  "deploy"
  ],
  "evidence_paths": [
   "test/scenario/VaultFlow.t.sol",
   "test/utils/FlowBreakdown.sol",
   "test/fork/ForkSelection.t.sol",
-  "test/fork/ForkBase.sol"
+  "test/fork/ForkBase.sol",
+  "test/utils/TestVaultOps.sol"
  ],
  "scorecard_dir": "docs/receipts/flow",
  "review_dir": "audit",
@@ -51,7 +53,7 @@
   },
   {
    "id": "O2",
-   "text": "DRAFT. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling; 2 gwei for redemption and wind-down work) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint (quoted at measured gas, D61), 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; budgets cap all pay at 0.041 ETH a day; the owner can stop pay at once.",
+   "text": "DRAFT. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling; 2 gwei for redemption and wind-down work) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint (quoted at measured gas, D61), 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; routine budgets cap pay at 0.03 ETH plus 0.01 ETH a day at canary values (0.02 ETH a day at most in bytecode); the owner can stop pay at once.",
    "metric": "facts.keeper_gas_per_position",
    "max": 1750000,
    "regimes": [
@@ -132,9 +134,5 @@
   }
  ],
  "explained": [],
- "approval": {
-  "outcomes_sha256": "452c764dd8e55493b945a931c872d56a461c3380159253a4ef067f8533ddf5d2",
-  "date": "2026-11-17",
-  "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgT10UwBigHu/hL3vKFUPPNoDIN6\n6Wsrnx17avHqp4qC8AAAAKYXNzZXQtZmxvdwAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gt\nZWQyNTUxOQAAAECR/pXtVSCvuIbhLboFaXRNU/lEf2ROnh+4c9mTDyLAUWZSAG0Ys3R6Hv\nl2O8L7IKvCfZRhDHdb9kTD/g2DeK8L\n-----END SSH SIGNATURE-----\n"
- }
+ "approval_history": "docs/release/history/asset-flow-signed-2026-11-17.json (older candidate). This candidate is unsigned; see docs/release/ACCEPTANCE.md."
 }

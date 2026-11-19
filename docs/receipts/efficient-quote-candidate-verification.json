@@ -1,0 +1,96 @@
+{
+  "revision": "15348d1 plus exact source hashes below; prepared candidate, not yet broadcast",
+  "source_sha256": {
+    "src/PackVault.sol": "448106b8915413badef411355a5cb729ca15046743be768919d74e9349ddcd8b",
+    "src/VaultLib.sol": "8223991816433e0aff0b50253d6daa212d822f5545ad53ca04482efbf94d5252",
+    "keeper/policy.py": "8e6ee88e5a1b86712c11c1d6d264844c48d820f576646631ed14bdec681061d0",
+    "keeper/test_policy.py": "2d33f0ebf2a829059fb231fff472c24b7b4d7465a790774c9dfcd3d8625500fa",
+    "keeper/efficient_journal_candidate.py": "abaa9f45ef303829f2bd7350cd482132f5d9a49da829648bf9237b5e6979ca88",
+    "test/fork/EfficientJournal.t.sol": "1a042d2d45780fb241a416058ac0405e9d83189430d4035a172a69adf2d3720b",
+    "sim/vault.py": "e958d86859ff9ddd9e2766459683f77cf9caea9ac87691be6360d2e92614ba7a",
+    "sim/forward.py": "f36f9295aec5c41583e2c6a6763134c2f1dc30a33f5e8790e55c96747685daa7",
+    "sim/efficient_operating.py": "027df41dfb2e6d9153c465351863ca4fa3af95afb89a50ac3491e1e847832e90",
+    "test/scenario/VaultFlow.t.sol": "324d0e538fbb977ae63bd1ff2fe770032d2317a9a05e7b970aaf8e9ac4da75da"
+  },
+  "checks": [
+    {
+      "artifact": "docs/receipts/efficient-quote-candidate-journal-tests.txt",
+      "sha256": "a0ae9a3e2032e61d2dfa6d8031d7c14ddf7d94d3a0f3f97b5536e4e9b9128049",
+      "exit_status": 0,
+      "passing_cases": 5
+    },
+    {
+      "artifact": "docs/receipts/efficient-quote-candidate-reconciles.txt",
+      "sha256": "b33f1696969b060626463e54e9fcfbfd63eb2ac28594854cbd9db1f2183da530",
+      "exit_status": 0,
+      "passing_cases": 2
+    },
+    {
+      "artifact": "docs/receipts/efficient-quote-candidate-python-reconcile.txt",
+      "sha256": "1bf592b41d6b70009ba414903e1bc1eff4948b212c93dafb233586cf77db3ce3",
+      "exit_status": 0,
+      "passing_cases": null
+    },
+    {
+      "artifact": "docs/receipts/efficient-quote-candidate-policy.txt",
+      "sha256": "4fea7cddeaf38b87d1ede6e9754958201af25be17441629419ed9bdac8fecf6f",
+      "exit_status": 0,
+      "passing_cases": null
+    },
+    {
+      "artifact": "docs/receipts/efficient-quote-candidate-vault-model.txt",
+      "sha256": "4c36b42d0c0aac9cb059f13f02b307b6ea5e30373f1e16b77ebbe954a54cc573",
+      "exit_status": 0,
+      "passing_cases": 14
+    },
+    {
+      "artifact": "docs/receipts/efficient-quote-candidate-o2-o6.txt",
+      "sha256": "3ab2b83982f5ca98087715fe6edd05ef0291fe6ecc9ff03ba2d1d527bdcf52cc",
+      "exit_status": 0,
+      "passing_cases": 2
+    },
+    {
+      "artifact": "docs/receipts/efficient-candidate-optimized-python-refusal.json",
+      "sha256": "b4b992c3a107cff421fba0cfbd24258aeb3fc0406aebe0b707c59023606f0080",
+      "exit_status": 1,
+      "result": "Expected fail-closed rejection before any optimized preparation/execution"
+    },
+    {
+      "artifact": "docs/receipts/efficient-candidate-file-lock-check.json",
+      "sha256": "01c1abc2e7c65231e4d172bc1faf06b7daae53b309e79d8c78e5ffe7b3608da0",
+      "exit_status": 0,
+      "result": "Actual OS exclusive lock refuses second independent open; launcher integration source-reviewed, not executed before approval"
+    }
+  ],
+  "runtimes": {
+    "PackVault": {
+      "bytes": 24451,
+      "spare": 125
+    },
+    "VaultLib": {
+      "bytes": 23001,
+      "spare": 1575
+    }
+  },
+  "amendment_sha256": "23aaa40e8dd8d8cdaac03ba3662bb83dc39b3ef64d5b17c8d5a5a7687af99089",
+  "baseline_results_sha256": "36456b7191f6b9b47c9d609636ecbd461ebb18afaaed5a65462678d4ded6252f",
+  "limits": [
+    "Focused affected checks only; no full release suite, new outcome signature or release acceptance.",
+    "Reconciler consumes observed payments; to-the-wei equality is accounting evidence, not independent quote proof.",
+    "Initial policy assertion retained obsoleteQ30reserve expected amount and failed; only candidate-derived expected arithmetic corrected; raw failed tool output retained in session.",
+    "Earlier failures, repairs and immutable prior-source artifacts remain archived separately."
+  ],
+  "independent_review": {
+    "docs/receipts/efficient-quote-candidate-independent-review.md": "3427baa7eb457d9330c43950753631473b500af77a70a0545247968fc3a6663a",
+    "docs/receipts/efficient-candidate-launcher-review.md": "aeedd6c1be102a807ad9729108a7850b7e920bbc9592c632e12acf06f8e50e8d",
+    "docs/receipts/efficient-timed-independent-review.md": "b10bdc0adf9d0b132706eb072a87bff735682cc78ae38daec45eb0f3fa5bc22d"
+  },
+  "staged_content_review": {
+    "explicit_task_paths": 61,
+    "staged_sha256_matches_reviewed_worktree": true,
+    "secret_assignment_scan": "pass",
+    "source_json_markdown_whitespace_check_exit_status": 0,
+    "raw_log_whitespace_diagnostics": "docs/receipts/efficient-quote-candidate-o2-o6.txt:25: trailing whitespace.\n+  \ndocs/receipts/efficient-quote-candidate-o2-o6.txt:87: trailing whitespace.\n+  \n",
+    "raw_logs_preserved_exactly": true
+  }
+}

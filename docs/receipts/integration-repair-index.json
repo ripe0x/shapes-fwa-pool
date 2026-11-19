@@ -1,0 +1,50 @@
+[
+  {
+    "name": "broad",
+    "command": "CANDIDATE_RUN=1 SOURCE_HASH=27f6d8d94fb06e2c527abbe5b44fd7f9490adce531105b86620ceb3ef8ceca24 forge test --no-match-path 'test/research/**' --no-match-contract ProductionLedgerModelTest --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+    "exit_status": 1,
+    "result": "120 passed,13 failed; exact input hashes in integration-broad-inputs.json",
+    "receipt": "integration-broad-results.txt",
+    "limitations": "Gross gas includes intrinsic/calldata where the test states it. Fixture construction can span many simulated transactions. No broadcasts. Candidate hash is baseline before final Q_LIST repair; later affected receipts supersede."
+  },
+  {
+    "name": "focused_staging",
+    "command": "CANDIDATE_RUN=1 forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-contract ForkProductionStagingTest --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+    "exit_status": 0,
+    "result": "2 passed; real15/17 foreign staged prefixes; strict atomic rejection",
+    "receipt": "integration-final-staging.txt",
+    "limitations": "Gross gas includes intrinsic/calldata where the test states it. Fixture construction can span many simulated transactions. No broadcasts. Candidate hash is baseline before final Q_LIST repair; later affected receipts supersede."
+  },
+  {
+    "name": "focused_max8_journal",
+    "command": "CANDIDATE_RUN=1 forge test --match-path 'test/fork/Fork*Gas.t.sol' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+    "exit_status": 0,
+    "result": "4 passed; max8 largest/mixed crown admissions, complete holder checkpoint, startup/steady/split real foreign journal",
+    "receipt": "integration-final-max8-journal.txt",
+    "limitations": "Gross gas includes intrinsic/calldata where the test states it. Fixture construction can span many simulated transactions. No broadcasts. Candidate hash is baseline before final Q_LIST repair; later affected receipts supersede."
+  },
+  {
+    "name": "fixture_repairs_first",
+    "command": "CANDIDATE_RUN=1 forge test --match-test 'test_(busyQueueRefusesListing|emptyOracleAddressRejectedBeforeWindDownExit|exemptListsAtFloor|gasOptimalAboveFloorAtHighCeiling|pendingBlockBasefeeNeedsFreshEconomicProposal|manufacturedCycleLosesAtMaxima|oneExitEmptiesEssentialBudget|buildAboveCeilingPaidAtCeilingPrice|keeperBatchesFitTxCap)' --no-match-path 'test/research/**' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+    "exit_status": 1,
+    "result": "8 passed,1 failed: strengthened full exit found residual locked rights",
+    "receipt": "integration-fixture-repairs-first.txt",
+    "limitations": "Gross gas includes intrinsic/calldata where the test states it. Fixture construction can span many simulated transactions. No broadcasts. Candidate hash is baseline before final Q_LIST repair; later affected receipts supersede."
+  },
+  {
+    "name": "complete_exits_real301",
+    "command": "CANDIDATE_RUN=1 forge test --match-test 'test_(checkpointGasWith301RealListings|manufacturedCycleLosesAtMaxima|oneExitEmptiesEssentialBudget)' --no-match-path 'test/research/**' --gas-limit 10000000000 --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+    "exit_status": 1,
+    "result": "2 passed,1 failed: actual301 listings and complete budget-exhausted holder exit passed; attacker attempted unnecessary second unlist",
+    "receipt": "integration-complete-exits-real301.txt",
+    "limitations": "Gross gas includes intrinsic/calldata where the test states it. Fixture construction can span many simulated transactions. No broadcasts. Candidate hash is baseline before final Q_LIST repair; later affected receipts supersede."
+  },
+  {
+    "name": "manufactured_complete",
+    "command": "CANDIDATE_RUN=1 forge test --match-path test/fork/ForkKeeperPay.t.sol --match-test test_manufacturedCycleLosesAtMaxima --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+    "exit_status": 0,
+    "result": "1 passed; complete attacker exit, no remaining shares/redemption/claimable; net -0.080022479425358461ETH after conservative basefee-only gas",
+    "receipt": "integration-manufactured-complete.txt",
+    "limitations": "Gross gas includes intrinsic/calldata where the test states it. Fixture construction can span many simulated transactions. No broadcasts. Candidate hash is baseline before final Q_LIST repair; later affected receipts supersede."
+  }
+]

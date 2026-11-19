@@ -1,0 +1,116 @@
+{
+  "recorded_at_utc": "2026-11-18T20:51:44.642288+00:00",
+  "base_revision": "a4496adaba9048170ba39f1255783dccf891f163",
+  "scope": "Owner-approved provably-unexposed unpaid constant-work journal cursor advance in sync, first admission and checkpoint; no advance while any outstanding FWA membership, identifier, backing, allocation or receipt remains.",
+  "source_sha256": {
+    "src/PackVault.sol": "1dc1ddb5d4c09057f34797efdff5d87929898c51bda671423de23625e7687af2",
+    "src/VaultLib.sol": "259d85003ff2392be404ead8d067edc92b1277044ee905e4f3640235bc760aae",
+    "test/fork/ReviewBootstrap.t.sol": "52474aa5efe6f77210e9e385d60b58a1ba5ac877fe606cc8a8e7dc09a3845c0e",
+    "test/fork/ForkIncrementalProduction.t.sol": "211071b3fb8f5d7057564e094ec948195e966719a324620e705fb47608558109",
+    "test/fork/ProductionLedgerModel.t.sol": "8b287d86cc6eaa80974bc2058672bdc0152d2f67d63070e634758f3b103020e4"
+  },
+  "compiled_artifacts": {
+    "PackVault": {
+      "runtime_bytes": 24322,
+      "artifact_sha256": "c5313eafa68b709c8a1eccac8248af90a800619c8c78e36655f0c70fb1d1ec88"
+    },
+    "VaultLib": {
+      "runtime_bytes": 21313,
+      "artifact_sha256": "55e6c06772ddf759bf1a63501e25c5933fe37da10a70fb9febc1f1a4a2303629"
+    }
+  },
+  "environment": {
+    "rpc": "https://mainnet.gateway.tenderly.co",
+    "deployment_fork_block": 26400000,
+    "real_history_target_block": 26434971,
+    "basefee_wei": 450000000,
+    "transaction_gas_price_wei": 500000000,
+    "initial_seed_wei": 10000000000000000,
+    "observed_deployment_dust_wei": 1,
+    "broadcasts": false,
+    "counterparty_mocks": false,
+    "protocol_state_fakes": false,
+    "persistent_addresses": "Only deployed local vault, local keeper policy, and linked VaultLib; FWA, Packs, Shapes and oracle follow actual archived mainnet state."
+  },
+  "runs": [
+    {
+      "log": "review-bootstrap-before-dns.txt",
+      "command": "forge test --match-path test/fork/ReviewBootstrap.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 1,
+      "result": "Sandbox DNS failure; no accounting conclusion."
+    },
+    {
+      "log": "review-bootstrap-baseline-insufficient-history.txt",
+      "command": "forge test --root /private/tmp/review-bootstrap-baseline --match-path test/fork/ReviewBootstrap.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 1,
+      "result": "Earlier fixture began at26424971 and yielded269 actual completed records, insufficient for576 requirement; no accounting conclusion."
+    },
+    {
+      "log": "review-bootstrap-fixed-insufficient-history.txt",
+      "command": "forge test --match-path test/fork/ReviewBootstrap.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 1,
+      "result": "Same insufficient-history setup; subsequently moved deployment fork earlier to26400000."
+    },
+    {
+      "log": "review-bootstrap-baseline-real-failure.txt",
+      "command": "forge test --root /private/tmp/review-bootstrap-baseline --match-path test/fork/ReviewBootstrap.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 1,
+      "result": "One test on unmodified base Solidity;673 actual completed foreign records, total journal pay10000000000000001wei, remaining cash0, next deposit checkpoint panic0x12."
+    },
+    {
+      "log": "review-bootstrap-fixed-two-pass.txt",
+      "command": "forge test --match-path test/fork/ReviewBootstrap.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "result": "Two tests passed before final feeCredit-zero check and reserve/minPay case were added; no source differences."
+    },
+    {
+      "log": "review-bootstrap-fixed-three-pass.txt",
+      "command": "forge test --match-path test/fork/ReviewBootstrap.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "result": "All three final tests pass;673 actual completed foreign records; zero fee credit; zero catchup pay; seed preserved; protected escrow/pool; successful first deposit; checkpoint auto-advance; minPay atomicity; reserve0; no-progress guard."
+    },
+    {
+      "log": "review-bootstrap-guards-empty-filter.txt",
+      "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test 'test_(mutatingCheckpointCannotSkipUnseenOwnSelectionAndReceipt|receiptBeforeJournalBlocksPricingAndCannotRetireEarly|staleAllocationHeadNeedsBoundedPruneAndCannotUseProcessingPool|bidReturnPreservesFloorBeforeInventorySyncAndReusesIdentifierAfterRetirement|stagedAdmissionAfterDrainedPrecheckRevertsAtomically)$' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "result": "No tests selected because anchored filter did not include test signature suffix; not passing evidence."
+    },
+    {
+      "log": "review-bootstrap-exposure-guards.txt",
+      "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test 'test_(mutatingCheckpointCannotSkipUnseenOwnSelectionAndReceipt|receiptBeforeJournalBlocksPricingAndCannotRetireEarly|staleAllocationHeadNeedsBoundedPruneAndCannotUseProcessingPool|bidReturnPreservesFloorBeforeInventorySyncAndReusesIdentifierAfterRetirement|stagedAdmissionAfterDrainedPrecheckRevertsAtomically)' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "result": "All5 focused real-fork tests pass: mutating exposed checkpoint cannot advance; strict view remains; authenticated recovery then checkpoint; stale allocation-head prune; inventory-to-relisting identifier reuse; rejected staged admission rolls back atomically."
+    },
+    {
+      "log": "review-bootstrap-owed-kernel.txt",
+      "command": "forge test --match-path test/fork/ProductionLedgerModel.t.sol --match-test 'test_(owedReturnsKeepPrincipalAndCannotBeSpentEarly|fifoOnlyNeedsBoundedTombstoneCleanup)' -vv",
+      "exit_status": 0,
+      "result": "Two existing pure production library-kernel accounting model tests pass; not real protocol custody recovery evidence."
+    }
+  ],
+  "observations": {
+    "completed_foreign_records": 673,
+    "minimum_individually_authenticated_records": 576,
+    "fixed_catchup_payment_wei": 0,
+    "seed_preserved_before_deposit_wei": 10000000000000001,
+    "first_deposit_principal_wei": 100000000000000000,
+    "automatic_checkpoint_call_gas_excluding_intrinsic": 253773,
+    "existing_checkpoint_fixed_gas_quote": 400000,
+    "stale_allocation_head_prune_complete_gas_including_21000_intrinsic": 141933,
+    "stale_allocation_head_prune_payment_wei": 26000000000000
+  },
+  "limits": [
+    "Fork tests only; no local rehearsal broadcast or production transaction.",
+    "Checkpoint call gas is gasleft delta within the test, excluding transaction intrinsic gas; it is not a billed receipt.",
+    "Baseline first-test total gas47518743 and final first-test total gas30260016 include hundreds of archival verification reads and many bounded vault calls; these are not single keeper transaction costs.",
+    "This fix does not establish acceptable funding or returns for a vault with FWA exposure.",
+    "The real-fork added checkpoint regression establishes rejection while own selection is still book-ACTIVE and its genuine keep receipt is pending, with complete rollback, then successful same-window checkpoint after authenticated journal and receipt reconciliation.",
+    "Real protocol OWED custody recovery does not have an existing reachable production fixture. Only library model coverage and review of open-membership predicate establish this branch here.",
+    "The existing inventory-to-listing test exercises the shared admission helper after retiring an identifier, but this narrow pass does not separately manufacture a post-retirement foreign backlog."
+  ],
+  "things_that_do_not_make_sense": [
+    "The prior empty vault could spend all bootstrap capital on unrelated journal history before issuing its first holder shares.",
+    "A per-entry sync limit previously charged for history that provably could never affect an unexposed vault. Owner-approved constant-work unpaid advancement intentionally refines that requirement.",
+    "Exposed vault global journal funding remains a separate economic blocker."
+  ]
+}

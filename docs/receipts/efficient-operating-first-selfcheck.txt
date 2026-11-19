@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "<stdin>", line 7, in <module>
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/sim/forward.py", line 791, in self_check
+    assert rows["partial_redemption"]["checkpoints"] == 2
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

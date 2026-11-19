@@ -1,0 +1,33 @@
+{
+  "scope": "Checkpoint Q360 candidate; unchanged journal quote and budgets",
+  "base_revision": "6319d5edab185f2443324aa40e5cf9bc62be25e1",
+  "source_sha256": {
+    "keeper/policy.py": "023df5a03eff840d9967af3e6200250b34c11e4103a83275e3fcb56c1a9107f4",
+    "keeper/test_policy.py": "c83a09f1bdd0def9102ab4c35c8b5831ff7ac3a65c5824fb988c85b52a9284d7",
+    "sim/vault.py": "bc3784c2574e1b631b0971974a0913c85a2de691755cfabde1b1dfbee6c0c49a",
+    "sim/forward.py": "d129f9cb4a644fcd011825be8b837714ab03d1b341ab2ba022e14010e046c105",
+    "sim/reconcile.py": "cbbe9121e1a1bf6c68fb6ef2b8d430a761175d31a2cc727ff2e000a5fce9eaff"
+  },
+  "checks": [
+    {
+      "command": "python3 keeper/test_policy.py",
+      "exit_status": 0,
+      "result": "policy checks including absolute O6=200000000000000wei pass"
+    },
+    {
+      "command": "python3 sim/test_vault.py",
+      "exit_status": 0,
+      "result": "11 accounting tests pass; accounting source unchanged"
+    },
+    {
+      "command": "python3 /private/tmp/review-forward-q360.py self-check",
+      "exit_status": 0,
+      "result": "7 focused forward scenarios pass",
+      "output": "docs/receipts/review-q360-python-forward.txt"
+    }
+  ],
+  "limits": [
+    "Models do not establish realized returns or billed keeper profits.",
+    "Fresh source-bound real fork reconciliations are recorded separately."
+  ]
+}

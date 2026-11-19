@@ -1,0 +1,11 @@
+COMMAND python3 keeper/test_policy.py EXIT 0
+keeper/test_policy.py: pass (economic gates, constant checkpoint charge, bounded catchup/proposals, reserve amounts)
+
+COMMAND python3 keeper/test_index.py EXIT 0
+index projection: restart, identity, exact wei/debt, rollback/replay, duplicate atomicity, identifier reuse, 10k bounded candidates: pass
+
+COMMAND python3 keeper/test_inclusion.py EXIT 0
+inclusion arithmetic: EIP1559 roundings pass; head-target drift3616096947962365wei exceeds10k tag tolerance
+
+COMMAND python3 -m py_compile keeper/index.py keeper/measure_gas.py keeper/rehearse_canary.py keeper/test_inclusion.py keeper/rehearse_current.py keeper/policy.py keeper/keeper.py keeper/rehearse_list_split.py keeper/rehearsal_batch.py keeper/test_index.py keeper/test_tx.py keeper/tx.py keeper/test_policy.py EXIT 0
+

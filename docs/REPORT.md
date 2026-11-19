@@ -1,3 +1,125 @@
+> **Current release instructions: [docs/release/RUNBOOK.md](release/RUNBOOK.md)** (2026-11-19). This document is history for the candidate it names; where it gives current instructions, the runbook replaces them.
+
+# Complete operating pass
+
+2026-11-18. The remaining contract, keeper and economic changes are implemented together. Standalone harvesting is caller funded. Economical fee credit and the smallest necessary active fee prefix can fund verified sync work, with protected cash, fee share, budget and distribution checks enforced onchain. The keeper uses bounded exact preflight alternatives and the model follows the same indexed candidates.
+
+Paid primary shapes mints, mint fees, the split and pack recipe, one authoritative book and the absence of a total position ceiling are preserved. Routine spending is funded by actual vault cash. The refill is sized from complete operation and exit scenarios, including a 90 day permission drift check; creator revenue is separate.
+
+**Current result and evidence: [Complete operating pass](COMPLETE-OPERATING-PASS.md).** That document is the current decision record and explains the precise receipt and simulation scope. The original O2 threshold still fails at 1,919,655 versus 1,750,000; O6 remains 0.0002 ETH. PR 2 remains draft, with no merge, public deployment or new outcome signature.
+
+Everything below is historical evidence for its named revision. Its proposed next steps and missing evidence statements are superseded by the current pass above.
+
+---
+
+# Efficient journal revision: candidate measured, economics blocked
+
+2026-11-18. The approved baseline and amended candidate passed: **517/540 transactions**, **27.869594973162081536/32 simulated ETH** aggregate value, 8.3 ETH funded once, no topups. The 199-transaction candidate required no repair. The owned 8559 node is restored to entry; 8557 is untouched. Code remains `aa38fab`.
+
+All 24 candidate journal cases show positive operator-calibration keeper net, positive exact signed-estimate headroom and accepted ordinary preflight. Default holder/distribution singleton bills are 122,417/202,270 gas against 132,000/212,000 quotes; full 128 bills 2,233,071 against 2,901,000. Processing-pool/holder protection and routine classification pass. Calibration sends use `minPay=0`; signed 80% preflight is separate evidence. Refunded records do not prove successful-foreign costs.
+
+The baseline standalone full-holder checkpoint bills 346,017 gas and passes ordinary preflight at 0.2/0.5/2 gwei. O6 remains 0.0002 ETH; O2 remains 1,919,655 versus 1,750,000. Runtime 24,451/23,001 bytes. The candidate did not repeat the full-holder baseline fixture. No outcome, allowance, fee, minimum TVL or sponsorship assumption changed; no public deployment or release acceptance.
+
+The corrected conditional timed model completes 3/4 exits, but only zero demand pays every routine job. Frequent harvesting remains an economic blocker.32 of 44 timely underpaid holder harvests hit the existing 25% fee-share zero-payment gate, so permission alone cannot pay those same calls. A bot-only scheduling improvement also cannot constrain other permissionless callers.
+
+Current receipts: `receipts/efficient-journal-candidate-summary.json`; proposed next work and complete conditional cash/return table: `REVIEW-FUNDING-PROPOSAL.md`; detailed scope/history: `EFFICIENT-JOURNAL-RESULTS.md`.
+
+Things that don't make sense: global expense follows unrelated activity; gross fees also replace backing transferred out; complete claims can depend on underpaid routine work. The PR stays draft.
+
+Everything below is prior revision evidence for its named source, retained as history.
+
+---
+
+# Current review repair
+
+2026-11-18. Empty-vault bootstrap capital is protected by the owner-approved unexposed cursor
+advance (D67). The keeper image installs pinned dependencies and persists both stores under
+`/data`; actual image startup and two-container persistence passed. Packaging commit: `2f3ca40`.
+Verified vault/keeper/model repair and focused evidence commit: `6319d5e`.
+Checkpoint calibration and final affected verification commit: `e948b1e`.
+
+Three bootstrap and five real exposure/admission tests pass. The new mutating checkpoint gate
+rejects an unseen own selection/receipt, then succeeds after reconciliation. Four exact receiver
+checks and both fork/model reconciliations pass. Current runtime is 24,322 bytes, 254 below EIP-170.
+
+**Acceptance remains blocked.** O2 is still 1,919,655 quoted gas versus 1,750,000. Checkpoint's gas
+component is now 360,000, meeting O6's existing 0.0002 ETH limit, with fresh affected fork checks.
+Exposed global maintenance funding remains insufficient in the recorded window. No journal quote,
+cap, refill, accepted outcome or signature changed. Actual billed full-holder checkpoint evidence
+remains a release gap; the calibration uses bounded executed-fork refund measurements.
+
+The owner-approved replacement local batch passed: 77/80 transactions, 1.755867382438961584/3 ETH
+aggregate transaction value, exactly 3 simulated ETH initial funding and no topups. Real refunded
+prefixes/tails and an exposed zero-essential-budget exit are recorded on the preceding Q400 source.
+The exit's six calls cost 0.0003838206 ETH gas at 0.2 gwei and paid only 0.0001 ETH checkpoint pay.
+Its entry snapshot is restored; owned PID 98279 remains at port 8557 with an empty pool. The
+earlier PID 10583 observation below is historical.
+
+Current evidence and exact limits: `POSITION-INTEGRATION-ACCEPTANCE.md` review repair section.
+Funding and return options: `REVIEW-FUNDING-PROPOSAL.md`.
+
+Things that don't make sense: global costs scale with all FWA activity while small-vault income
+does not; zero-funded essential exits include foreign history; larger allowances supply no cash.
+
+---
+
+# Earlier position-accounting integration
+
+2026-11-18. **Implemented and locally verified; milestone acceptance is blocked by maintenance
+funding and changed economic outcomes.** Branch `codex/incremental-position-integration` starts at
+research handoff `f75ee77` (proof `3b9cd65`, main baseline `063b6c7`).
+
+Production/test/deployment commit: `909e761`. Keeper/simulation commit: `c93ac2f`.
+The implementation removes the total position ceiling, full valuation and ordinary keeper scans.
+One exact book, ordered global journal, authenticated receipts and fee witness now price the
+existing share vault. Paid primary mints, their fees, the mint/split/pack recipe, pack sizing and
+holder rules remain. There is no factory, shared exposure book or new holder charge policy.
+
+- Final affected regressions: **52/52**, plus detailed final receiver traces and the separate real
+  301-listing setup. All 13 failures from the first 120/133 broad run are preserved and resolved by
+  affected passing checks. The reused eight-test production model includes 40,960 steps and
+  301/1,000/10,000 bookkeeping positions; it is not 10,000 external FWA listings.
+- Exact production receiver: **46,462 gas keep / 69,730 kick**, at least 30,270 below the 100,000
+  stipend; all 99 sampled gas boundaries record or fail atomically. Every measured maximum
+  operation fits 16,777,216 with 25% margin. Runtime is **24,549 bytes**, only 27 below EIP-170.
+- Both Python/fork traces match every financial bucket to the wei; ten accounting tests and seven
+  focused forward scenarios pass. Final quiet local lifecycle: 29 listings, 20 keeper transactions,
+  no reverted receipts, full holder exit and zero ledger gap. Root's pinned readback confirms no
+  positions, inventory, allocations, pending receipts or holder requests; 2 wei rounding reserve
+  remains beside the dead-share seed slice.
+- Independent implementation review covered immutable production and keeper inputs and affected
+  repairs. It is not a full security audit or release approval.
+
+**Unchanged settings do not fund continuous journal progress.** At 0.5 gwei the recorded 30-day
+global-only quote is at least 0.3227925 ETH, against at most 0.25 ETH of mainnet routine budget:
+0.0727925 ETH shortfall before own work. Canary's 0.054 ETH permits less than the 0.129117 ETH
+quote even at 0.2 gwei. The 0.005 ETH reserve covers individual batches, not the recurring cost.
+No budget, reserve, mint fee or keeper maximum was raised to make this appear affordable.
+
+The asset gate exits 2. O2 is **1,919,655 quoted gas versus 1,750,000**; O6 is **0.00022 ETH versus
+0.0002 ETH**. Every asset-flow bucket balances across 16 regimes, but the historical signature
+and outcomes do not approve this changed candidate. No new signature is supplied.
+
+Details, exact inputs/commands, gas, deployment receipts, budget options and gaps:
+`POSITION-INTEGRATION-ACCEPTANCE.md`. Draft PR body: `POSITION-INTEGRATION-PR.md`. One-screen
+scorecard: `receipts/integration-economic-scorecard.md`.
+
+Only the explicitly approved isolated local batch ran. No public-network transaction, real funds,
+push, merge or owner signature occurred. Local node PID 10583 and the paused original driver
+PID 10551 remain preserved at 127.0.0.1:8557. Current pending/queued pools are empty.
+
+Next action: review the funding/outcome proposal in the acceptance report before changing policy
+or preparing a funded release candidate. The current annual return report is historical.
+
+Things that don't make sense: each vault must pay for new global FWA activity even without an
+own selection. Conservatively quoting batches while some singleton calls lose money also means
+balanced books and an affordable single batch cannot establish continuous keeper liveness.
+
+---
+
+The report below is historical evidence for the earlier main candidate and is not a release
+recommendation for this integration.
+
 # PackVault: validation and repair report
 
 2026-11-16, second pass. Scope: does the automation work, are the performance claims supported,

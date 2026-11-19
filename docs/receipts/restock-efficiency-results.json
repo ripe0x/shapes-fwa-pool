@@ -1,0 +1,445 @@
+{
+  "recorded_at_utc": "2026-11-18T22:13:02.653977+00:00",
+  "baseline_revision": "d1b59f11fb74ed6ae9b3841298e70fb189eaaa6f",
+  "working_base_revision": "d1b59f11fb74ed6ae9b3841298e70fb189eaaa6f",
+  "scope": "Restock transient freshly split IDs remain in memory and only genuine leftovers enter storage; immutable validation-phase economics are read once per batch. Public edge and validateBacking interfaces retain behavior; list obtains new terms for each call and never caches across admission.",
+  "source_sha256": {
+    "src/PackVault.sol": "4e82d4428390dd909ec8749ba4dbd032ae3c60932fd0f65185a0098bc786461a",
+    "src/VaultLib.sol": "ffe76e84dad7afcc48ce622334b6061131a1912761fc74f2b502d6ed7da49f00",
+    "test/fork/RestockEfficiency.t.sol": "ba3b6b737cebfdb74ef89997f7ef81a143e1c24db02fcf43e0785c7cbe56577b",
+    "test/fork/ForkMaxBatchGas.t.sol": "c142ba0c2689c48d70166ab6d4c249f4633df1b85c7462a801942ae951167be8",
+    "test/fork/ForkVaultLifecycle.t.sol": "5d0be21ec4a8b147dde7a6593cb04ac9a739adc4a6dc9f991fe97a741488748c",
+    "test/fork/ForkBase.sol": "617a9de43d608ee4399647256557d142f573900c9c4a19c52d77b9e02e73e0e5",
+    "test/utils/TestVaultOps.sol": "1f41290f73c036736a8fd71746c145b80269695c0df8da4fc30842bdf6ceb66f",
+    "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520"
+  },
+  "baseline_source_sha256": {
+    "src/PackVault.sol": "1dc1ddb5d4c09057f34797efdff5d87929898c51bda671423de23625e7687af2",
+    "src/VaultLib.sol": "51fd0f008b590b9d85a862d0418038b834d31e34c6cab07264600b69c4740498",
+    "test/fork/RestockEfficiency.t.sol": "ba3b6b737cebfdb74ef89997f7ef81a143e1c24db02fcf43e0785c7cbe56577b",
+    "test/fork/ForkBase.sol": "617a9de43d608ee4399647256557d142f573900c9c4a19c52d77b9e02e73e0e5",
+    "test/utils/TestVaultOps.sol": "8e14f307214f04129691f7a38f805f3c24b618ed433969e1839ff62450a2cbc3"
+  },
+  "compiled_artifacts": {
+    "PackVault": {
+      "runtime_bytes": 24344,
+      "artifact_sha256": "7443581075e43c59e182ef14488e8eab3e10c52ae3cd9131d66a26057009833a",
+      "deployed_bytecode_object_sha256": "b5e2c77baacc9377c85990ee90e6284c4444e1a801e9caaad5aab52c20ea5012"
+    },
+    "VaultLib": {
+      "runtime_bytes": 21593,
+      "artifact_sha256": "6c89cda4f418ae8c225c17b23d5e01df229ba3d20e2e473f92f94b88f769248e",
+      "deployed_bytecode_object_sha256": "5413a2ead1ab423fdd972c6404072cf870dec6890f8ca9fc11bc46687026b3f9"
+    }
+  },
+  "measurement_correction": "restock-efficiency-meter-correction.json",
+  "runs": [
+    {
+      "log": "restock-efficiency-baseline-corrected.txt",
+      "command": "forge test --root /private/tmp/restock-efficiency-baseline-d1b59f1 --match-path test/fork/RestockEfficiency.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "passed": 7,
+      "skipped": 1,
+      "scope": "Committed baseline d1b59f1, corrected identical profile test source; recent-head test explicitly opts out without its block variable.",
+      "compilation_duration_if_performed": "8.82s",
+      "reported_suite_summary": "Ran 1 test suite in 1.05s (734.10ms CPU time): 7 tests passed, 0 failed, 1 skipped (8 total tests)"
+    },
+    {
+      "log": "restock-efficiency-integrated-corrected.txt",
+      "command": "forge test --match-path test/fork/RestockEfficiency.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "passed": 7,
+      "skipped": 1,
+      "scope": "Frozen integrated optimization and separate root journal change; same historical setup/fee context and exact recipe checks.",
+      "compilation_duration_if_performed": "9.27s",
+      "reported_suite_summary": "Ran 1 test suite in 1.20s (831.33ms CPU time): 7 tests passed, 0 failed, 1 skipped (8 total tests)"
+    },
+    {
+      "log": "restock-efficiency-recent.txt",
+      "head_read_command": "cast block-number --rpc-url https://mainnet.gateway.tenderly.co",
+      "head_read_result": 26444840,
+      "command": "RESTOCK_RECENT_BLOCK=26444840 forge test --match-path test/fork/RestockEfficiency.t.sol --match-test test_recentHeadSmallRestock --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "passed": 1,
+      "scope": "One recent-head three-unit restock only, explicitly pinned and asserted inside test.",
+      "compilation_duration_if_performed": "No compilation needed",
+      "reported_suite_summary": "Ran 1 test suite in 9.58s (9.25s CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)"
+    },
+    {
+      "log": "restock-efficiency-checkpoint-corrected.txt",
+      "command": "forge test --match-path test/fork/ForkMaxBatchGas.t.sol --match-test test_checkpointFullHolderMixCompleteGas --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "passed": 1,
+      "scope": "Current full-holder and essential-spike branches; direct frameTotal<=360000 guard after correction.",
+      "compilation_duration_if_performed": "4.79s",
+      "reported_suite_summary": "Ran 1 test suite in 1.41s (1.11s CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)"
+    },
+    {
+      "log": "restock-efficiency-edge-caller.txt",
+      "command": "forge test --match-path test/fork/ForkVaultLifecycle.t.sol --match-test test_edgeGateStopsListingWhenCrownShareRaised --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "passed": 1,
+      "scope": "Existing actual FWA crown-share change closes public edge, prevents mint, permits legitimate withdrawal.",
+      "compilation_duration_if_performed": "4.27s",
+      "reported_suite_summary": "Ran 1 test suite in 1.12s (802.40ms CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)"
+    }
+  ],
+  "comparisons": [
+    {
+      "case": "funding boundary first pack",
+      "before": {
+        "call meter plus intrinsic": 2839534,
+        "isolated receipt-equivalent gas": 2812644,
+        "finalized frame refund": 147700,
+        "isolated gross before refund": 2960344,
+        "keeper pay wei": 581000000000000,
+        "newly paid mints": 1
+      },
+      "after": {
+        "call meter plus intrinsic": 2803509,
+        "isolated receipt-equivalent gas": 2776619,
+        "finalized frame refund": 88000,
+        "isolated gross before refund": 2864619,
+        "keeper pay wei": 581000000000000,
+        "newly paid mints": 1
+      },
+      "receipt_equivalent_gas_saved": 36025,
+      "receipt_equivalent_saving_percent": 1.2808233107353793,
+      "matched_0_2gwei_cost_saved_wei": 7205000000000,
+      "keeper_pay_unchanged": true,
+      "mint_count_unchanged": true
+    },
+    {
+      "case": "four first leftover6",
+      "before": {
+        "call meter plus intrinsic": 2876833,
+        "isolated receipt-equivalent gas": 2849937,
+        "finalized frame refund": 167600,
+        "isolated gross before refund": 3017537,
+        "keeper pay wei": 588000000000000,
+        "newly paid mints": 1
+      },
+      "after": {
+        "call meter plus intrinsic": 2836859,
+        "isolated receipt-equivalent gas": 2809957,
+        "finalized frame refund": 88000,
+        "isolated gross before refund": 2897957,
+        "keeper pay wei": 588000000000000,
+        "newly paid mints": 1
+      },
+      "receipt_equivalent_gas_saved": 39980,
+      "receipt_equivalent_saving_percent": 1.4028380276476287,
+      "matched_0_2gwei_cost_saved_wei": 7996000000000,
+      "keeper_pay_unchanged": true,
+      "mint_count_unchanged": true
+    },
+    {
+      "case": "four mixed old6 new10",
+      "before": {
+        "call meter plus intrinsic": 3137806,
+        "isolated receipt-equivalent gas": 3110692,
+        "finalized frame refund": 235700,
+        "isolated gross before refund": 3346392,
+        "keeper pay wei": 680000000000000,
+        "newly paid mints": 1
+      },
+      "after": {
+        "call meter plus intrinsic": 3022237,
+        "isolated receipt-equivalent gas": 2995132,
+        "finalized frame refund": 76500,
+        "isolated gross before refund": 3071632,
+        "keeper pay wei": 680000000000000,
+        "newly paid mints": 1
+      },
+      "receipt_equivalent_gas_saved": 115560,
+      "receipt_equivalent_saving_percent": 3.714929025438712,
+      "matched_0_2gwei_cost_saved_wei": 23112000000000,
+      "keeper_pay_unchanged": true,
+      "mint_count_unchanged": true
+    },
+    {
+      "case": "four leftover only0",
+      "before": {
+        "call meter plus intrinsic": 1227825,
+        "isolated receipt-equivalent gas": 1200711,
+        "finalized frame refund": 56400,
+        "isolated gross before refund": 1257111,
+        "keeper pay wei": 240000000000000,
+        "newly paid mints": 0
+      },
+      "after": {
+        "call meter plus intrinsic": 1140823,
+        "isolated receipt-equivalent gas": 1113721,
+        "finalized frame refund": 56400,
+        "isolated gross before refund": 1170121,
+        "keeper pay wei": 240000000000000,
+        "newly paid mints": 0
+      },
+      "receipt_equivalent_gas_saved": 86990,
+      "receipt_equivalent_saving_percent": 7.244874078774992,
+      "matched_0_2gwei_cost_saved_wei": 17398000000000,
+      "keeper_pay_unchanged": true,
+      "mint_count_unchanged": true
+    },
+    {
+      "case": "large prefix setup",
+      "before": {
+        "call meter plus intrinsic": 2839528,
+        "isolated receipt-equivalent gas": 2812644,
+        "finalized frame refund": 147700,
+        "isolated gross before refund": 2960344,
+        "keeper pay wei": 581000000000000,
+        "newly paid mints": 1
+      },
+      "after": {
+        "call meter plus intrinsic": 2803503,
+        "isolated receipt-equivalent gas": 2776619,
+        "finalized frame refund": 88000,
+        "isolated gross before refund": 2864619,
+        "keeper pay wei": 581000000000000,
+        "newly paid mints": 1
+      },
+      "receipt_equivalent_gas_saved": 36025,
+      "receipt_equivalent_saving_percent": 1.2808233107353793,
+      "matched_0_2gwei_cost_saved_wei": 7205000000000,
+      "keeper_pay_unchanged": true,
+      "mint_count_unchanged": true
+    },
+    {
+      "case": "large consumes thirty new leaves old7",
+      "before": {
+        "call meter plus intrinsic": 7848621,
+        "isolated receipt-equivalent gas": 7821713,
+        "finalized frame refund": 806900,
+        "isolated gross before refund": 8628613,
+        "keeper pay wei": 1650000000000000,
+        "newly paid mints": 3
+      },
+      "after": {
+        "call meter plus intrinsic": 7712281,
+        "isolated receipt-equivalent gas": 7685373,
+        "finalized frame refund": 207100,
+        "isolated gross before refund": 7892473,
+        "keeper pay wei": 1650000000000000,
+        "newly paid mints": 3
+      },
+      "receipt_equivalent_gas_saved": 136340,
+      "receipt_equivalent_saving_percent": 1.7430964291325952,
+      "matched_0_2gwei_cost_saved_wei": 27268000000000,
+      "keeper_pay_unchanged": true,
+      "mint_count_unchanged": true
+    },
+    {
+      "case": "thirty units ten small packs",
+      "before": {
+        "call meter plus intrinsic": 10352610,
+        "isolated receipt-equivalent gas": 10323926,
+        "finalized frame refund": 880600,
+        "isolated gross before refund": 11204526,
+        "keeper pay wei": 2226000000000000,
+        "newly paid mints": 3
+      },
+      "after": {
+        "call meter plus intrinsic": 9678225,
+        "isolated receipt-equivalent gas": 9649541,
+        "finalized frame refund": 263700,
+        "isolated gross before refund": 9913241,
+        "keeper pay wei": 2226000000000000,
+        "newly paid mints": 3
+      },
+      "receipt_equivalent_gas_saved": 674385,
+      "receipt_equivalent_saving_percent": 6.532253330758085,
+      "matched_0_2gwei_cost_saved_wei": 134877000000000,
+      "keeper_pay_unchanged": true,
+      "mint_count_unchanged": true
+    },
+    {
+      "case": "thirty units one large pack",
+      "before": {
+        "call meter plus intrinsic": 7855454,
+        "isolated receipt-equivalent gas": 7828546,
+        "finalized frame refund": 858200,
+        "isolated gross before refund": 8686746,
+        "keeper pay wei": 1650000000000000,
+        "newly paid mints": 3
+      },
+      "after": {
+        "call meter plus intrinsic": 7719114,
+        "isolated receipt-equivalent gas": 7692206,
+        "finalized frame refund": 241300,
+        "isolated gross before refund": 7933506,
+        "keeper pay wei": 1650000000000000,
+        "newly paid mints": 3
+      },
+      "receipt_equivalent_gas_saved": 136340,
+      "receipt_equivalent_saving_percent": 1.741575000006387,
+      "matched_0_2gwei_cost_saved_wei": 27268000000000,
+      "keeper_pay_unchanged": true,
+      "mint_count_unchanged": true
+    },
+    {
+      "case": "roundtrip two small packs",
+      "before": {
+        "call meter plus intrinsic": 3217746,
+        "isolated receipt-equivalent gas": 3190662,
+        "finalized frame refund": 210200,
+        "isolated gross before refund": 3400862,
+        "keeper pay wei": 666000000000000,
+        "newly paid mints": 1
+      },
+      "after": {
+        "call meter plus intrinsic": 3110099,
+        "isolated receipt-equivalent gas": 3083015,
+        "finalized frame refund": 90800,
+        "isolated gross before refund": 3173815,
+        "keeper pay wei": 666000000000000,
+        "newly paid mints": 1
+      },
+      "receipt_equivalent_gas_saved": 107647,
+      "receipt_equivalent_saving_percent": 3.373813960864548,
+      "matched_0_2gwei_cost_saved_wei": 21529400000000,
+      "keeper_pay_unchanged": true,
+      "mint_count_unchanged": true
+    },
+    {
+      "case": "three first leftover7",
+      "before": {
+        "call meter plus intrinsic": 2839534,
+        "isolated receipt-equivalent gas": 2812644,
+        "finalized frame refund": 147700,
+        "isolated gross before refund": 2960344,
+        "keeper pay wei": 581000000000000,
+        "newly paid mints": 1
+      },
+      "after": {
+        "call meter plus intrinsic": 2803509,
+        "isolated receipt-equivalent gas": 2776619,
+        "finalized frame refund": 88000,
+        "isolated gross before refund": 2864619,
+        "keeper pay wei": 581000000000000,
+        "newly paid mints": 1
+      },
+      "receipt_equivalent_gas_saved": 36025,
+      "receipt_equivalent_saving_percent": 1.2808233107353793,
+      "matched_0_2gwei_cost_saved_wei": 7205000000000,
+      "keeper_pay_unchanged": true,
+      "mint_count_unchanged": true
+    },
+    {
+      "case": "three leftover only4",
+      "before": {
+        "call meter plus intrinsic": 651141,
+        "isolated receipt-equivalent gas": 624257,
+        "finalized frame refund": 20000,
+        "isolated gross before refund": 644257,
+        "keeper pay wei": 141000000000000,
+        "newly paid mints": 0
+      },
+      "after": {
+        "call meter plus intrinsic": 623803,
+        "isolated receipt-equivalent gas": 596919,
+        "finalized frame refund": 20000,
+        "isolated gross before refund": 616919,
+        "keeper pay wei": 141000000000000,
+        "newly paid mints": 0
+      },
+      "receipt_equivalent_gas_saved": 27338,
+      "receipt_equivalent_saving_percent": 4.379286095310104,
+      "matched_0_2gwei_cost_saved_wei": 5467600000000,
+      "keeper_pay_unchanged": true,
+      "mint_count_unchanged": true
+    },
+    {
+      "case": "three mixed old4 new10",
+      "before": {
+        "call meter plus intrinsic": 3441462,
+        "isolated receipt-equivalent gas": 3414178,
+        "finalized frame refund": 258400,
+        "isolated gross before refund": 3672578,
+        "keeper pay wei": 751000000000000,
+        "newly paid mints": 1
+      },
+      "after": {
+        "call meter plus intrinsic": 3262186,
+        "isolated receipt-equivalent gas": 3234902,
+        "finalized frame refund": 79300,
+        "isolated gross before refund": 3314202,
+        "keeper pay wei": 751000000000000,
+        "newly paid mints": 1
+      },
+      "receipt_equivalent_gas_saved": 179276,
+      "receipt_equivalent_saving_percent": 5.250927163141465,
+      "matched_0_2gwei_cost_saved_wei": 35855200000000,
+      "keeper_pay_unchanged": true,
+      "mint_count_unchanged": true
+    }
+  ],
+  "money_flow_checks": [
+    "Each actual paid primary mint sends0.101ETH from vault to Shapes:0.1ETH redeemable backing and0.001ETH pending artist fee. Artist recipient claim is asserted independently.",
+    "Each pack retains exact existing LIFO split-ID order, actual custody and3/4/30unit value; only remaining0.01ETH Shapes stay loose.",
+    "Tracked and immediately idle principal increase exactly0.1ETH per paid mint, with no increase for reuse-only assembly.",
+    "Idle funding adds every proposal exactly. A second leftover-only pack is rejected when cash cannot cover existing idleFunding plus its new backing.",
+    "Vault cash reduction equals actual mint payment plus actual keeper transfer, and every keeper payment remains the unchanged fixed schedule.",
+    "Real wind-down redeems minted0.1ETH back to the vault while artist pending fee remains intact; tracked principal, idle packs, loose Shapes and idleFunding reachzero.",
+    "Invalid last proposal reverts before any real paid mint or supply/cash change."
+  ],
+  "largest_sample": {
+    "before_receipt_equivalent_gas": 10323926,
+    "after_receipt_equivalent_gas": 9649541,
+    "receipt_equivalent_saved": 674385,
+    "quoted_keeper_payment_wei_unchanged": 2226000000000000,
+    "matched_price_wei": 200000000,
+    "before_sample_cost_wei": 2064785200000000,
+    "after_sample_cost_wei": 1929908200000000,
+    "sample_cost_saved_wei": 134877000000000,
+    "before_keeper_margin_wei": 161214800000000,
+    "after_keeper_margin_wei": 296091800000000,
+    "before_max_reconstructed_gross": 11204526,
+    "after_max_reconstructed_gross": 9913241,
+    "before_max_gross_padded_25_percent": 14005658,
+    "after_max_gross_padded_25_percent": 12391552,
+    "transaction_gas_limit": 16777216
+  },
+  "recent_head_sample": {
+    "fork_block": 26444840,
+    "base_fee_override_wei": 150000000,
+    "transaction_gas_price_wei": 200000000,
+    "receipt_equivalent_gas": 2752737,
+    "finalized_refund": 88000,
+    "reconstructed_gross": 2840737,
+    "keeper_pay_wei": 581000000000000,
+    "mint_payment_wei": 101000000000000000,
+    "new_redeemable_backing_wei": 100000000000000000,
+    "new_pending_artist_fee_wei": 1000000000000000
+  },
+  "corrected_current_checkpoint": {
+    "receipt_equivalent_gas": 345937,
+    "finalized_refund": 29600,
+    "reconstructed_gross": 375537,
+    "call_meter_plus_manual_intrinsic": 372332,
+    "fixed_quote": 360000,
+    "gas_component_headroom": 14063,
+    "normal_actual_tx_price_wei": 200000000,
+    "normal_payment_wei": 92000000000000,
+    "matched_0_5gwei_arithmetic_cost_wei": 172968500000000,
+    "matched_0_5gwei_arithmetic_payment_wei": 200000000000000,
+    "essential_actual_tx_price_wei": 2000000000,
+    "essential_actual_payment_wei": 740000000000000,
+    "essential_receipt_equivalent_gas": 345937,
+    "maintenance_budgets_unchanged": true
+  },
+  "limits": [
+    "No actual signed transaction receipt for this new restock or checkpoint candidate, no broadcasts, no new signers and no protocol state/balance fakes. Isolated frame gas is EVM receipt-equivalent evidence rather than a live gas-market or mempool test.",
+    "Comparison is baseline d1b59f1 against integrated candidate including the separate journal change; static call-dispatch differences may contribute a small amount, so do not attribute every single gas solely to one restock edit.",
+    "Profiles assert isIsolateMode and executed0.15gwei basefee/0.2gwei transaction price, mark account and storage slots cold, and compare identical historical setups. Recent-head smoke has the same declared launch fee overrides, not the head actual market price.",
+    "Gas savings do not reduce holder payments while fixed Q constants remain unchanged. No O2 acceptance, quote calibration or funding adequacy is established by this implementation test.",
+    "The optional recent test skips by default and is separately executed once with explicit26444840 binding. No broad16-scenario suite was run in this slice.",
+    "Corrected formulas supersede earlier double-refund-derived net-upper-bound/gross descriptions; historical raw logs remain intact and actual signed receipts retain their original validity.",
+    "Existing production hostile-gift and broader caller cases are outside this focused matrix and require the lead affected verification."
+  ],
+  "things_that_do_not_make_sense": [
+    "Refunds were previously subtracted twice under Foundry isolated calls; correcting this measurement reverses the apparent large-pack regressions and must remain visible in archived evidence.",
+    "Execution savings initially accrue to keepers under unchanged fixed quotes; claiming lower holder O2 cost would be incorrect.",
+    "A minimum0.01ETH fresh vault and20ETH mechanics test represent different capital regimes; funding-boundary regression and existing bootstrap evidence must remain distinct."
+  ]
+}

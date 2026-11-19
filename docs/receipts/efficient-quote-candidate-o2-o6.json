@@ -1,0 +1,40 @@
+{
+  "command": [
+    "forge",
+    "test",
+    "--match-path",
+    "test/scenario/VaultFlow.t.sol",
+    "--match-test",
+    "test_flow_(max_load|gas_spike)",
+    "--rpc-url",
+    "https://mainnet.gateway.tenderly.co",
+    "--fork-retries",
+    "30",
+    "--fork-retry-backoff",
+    "5000",
+    "--compute-units-per-second",
+    "100",
+    "-vv"
+  ],
+  "exit_status": 0,
+  "source_hash": "9da73835e0267507dd8fa5926985a097263aa770cf7aa5eca4ce0438ffeb98b4",
+  "results": {
+    "max_load.json": {
+      "open_listings": 29,
+      "packs_listed": 29,
+      "keeper_gas_per_position": 1919655,
+      "work_fee_per_position_wei": 40000000000000,
+      "_4": 0,
+      "_5": 0
+    },
+    "gas_spike.json": {
+      "open_listings": 3,
+      "gas_price_gwei_x100": 200,
+      "checkpoint_pay_wei": 200000000000000,
+      "build_pay_wei": 0,
+      "_4": 0,
+      "_5": 0
+    }
+  },
+  "scope": "Only two affected economic regimes; historical flow files restored; no accepted outcome/signature change"
+}

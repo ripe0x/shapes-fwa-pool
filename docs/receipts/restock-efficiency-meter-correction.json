@@ -1,0 +1,63 @@
+{
+  "scope": "Correct interpretation of isolated CALL gas in the exact installed Foundry build; preserve all earlier raw evidence and supersede derived labels/math only.",
+  "installed_forge": {
+    "version": "1.8.1",
+    "commit": "982849d3140c01fd3b72905759581a132df7aa98",
+    "build_timestamp": "2026-08-28T17:50:40.383510000Z",
+    "evm_version": "cancun",
+    "isIsolateMode_asserted_true": "test/fork/RestockEfficiency.t.sol, corrected baseline seven historical cases"
+  },
+  "primary_sources": [
+    {
+      "url": "https://raw.githubusercontent.com/foundry-rs/foundry/982849d3140c01fd3b72905759581a132df7aa98/crates/evm/evm/src/inspectors/stack.rs",
+      "lines": "894-915,1072-1079,1551-1570",
+      "finding": "Depth-one CALLs use transact_inner; its returned Gas records finalized transaction gas via tx_gas_used and separately records final_refunded. The synthetic transaction includes intrinsic gas."
+    },
+    {
+      "url": "https://raw.githubusercontent.com/foundry-rs/foundry/982849d3140c01fd3b72905759581a132df7aa98/crates/cheatcodes/src/inspector.rs",
+      "lines": "2363-2374",
+      "finding": "lastCallGas stores the returned Gas total_gas_spent, refunded and remaining values after the isolated transaction has finished."
+    }
+  ],
+  "correct_formula": {
+    "receipt_equivalent_gas": "vm.lastCallGas().gasTotalUsed, after asserting vm.isIsolateMode()",
+    "finalized_refund": "vm.lastCallGas().gasRefunded; final, not an unapplied raw counter in this mode",
+    "reconstructed_gross_before_refund": "gasTotalUsed + gasRefunded",
+    "outside_call_meter": "gasleft delta + manually added intrinsic is a separate measurement including caller setup overhead and extra intrinsic; it is neither unrefunded transaction gross nor a second source of refundable gas."
+  },
+  "superseded_interpretations": [
+    {
+      "number": 342766,
+      "previous_label": "Full-holder checkpoint refund-adjusted gas upper bound",
+      "correction": "Invalid derivation. Refund29600 was subtracted a second time from outside-call meter372366. The archived frameTotal345971 was already isolated receipt-equivalent usage, not pre-refund execution gas. New correctly labelled full-holder profile is required."
+    },
+    {
+      "context": "Restock before/after matrix first integrated pass",
+      "correction": "Apparent large-pack net regressions came from the same duplicate refund subtraction; do not use the old sample-net fields as billed-cost comparisons. Compare corrected isolated frame totals instead."
+    }
+  ],
+  "unchanged_validity": [
+    "Real counterparties, exact principal/mint-fee/artist-credit accounting assertions and their pass/fail results are unaffected by relabelling gas.",
+    "Historical logs retain the actual emitted numbers and exact source bindings; no raw evidence was overwritten.",
+    "Actual Anvil transaction receipts remain actual billed gas evidence for the candidate they exercised; they are not affected by the Foundry frame-label correction."
+  ],
+  "limits": [
+    "Receipt-equivalent Foundry gas is not an actual signed-transaction receipt; final actual full-holder receipt remains a release evidence gap.",
+    "This correction does not itself accept Q360, revised gas quotes, continuous funding or owner economic outcomes.",
+    "The first forge test --help read was rejected by the local whole-suite guard, even though help was intended; no suite or alternative bypass was run. Primary version-specific source was read instead."
+  ],
+  "things_that_do_not_make_sense": [
+    "A refund counter cannot be subtracted again after isolated transaction gas has already been finalized.",
+    "The same meter pattern appeared in several historical fork gas reports; their gas-limit/billed-cost descriptions need scope-aware correction rather than blanket relabelling actual receipts."
+  ],
+  "corrected_current_evidence": {
+    "receipt": "restock-efficiency-results.json",
+    "log": "restock-efficiency-checkpoint-corrected.txt",
+    "checkpoint_receipt_equivalent_gas": 345937,
+    "checkpoint_finalized_refund": 29600,
+    "checkpoint_reconstructed_gross": 375537,
+    "fixed_quote": 360000,
+    "direct_sample_guard_passed": true,
+    "actual_receipt_gap_remains": true
+  }
+}

@@ -1,0 +1,42 @@
+Command: CANDIDATE_RUN=1 forge build --force --sizes --no-lint
+Exit status: 1
+Scope: initial Params ABI migration; compile failed on an old checkpoint caller before consumer repair. A later complete consumer build and final targeted compilation passed. No force-build PASS is claimed. Exact whole-tree hash was not captured for this intermediate run.
+
+Warning: lib/forge-std: missing from foundry.lock (found 6e8c4a92c9a8b31c1b0f0c39296d1fa4695c7df8)
+Warning: lib/solady: missing from foundry.lock (found acd959aa4bd04720d640bf4e6a5c71037510cc4b)
+Compiling 66 files with Solc 0.8.30
+Solc 0.8.30 finished in 536.63ms
+Error: Compiler run failed:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:171:35:
+    |
+171 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:564:5:
+    |
+564 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2519): This declaration shadows an existing declaration.
+   --> test/fork/ForkMeasure.t.sol:217:53:
+    |
+217 |             try this.buyExternal(sizes[i]) returns (uint256 t) {
+    |                                                     ^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> test/fork/ForkMeasure.t.sol:236:9:
+    |
+236 |         uint256 t = this.buyExternal(0.01 ether);
+    |         ^^^^^^^^^
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Error (6160): Wrong argument count for function call: 1 arguments given but expected 2.
+   --> test/fork/ForkKeeperPolicy.t.sol:275:9:
+    |
+275 |         v.checkpoint(0);
+    |         ^^^^^^^^^^^^^^^

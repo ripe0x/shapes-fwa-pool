@@ -7,7 +7,7 @@
    presence changes the harmonic backing (so the fee) and the selection odds exactly as FWA's
    formulas do. Selections are drawn per acquisition.
 3. Forward simulation: a year, day by day, with the vault's cash flows from sim/vault.py (the
-   model reconciled to a fork run to the wei, sim/reconcile.py) and every keeper decision from
+   integer model; candidate fork reconciliation is recorded separately) and every keeper decision from
    keeper/policy.py (the live keeper's rules). FWA's pool is the live snapshot; volume, gas,
    protocol settings, purchaser behaviour and holder flows vary by scenario.
 4. Realized performance: none. Nothing is deployed.
@@ -17,6 +17,12 @@ fee per acquisition F = (1 + surcharge) x harmonic-mean backing; F (1 - cut)(1 -
 equally over active listings; selection odds proportional to 1 / backing. FWA tokens are zero.
 """
 import json
+import copy
+import functools
+import heapq
+from itertools import islice
+from fractions import Fraction
+from collections import deque
 import sqlite3
 import sys
 from pathlib import Path
@@ -28,7 +34,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent / "keeper"))
 import policy  # noqa: E402
 import bisect  # noqa: E402
-from vault import ACTIVE, ALLOCATED, SETTLED, STAGED, WITHDRAWN, Vault  # noqa: E402
+from vault import ACTIVE, ALLOCATED, SETTLED, WITHDRAWN, OWED, Vault  # noqa: E402
 
 DB = ROOT / "data/fwa.sqlite"
 OUT = ROOT / "out"
@@ -38,6 +44,7 @@ P = 3 * 10**16
 SUR, CUT, S_FEE, BID_RATE = 0.05, 0.01, 0.01, 0.90
 ASK, PREMIUM = 0.033, 0.10
 MINT_FEE = 10**15
+MARK_DAYS = 30  # operating marks interval (diagnostics may lower it)
 DAY = 86_400
 WORK_FEE = 2 * 10**13  # wei per unit of work, canary value (D55)
 CEILING = 0.5  # gwei: canary gasCeiling; above it the keeper waits (D45, D51)
@@ -53,7 +60,7 @@ def history():
     cache = OUT / "acq_history.npz"
     if cache.exists():
         return dict(np.load(cache))
-    db = sqlite3.connect(DB)
+    db = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
     n_active, cut, crown = 0, 100, 500
     rows = []
     q = ("SELECT ts, event, args FROM logs WHERE event IN ('ListingRewardActivated','ListingRewardRemoved',"
@@ -72,6 +79,7 @@ def history():
         else:
             a = json.loads(a)
             rows.append((ts, int(a["acquisitionFee"]) / E, int(a["totalWeight"]) / E, n_active, cut, crown))
+    db.close()
     h = {k: np.array(v) for k, v in zip(("ts", "fee", "w", "n", "cut", "crown"), zip(*rows))}
     np.savez(cache, **h)
     return h
@@ -84,7 +92,7 @@ def staging_delays(days_back=30, poll=600):
     cache = OUT / f"staging_delays_{days_back}.npy"
     if cache.exists():
         return np.load(cache)
-    db = sqlite3.connect(DB)
+    db = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
     times, counts, drains, relists, n = [], [], [], [], 0
     q = ("SELECT ts, event FROM logs WHERE event IN ('AcquisitionRequested','AcquisitionProcessed',"
          "'DepositorBidAccepted','DepositorBidAcceptedAsTokens') ORDER BY block, log_index")
@@ -111,17 +119,19 @@ def staging_delays(days_back=30, poll=600):
             continue
         k = bisect.bisect_left(drains, t)
         out.append(drains[k] - t if k < len(drains) else end - t)
+    db.close()
     arr = np.array(out, dtype=float)
     np.save(cache, arr)
     return arr
 
 
 STAGING = None  # set in main(): relist waits from the last 30 days of history
+REFUNDS_PER_SELECTION = 0.0  # main() reads actual completed status counts from the same history
 
 
 def pool_snapshot():
     """Backings (ETH) of listings active at the end of the ingested history."""
-    db = sqlite3.connect(DB)
+    db = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
     value = {}
     for ev, a in db.execute("SELECT event, args FROM logs WHERE event IN ('NFTListed','BackingUpdated',"
                             "'NFTAllocated','ListingWithdrawn','ListingKicked') ORDER BY block, log_index"):
@@ -133,6 +143,7 @@ def pool_snapshot():
             value[lid] = int(a["newBacking"]) / E
         else:
             value.pop(lid, None)
+    db.close()
     return np.array(list(value.values()))
 
 
@@ -207,235 +218,985 @@ def charge_state(gas, open_positions, pool=0):
                         essential_ceiling=int(ESSENTIAL_CEILING * GWEI), processing_pool=pool)
 
 
-def run(sc, n_target, seed, days=365):
+def backing_proposals(target, positions, minimum=0, maximum=2**256 - 1, count=policy.MAX_BATCH["list"]):
+    """Bounded offchain identifier proposals, using current outstanding identifiers."""
+    if not target:
+        return []
+    return list(_proposals(target, frozenset(p.backing for p in positions.values()), minimum, maximum, count))
+
+
+@functools.lru_cache(maxsize=65_536)
+def _proposals(target, reserved, minimum, maximum, count):
+    # Speed only: the proposals are a pure function of these arguments.
+    return tuple(policy.propose_backings(target, len(reserved), count, reserved.__contains__,
+                                         minimum=minimum, maximum=maximum))
+
+
+def economic_nav(v, credit):
+    """Independent end-of-run mark, including known outcomes still awaiting bookkeeping.
+
+    A blocked checkpoint never prices from this reference. It only reports what the modeled
+    external assets hold when journal or receipt processing is behind.
+    """
+    value = v.free() + sum(v.idle_packs) + sum(v.recovery_packs) + v.loose_shapes * policy.UNIT + credit
+    for p in v.positions.values():
+        if p.status == ACTIVE:
+            value += p.value + p.backing + p.pending_fees
+        elif p.status == ALLOCATED or p.pack_owned:
+            value += p.value
+    return value
+
+
+class OperatingClock:
+    """Opt-in scenario calendar; external events are hypotheses, never RPC answers.
+
+    Requests stop during the real blackout. Fixed response/VRF delays are explicit
+    scenario inputs. A keeper pass waits for each conditional receipt before its next
+    read; after at most40calls (or no affordable action) it waits the configured poll.
+    """
+    INTERVAL, BLACKOUT_START, SETTLEMENT = 43_200, 42_300, 3_600
+
+    def __init__(self, sc, seed, days, exit_days):
+        self.start = int(sc["start_timestamp"])
+        self.end = (days + exit_days) * DAY
+        self.poll = int(sc.get("poll_seconds", 60))
+        self.receipt_delay = int(sc.get("receipt_seconds", 36))
+        self.response_delay = sc.get("purchaser_response_seconds", 120)
+        self.events, self.serial = [], 0
+        if self.poll <= 0 or self.receipt_delay <= 0:
+            raise ValueError("timed polling and receipt delay must be positive")
+        market_rng = np.random.default_rng(seed ^ 0xF00D)
+        replay = sc.get("replay_events")
+        if replay is not None:
+            # Recorded FWA activity, repeated end to end until the horizon. The caller supplies
+            # (offset seconds, kind, payload) from one authenticated window of the event log.
+            period = int(sc["replay_period_seconds"])
+            for repeat in range(-(-self.end // period)):
+                for at, kind, payload in replay:
+                    self.push(repeat * period + at, kind, payload)
+        for day in range(days + exit_days if replay is None else 0):
+            volume = sc["volume"](day, market_rng)
+            successes = int(market_rng.poisson(max(0, volume)))
+            refunds = int(market_rng.poisson(successes * sc.get("refunds_per_selection", REFUNDS_PER_SELECTION)))
+            for successful in [True] * successes + [False] * refunds:
+                at = day * DAY + int(market_rng.integers(DAY))
+                # Preserve the sampled count while moving blackout requests to the next opening.
+                phase = (self.start + at) % self.INTERVAL
+                if phase >= self.BLACKOUT_START:
+                    at += self.INTERVAL - phase
+                self.push(at, "request", successful)
+                self.push(at + int(sc.get("vrf_seconds", 60)), "acquisition", successful)
+        self.push(0, "keeper", 40)
+        self.push(days * DAY, "cutoff")
+        for day, fraction in sc.get("redeem", []):
+            self.push(day * DAY, "redemption", fraction)
+
+    def push(self, at, kind, payload=None):
+        if at > self.end:
+            return
+        # Explicit tie convention: market completion/response before the keeper's fresh read.
+        priority = 1 if kind == "keeper" else 0
+        self.serial += 1
+        heapq.heappush(self.events, (at, priority, self.serial, kind, payload))
+
+    def __iter__(self):
+        while self.events:
+            at, _, _, kind, payload = heapq.heappop(self.events)
+            yield at, kind, payload
+
+
+def bounded_policy_positions(v, now, settlement_window, returned_order, selected_times, owed_after=""):
+    """Model the event index's fixed candidate classes, without an omniscient policy input.
+
+    The simulator owns external state so it can project these classes in memory. Production
+    obtains the identical bounded classes from indexed SQL queries, then hydrates their IDs.
+    Text ID ordering matches keeper/index.py's TEXT primary keys.
+    """
+    limit = policy.MAX_BATCH["sync"]  # keeper.keeper.MAX_CANDIDATES
+    positions = v.positions
+    returned = sorted((i for i, p in positions.items()
+                       if p.status == SETTLED and p.pack_owned and p.state != OWED),
+                      key=lambda i: returned_order.get(i, (selected_times.get(i, 0), i)))[:limit]
+    due = list(returned)
+    for i in sorted(v.receipts, key=str)[:limit]:
+        if len(due) == limit:
+            break
+        if i not in due:
+            due.append(i)
+    selected = sorted((i for i, p in positions.items()
+                       if p.state == ACTIVE and p.status in (ALLOCATED, SETTLED)),
+                      key=lambda i: (selected_times.get(i, 0), i))[:limit]
+    due += selected
+    due += sorted((i for i, p in positions.items()
+                   if p.state == ALLOCATED and p.allocated_at <= now - settlement_window),
+                  key=lambda i: (positions[i].allocated_at, str(i)))[:limit]
+    owed = sorted((i for i, p in positions.items() if p.state == OWED), key=str)
+    rotation = [i for i in owed if str(i) > owed_after][:limit]
+    rotation += [i for i in owed if str(i) <= owed_after][:limit - len(rotation)]
+    if rotation:
+        owed_after = str(rotation[-1])
+    due += rotation
+    active = sorted((i for i, p in positions.items() if p.state == ACTIVE),
+                    key=lambda i: (positions[i].fee_debt, str(i)))[:limit]
+    return list(dict.fromkeys(due + active)), owed_after
+
+
+def run(sc, n_target, seed, days=365, values=None):
     rng = np.random.default_rng(seed)
-    others = POOL
-    if sc.get("pool_scale", 1.0) != 1.0:
-        others = rng.choice(POOL, int(len(POOL) * sc["pool_scale"]))
-    W_o, N_o = float(np.sum(1 / others)), len(others)
-    g_of = sc.get("gwei", 0.15)  # gwei, or a function of the day (gas changing after deployment)
-    deposit = int((n_target * (0.0363 + 0.03) + 0.06 + 0.11) * E)  # positions + mint room + slack
-    v = Vault(seed=10**16, balance=10**16, reserve=9 * 10**15)  # policy.reserve_need at 300 positions, 0.5 gwei (D46)
+    if "foreign_pool_weight" in sc:
+        # Timed scenarios need only the authenticated aggregate inverse-backing weight.
+        # Do not invent per-listing records when the historical SQLite archive is absent.
+        if sc.get("pool_scale", 1.0) != 1.0:
+            raise ValueError("aggregate snapshot cannot sample individual foreign listings")
+        W_o = float(sc["foreign_pool_weight"])
+        if W_o <= 0 or not np.isfinite(W_o):
+            raise ValueError("foreign pool weight must be positive and finite")
+    else:
+        others = POOL
+        if sc.get("pool_scale", 1.0) != 1.0:
+            others = rng.choice(POOL, int(len(POOL) * sc["pool_scale"]))
+        W_o = float(np.sum(1 / others))
+    g_of = sc.get("gwei", 0.15)  # scenario basefee; the actual bid also includes maxTip
+    deposit = sc.get("deposit_wei", int((n_target * (0.0363 + 0.03) + 0.06 + 0.11) * E))
+    values = values or json.loads((ROOT.parent / "deploy/mainnet.json").read_text())
+    ceiling, tip = values["gasCeilingWei"], values["maxTipWei"]
+    essential_ceiling = values["essentialCeilingWei"]
+    work_fee, mint_fee = values["workFeeWei"], MINT_FEE
+    if deposit > values["tvlCapWei"]:
+        raise ValueError("model deposit exceeds configured TVL cap")
+    v = Vault(seed=10**16, balance=10**16, reserve=values["reserveWei"],
+              distribution_bps=values["distributionBps"], allocated_bound_bps=values["allocatedBoundBps"])
+    v.routine_budget = v.routine_cap = values["routineCapWei"]
+    v.essential_budget = v.essential_cap = values["essentialCapWei"]
+    v.routine_rate, v.essential_rate = values["routineRatePerDayWei"], values["essentialRatePerDayWei"]
+    journal = deque()  # (our listing ID or None, actual selection time)
+    journal_paid = journal_own = journal_foreign = journal_pruned = terminal_work = 0
+    journal_rebased = journal_scans = journal_scanned = journal_skipped = 0
+    # Operating-period diagnostics (timed mode): time-weighted deployed capital and book value, and
+    # keeper passes that left due work waiting for gas or deferred it.
+    last_tick = deployed_int = book_int = gas_wait_seconds = deferred_seconds = settlement_wait_seconds = 0
+    self_serve_cost = skipped_funding = call_limit_days = 0
     g0 = g_of(0) if callable(g_of) else g_of
     st0 = charge_state(int(g0 * GWEI), 0)
-    ck0 = policy.request_charge(st0)
-    d0 = policy.deploy_charge(st0)
-    v.deposit("h", deposit, ck0, deposit * d0 // (policy.POSITION_VALUE + d0))  # D56 request charges
-    paid_in = deposit + ck0  # every wei the holder sent
-    nav0_per_share = None
-    next_id = 0
-    credit = 0  # FWA fee credit owed to the vault
-    keeper_unpaid = 0  # gas keepers spent on calls the vault does not pay
+    st0.gas_ceiling, st0.essential_ceiling, st0.max_tip = ceiling, essential_ceiling, tip
+    st0.work_fee, st0.essential_cap = work_fee, values["essentialCapWei"]
+    ck0, d0 = policy.request_charge(st0), policy.deploy_charge(st0)
+    v.deposit("h", deposit, ck0, deposit * d0 // (policy.POSITION_VALUE + d0))
+    paid_in = deposit + ck0
+    exit_all = sc.get("exit_all", False)
+    exit_days = sc.get("exit_days", 30) if exit_all else 0
+    user_gas = sc.get("user_gas_proxy", {})
+    holder_gas = (int(g0 * GWEI) + tip) * user_gas.get("deposit", 0)
+    unknown_user_gas = int(exit_all and "deposit" not in user_gas)
+    holder_claimed = holder_cancelled = holder_keeper_pay = holder_maintenance_gas = 0
+    exit_requested = False
+    operation_end_backlog = 0
+    operation_end_cash = operation_end_keeper_paid = operation_end_fees = 0
+    operation_end_routine_paid = operation_end_routine_budget = 0
+    operating_budget_marks = {}
+    operation_end_idle = operation_end_funding = operation_end_loose = operating_active_days = 0
+    rescue_sync = sc.get("holder_rescue_sync", False)
+    trace = sc.get("trace_sink")
+    timed = sc.get("timed", False)
+    clock = OperatingClock(sc, seed, days, exit_days) if timed else None
+    now = absolute_now = 0
+    event_kind = "day"
+    market_pending = last_checkpoint_interval = 0
+    selected_times, returned_order, applied_changes, active_days_seen = {}, {}, set(), set()
+    response_keep = {}
+    expected_selections = 0.0
+    owed_after, event_order = "", 0
+    expired_backing = expired_nft = purchaser_returns = late_purchaser_returns = 0
+    timed_checkpoint_times = []
+    timed_pass_limits = 0
+    routine_paid = essential_paid = request_paid = 0
+    routine_unfunded = unpaid_routine_calls = zero_quote_sync_calls = 0
+    sync_credit_sweeps = sync_active_fee_claims = sync_fee_receipts = sync_collection_quote = 0
+    last_unfunded_offer = last_cash_shortfall = last_permission_shortfall = 0
+    op_names = ("sync", "harvest", "unlist", "liquidate", "checkpoint", "restock", "list")
+    op_paid = dict.fromkeys(op_names, 0)
+    op_calls = dict.fromkeys(op_names, 0)
+    holder_calls = dict.fromkeys(op_names, 0)
+    min_free = v.free()
+    next_id, credit = 1, 0
+
+    def locked_holder():
+        r = v.redemptions.get("h")
+        return (r.shares * v.redeem_g // r.g0) if r and r.shares and r.era == v.redeem_era else 0
+
+    def trace_state(action, day):
+        if trace is not None:
+            trace.append(dict(day=day, action=action, **(dict(timestamp=absolute_now, event=event_kind) if timed else {}), cash=v.balance, free=v.free(), routine_budget=v.routine_budget,
+                              protected=v.redemption_reserve + v.distribution_reserve + v.claimable_total + v.processing_pool,
+                              locked=locked_holder(), global_locked=v.locked_shares, positions=len(v.positions),
+                              returned_value=sum(p.value for p in v.positions.values() if p.status == SETTLED and p.pack_owned),
+                              journal=len(journal), claimed=holder_claimed))
+
+    def claim_available(gas_price, day):
+        nonlocal holder_claimed, holder_gas, unknown_user_gas
+        r = v.redemptions.get("h")
+        redemption_pay = 0
+        if r and r.shares:
+            q = v.era_final_q[r.era] if r.era < v.redeem_era else v.redeem_q
+            redemption_pay = r.shares * (q - r.q0) // r.g0
+        distribution_pay = v.shares.get("h", 0) * v.dist_per_share // E - v.dist_debt.get("h", 0)
+        if v.claimable.get("h", 0) + redemption_pay + distribution_pay <= 0:
+            return
+        received = v.claim("h")
+        assert received > 0
+        holder_claimed += received
+        holder_gas += user_gas.get("claim", 0) * gas_price
+        unknown_user_gas += int("claim" not in user_gas)
+        trace_state("claim", day)
     allocated_day = {}
     ask, crown = ASK, 0.001
-    vol_hist = []
-    checkpoints = 0
-    accrued = selected = 0
-    missed_alloc = 0  # model check: accrued / (selected x B) must approach k
-    open_days = []
-    stage_until = {}  # listing -> first day it earns: the keeper lists only after FWA's queue drains
+    vol_hist, open_days = [], []
+    if timed:
+        vol_hist = [0] * (days + exit_days + 1)
+    checkpoints = accrued = selected = selected_backing = missed_alloc = 0
+    listing_ready_day = 0
     waits = sc.get("staging", STAGING)
-    for d in range(days):
-        for i, d1 in list(stage_until.items()):
-            if d >= d1:
-                del stage_until[i]
-                if i in v.positions and v.positions[i].status == STAGED:
-                    v.positions[i].status = ACTIVE
+    max_calls = sc.get("max_keeper_calls_per_day", 512)
+    self_serve = sc.get("self_serve_exits", True)  # D64: the withdrawing holder executes unpaid exit work
+
+    ticks = clock if timed else ((d * DAY, "day", None) for d in range(days + exit_days))
+    for now, event_kind, payload in ticks:
+        if timed and now // DAY < days and now > last_tick:
+            deployed_int += (now - last_tick) * (v.active_backing + v.active_count * 3 * policy.UNIT)
+            book_int += (now - last_tick) * (v.free() + v.tracked_value + v.active_backing)
+        last_tick = max(last_tick, now)
+        event_order += 1
+        d = now // DAY
+        absolute_now = (clock.start if timed else 0) + now
+        v.sync_budget(now)
+        if d <= days and d % MARK_DAYS == 0 and str(d) not in operating_budget_marks:
+            operating_budget_marks[str(d)] = dict(elapsed_seconds=now, routine_budget_wei=v.routine_budget,
+                routine_paid_wei=routine_paid, free_wei=v.free(), positions=len(v.positions),
+                fees_wei=v.fees_received, lost_wei=v.backing_lost, selections=selected)
         gas = int((g_of(d) if callable(g_of) else g_of) * GWEI)
-        for (day, key, val) in sc.get("changes", []):
-            if day == d:
-                if key == "crown":
-                    crown = val
-                elif key == "ask":
-                    ask = val
-                    cap = int(ask * (1 + PREMIUM) * E)
-                    for i, p in list(v.positions.items()):
-                        if not sc.get("exempt", True) and p.status == ACTIVE and p.backing > cap:
-                            v.kicked(i)  # anyone may kick it in the next blackout
+        for day, key, val in sc.get("changes", []):
+            if day != d or (timed and (day, key) in applied_changes):
+                continue
+            applied_changes.add((day, key))
+            if key == "crown":
+                crown = val
+            elif key == "ask":
+                ask = val
+                cap = int(ask * (1 + PREMIUM) * E)
+                for i, p in list(v.positions.items()):
+                    if not sc.get("exempt", True) and p.status == ACTIVE and p.backing > cap:
+                        credit += p.pending_fees
+                        v.kicked(i)
         cap = int(ask * (1 + PREMIUM) * E)
         k = int(k_of(crown) * E)
-        # D62: ShapePacks is oracle-exempt on FWA (no cap) unless the scenario says otherwise.
         backing = policy.edge_backing(k, None if sc.get("exempt", True) else cap, int(S_FEE * 1e4), 3,
-                                      int(CEILING * GWEI), 0, WORK_FEE,
-                                      price=min(gas + 5 * 10**7, int(CEILING * GWEI)), mint_fee=MINT_FEE)
+                                      ceiling, values["payMarkupBps"], work_fee,
+                                      price=min(gas + tip, ceiling), mint_fee=mint_fee,
+                                      buffer_bps=values["bufferBps"], min_edge_bps=values["minEdgeBps"])
 
-        # Purchasers resolve yesterday's allocations: bid unless they keep (vault prefers keep).
-        for i, d0 in list(allocated_day.items()):
-            if d >= d0 + 1:
-                del allocated_day[i]
-                if rng.random() < sc.get("keep", 0.0):
-                    v.resolve_keep(i)
-                else:
-                    v.bid_settled(i)
-
-        # FWA acquisitions today.
-        act = [i for i, p in v.positions.items() if p.status == ACTIVE]
-        n = len(act)
-        Bv = backing or cap
-        W = W_o + (n / (Bv / E) if n else 0)
-        share = (n / (Bv / E)) / W if n else 0
-        vol = sc["volume"](d, rng) * max(0.0, 1 - sc.get("elasticity", 0) * share)
-        A = rng.poisson(vol) if vol > 0 else 0
-        vol_hist.append(A)
-        if n and A:
-            H = (N_o + n) / W
-            per_listing = int((1 + SUR) * H * (1 - CUT) * (1 - crown) / (N_o + n) * E)
-            # Each listing is selected at most once: its odds over the day are 1 - (1 - q)^A with
-            # q = (1/B) / W per acquisition. (Drawing Binomial(A, n q) over-selects by (A-1) q / 2.)
-            q = (1 / (Bv / E)) / W
-            p_day = 1 - (1 - q) ** A
-            hit = rng.random(n) < p_day
-            chosen = {i for i, h_ in zip(act, hit) if h_}
-            sel = len(chosen)
-            # A selected listing earned one share per acquisition up to and including the one
-            # that picked it: E[N | N <= A] for N ~ Geometric(q). About (A + 1) / 2 on a quiet
-            # day, about 1 / q on a day busy enough that most listings get picked.
-            before_sel = int(per_listing * (1 / q - A * (1 - q) ** A / p_day))
-            selected += sel
-            accrued += per_listing * A * (n - sel) + before_sel * sel
-            for i in act:
-                p = v.positions[i]
-                if i in chosen:  # selected mid-day: fees up to and including that acquisition
-                    credit += p.pending_fees + before_sel
-                    p.pending_fees = 0
-                    p.status = ALLOCATED
-                    allocated_day[i] = d
-                else:
-                    p.pending_fees += per_listing * A
-
-        # Keeper passes: repeat in the open interval until nothing is left to resolve or deploy
-        # (a live keeper loops), then one pass in the blackout, which may host a checkpoint
-        # unless FWA's queue is busy.
-        blackout_ok = rng.random() >= sc.get("checkpoint_miss", 0.0)
-        recent = float(np.mean(vol_hist[-7:]))
-        passes = 0
-        # Congestion: inclusion needs a priority fee above the reimbursed maxTip, so a keeper
-        # that is not subsidized does nothing that day.
-        step = 2 if sc.get("congested") and sc["congested"](d) else 0
-        open_days.append(len(v.positions))
-        while step < 2:
-            passes += 1
-            listings = [policy.Listing(i, p.status, allocated_at=0, pending_fees=p.pending_fees)
-                        for i, p in v.positions.items()]
-            # The simulator settles allocations at day granularity: nothing waits on the window.
-            st = policy.State(
-                now=d * DAY, gas_price=gas, base_fee=gas, gas_ceiling=int(CEILING * GWEI), max_tip=5 * 10**7,
-                markup_bps=0, share_bps=2_500, k=k, backing=backing, min_edge_bps=100, mint_fee=MINT_FEE,
-                settlement_window=10**12, blackout=(step == 1), queue_drained=blackout_ok or step == 0,
-                checkpoint_done_this_interval=False, listings=listings, idle_packs=len(v.idle_packs),
-                loose_shapes=v.loose_shapes, free=v.free(), idle_eth=v.idle(), owed_estimate=v.owed_estimate(),
-                pending_deposits=v.pending_total, locked_shares=v.locked_shares, fee_credit=credit,
-                open_positions=len(v.positions), max_positions=300, recent_volume=recent, work_fee=WORK_FEE,
-                slowdown_volume=sc.get("slowdown", 0.0), essential_ceiling=int(ESSENTIAL_CEILING * GWEI),
-                processing_pool=v.processing_pool)
-            planned = policy.plan(st)
-            if step == 1:
-                step = 2
-            elif passes >= 40 or not any(a[0] in ("sync", "list", "restock") for a in planned):
-                step = 1
-            for act_ in planned:
-                fn = act_[0]
-                q = lambda g, u=0, e=False: policy.quote(st, g, u, e)  # noqa: E731  envelope (gates)
-                pv = lambda g, u=0, e=False: policy.pay_v1(st, g, u, e)  # noqa: E731  V1 pay
-                Q = policy.Q
-                ess = v.locked_shares != 0  # redemption work: no premium, essential budget (D56)
-                if fn == "sync":
-                    for i in act_[1]:
-                        p = v.positions[i]
-                        if p.status in (SETTLED, WITHDRAWN) and p.pack_owned:
-                            v.sync_owned(i)
-                    n_ = len(act_[1])
-                    v.pay_keeper(pv(Q["sync"] + Q["synced"] * n_, n_, ess))
-                elif fn == "harvest":
-                    amt = credit + sum(v.positions[i].pending_fees for i in act_[1])
-                    for i in act_[1]:
-                        v.positions[i].pending_fees = 0
-                    credit = 0
-                    v.receive_fees(amt)
-                    g = q(Q["harvest"] + Q["harvested"] * len(act_[1]))
-                    if g * 10_000 <= amt * 2_500:  # gate on the envelope, pay the policy
-                        v.pay_keeper(pv(Q["harvest"] + Q["harvested"] * len(act_[1])))
-                    else:
-                        keeper_unpaid += g
-                elif fn == "unlist":
-                    for i in act_[1]:
-                        p = v.positions[i]
+        if timed:
+            A = 0
+            if event_kind == "request":
+                market_pending += 1
+            elif event_kind == "acquisition":
+                market_pending -= 1
+                assert market_pending >= 0
+                # A replayed acquisition carries its recorded foreign totalWeight (1/ETH).
+                successful, foreign_weight = payload if isinstance(payload, tuple) else (payload, W_o)
+                A = int(successful)
+                chosen = None
+                if successful:
+                    act = [i for i, p in v.positions.items() if p.status == ACTIVE]
+                    weights = [E / v.positions[i].backing for i in act]
+                    W = foreign_weight + sum(weights)
+                    expected_selections += sum(weights) / W
+                    # Conditional counterfactual selection, not replay of a real VRF word.
+                    draw = rng.random() * W
+                    for i, weight in zip(act, weights):
+                        draw -= weight
+                        if draw < 0:
+                            chosen = i
+                            break
+                    fee = int((1 + SUR) * (1 - CUT) * (1 - crown) / W * E)
+                    for i in act:
+                        v.accrue(i, fee)
+                        accrued += fee
+                    if chosen is not None:
+                        p = v.positions[chosen]
                         credit += p.pending_fees
-                        v.unlist(i)
-                    n_ = len(act_[1])
-                    v.pay_keeper(pv(Q["unlist"] + Q["unlisted"] * n_, n_, True))
-                elif fn == "liquidate":
-                    m = 0
-                    while m < act_[1] and (v.idle_packs or v.loose_shapes) and \
-                            (v.owed_estimate() > v.free() + v.pending_total):
-                        v.liquidate_one()
-                        m += 1
-                    if m:
-                        v.pay_keeper(pv(Q["liquidate"] + Q["liq_pack"] * m, m, True))
-                elif fn == "checkpoint":
-                    nav_pos = v.nav_positions()[0]
-                    pool = v.processing_pool
-                    flows = v.pending_total != 0 or v.locked_shares != 0
-                    try:
-                        paid = v.checkpoint(credit)
-                    except RuntimeError:  # AllocatedExposure: the contract reverts; retry next blackout
-                        missed_alloc += 1
+                        p.pending_fees = 0
+                        p.status = ALLOCATED
+                        selected_times[chosen] = absolute_now
+                        selected_backing += p.backing
+                        selected += 1
+                        trace_state("selection", d)
+                        if trace is not None:
+                            trace[-1]["listing_id"] = chosen
+                        delay, kept = clock.response_delay, None
+                        if "response_sampler" in sc:
+                            # Empirical purchaser behaviour: (seconds or None for silence, kept).
+                            delay, kept = sc["response_sampler"](rng)
+                            response_keep[chosen] = kept
+                        settlement_wait_seconds += clock.SETTLEMENT if delay is None else min(int(delay), clock.SETTLEMENT)
+                        if delay is not None:
+                            clock.push(now + int(delay), "response", chosen)
+                journal.append((chosen, absolute_now if chosen is not None else 0))
+                v.completed_prefix += 1
+            elif event_kind == "response":
+                p = v.positions.get(payload)
+                if p and p.status == ALLOCATED:
+                    late_purchaser_returns += int(absolute_now >= selected_times[payload] + clock.SETTLEMENT)
+                    kept = response_keep.pop(payload, None)
+                    if kept if kept is not None else rng.random() < sc.get("keep", 0.0):
+                        v.record_keep(payload, v.settlement_fee_bps)
+                    else:
+                        v.bid_settled(payload)
+                        returned_order[payload] = (absolute_now, event_order)
+                    purchaser_returns += 1
+                    trace_state("purchaser-response", d)
+            for i, p in v.positions.items():
+                p.expired = p.status == ALLOCATED and absolute_now >= selected_times.get(i, absolute_now) + clock.SETTLEMENT
+            if event_kind == "acquisition":
+                vol_hist[d] += A
+            if event_kind == "keeper":
+                open_days.append(len(v.positions))
+                if d < days and any(p.status == ACTIVE for p in v.positions.values()):
+                    active_days_seen.add(d)
+                operating_active_days = len(active_days_seen)
+        else:
+            for i, d0 in list(allocated_day.items()):
+                if d >= d0 + 1:
+                    del allocated_day[i]
+                    if rng.random() < sc.get("keep", 0.0):
+                        v.record_keep(i, v.settlement_fee_bps)
+                    else:
+                        v.bid_settled(i)
+
+            # Daily sampling approximates selection timing, but each position uses its actual B.
+            # Clamp the sampled set to A so the approximation cannot invent journal records.
+            act = [i for i, p in v.positions.items() if p.status == ACTIVE]
+            n = len(act)
+            if d < days:
+                operating_active_days += int(n > 0)
+            weights = np.array([E / v.positions[i].backing for i in act])
+            W = W_o + float(weights.sum())
+            share = float(weights.sum()) / W if n else 0
+            vol = sc["volume"](d, rng) * max(0.0, 1 - sc.get("elasticity", 0) * share)
+            A = int(rng.poisson(vol)) if vol > 0 else 0
+            vol_hist.append(A)
+            chosen = []
+            if n and A:
+                per_listing = int((1 + SUR) * (1 - CUT) * (1 - crown) / W * E)
+                qs = weights / W
+                p_days = 1 - (1 - qs) ** A
+                chosen = [i for i, hit in zip(act, rng.random(n) < p_days) if hit]
+                if len(chosen) > A:
+                    chosen = rng.choice(chosen, A, replace=False).tolist()
+                chosen_set = set(chosen)
+                for i, q_i, p_day in zip(act, qs, p_days):
+                    p = v.positions[i]
+                    if i in chosen_set:
+                        before_sel = int(per_listing * (1 / q_i - A * (1 - q_i) ** A / p_day))
+                        credit += p.pending_fees + before_sel
+                        accrued += before_sel
+                        p.pending_fees = 0
+                        p.status = ALLOCATED  # FWA changed; the vault's book changes only in sync below
+                        allocated_day[i] = d
+                        selected_backing += p.backing
+                    else:
+                        v.accrue(i, per_listing * A)
+                        accrued += per_listing * A
+                selected += len(chosen)
+            refunds = int(rng.poisson(A * sc.get("refunds_per_selection", REFUNDS_PER_SELECTION)))
+            journal.extend((i, d * DAY) for i in chosen)
+            journal.extend((None, 0) for _ in range(A - len(chosen) + refunds))
+            v.completed_prefix += A + refunds
+
+        blackout_ok = True if timed else rng.random() >= sc.get("checkpoint_miss", 0.0)
+        congested = sc.get("congested") and sc["congested"](d)
+        if not timed:
+            open_days.append(len(v.positions))
+        calls = 0
+        checkpoint_done = timed and last_checkpoint_interval == absolute_now // OperatingClock.INTERVAL
+        holder_finished = False
+        phases = ([absolute_now % clock.INTERVAL >= clock.BLACKOUT_START] if event_kind == "keeper" else []) if timed else (False, True)
+        for blackout in phases:
+            while not congested and not holder_finished and calls < (1 if timed else max_calls):
+                hydrated = list(v.positions)
+                if timed:
+                    hydrated, owed_after = bounded_policy_positions(v, absolute_now, clock.SETTLEMENT,
+                                                                     returned_order, selected_times, owed_after)
+                listings = [policy.Listing(i, p.status, allocated_at=selected_times.get(i, p.allocated_at) if timed else p.allocated_at, pending_fees=p.pending_fees,
+                                           value=p.value, backing=p.backing,
+                                           unapplied=p.state == ACTIVE and p.status in (ALLOCATED, SETTLED))
+                            for i in hydrated for p in [v.positions[i]]]
+                st = policy.State(
+                    now=absolute_now, gas_price=gas + tip, base_fee=gas, gas_ceiling=ceiling, max_tip=tip,
+                    markup_bps=values["payMarkupBps"], share_bps=values["keeperShareBps"], k=k, backing=backing,
+                    min_edge_bps=values["minEdgeBps"], mint_fee=mint_fee, settlement_window=clock.SETTLEMENT if timed else 10**12,
+                    blackout=blackout, queue_drained=(market_pending == 0 if timed else (blackout_ok or not blackout) and d >= listing_ready_day),
+                    checkpoint_done_this_interval=checkpoint_done, listings=listings, idle_packs=len(v.idle_packs),
+                    recovery_packs=len(v.recovery_packs), loose_shapes=v.loose_shapes,
+                    free=v.free(), idle_eth=v.idle(), owed_estimate=v.owed_estimate(),
+                    pending_deposits=v.pending_total, locked_shares=v.locked_shares,
+                    total_shares=v.total_shares, fee_credit=credit,
+                    open_positions=len(v.positions), active_count=v.active_count, idle_value=v.idle_value,
+                    idle_funding=v.idle_funding,
+                    journal_cursor=v.acquisition_cursor, completed_prefix=v.completed_prefix,
+                    pending_receipts=len(v.receipts), routine_budget=v.routine_budget,
+                    essential_budget=v.essential_budget, essential_cap=values["essentialCapWei"],
+                    recent_volume=float(np.mean(vol_hist[max(0, d - 6):d + 1] if timed else vol_hist[-7:])), work_fee=work_fee,
+                    slowdown_volume=sc.get("slowdown", 0.0), essential_ceiling=essential_ceiling,
+                    pack_units_mask=values["packUnitsMask"], reserve=values["reserveWei"],
+                    processing_pool=v.processing_pool, distribution_bps=v.distribution_bps,
+                    allocation_stale=(v.allocation_head < len(v.allocation_queue) and
+                                      (v.allocation_queue[v.allocation_head] not in v.positions or
+                                       v.positions[v.allocation_queue[v.allocation_head]].state != ALLOCATED)),
+                    own_journal_pending=any(v.positions[i].state == ACTIVE and v.positions[i].status in (ALLOCATED, SETTLED)
+                                            for i in hydrated))
+                if backing:
+                    up = lambda a, b: -(-a // b)
+                    keep_bps = int(S_FEE * 10_000)
+                    cycle = policy.quote(st, policy.CYCLE_GAS, 2)
+                    minimum = max(up(P * 10_000, 9500), up(P * 10_000, 10_000 - keep_bps),
+                                  up(P * 10_000, int(BID_RATE * 10_000)),
+                                  up(P * E, k - keep_bps * 10**14), cycle * E // (k - E) + 1)
+                    maximum = 2**256 - 1 if sc.get("exempt", True) else cap * (10_000 - values["bufferBps"]) // 10_000
+                    # Speed only: with no idle pack and idle ETH below one backing, the planner can
+                    # use neither list nor restock proposals, so skipping them changes no decision.
+                    if v.idle_packs or st.idle_eth >= minimum:
+                        st.backing_proposals = backing_proposals(backing, v.positions, minimum, maximum)
+                        build_minimum = max(minimum, up((cycle + policy.build_cost(st)) * E, k - E))
+                        build_quote = backing_proposals(backing, v.positions, build_minimum, maximum, 1)
+                        st.restock_proposals = build_quote * policy.MAX_BATCH["restock"]
+                planned = policy.plan(st)
+                if timed and calls == 0 and d < days:
+                    waiting = v.idle_packs or any(l.status in (SETTLED, WITHDRAWN) or (l.status == ALLOCATED and
+                                                  absolute_now >= l.allocated_at + clock.SETTLEMENT) for l in listings)
+                    if waiting and st.gas_price > st.gas_ceiling:
+                        gas_wait_seconds += clock.poll
+                    elif any(l.status in (SETTLED, WITHDRAWN) for l in listings) and not any(a[0] == "sync" for a in planned):
+                        deferred_seconds += clock.poll
+                Q = policy.Q
+                essential = v.locked_shares != 0
+                executed = False
+
+                def affordable(gas_q, units=0, ess=False, funding_cap=None, cash_delta=0, liability=False, final_candidate=True):
+                    nonlocal skipped_funding, routine_unfunded
+                    nonlocal last_unfunded_offer, last_cash_shortfall, last_permission_shortfall
+                    offer = policy.pay_v1(st, gas_q, units, ess)
+                    funds = funding_cap if funding_cap is not None else (v.essential_budget if ess else v.routine_budget)
+                    paid = min(offer, funds, max(0, v.free() + cash_delta))
+                    holder_fallback = self_serve and liability and (not exit_all or fn != "sync"
+                        or (rescue_sync and exit_requested and v.locked_shares))
+                    if paid < offer and not holder_fallback:
+                        if not final_candidate:
+                            return False  # A shorter preflight prefix is not an operating stall.
+                        skipped_funding += 1
+                        last_unfunded_offer = offer
+                        last_cash_shortfall = max(0, offer - max(0, v.free() + cash_delta))
+                        last_permission_shortfall = max(0, offer - funds)
+                        if not ess and fn != "checkpoint":
+                            routine_unfunded += 1
+                        if exit_requested:
+                            trace_state("unfunded-" + fn, d)
+                        return False
+                    return True
+
+                def pay(gas_q, units=0, ess=False, funding_cap=None, liability=False):
+                    nonlocal self_serve_cost, holder_gas, holder_keeper_pay, holder_maintenance_gas
+                    nonlocal routine_paid, essential_paid, request_paid, unpaid_routine_calls
+                    offer = policy.pay_v1(st, gas_q, units, ess)
+                    paid = v.pay_keeper(offer, essential=ess, cap=funding_cap)
+                    op_paid[fn] += paid
+                    op_calls[fn] += 1
+                    if fn == "checkpoint" and funding_cap is not None:
+                        request_paid += paid
+                    elif ess:
+                        essential_paid += paid
+                    else:
+                        routine_paid += paid
+                        unpaid_routine_calls += int(paid < offer and fn != "harvest")
+                    if self_serve and liability:
+                        # Proxy from the operation quote, not a measured gas claim. Kept outside
+                        # vault NAV because the withdrawing holder pays this gas personally.
+                        self_serve_cost += max(0, gas_q * st.gas_price - paid)
+                        if exit_all and paid < offer:
+                            # Variable-size unpaid maintenance retains the explicitly labeled
+                            # operation-quote gas proxy until matching receipt curves exist.
+                            cost = user_gas.get(fn, gas_q) * st.gas_price
+                            holder_gas += cost
+                            holder_maintenance_gas += cost
+                            holder_keeper_pay += paid
+                            holder_calls[fn] += 1
+                    return paid
+
+                for action_index, action in enumerate(planned):
+                    fn = action[0]
+                    action_meta = {}
+                    if fn == "sync":
+                        unexposed = not v.positions and not v.receipts and not v.active_count and not v.active_backing and not v.allocated_value
+                        rebase_count = len(journal) if unexposed else 0
+                        entries = []
+                        own = 0
+                        for entry in islice(journal, policy.MAX_BATCH["journal"]):
+                            if entry[0] is not None:
+                                if own == policy.MAX_BATCH["selected"]:
+                                    break
+                                own += 1
+                            entries.append(entry)
+                        if rebase_count:
+                            assert all(i is None for i, _ in journal)
+                            entries = []
+                        own_ids = [i for i, _ in entries if i is not None]
+                        # ScanLib.rebase: read the open positions instead of the journal when cheaper.
+                        found = [(at, i) for i, at in journal if i is not None]
+                        scanned, scan_now = 0, False
+                        if (not unexposed and journal and len(v.positions) * Q["scan"] <= min(len(journal), policy.MAX_BATCH["journal"]) * Q["journal"]
+                                and len(found) <= policy.MAX_BATCH["selected"]):
+                            entries, scan_now = [], True
+                            own_ids = [i for _, i in sorted(found)]
+                            scanned = sum(p.state == ACTIVE for p in v.positions.values())
+                        expired_ids = [i for i in action[1] if timed and i in v.positions
+                                       and v.positions[i].status == ALLOCATED and v.positions[i].expired
+                                       and (v.positions[i].state == ALLOCATED or i in own_ids)]
+                        resolved = [i for i in action[1] if i in v.positions and
+                                    (v.positions[i].status == WITHDRAWN or
+                                     (v.positions[i].status == SETTLED and
+                                      (v.positions[i].state == ALLOCATED or i in own_ids)) or i in expired_ids)]
+                        reclaim_cash = sum(v.positions[i].backing * (10_000 - v.settlement_fee_bps) // 10_000
+                                           for i in expired_ids if v.positions[i].backing * (10_000 - v.settlement_fee_bps) // 10_000 >= v.positions[i].value)
+                        prospective = [v.allocation_queue[j] for j in range(v.allocation_head,
+                                      min(len(v.allocation_queue), v.allocation_head + policy.MAX_BATCH["prune"]))] + own_ids
+                        pruned = 0
+                        for i in prospective[:policy.MAX_BATCH["prune"]]:
+                            p = v.positions.get(i)
+                            if i not in resolved and (i in own_ids or (p and p.state == ALLOCATED)):
+                                break
+                            pruned += 1
+                        if not entries and not scan_now and not resolved and not pruned and not rebase_count:
+                            continue
+                        checkpoint_due = (st.blackout and st.queue_drained and not st.checkpoint_done_this_interval
+                                          and (st.pending_deposits or st.locked_shares or st.distribution_bps))
+                        tail_base = Q["journal_tail"] + (Q["distribution_proof"]
+                            if st.distribution_bps and not (st.pending_deposits or st.locked_shares) else 0)
+                        tail_q = tail_base + len(entries) * Q["journal"] + scanned * Q["scan"] + pruned * Q["pruned"]
+                        distribution_probe = v
+                        if pruned and st.distribution_bps and not (st.pending_deposits or st.locked_shares):
+                            distribution_probe = copy.deepcopy(v)
+                            distribution_probe.prune(policy.MAX_BATCH["prune"])
+                        tail_paid = checkpoint_due and (st.pending_deposits or st.locked_shares
+                            or distribution_probe.distribution_tail(policy.quote(st, tail_q), credit))
+                        journal_paid_work = (len(entries) == policy.MAX_BATCH["journal"] or own_ids or resolved
+                                             or ((entries or scanned) and tail_paid))
+                        required_tail = bool((entries or scanned) and len(entries) < policy.MAX_BATCH["journal"]
+                                             and not own_ids and not resolved and tail_paid)
+                        base_q = tail_base if required_tail else Q["sync"]
+                        gas_q = base_q + (len(entries) * Q["journal"] if journal_paid_work else 0) \
+                            + (scanned * Q["scan"] if own_ids or required_tail else 0) + len(own_ids) * Q["selected"] \
+                            + len(resolved) * Q["synced"] + pruned * Q["pruned"]
+                        if ((unexposed and not v.tracked_value) or (rebase_count and not pruned)
+                                or (not journal_paid_work and not own_ids and not resolved and not pruned)):
+                            gas_q = 0
+                        base_gas_q = gas_q
+                        funding_probe = distribution_probe if required_tail and st.distribution_bps \
+                            and not (st.pending_deposits or st.locked_shares) else v
+                        gas_q, take_credit, fee_ids = funding_probe.sync_fee_plan(
+                            action[1], credit, gas_q, len(resolved),
+                            lambda g, u: policy.quote(st, g, u), st.share_bps,
+                            Q["sync_credit"], Q["sync_funding"], Q["harvested"],
+                            cash_delta=reclaim_cash,
+                            distribution_tail=bool(required_tail and st.distribution_bps
+                                                   and not (st.pending_deposits or st.locked_shares)))
+                        fee_receipts = take_credit + sum(v.positions[i].pending_fees for i in fee_ids)
+                        if exit_all and gas_q == 0:
+                            if not (exit_requested and v.locked_shares):
+                                continue  # No operator gratuity is invented for an unpaid job.
+                            cost = user_gas.get("unexposed_sync", 0) * st.gas_price
+                            holder_gas += cost
+                            holder_maintenance_gas += cost
+                            unknown_user_gas += int("unexposed_sync" not in user_gas)
+                            holder_calls["sync"] += 1
+                            zero_quote_sync_calls += 1
+                        if not affordable(gas_q, len(resolved), False,
+                                          cash_delta=reclaim_cash + fee_receipts, liability=essential,
+                                          final_candidate=not any(a[0] == "sync" for a in planned[action_index + 1:])):
+                            continue
+                        if rebase_count:
+                            assert v.advance_unexposed()
+                            journal.clear()
+                            journal_rebased += rebase_count
+                        if scan_now:
+                            assert v.scan_rebase(found) == scanned
+                            journal_scans += 1
+                            journal_scanned += scanned
+                            journal_skipped += len(journal) - len(found)
+                            journal.clear()
+                        for i, at in entries:
+                            journal.popleft()
+                            if i is not None:
+                                v.select(i, at)
+                            v.acquisition_cursor += 1
+                        for i in resolved:
+                            if i in expired_ids:
+                                p = v.positions[i]
+                                if p.backing * (10_000 - v.settlement_fee_bps) // 10_000 >= p.value:
+                                    v.record_keep(i, v.settlement_fee_bps)
+                                    expired_backing += 1
+                                    trace_state("expiry-backing", d)
+                                else:
+                                    v.bid_settled(i)
+                                    expired_nft += 1
+                                    trace_state("expiry-nft", d)
+                            if v.receipts.get(i, (0,))[0] == 1:
+                                v.consume_keep(i)
+                            else:
+                                v.sync_owned(i)
+                        assert v.prune(policy.MAX_BATCH["prune"]) == pruned
+                        for i in fee_ids:
+                            v.harvest_listing(i)
+                        if fee_receipts:
+                            v.receive_fees(fee_receipts)
+                        credit -= take_credit
+                        sync_credit_sweeps += int(take_credit != 0)
+                        sync_active_fee_claims += len(fee_ids)
+                        sync_fee_receipts += fee_receipts
+                        sync_collection_quote += policy.quote(st, gas_q, len(resolved)) - policy.quote(st, base_gas_q, len(resolved))
+                        if timed:
+                            action_meta = dict(sync_credit=take_credit, sync_fee_ids=fee_ids,
+                                               sync_fee_receipts=fee_receipts,
+                                               sync_collection_gas=gas_q - base_gas_q)
+                        journal_paid += pay(gas_q, len(resolved), False, liability=essential)
+                        journal_own += len(own_ids)
+                        journal_foreign += 0 if scan_now else len(entries) - len(own_ids)
+                        journal_pruned += pruned
+                        terminal_work += len(resolved)
+                    elif fn == "harvest":
+                        ids = action[1]
+                        amt = credit + sum(v.positions[i].pending_fees for i in ids)
+                        if timed:
+                            action_meta = dict(harvest_amount=amt, harvested_credit=credit,
+                                               harvested_pending={i: v.positions[i].pending_fees for i in ids})
+                        gas_q = Q["harvest"] + Q["harvested"] * len(ids)
+                        funding_cap = 0  # Standalone fee collection never earns keeper compensation.
+                        liability = essential and v.owed_estimate() > v.free() + v.pending_total
+                        if not affordable(gas_q, funding_cap=funding_cap, cash_delta=amt, liability=liability):
+                            continue
+                        for i in ids:
+                            v.harvest_listing(i)
+                        v.receive_fees(amt)
+                        credit = 0
+                        pay(gas_q, funding_cap=funding_cap, liability=liability)
+                    elif fn == "unlist":
+                        ids = action[1]
+                        cash = sum(v.positions[i].backing for i in ids)
+                        gas_q = Q["unlist"] + Q["unlisted"] * len(ids)
+                        if not affordable(gas_q, len(ids), essential, cash_delta=cash, liability=essential):
+                            continue
+                        for i in ids:
+                            credit += v.positions[i].pending_fees
+                            v.unlist(i)
+                        pay(gas_q, len(ids), essential, liability=essential)
+                    elif fn == "liquidate":
+                        packs = shapes = units = 0
+                        inventory = reversed(v.idle_packs)
+                        cash = 0
+                        while packs + shapes < action[1] and units < 30 and \
+                                v.owed_estimate() > v.free() + v.pending_total + cash:
+                            value = next(inventory, None)
+                            if value is not None:
+                                if units + value // policy.UNIT > 30:
+                                    break
+                                packs += 1
+                                units += value // policy.UNIT
+                                cash += value
+                            elif shapes < v.loose_shapes:
+                                shapes += 1
+                                units += 1
+                                cash += policy.UNIT
+                            else:
+                                break
+                        if not packs + shapes:
+                            continue
+                        gas_q = (Q["liquidate"] + Q["liq_pack"] * packs
+                                 + Q["redeem_shape"] * (units - shapes) + Q["liq_shape"] * shapes)
+                        if not affordable(gas_q, packs + shapes, True, cash_delta=cash, liability=True):
+                            continue
+                        for _ in range(packs + shapes):
+                            v.liquidate_one()
+                        pay(gas_q, packs + shapes, True, liability=True)
+                    elif fn == "checkpoint":
+                        pool = v.processing_pool
+                        flows = v.pending_total != 0 or v.locked_shares != 0
+                        gas_q = Q["checkpoint"]
+                        funding_cap = pool if flows else None
+                        if not affordable(gas_q, 1, essential, funding_cap, cash_delta=pool, liability=essential):
+                            continue
+                        snap = copy.deepcopy(v.__dict__)
+                        try:
+                            v.checkpoint(credit)
+                        except RuntimeError:
+                            v.__dict__.update(snap)
+                            missed_alloc += 1
+                            continue
+                        credit = 0
+                        checkpoints += 1
+                        checkpoint_done = True
+                        if timed:
+                            last_checkpoint_interval = absolute_now // clock.INTERVAL
+                            timed_checkpoint_times.append(absolute_now)
+                        pay(gas_q, 1, essential, funding_cap, liability=essential)
+                    elif fn == "restock":
+                        units, proposals = action[1], action[2]
+                        need = len(proposals) * units
+                        mints = max(0, -(-(need - v.loose_shapes) // 10))
+                        cash = mints * (10 * policy.UNIT + mint_fee)
+                        gas_q = Q["restock"] + Q["pack"] * len(proposals) + Q["mint"] * mints
+                        if v.idle() < cash + v.idle_funding + sum(proposals) or not affordable(gas_q, len(proposals), cash_delta=-cash):
+                            continue
+                        v.restock(len(proposals), units, mint_fee, proposals)
+                        pay(gas_q, len(proposals))
+                    elif fn == "list":
+                        if not timed:
+                            if d < listing_ready_day:
+                                continue
+                            wait = waits[rng.integers(len(waits))] / DAY if waits is not None and len(waits) else 0.0
+                            first = d + int(np.ceil(rng.random() + wait))
+                            if first > d + 1:
+                                listing_ready_day = first - 1
+                                continue
+                        proposals = []
+                        cash = 0
+                        for proposal in action[1]:
+                            if len(proposals) >= len(v.idle_packs) or cash + proposal > v.idle():
+                                break
+                            proposals.append(proposal)
+                            cash += proposal
+                        gas_q = Q["list"] + Q["listed"] * len(proposals)
+                        if not proposals or not affordable(gas_q, len(proposals), cash_delta=-cash):
+                            continue
+                        for proposal in proposals:
+                            v.list(next_id, proposal)
+                            next_id += 1
+                        pay(gas_q, len(proposals))
+                    else:
                         continue
-                    credit = 0
-                    checkpoints += 1
-                    g = pv(Q["checkpoint"] + Q["checkpoint_pos"] * len(v.positions), 1, True)
-                    if paid:
-                        v.pay_keeper(min(g, pool) if flows else g)  # flows: paid from the request charges
-                    if nav0_per_share is None:
-                        nav0_per_share = v.last_nav * E // v.total_shares
-                    del nav_pos
-                elif fn == "restock":
-                    if v.idle() >= act_[1] * backing:
-                        mints = v.restock(act_[1], 3, MINT_FEE)
-                        v.pay_keeper(pv(Q["restock"] + Q["pack"] * act_[1] + Q["mint"] * mints, act_[1]))
-                elif fn == "list":
-                    m = 0
-                    while m < act_[1] and v.idle_packs and v.idle() >= backing:
-                        # Listed at a uniform moment of day d, after the queue's historical wait;
-                        # the model's convention is that a listing earns from the next whole day.
-                        wait = waits[rng.integers(len(waits))] / DAY if len(waits) else 0.0
-                        first = d + int(np.ceil(rng.random() + wait))
-                        if first > d + 1:
-                            v.list(next_id, backing, STAGED)  # earns nothing yet (no activation call)
-                            stage_until[next_id] = first
-                        else:
-                            v.list(next_id, backing)
-                        next_id += 1
-                        m += 1
-                    if m:
-                        v.pay_keeper(pv(Q["list"] + Q["listed"] * m, m))
-        # Holder flows by scenario.
-        for (day, frac) in sc.get("redeem", []):
+                    rebased_now = v.acquisition_cursor - journal_own - journal_foreign - journal_rebased - journal_skipped
+                    for _ in range(rebased_now):
+                        skipped_id, _at = journal.popleft()
+                        assert skipped_id is None, "unexposed proof cannot hide an own selection"
+                    journal_rebased += rebased_now
+                    min_free = min(min_free, v.free())
+                    executed = True
+                    calls += 1
+                    trace_state(fn, d)
+                    if timed and trace is not None:
+                        trace[-1].update(action_meta)
+                    if exit_all and exit_requested and fn == "checkpoint":
+                        claim_available(gas + tip, d)
+                        holder_finished = not v.share_balance("h") and not locked_holder() and not v.locked_shares
+                    break  # The real keeper re-reads state after every successful transaction.
+                if not executed:
+                    break
+        if timed and event_kind == "keeper":
+            remaining = payload - calls
+            timed_pass_limits += int(calls and not remaining)
+            delay = clock.receipt_delay if calls else 0
+            clock.push(now + delay + (0 if calls and remaining else clock.poll), "keeper", remaining if calls and remaining else 40)
+        if calls == max_calls:
+            call_limit_days += 1
+        redemptions = list(sc.get("redeem", []))
+        if (event_kind == "cutoff") if timed else (d == days - 1):
+            operation_end_backlog = len(journal)
+            operation_end_cash, operation_end_keeper_paid, operation_end_fees = v.balance, v.keeper_paid, v.fees_received
+            operation_end_routine_paid, operation_end_routine_budget = routine_paid, v.routine_budget
+            operation_end_idle, operation_end_funding, operation_end_loose = v.idle_value, v.idle_funding, v.loose_shapes * policy.UNIT
+        if timed:
+            redemptions = [(d, 1.0)] if event_kind == "cutoff" and exit_all else ([(d, payload)] if event_kind == "redemption" else [])
+        elif exit_all:
+            redemptions.append((days - 1, 1.0))
+        for day, frac in redemptions:
             if day == d:
-                sh = v.share_balance("h") * frac // 1
+                fraction = Fraction(str(frac))
+                sh = v.share_balance("h") * fraction.numerator // fraction.denominator
+                if exit_all and frac == 1.0:
+                    exit_requested = True
+                if sh == 0:
+                    if exit_requested and v.pending_total:
+                        holder_cancelled += v.cancel("h")
+                        holder_gas += user_gas.get("cancel", 0) * (gas + tip)
+                        unknown_user_gas += int("cancel" not in user_gas)
+                    continue
                 st1 = charge_state(gas, len(v.positions), v.processing_pool)
+                st1.gas_ceiling, st1.essential_ceiling, st1.max_tip = ceiling, essential_ceiling, tip
+                st1.work_fee, st1.essential_cap = work_fee, values["essentialCapWei"]
                 ck = policy.request_charge(st1)
                 unwind = (sh * v.last_nav // v.total_shares) * policy.unwind_charge(st1) // policy.POSITION_VALUE
                 v.request_redeem("h", sh, ck, unwind)
+                trace_state("request-redeem", d)
                 paid_in += ck + unwind
-    end_nav = v.nav_now() + credit
+                holder_gas += user_gas.get("request_redeem", 0) * (gas + tip)
+                unknown_user_gas += int(exit_all and "request_redeem" not in user_gas)
+        if exit_all and exit_requested:
+            claim_available(gas + tip, d)
+            if (not v.share_balance("h") and not locked_holder()
+                    and not v.claimable.get("h", 0) and not v.pending_total and not journal and not v.receipts
+                    and not v.locked_shares):
+                break
+
+    end_nav = economic_nav(v, credit)
+    unexposed = not v.positions and not v.receipts and not v.active_count and not v.active_backing and not v.allocated_value
+    end_blocked = bool((journal and not unexposed) or v.receipts or (v.allocation_head < len(v.allocation_queue) and
+                       (v.allocation_queue[v.allocation_head] not in v.positions or
+                        v.positions[v.allocation_queue[v.allocation_head]].state != ALLOCATED))
+                       or v.allocated_value * 10_000 > end_nav * v.allocated_bound_bps)
+    assert len(journal) == v.completed_prefix - v.acquisition_cursor
+    assert journal_own + journal_foreign + journal_rebased + journal_skipped == v.acquisition_cursor
     supply = v.total_shares
-    # Holder's value: shares at end NAV plus anything already redeemed or claimable.
-    # Escrowed deposits (never priced, e.g. no keeper ran) stay cancellable at face value.
     d_ = v.pending.get("h", [0, 0])
-    unpriced = d_[0] if d_[1] >= v.epoch else 0  # priced deposits already count as shares
-    claimed = v.claimable.get("h", 0) + v.redemption_reserve + unpriced
+    unpriced = d_[0] if d_[1] >= v.epoch else 0
+    # With only this holder and no locked exit, cancelling the unpriced deposit also refunds
+    # its checkpoint charge. No work was performed, so do not invent an entry loss.
+    unpriced_refund = unpriced + (v.processing_pool if unpriced and not v.locked_shares else 0)
+    claimed = v.claimable.get("h", 0) + v.redemption_reserve + unpriced_refund
     holder = v.share_balance("h") * end_nav // supply + claimed
     locked_val = v.locked_shares * end_nav // supply
-    value_end = holder + locked_val
+    value_end = (holder + locked_val + holder_claimed + holder_cancelled + holder_keeper_pay - holder_gas
+                 if exit_all else holder + locked_val - self_serve_cost)
     ret = value_end / paid_in - 1
-    deployed = sum(p.backing + p.units * 10**16 for p in v.positions.values())
-    return dict(ret=ret * 365 / days, keeper=v.keeper_paid / deposit, mint=v.mint_fees / deposit,
+    deployed = sum(p.backing + p.value for p in v.positions.values() if p.status == ACTIVE)
+    remaining_locked = locked_holder()
+    exit_complete = (exit_requested and not v.share_balance("h") and not remaining_locked
+                     and not v.claimable.get("h", 0) and not unpriced and not journal and not v.receipts
+                     and not v.locked_shares and not end_blocked)
+    physical = (v.balance + sum(v.idle_packs) + v.loose_shapes * policy.UNIT + sum(v.recovery_packs)
+                + sum(p.value for p in v.positions.values() if p.status in (ACTIVE, ALLOCATED) or p.pack_owned)
+                + sum(p.backing for p in v.positions.values() if p.status in (ACTIVE, ALLOCATED)))
+    unreconciled_keep = sum(p.value for p in v.positions.values() if p.status == SETTLED and not p.pack_owned)
+    ledger_gap = (v.seed + paid_in + v.fees_received - v.keeper_paid - v.mint_fees - v.backing_lost
+                  - v.settlement_fees - unreconciled_keep - holder_claimed - holder_cancelled - physical)
+    assert ledger_gap == 0, ("operating asset ledger", ledger_gap)
+    assert routine_paid + essential_paid + request_paid == v.keeper_paid
+    if timed:
+        assert accrued == v.fees_received + credit + sum(p.pending_fees for p in v.positions.values()), "external fee conservation"
+    if exit_complete:
+        assert not v.locked_shares and not v.receipts
+        value_end = holder_claimed + holder_cancelled + holder_keeper_pay - holder_gas
+        ret = value_end / paid_in - 1
+    elapsed = now / DAY if timed else d + 1
+    result = dict(ret=ret * 365 / (elapsed if exit_all else days), keeper=v.keeper_paid / deposit, mint=v.mint_fees / deposit,
                 fees=v.fees_received / deposit, lost=v.backing_lost / deposit, util=deployed / max(1, end_nav),
-                positions=len(v.positions), pos_mean=float(np.mean(open_days)), pos_max=max(open_days),
-                checkpoints=checkpoints,
-                k_eff=accrued / max(1, selected * 0.0363 * E), missed_alloc=missed_alloc, keeper_unpaid=keeper_unpaid / deposit,
-                vol=float(np.mean(vol_hist)))
+                positions=len(v.positions), pos_mean=float(np.mean(open_days)), pos_max=max(open_days, default=0),
+                checkpoints=checkpoints, journal_paid=journal_paid / deposit, journal_backlog=len(journal),
+                journal_own=journal_own, journal_foreign=journal_foreign, journal_pruned=journal_pruned, journal_rebased=journal_rebased,
+                journal_scans=journal_scans, journal_scanned=journal_scanned, journal_skipped=journal_skipped,
+                avg_deployed_wei=deployed_int // max(1, days * DAY) if timed else 0,
+                avg_book_wei=book_int // max(1, days * DAY) if timed else 0,
+                gas_wait_seconds=gas_wait_seconds, deferred_terminal_seconds=deferred_seconds,
+                settlement_wait_seconds=settlement_wait_seconds,
+                terminal_work=terminal_work, pending_receipts=len(v.receipts), end_pricing_blocked=end_blocked,
+                skipped_unfunded=skipped_funding, call_limit_days=call_limit_days,
+                self_serve_gas_proxy=(holder_maintenance_gas - holder_keeper_pay if exit_all else self_serve_cost) / deposit,
+                k_eff=accrued / selected_backing if selected_backing else 0.0, missed_alloc=missed_alloc,
+                keeper_unpaid=(holder_maintenance_gas - holder_keeper_pay if exit_all else self_serve_cost) / deposit,
+                issued_entries=v.completed_prefix, processed_entries=v.acquisition_cursor,
+                routine_budget_wei=v.routine_budget, essential_budget_wei=v.essential_budget,
+                economic_nav_wei=end_nav, free_wei=v.free(), keeper_paid_wei=v.keeper_paid,
+                principal_deposit_wei=deposit, holder_paid_in_wei=paid_in,
+                holder_end_value_before_external_gas_wei=(0 if exit_complete else holder + locked_val)
+                    + holder_claimed + holder_cancelled + holder_keeper_pay,
+                min_free_wei=min_free, fees_received_wei=v.fees_received,
+                mint_fees_wei=v.mint_fees, backing_lost_wei=v.backing_lost,
+                journal_paid_wei=journal_paid, elapsed_days=elapsed,
+                external_exit_gas_proxy_wei=holder_maintenance_gas - holder_keeper_pay if exit_all else self_serve_cost,
+                vol=float(np.mean(vol_hist[:d + 1] if timed else vol_hist)), operating_days=days, exit_requested=exit_requested,
+                exit_complete=exit_complete, exit_days_elapsed=max(0, elapsed - days),
+                holder_claimed_wei=holder_claimed, holder_cancelled_wei=holder_cancelled,
+                holder_keeper_pay_wei=holder_keeper_pay, holder_gas_proxy_cost_wei=holder_gas,
+                holder_maintenance_gas_proxy_wei=holder_maintenance_gas,
+                unknown_user_gas_calls=unknown_user_gas, holder_remaining_shares=v.share_balance("h"),
+                holder_remaining_locked_shares=remaining_locked, holder_remaining_claimable_wei=v.claimable.get("h", 0),
+                holder_net_realized_wei=holder_claimed + holder_cancelled + holder_keeper_pay - holder_gas - paid_in,
+                routine_keeper_paid_wei=routine_paid, essential_keeper_paid_wei=essential_paid,
+                request_funded_keeper_paid_wei=request_paid, routine_unfunded_attempts=routine_unfunded,
+                unpaid_routine_calls=unpaid_routine_calls, zero_quote_holder_sync_calls=zero_quote_sync_calls,
+                uninterrupted_routine_funding=routine_unfunded == 0,
+                fully_paid_routine=routine_unfunded == 0 and unpaid_routine_calls == 0,
+                operation_end_backlog=operation_end_backlog,
+                operation_end_cash_wei=operation_end_cash, operation_end_keeper_paid_wei=operation_end_keeper_paid,
+                operation_end_fees_received_wei=operation_end_fees, holder_rescue_sync_enabled=rescue_sync,
+                operating_active_days=operating_active_days, operation_end_idle_value_wei=operation_end_idle,
+                operation_end_idle_funding_wei=operation_end_funding, operation_end_loose_value_wei=operation_end_loose,
+                exit_stall_journal=bool(journal and not unexposed), exit_stall_receipts=bool(v.receipts),
+                exit_stall_pending_deposit=bool(unpriced), exit_stall_locked=bool(v.locked_shares),
+                exit_stall_free_cash=bool(not exit_complete and last_cash_shortfall),
+                exit_stall_routine_budget=bool(not exit_complete and last_permission_shortfall),
+                last_unfunded_offer_wei=last_unfunded_offer, last_unfunded_cash_shortfall_wei=last_cash_shortfall,
+                last_unfunded_permission_shortfall_wei=last_permission_shortfall,
+                end_unreconciled_returned_value_wei=sum(p.value for p in v.positions.values() if p.status == SETTLED and p.pack_owned),
+                end_allocated_book_value_wei=v.allocated_value,
+                creator_mint_fees_wei=v.mint_fees, settlement_fees_wei=v.settlement_fees,
+                physical_assets_wei=physical, vault_cash_wei=v.balance, holder_liability_wei=v.redemption_reserve + v.distribution_reserve + v.claimable_total,
+                ledger_gap_wei=ledger_gap, routine_initial_cap_wei=values["routineCapWei"],
+                routine_refill_per_day_wei=values["routineRatePerDayWei"],
+                routine_period_permission_upper_wei=values["routineCapWei"] + now * values["routineRatePerDayWei"] // DAY,
+                timed_mode=timed, elapsed_seconds=now if timed else (d + 1) * DAY,
+                expired_backing_reclaims=expired_backing, expired_nft_reclaims=expired_nft,
+                purchaser_responses=purchaser_returns, late_purchaser_responses=late_purchaser_returns,
+                timed_checkpoint_count=len(timed_checkpoint_times), timed_pass_limit_hits=timed_pass_limits)
+    result.update(expected_own_selections=expected_selections, own_selections=selected,
+                  sync_credit_sweeps=sync_credit_sweeps, sync_active_fee_claims=sync_active_fee_claims,
+                  sync_fee_receipts_wei=sync_fee_receipts, sync_collection_quote_wei=sync_collection_quote,
+                  operation_end_routine_paid_wei=operation_end_routine_paid,
+                  operation_end_routine_budget_wei=operation_end_routine_budget,
+                  operating_budget_marks=operating_budget_marks)
+    if timed:
+        result.update(external_fees_generated_wei=accrued, unharvested_fee_credit_wei=credit,
+                      unharvested_listing_fees_wei=sum(p.pending_fees for p in v.positions.values()))
+    for name in op_names:
+        result[f"keeper_paid_{name}_wei"] = op_paid[name]
+        result[f"keeper_calls_{name}"] = op_calls[name]
+        result[f"holder_calls_{name}"] = holder_calls[name]
+    return result
+
+
+def self_check():
+    """Focused model regressions using the caller's recorded pool and wait inputs."""
+    rows = {}
+    rows["zero"] = run(Scenario(volume=const(0), gwei=0.15), 10, 8, days=20)
+    assert rows["zero"]["mint"] > 0 and rows["zero"]["fees"] == 0
+    rows["keeps"] = run(Scenario(volume=const(609), gwei=0.15, keep=1.0), 30, 8, days=20)
+    assert rows["keeps"]["journal_own"] > 0 and rows["keeps"]["terminal_work"] > 0
+    assert rows["keeps"]["pending_receipts"] == 0
+    rows["at_bid_ceiling"] = run(Scenario(volume=const(100), gwei=0.45), 10, 8, days=20)
+    assert rows["at_bid_ceiling"]["positions"] > 0
+    rows["above_bid_ceiling"] = run(Scenario(volume=const(100), gwei=0.5), 10, 8, days=20)
+    assert rows["above_bid_ceiling"]["positions"] == 0
+    assert rows["above_bid_ceiling"]["checkpoints"] == 0
+    assert rows["above_bid_ceiling"]["ret"] == 0  # unpriced deposit and charge remain refundable
+    values = json.loads((ROOT.parent / "deploy/mainnet.json").read_text())
+    values.update(routineCapWei=0, routineRatePerDayWei=0)
+    rows["empty_budget"] = run(Scenario(volume=const(609), gwei=0.15), 10, 8, days=10, values=values)
+    assert rows["empty_budget"]["keeper_paid_wei"] == policy.checkpoint_cost(charge_state(150_000_000, 0))
+    assert rows["empty_budget"]["checkpoints"] == 1
+    # Later foreign history can wait until the next real checkpoint/admission without
+    # requiring standalone unpaid calls or blocking a cash-only vault's pricing.
+    assert rows["empty_budget"]["journal_rebased"] > 0
+    assert not rows["empty_budget"]["end_pricing_blocked"]
+    assert rows["empty_budget"]["positions"] == 0
+    values.update(routineCapWei=5 * 10**15)
+    rows["depleted_budget"] = run(Scenario(volume=const(100), gwei=0.15), 10, 8, days=20, values=values)
+    assert rows["depleted_budget"]["checkpoints"] == 1
+    assert rows["depleted_budget"]["journal_backlog"] > 0
+    assert rows["depleted_budget"]["keeper_paid_wei"] <= 5 * 10**15 + policy.checkpoint_cost(charge_state(150_000_000, 0))
+    rows["partial_redemption"] = run(Scenario(volume=const(15), gwei=0.15, redeem=[(10, 0.5)]),
+                                     30, 8, days=20)
+    assert rows["partial_redemption"]["checkpoints"] == 2
+    assert rows["partial_redemption"]["external_exit_gas_proxy_wei"] > 0
+    for row in rows.values():
+        assert row["processed_entries"] == row["journal_own"] + row["journal_foreign"] + row["journal_rebased"]
+        assert row["issued_entries"] == row["processed_entries"] + row["journal_backlog"]
+    return rows
 
 
 def wilson(k, n, z=1.96):
@@ -449,7 +1210,7 @@ def wilson(k, n, z=1.96):
 
 
 def summarize(sc, n, runs, days=365):
-    rs = [run(sc, n, seed) for seed in range(runs)]
+    rs = [run(sc, n, seed, days=days) for seed in range(runs)]
     r = np.array([x["ret"] for x in rs])
     mean = {k: float(np.mean([x[k] for x in rs])) for k in rs[0]}
     k = int(np.sum(r < 0))
@@ -498,10 +1259,25 @@ def ci(s):
 
 
 def main():
-    global POOL, STAGING
+    global POOL, STAGING, REFUNDS_PER_SELECTION
     OUT.mkdir(exist_ok=True)
     POOL = pool_snapshot()
     STAGING = staging_delays(30)
+    db = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    end, end_block = db.execute("SELECT max(ts),max(block) FROM logs").fetchone()
+    statuses = [json.loads(a)["status"] for (a,) in db.execute(
+        "SELECT args FROM logs WHERE event='AcquisitionProcessed' AND ts>=?", (end - 30 * DAY,))]
+    successes = sum(int(status) == 2 for status in statuses)
+    REFUNDS_PER_SELECTION = (len(statuses) - successes) / successes if successes else 0.0
+    db.close()
+    if len(sys.argv) > 1 and sys.argv[1] == "--self-check":
+        results = self_check()
+        print(json.dumps(dict(block=end_block, end_timestamp=end, pool_listings=len(POOL),
+                              completed30d=len(statuses), successful30d=successes,
+                              context="model scenarios; gwei is basefee, bid includes maxTip; no return gate claim",
+                              results=results), indent=1))
+        print(f"PASS: {len(results)} focused forward model scenarios")
+        return
     vol, first = successful_daily()
     last30, last14, last7 = vol[-30:], vol[-14:], vol[-7:]
     spike = int(np.argmax(last30))
@@ -509,14 +1285,14 @@ def main():
     runs = int(sys.argv[1]) if len(sys.argv) > 1 else 400
     md = ["# PackVault economics: gate, expectation, forward simulation\n",
           "Generated by `python3 sim/forward.py " + str(runs) + "`. Data: `sim/data/fwa.sqlite`, FWA, rewards and oracle "
-          "events through block 26,425,500 (`python3 sim/ingest.py`); pool snapshot at the end of that history; "
+          f"events through block {end_block:,}, timestamp {end} (`python3 sim/ingest.py`); pool snapshot at the end of that history; "
           "volume = acquisitions per UTC day that reached a selection (refunded requests distributed no fees). "
           "The historical replay and its reconciliation with these numbers are in `sim/out/backtest_audit.md`.\n",
           f"Pool: {len(POOL):,} listings, harmonic backing {len(POOL) / np.sum(1 / POOL):.4f} ETH. Successful acquisitions "
           f"per day: last 7 d {last7.mean():.0f}, last 14 d {last14.mean():.0f}, last 30 d {last30.mean():.0f} "
           f"({last30_ex.mean():.0f} without the {last30.max():.0f} of Oct 31), 30-day median {np.median(last30):.0f}.",
-          "Vault: 3-unit packs (P = 0.03 ETH) at the 0.0363 cap; k = 1.0385; keeper pay V1 (quoted gas + work fee, no premium); maxTip 0.05 gwei; "
-          f"gas ceiling {CEILING} gwei; FWA tokens at zero; purchasers take the bid unless stated (keeps pay the vault more).\n",
+          "Forward fixture: 3-unit packs (P = 0.03 ETH), with backing proposed from the current policy; the research pack size does not change production sizing rules. The closed form uses fixed B = 0.0363 ETH as a theoretical comparison. Keeper pay V1 uses quoted gas + work fee, no premium; maxTip 0.05 gwei; "
+          f"gas ceiling {CEILING} gwei; scenario gwei is basefee and actual bid is basefee + maxTip. FWA tokens have zero value; purchasers take the bid unless stated. Gas quotes require candidate calibration; this report alone does not validate the return or launch gate.\n",
           f"FWA staging (audit E7): the keeper lists only when FWA's queue is drained, so a relist never stages; each "
           f"listing first waits the queue's historical drain time, sampled from {len(STAGING)} relist moments in the last "
           f"30 days ({100 * np.mean(STAGING > 0):.1f}% found the queue busy; waits up to {STAGING.max() / 3600:.1f} h). "
@@ -525,20 +1301,22 @@ def main():
     # 1. The formal gate, as approved: trailing 30-day volume, tokens at zero.
     md += ["## 1. Formal economic gate (owner's definition)\n",
            f"Gate: 10%/yr net of gas at trailing-30-day volume, tokens at zero, at the {CEILING} gwei gas ceiling (D42); "
-           "bid outcome positive at the ceiling; a usable exit window each day. 0.15 gwei is spot at the pinned block. "
+           "bid outcome positive at the ceiling; a usable exit window each day. The ceiling row uses 0.45 gwei basefee plus the 0.05 gwei tip. The closed form omits global journal overhead and is a theoretical comparison. 0.15 gwei is basefee at the pinned block. "
            "Above the ceiling the keeper waits; calls are still accepted, paid at the ceiling price (D51).\n",
-           "| gas | net per bid cycle (mETH) | closed form, 100 positions | forward sim mean, 100 positions | passes 10%? |",
+           "| basefee / bid | net per bid cycle (mETH) | closed form, 100 positions | forward sim mean, 100 positions | 10% comparison |",
            "|---|---|---|---|---|"]
     gate = {}
-    for g in (0.15, CEILING):
+    for g in (0.15, max(0, CEILING - 0.05)):
         x = expectation(100, last30.mean(), g)
         sm = summarize(Scenario(volume=boot(last30), gwei=g), 100, runs)
-        gate[g] = (x, sm)
-        md.append(f"| {g} gwei | {x['net_meth']:+.3f} | {pct(x['apr'])} | {pct(sm['mean'])} (p5 {pct(sm['p5'])}) | "
-                  f"{'yes' if x['apr'] >= 0.10 else 'no'} (closed form); {'yes' if sm['mean'] >= 0.10 else 'no'} (sim) |")
+        gate[min(g + 0.05, CEILING)] = (x, sm)
+        comparison = (f"not established: {100 * sm['m_end_pricing_blocked']:.0f}% end with pricing blocked"
+                      if sm["m_end_pricing_blocked"] else "above threshold" if sm["mean"] >= 0.10 else "below threshold")
+        md.append(f"| {g:.2f} / {g + 0.05:.2f} gwei | {x['net_meth']:+.3f} | {pct(x['apr'])} | {pct(sm['mean'])} (p5 {pct(sm['p5'])}) | "
+                  f"{comparison}; candidate validation separate |")
         print(md[-1], flush=True)
     md.append(f"\nBid outcome at the {CEILING} gwei ceiling: {gate[CEILING][0]['net_meth']:+.3f} mETH per cycle. New packs "
-              "need a quoted price below ~0.52 gwei (one bid cycle must repay the build); the closed form assumes positions already "
+              "must repay their build from one bid cycle under the current policy; the closed form assumes positions already "
               "exist. Exit windows: 59 of the last 60 blackouts had a drained queue (Phase 0.2).\n")
 
     md += ["## 2. Expectation (closed form, per position, no variance)\n",
@@ -553,10 +1331,9 @@ def main():
     gross = 0.0363 * (k_of() - 1)
     fee = WORK_FEE / E
     build_g = policy.Q["pack"] + policy.Q["mint"] * 3 // 10 + policy.Q["listed"]
-    md.append(f"\nBreak-even quoted price for a bid cycle (D56: quoted gas {policy.CYCLE_GAS:,} = resolve 75k + relist 530k "
-              f"+ harvest share 15k, + 2 work fees; V1 pays no markup): {(gross - 2 * fee) / policy.CYCLE_GAS * 1e9:.2f} gwei. "
-              f"New packs (build {build_g:,} quoted gas, mint fee share 0.0003 ETH and one more work fee on top): "
-              f"below {(gross - 0.0003 - 3 * fee) / (policy.CYCLE_GAS + build_g) * 1e9:.2f} gwei quoted price "
+    md.append(f"\nBreak-even quoted price for a bid cycle (D56: quoted gas {policy.CYCLE_GAS:,}, including own journal, selection, terminal, cleanup, relist and harvest components, plus 2 work fees; V1 pays no markup): {(gross - 2 * fee) / policy.CYCLE_GAS * 1e9:.2f} gwei. "
+              f"New packs (build {build_g:,} quoted gas, mint fee share 0.0003 ETH and two additional work fees): "
+              f"below {(gross - 0.0003 - 4 * fee) / (policy.CYCLE_GAS + build_g) * 1e9:.2f} gwei quoted price "
               "(basefee + 0.05 gwei tip).\n")
 
     def g_path(base, high, start, stop=10**9):
@@ -573,7 +1350,7 @@ def main():
         ("15/day", dict(volume=const(15), gwei=0.15), (100,)),
         ("decline 97 -> 10/day over the year", dict(volume=decline(97, 10), gwei=0.15), (100,)),
         ("inactive after 60 days", dict(volume=stop_after(last14, 60), gwei=0.15), (100,)),
-        ("last 14 d at the 0.5 gwei ceiling", dict(volume=boot(last14), gwei=0.5), (100,)),
+        ("last 14 d at 0.5 gwei bid ceiling (0.45 basefee)", dict(volume=boot(last14), gwei=0.45), (100,)),
         ("enter at 0.15 gwei, 0.4 gwei from day 30 on", dict(volume=boot(last14), gwei=g_path(0.15, 0.4, 30)), (100,)),
         ("enter at 0.15 gwei, 1.0 gwei (above ceiling) from day 30 on", dict(volume=boot(last14), gwei=g_path(0.15, 1.0, 30)), (100,)),
         ("enter at 0.15 gwei, 2.0 gwei (above ceiling) days 30-120", dict(volume=boot(last14), gwei=g_path(0.15, 2.0, 30, 120)), (100,)),
@@ -588,14 +1365,19 @@ def main():
         ("pool shrinks to half", dict(volume=boot(last14), gwei=0.15, pool_scale=0.5), (100,)),
         ("half of checkpoints missed", dict(volume=boot(last14), gwei=0.15, checkpoint_miss=0.5), (100,)),
     ]
-    md += ["## 3. Forward simulation (one year, daily, reconciled vault model + live keeper policy)\n",
+    md += ["## 3. Forward simulation (one year, daily integer vault model + live keeper policy)\n",
            f"{runs} runs per row. One year, so the raw return is the annual return. Every expense is included: keeper gas "
            "pay, mint fees, FWA settlement fees, backing lost to purchasers. The simulation holds real cash: a relist "
            "needs backing the vault has, a pack waits for its purchaser's settlement, and redemptions are paid before "
-           "anything is redeployed. Positions: the initial target / mean held / most held (cap 300; NAV growth can "
-           "add positions). P(loss) with a 95% interval.\n",
+           "anything is redeployed. Positions: the initial target / mean held / most held; capital and transaction "
+           "work limits bound deployment, with no total position cap. Global journal processing includes foreign "
+           "and refunded records, at the historical completed/refunded ratio. Routine calls wait when budget or free cash cannot fund their full quote. "
+           "Self-serve exits use a separate quoted-gas cost proxy paid by the withdrawing holder, outside vault NAV. "
+           "Selection timing is a daily approximation. End values use an independent mark when pricing is blocked; "
+           "the reported blocked flag must not be treated as a completed redemption. Calls are capped at512 per modeled day, "
+           "with any remaining journal retained. P(loss) with a 95% interval.\n",
            "| scenario | positions (target/mean/max) | mean (± s.e.) | p5 | median | p95 | worst run | P(loss) | fees/dep | "
-           "lost/dep | keeper/dep | mint/dep |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+           "lost/dep | keeper/dep | mint/dep | pricing blocked | journal backlog |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     results = {}
     for name, sc, sizes in scen:
         for n in sizes:
@@ -604,7 +1386,7 @@ def main():
             md.append(f"| {name} | {n}/{sm['m_pos_mean']:.0f}/{sm['m_pos_max']:.0f} | {pct(sm['mean'])} ± {100 * sm['se']:.1f} | "
                       f"{pct(sm['p5'])} | {pct(sm['p50'])} | {pct(sm['p95'])} | {pct(sm['worst'])} | {ci(sm)} | "
                       f"{100 * sm['m_fees']:.0f}% | {100 * sm['m_lost']:.0f}% | {100 * sm['m_keeper']:.2f}% | "
-                      f"{100 * sm['m_mint']:.2f}% |")
+                      f"{100 * sm['m_mint']:.2f}% | {100 * sm['m_end_pricing_blocked']:.0f}% | {sm['m_journal_backlog']:.0f} |")
             print(md[-1], flush=True)
 
     md += ["\n## 4. Deployment slowdown (keeper stops building new packs while 7-day volume is low)\n",

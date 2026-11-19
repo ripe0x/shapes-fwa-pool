@@ -1,0 +1,96 @@
+{
+  "base_revision": "d1b59f11fb74ed6ae9b3841298e70fb189eaaa6f",
+  "status": "affected checks passed; receipt calibration and economic acceptance pending",
+  "source_sha256": {
+    "src/PackVault.sol": "448106b8915413badef411355a5cb729ca15046743be768919d74e9349ddcd8b",
+    "src/VaultLib.sol": "1a5407f1044f0e79b874ee77cd6936bb53438b020f4c8e093db200909990490f",
+    "sim/vault.py": "e958d86859ff9ddd9e2766459683f77cf9caea9ac87691be6360d2e92614ba7a",
+    "sim/test_vault.py": "b8234fa12d05967abfe7cc92a636d98a3ec46b5eed9f82b40c91b0bbf181e508",
+    "keeper/policy.py": "cba78633858db621b48bf729571673f84693e503d6d49eecda0cb905730703a2",
+    "keeper/test_policy.py": "132a535796c934998a246c36cef61178fe5f1f8f90e4dbe463c2149965c0b9f9",
+    "test/fork/EfficientJournal.t.sol": "b1fa04ccb65f471456c494a1474fbbfea7a41a455f302caba2b2c89f29e29aa0",
+    "test/fork/ForkIncrementalProduction.t.sol": "8f291879a30db49a4f1bdf640aaa096e0f68aba012f13afd12c2fc84ada65a8f",
+    "test/fork/ForkJournalGas.t.sol": "1edbc7b801343803e72026260a572887e5e82a7f2e5a66c1720c9b3b7a4d8bef",
+    "test/fork/ForkSelection.t.sol": "bbab3d70af0fa573832824fb15ad66852dd9c84b1a69c7dee11935381f63cd12",
+    "test/fork/ForkVaultLifecycle.t.sol": "b79cab671f67cf4df945278cfe4d0be5e5e1c8be154016c66688c359c97b1e2f",
+    "test/utils/TestVaultOps.sol": "f2397c303b8e33b5664efde087a678cc54f3a2c41dc12f4f5f0a25530e10ec9d",
+    "test/fork/ReviewJournal.t.sol": "521bd24bb59d8d6ce427bfda81fb9ee466db233221ff02ed84148a069a7b5c02",
+    "test/fork/ReviewBootstrap.t.sol": "550de7d7cd53782027f14239f98be6b4adf45e9fbe1f391920c16d8bd4e41547"
+  },
+  "checks": [
+    {
+      "scope": "five real FWA refund/full-job/holder/distribution journal regressions",
+      "command": "forge test --match-path test/fork/EfficientJournal.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "passed": 5,
+      "log": "docs/receipts/efficient-journal-focused.txt"
+    },
+    {
+      "scope": "incremental production affected suite before caller expectation migration",
+      "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 1,
+      "passed": 13,
+      "failed": 3,
+      "log": "docs/receipts/efficient-production-before-caller-repairs.txt",
+      "reason": "Old selective journal/prune expectations; all three revised to assert automatic ordered journal+terminal+prune and unpaid optional tails, preserving protected bucket checks."
+    },
+    {
+      "scope": "three repaired production caller expectations",
+      "exit_status": 0,
+      "passed": 3,
+      "log": "docs/receipts/efficient-production-caller-repairs.txt",
+      "command": "forge test --match-path test/fork/ForkIncrementalProduction.t.sol --match-test 'test_(receiptBeforeJournalBlocksPricingAndSyncOrdersReconciliation|realRefundedForeignTailDoesNotEarnImmediateCompensation|terminalReconciliationPrunesItsHeadWithoutAnotherPaidCall)' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv"
+    },
+    {
+      "scope": "unexposed actual foreign successful history remains unpaid",
+      "command": "forge test --match-path test/fork/ForkJournalGas.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "passed": 1,
+      "log": "docs/receipts/efficient-unexposed-journal.txt"
+    },
+    {
+      "scope": "affected lifecycle and authentic selection callers",
+      "command": "forge test --match-contract '^(ForkSelectionTest|ForkVaultLifecycleTest)$' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "passed": 17,
+      "log": "docs/receipts/efficient-lifecycle-selection-callers.txt"
+    },
+    {
+      "command": "python3 sim/test_vault.py",
+      "exit_status": 0,
+      "passed": 14,
+      "log": "docs/receipts/efficient-accounting-model-tests.txt"
+    },
+    {
+      "command": "python3 keeper/test_policy.py",
+      "exit_status": 0,
+      "log": "docs/receipts/efficient-policy-tests.txt"
+    },
+    {
+      "scope": "minimum-seed and cash-only backlog exit callers",
+      "command": "forge test --match-contract '^(ReviewBootstrapTest|ReviewJournalTest)$' --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+      "exit_status": 0,
+      "passed": 5,
+      "log": "docs/receipts/efficient-bootstrap-cash-callers.txt",
+      "source_note": "ReviewJournal emitted meter labels corrected afterwards only; raw gross labels in this preserved log are caller-meter plus intrinsic proxies, not true gross or billed receipts."
+    }
+  ],
+  "evidence_sha256": {
+    "docs/receipts/efficient-journal-focused.txt": "f1d7391a3822b42a230ada7ebcb573e57c019ea70104eff4fc77bdc2fbafbd4f",
+    "docs/receipts/efficient-production-before-caller-repairs.txt": "4238f5fc365aa80884086ffe278b706736fa29b7bab1a578921c2fc3bad4f8ad",
+    "docs/receipts/efficient-production-caller-repairs.txt": "61fdbf4132310c700e4278e1a8e52829747e456df572b39392456764e5bd8e33",
+    "docs/receipts/efficient-unexposed-journal.txt": "0c257bb815531bbf6da58ac9cd076dc21a1be24c7ec25d58aa8025b791f1120f",
+    "docs/receipts/efficient-lifecycle-selection-callers.txt": "b165edb3a01585a3ad4ed87870ed174ddd844519c68b67aeb19fa8d7fa6c060a",
+    "docs/receipts/efficient-accounting-model-tests.txt": "4c36b42d0c0aac9cb059f13f02b307b6ea5e30373f1e16b77ebbe954a54cc573",
+    "docs/receipts/efficient-policy-tests.txt": "4fea7cddeaf38b87d1ede6e9754958201af25be17441629419ed9bdac8fecf6f",
+    "docs/receipts/efficient-bootstrap-cash-callers.txt": "46ff7ff8e5cb584e9d5ec1ed511928ca6c330dd9bec50f6e9d5ca8119de468e3"
+  },
+  "limitations": [
+    "No real 17-own-selection consecutive burst or maximum combined128global/16own/16terminal/16prune measured.",
+    "Unexposed successful history is an unpaid constant-work rebase, not exposed successful foreign journal cost.",
+    "Foundry gasleft/caller meters are proxies; finalized gas/refund interpretation is superseded by restock-efficiency-meter-correction.json.",
+    "Failed python3 -m unittest sim.test_vault invocation had no PYTHONPATH for vault; repository python3 sim/test_vault.py command passed.",
+    "This affected verification does not establish broad release acceptance or economic outcomes.",
+    "Operator essential-budget status wording narrowed after policy checks; sync payment logic unchanged. ReviewJournal meter labels alone corrected after the archived caller check."
+  ]
+}

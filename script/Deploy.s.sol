@@ -33,7 +33,6 @@ contract Deploy is Script {
         p.essentialCeiling = uint64(fit(v, ".essentialCeilingWei", type(uint64).max));
         p.maxTip = uint64(fit(v, ".maxTipWei", type(uint64).max));
         p.workFee = uint64(fit(v, ".workFeeWei", type(uint64).max));
-        p.maxPositions = uint96(fit(v, ".maxPositions", type(uint96).max));
         p.reserve = uint128(fit(v, ".reserveWei", type(uint128).max));
         p.tvlCap = uint128(fit(v, ".tvlCapWei", type(uint128).max));
         p.routineCap = uint64(fit(v, ".routineCapWei", type(uint64).max));

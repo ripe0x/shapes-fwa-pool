@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/sim/efficient_operating.py", line 127, in <module>
+    main()
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/sim/efficient_operating.py", line 72, in main
+    checks = focused_checks(gas)
+             ^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/sim/efficient_operating.py", line 47, in focused_checks
+    assert zero['exit_complete'] and zero['journal_backlog'] == 0
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

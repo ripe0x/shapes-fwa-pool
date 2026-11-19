@@ -1,0 +1,45 @@
+{
+  "revision": "a4496adaba9048170ba39f1255783dccf891f163",
+  "scope": "Focused no-broadcast real mainnet fork history, no persisted external protocol or fabricated approvals/balances/state",
+  "source_sha256": {
+    "src/PackVault.sol": "1dc1ddb5d4c09057f34797efdff5d87929898c51bda671423de23625e7687af2",
+    "src/VaultLib.sol": "259d85003ff2392be404ead8d067edc92b1277044ee905e4f3640235bc760aae",
+    "src/KeeperPolicy.sol": "6a2336d6bfd1b86050eadd103261477284abfe2234fe774fc30a2b9b22c70c7a",
+    "test/fork/ReviewJournal.t.sol": "6cc2e95fbc91bb799bafe1248ec96f850b0a1ed9416d18089d95bd53aa720129",
+    "keeper/review_journal_calibration.py": "fe70b06c547aa88df103b957a15bbfeb9b83cdceb05c62fc749f8ba0a346ae56",
+    "docs/receipts/review-journal-local-plan.json": "06cac5f1df177aced2d186488fe6543861ec76282cd30124d1a02539fa71dd9e"
+  },
+  "command": "forge test --match-path test/fork/ReviewJournal.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100 -vv",
+  "exit_status": 0,
+  "result": {
+    "passed": 2,
+    "failed": 0,
+    "successful_foreign_records": 269,
+    "genuine_refunded_records": 16,
+    "basefee_wei": 150000000,
+    "gasprice_wei": 200000000,
+    "cash_only_rebase_gross_gas": 121884,
+    "full_holder_calls_gross_gas": 681114,
+    "full_holder_calls_gross_cost_proxy_wei": 136222800000000,
+    "actual_claim_wei": 1999894649974540410
+  },
+  "logs": {
+    "passing": "docs/receipts/review-journal-focused-final.txt",
+    "initial_fixture_failure": "docs/receipts/review-journal-failed-fixture.txt",
+    "first_cash_only_wrong_expected_amount_failure": "docs/receipts/review-journal-first-focused-network.txt",
+    "missing_node": "docs/receipts/review-journal-missing-node.txt"
+  },
+  "local_batch": {
+    "broadcast_transactions": 0,
+    "endpoint": "http://127.0.0.1:8557",
+    "expected_pid": 10583,
+    "result": "ownership guard stopped before node mutation; process absent and connection refused"
+  },
+  "limitations": [
+    "Gross intrinsic-plus-execution meters are not billed receipts or precise keeper profits; transaction refunds not deducted.",
+    "Holder request/rebase/checkpoint/claim summed gas is four separate complete calls; the test harness total includes real request setup and is not a broadcast transaction.",
+    "Cash-only vault has no FWA exposure and safely skips the prefix unpaid; no exposed successful/refunded backlog exit or new small/full/tail billed calibration has been proved.",
+    "Historical external FWA state advances normally; only local vault/policy/library persist. No protocol approvals persist.",
+    "No positive return, funding sufficiency, O2/O6 pass, mainnet readiness or full audit claim."
+  ]
+}

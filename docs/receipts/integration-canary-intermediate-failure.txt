@@ -1,0 +1,58 @@
+vault 0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f
+[deployed] balance 0.010000 open 0 idle 0 loose 0 tokens 0 lastNav 0.000000
+  event index at block 26389533; target 26418562; next pass resumes bounded replay
+  
+  event index at block 26405533; target 26418562; next pass resumes bounded replay
+  
+  policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v1
+  gas 0.060 gwei, 0 open, 0 idle packs, idle 0.0050 ETH, cycle net 1.281 mETH, 7d volume 96/day
+  status OK [ok] operating normally
+  sent checkpoint nonce 11 hash 0x2f8ae72d5dec4e71c1148b5dc4303e2d66ee6bd14bce4145c7205cbbcfbc7b55
+  mined checkpoint gas 231582 (est 253708) cost 13834872408474 pay 43896282800000 net 30061410391526 wei
+  sent restock nonce 12 hash 0xd285f867f5af8c29f91118f357d35b9589829e6266607a69bce4f6c5bf37f7a3
+  mined restock gas 10324101 (est 11319110) cost 604295627616318 pay 792934407340000 net 188638779723682 wei
+  sent list nonce 13 hash 0xaf0528bfad78091b1bc5160de5658d3526749c5e19bd488bf29939026b6ce6d5
+  mined list gas 6465556 (est 6643660) cost 373922487216888 pay 557891026240000 net 183968539023112 wei
+  sent list nonce 14 hash 0x0d3a602c39d1de491ac8db02abf703c48b85b361dd8a1462d7a1915ebac4f9cb
+  mined list gas 1855388 (est 1920692) cost 105877517693484 pay 150135243490000 net 44257725796516 wei
+  sent restock nonce 15 hash 0x08d457fd08405c3a00209586d18089e95269baeb6299b6d8cbe6270a8a4cf288
+  mined restock gas 10283830 (est 11321616) cost 578325567128170 pay 769674721870000 net 191349154741830 wei
+  sent list nonce 16 hash 0x10f71787009ac8c62d81c11c4b7fe17ee67b011e2db0d4890a24a4e5c2b0dd3d
+  mined list gas 6348544 (est 6526648) cost 353766741996800 pay 543381636000000 net 189614894003200 wei
+  sent list nonce 17 hash 0xb71b9aa53e4f5092113fefc98876f5acacfeff5908f997ea29653ecaa106f051
+  mined list gas 1838288 (est 1903592) cost 101399931152528 pay 146458763330000 net 45058832177472 wei
+  sent restock nonce 18 hash 0x3c1d17eb13693ab6343ce4fb15910a3fd2a1274ad8049fa7c35ccb545fc3c5b1
+  mined restock gas 9956363 (est 10861211) cost 543164474978041 pay 714906941135000 net 171742466156959 wei
+  sent list nonce 19 hash 0x0cec86ec8c0232f5b920f08ce2e106cafce6385c24993e2015c5a4be91297934
+  mined list gas 6395068 (est 6573172) cost 346447289956316 pay 532718062560000 net 186270772603684 wei
+  sent list nonce 20 hash 0xdcedce6648dc8a891cf8bd600558afa54eac2ab4eae9d8cf60ede013412cf84d
+  mined list gas 1051674 (est 1090178) cost 56541775008030 pay 79408772475000 net 22866997466970 wei
+  done: 10 sent, 0 failed
+  
+[priced] balance 0.034014 open 29 idle 0 loose 3 tokens 0 lastNav 2.000000
+  policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v1
+  gas 0.053 gwei, 29 open, 0 idle packs, idle 0.0290 ETH, cycle net 1.289 mETH, 7d volume 96/day
+  status OK [ok] operating normally
+  nothing to do
+  
+  policy 0xB0858Bf1b8a167188847499B3008E597B57EAEBc v1
+  gas 0.053 gwei, 29 open, 0 idle packs, idle 0.0290 ETH, cycle net 1.289 mETH, 7d volume 96/day
+  status OK [ok] operating normally
+  nothing to do
+  
+[deployed capital] balance 0.034014 open 29 idle 0 loose 3 tokens 0 lastNav 2.000000
+  FWA staged 0 of 29 listings
+  staged after admission: 0
+  buyback contract holds 0.000000 ETH
+Traceback (most recent call last):
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/rehearse_canary.py", line 390, in <module>
+    main()
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/rehearse_canary.py", line 230, in main
+    send(KICKER, bb, "buyback()")
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/rehearse_canary.py", line 74, in send
+    return B.send(frm, to, sig, a, value or 0, expect)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/rehearsal_batch.py", line 178, in send
+    raise RuntimeError(f"preflight failed: {action}: {estimate.stderr}")
+RuntimeError: preflight failed: {'sender': '0x2C42b18832Cef2Eb8C8C0f83250700176694E341', 'nonce': 2, 'to': '0xaba91665cdf921F0f6B33A099337336B324c9793', 'target_runtime_sha256': '014027a98db4ac6a9d981d49fd40514a82cc9032752a634a7cddd4619811c8d4', 'function': 'buyback()', 'arguments': [], 'value_wei': 0, 'expected_success': True, 'calldata': '0xf8ec6911'}: Error: server returned an error response: error code 3: execution reverted: custom error 0x3dc61b4a, data: "0x3dc61b4a"
+

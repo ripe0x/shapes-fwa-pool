@@ -1,0 +1,109 @@
+Compiling 7 files with Solc 0.8.30
+Solc 0.8.30 finished in 27.50s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:177:35:
+    |
+177 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:574:5:
+    |
+574 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:16:9:
+   |
+16 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditActivationGas.t.sol:12:5:
+   |
+12 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditOracleGas.t.sol:11:5:
+   |
+11 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkIncrementalProduction.t.sol:35:5:
+   |
+35 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+   --> test/fork/ForkIncrementalProduction.t.sol:534:5:
+    |
+534 |     function assertPendingGasEnvironment() external {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+   --> test/fork/ForkIncrementalProduction.t.sol:727:5:
+    |
+727 |     function assertStagingGasContext() external {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Ran 2 tests for test/fork/ForkVaultAdversarial.t.sol:ForkVaultAdversarialTest
+[PASS] test_buildAboveCeilingPaidAtCeilingPrice() (gas: 3413808)
+[PASS] test_keeperBatchesFitTxCap() (gas: 28077896)
+Logs:
+  restock 10 packs: 10327929
+  list 8: 6426738
+  unlist 10: 2683152
+  liquidate 10 packs + loose: 1747824
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 6.11s (5.20s CPU time)
+
+Ran 1 test for test/fork/ForkIncrementalProduction.t.sol:ForkProductionInventoryTest
+[PASS] test_pendingBlockBasefeeNeedsFreshEconomicProposal() (gas: 4966810)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 6.11s (5.14s CPU time)
+
+Ran 2 tests for test/fork/ForkBacking.t.sol:ForkBackingTest
+[PASS] test_exemptListsAtFloor() (gas: 5715054)
+[PASS] test_gasOptimalAboveFloorAtHighCeiling() (gas: 722695)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 6.12s (10.26s CPU time)
+
+Ran 1 test for test/audit/release/AuditOracleGas.t.sol:AuditOracleGas
+[PASS] test_emptyOracleAddressRejectedBeforeWindDownExit() (gas: 7787429)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 6.12s (5.15s CPU time)
+
+Ran 1 test for test/audit/release-b/AuditB.t.sol:AuditBBudget
+[PASS] test_oneExitEmptiesEssentialBudget() (gas: 46241583)
+Logs:
+  built, listed 20 20
+  routine paid for the build, routine budget left 8392000000000000 21608000000000000
+  idle packs, idle ETH 0 614608000001900001
+  alice's redeem charge (checkpoint + unwind) wei 15419189719642996
+  unlist pay 6780000000000000
+  liquidate #1 pay 2125000000000000
+  liquidate #2 pay 1095000000000000
+  essential budget after unlist + liquidate 0
+  idle packs left, loose shapes left 0 0
+  essential paid in total vs unwind charge alice paid 10000000000000000 15419189719642996
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 6.25s (4.37s CPU time)
+
+Ran 1 test for test/fork/ForkKeeperPay.t.sol:ForkKeeperPayTest
+[FAIL: the attacker completes the exit before net profit is measured: 9602540192242964 != 0] test_manufacturedCycleLosesAtMaxima() (block: 26424971) (gas: 68961304)
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 6.36s (4.62s CPU time)
+
+Ran 1 test for test/audit/release/AuditActivationGas.t.sol:AuditActivationGas
+[PASS] test_busyQueueRefusesListing() (gas: 57845043)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 6.75s (6.28s CPU time)
+
+Ran 7 test suites in 7.16s (43.82s CPU time): 8 tests passed, 1 failed, 0 skipped (9 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/fork/ForkKeeperPay.t.sol:ForkKeeperPayTest
+[FAIL: the attacker completes the exit before net profit is measured: 9602540192242964 != 0] test_manufacturedCycleLosesAtMaxima() (block: 26424971) (gas: 68961304)
+
+Encountered a total of 1 failing tests, 8 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 1 failed test
+Tip: Run `forge test --debug --match-test <TEST_NAME>` to inspect one failing test in the debugger
