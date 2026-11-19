@@ -435,8 +435,11 @@ def status(s, planned=None):
         out.append(("JOURNAL_CATCHUP", "wait", f"{s.completed_prefix - s.journal_cursor} completed global entries remain"))
         floor = journal_backlog_floor(s)
         out.append(("JOURNAL_FUNDING", "info", f"packed journal floor {floor} wei; free {s.free} wei; routine permission {s.routine_budget} wei"))
-        if floor > min(s.free, s.routine_budget):
-            out.append(("MAINTENANCE_UNFUNDED", "wait", "new exposure waits for maintenance cash or routine permission"))
+        short = [name for name, have in (("cash", s.free), ("permission", s.routine_budget)) if floor > have]
+        if short:
+            # Cash is ETH the vault holds; permission is the routine budget. Neither creates the other.
+            out.append(("MAINTENANCE_UNFUNDED", "wait", f"new exposure waits: known backlog {floor} wei exceeds "
+                        + " and ".join(f"routine {n}" for n in short)))
     if s.pending_receipts:
         out.append(("RECEIPTS_PENDING", "wait", f"{s.pending_receipts} identified payments require reconciliation"))
     if s.allocation_stale:

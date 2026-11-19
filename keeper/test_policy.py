@@ -127,6 +127,17 @@ def main():
     assert "sync" in fns(plan(blocked))
     assert not {"restock", "list"} & set(fns(plan(blocked)))
     assert "MAINTENANCE_UNFUNDED" in {c for c, _, _ in status(blocked)}
+    # Cash shortage, permission shortage and keeper profitability stay distinct, and each clears.
+    detail = lambda st: next(d for c, _, d in status(st) if c == "MAINTENANCE_UNFUNDED")  # noqa: E731
+    assert "routine permission" in detail(blocked) and "routine cash" not in detail(blocked)
+    cash_short = state(journal_cursor=0, completed_prefix=128, open_positions=1, free=1, idle_eth=E, idle_packs=1,
+                       routine_budget=E, markup_bps=0)
+    assert "routine cash" in detail(cash_short) and "routine permission" not in detail(cash_short)
+    assert not {"restock", "list"} & set(fns(plan(cash_short)))
+    resumed = state(journal_cursor=0, completed_prefix=128, open_positions=1, free=E, idle_eth=E, idle_packs=1,
+                    routine_budget=E, markup_bps=0)
+    assert "MAINTENANCE_UNFUNDED" not in {c for c, _, _ in status(resumed)}
+    assert "list" in fns(plan(resumed)) or "restock" in fns(plan(resumed)) or "sync" in fns(plan(resumed))
     assert "checkpoint" not in fns(plan(state(journal_cursor=7, completed_prefix=8, pending_deposits=E, open_positions=1)))
     assert "checkpoint" in fns(plan(state(journal_cursor=7, completed_prefix=100_007, pending_deposits=E)))
     assert "sync" not in fns(plan(state(journal_cursor=7, completed_prefix=100_007)))

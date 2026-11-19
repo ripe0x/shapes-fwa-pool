@@ -1,0 +1,297 @@
+{
+ "steps": [
+  {
+   "step": "primary prices the deposit at the blackout",
+   "at_block": 26450245
+  },
+  {
+   "step": "keepers build and list",
+   "at_block": 26450255
+  },
+  {
+   "step": "replacement prices the redemption through a lost RPC response",
+   "at_block": 26450272
+  },
+  {
+   "step": "backup completes a clean pass",
+   "at_block": 26450272
+  }
+ ],
+ "fork_block": 26450200,
+ "fork_hash": "0xda7052eb890b621f2ed635feb0af056e155f801305427af666aa7930d4baabc5",
+ "image": "packvault-keeper:dbed2de952d0b4e2b6bed8004a945172f3dbe407",
+ "foundry": "cast Version: 1.8.1",
+ "postflight": "postflight passed: 0x9514d311d248663d7ebc4f41a68412f3daad24f0 policy 0x23C94C8692B4187c512Bc2c2391AaE3d07E2a339 library 0xFb4f180f662f1c159D5eD7b99B76d32D45b19D43 owner 0x7683eaAFbF5f8d94004a703bF0c85248C0B1AcCa\nverification commands (Etherscan; ETHERSCAN_API_KEY from your environment):\n  forge verify-contract 0xFb4f180f662f1c159D5eD7b99B76d32D45b19D43 src/VaultLib.sol:VaultLib --chain mainnet --watch\n  forge verify-contract 0x23C94C8692B4187c512Bc2c2391AaE3d07E2a339 src/KeeperPolicy.sol:KeeperPolicyV1 --chain mainnet --watch\n  forge verify-contract 0x9514d311d248663d7ebc4f41a68412f3daad24f0 src/PackVault.sol:PackVault --chain mainnet --guess-constructor-args --libraries src/VaultLib.sol:VaultLib:0xFb4f180f662f1c159D5eD7b99B76d32D45b19D43 --watch",
+ "vault": "0x9514d311d248663d7ebc4f41a68412f3daad24f0",
+ "before_replacement": {
+  "stats": {
+   "sent": 3,
+   "mined": 3,
+   "reverted": 0,
+   "replaced": 0,
+   "dropped": 0,
+   "reorged": 0,
+   "skipped_expected": 0,
+   "skipped_loss": 0,
+   "spent_wei": 798450647555354,
+   "paid_wei": 1252950580990000
+  },
+  "pending": null,
+  "counted": [
+   {
+    "label": "checkpoint",
+    "block": 26450245,
+    "status": 1,
+    "gas_used": 238458,
+    "pay": 38182248920000
+   },
+   {
+    "label": "restock",
+    "block": 26450250,
+    "status": 1,
+    "gas_used": 9592116,
+    "pay": 709142663750000
+   },
+   {
+    "label": "list",
+    "block": 26450253,
+    "status": 1,
+    "gas_used": 6057352,
+    "pay": 505625668320000
+   }
+  ],
+  "head": 26450255
+ },
+ "after_replacement": {
+  "stats": {
+   "sent": 3,
+   "mined": 4,
+   "reverted": 0,
+   "replaced": 0,
+   "dropped": 0,
+   "reorged": 0,
+   "skipped_expected": 0,
+   "skipped_loss": 0,
+   "spent_wei": 920303269292192,
+   "paid_wei": 1450763827525000
+  },
+  "pending": null,
+  "counted": [
+   {
+    "label": "checkpoint",
+    "block": 26450245,
+    "status": 1,
+    "gas_used": 238458,
+    "pay": 38182248920000
+   },
+   {
+    "label": "restock",
+    "block": 26450250,
+    "status": 1,
+    "gas_used": 9592116,
+    "pay": 709142663750000
+   },
+   {
+    "label": "list",
+    "block": 26450253,
+    "status": 1,
+    "gas_used": 6057352,
+    "pay": 505625668320000
+   },
+   {
+    "label": "list",
+    "block": 26450272,
+    "status": 1,
+    "gas_used": 2435934,
+    "pay": 197813246535000
+   }
+  ],
+  "head": 26450272
+ },
+ "dropped_transaction": "0xc3d1a996d3acf14b4be46a29c9617a2ec4e34a6656241fce814ba9b69b33a2cc",
+ "dropped_transaction_status": 1,
+ "backup": {
+  "stored": {
+   "stats": {
+    "sent": 5,
+    "mined": 3,
+    "reverted": 2,
+    "replaced": 0,
+    "dropped": 0,
+    "reorged": 0,
+    "skipped_expected": 0,
+    "skipped_loss": 0,
+    "spent_wei": 802135585391638,
+    "paid_wei": 1251453457850000
+   },
+   "pending": null,
+   "counted": [
+    {
+     "label": "checkpoint",
+     "block": 26450245,
+     "status": 0,
+     "gas_used": 36148,
+     "pay": 0
+    },
+    {
+     "label": "restock",
+     "block": 26450251,
+     "status": 1,
+     "gas_used": 9523556,
+     "pay": 709190051890000
+    },
+    {
+     "label": "list",
+     "block": 26450255,
+     "status": 0,
+     "gas_used": 122315,
+     "pay": 0
+    },
+    {
+     "label": "checkpoint",
+     "block": 26450265,
+     "status": 1,
+     "gas_used": 295459,
+     "pay": 38018993960000
+    },
+    {
+     "label": "list",
+     "block": 26450268,
+     "status": 1,
+     "gas_used": 6009218,
+     "pay": 504244412000000
+    }
+   ],
+   "head": 26450271
+  },
+  "health": {
+   "last_pass": 1795109644,
+   "block": 26450262,
+   "status": [
+    [
+     "RESERVE_BELOW_NEED",
+     "info",
+     "reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH"
+    ]
+   ],
+   "pending": null,
+   "stats": {
+    "sent": 5,
+    "mined": 3,
+    "reverted": 2,
+    "replaced": 0,
+    "dropped": 0,
+    "reorged": 0,
+    "skipped_expected": 0,
+    "skipped_loss": 0,
+    "spent_wei": 802135585391638,
+    "paid_wei": 1251453457850000
+   },
+   "errors": [
+    {
+     "t": 1795109495,
+     "msg": "checkpoint reverted on chain: 0xd3e44e8cc10288e25a8a1e9f975e5a59c0b3b034dccd320698ec8d195f36df0b"
+    },
+    {
+     "t": 1795109583,
+     "msg": "list reverted on chain: 0x4ebca867ca3cce0176eb36cf15c1ca9b5ce23a17d167fed735f0ec77157c9708"
+    }
+   ],
+   "pass_errors": 0,
+   "policy": "policy 0x23C94C8692B4187c512Bc2c2391AaE3d07E2a339 v1",
+   "ok": true,
+   "fresh": true,
+   "attention": []
+  }
+ },
+ "lost_races": [
+  {
+   "lost": {
+    "label": "checkpoint",
+    "block": 26450245,
+    "status": 0,
+    "gas_used": 36148,
+    "pay": 0
+   },
+   "won": {
+    "label": "checkpoint",
+    "block": 26450245,
+    "status": 1,
+    "gas_used": 238458,
+    "pay": 38182248920000
+   }
+  },
+  {
+   "lost": {
+    "label": "list",
+    "block": 26450255,
+    "status": 0,
+    "gas_used": 122315,
+    "pay": 0
+   },
+   "won": {
+    "label": "list",
+    "block": 26450253,
+    "status": 1,
+    "gas_used": 6057352,
+    "pay": 505625668320000
+   }
+  }
+ ],
+ "primary_nonce": 4,
+ "primary_sends_counted": 3,
+ "result": "PASS",
+ "worker_log_tails": {
+  "primary-replacement": "",
+  "backup": ""
+ },
+ "ci": {
+  "run_id": 44577532617,
+  "url": "https://github.com/ripe0x/shapes-fwa-pool/actions/runs/44577532617",
+  "head_sha": "dbed2de952d0b4e2b6bed8004a945172f3dbe407",
+  "conclusion": "success",
+  "created": "2026-11-19T17:28:23Z",
+  "steps": [
+   [
+    "Set up job",
+    "success"
+   ],
+   [
+    "Run actions/checkout@v4",
+    "success"
+   ],
+   [
+    "Toolchain pinned like the image",
+    "success"
+   ],
+   [
+    "Build contracts",
+    "success"
+   ],
+   [
+    "Build production image",
+    "success"
+   ],
+   [
+    "Image smoke and shared volume",
+    "success"
+   ],
+   [
+    "Image against a fresh fork",
+    "success"
+   ],
+   [
+    "Run actions/upload-artifact@v4",
+    "success"
+   ],
+   [
+    "Post Run actions/checkout@v4",
+    "success"
+   ],
+   [
+    "Complete job",
+    "success"
+   ]
+  ]
+ }
+}

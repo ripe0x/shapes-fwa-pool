@@ -259,7 +259,15 @@ class OperatingClock:
         if self.poll <= 0 or self.receipt_delay <= 0:
             raise ValueError("timed polling and receipt delay must be positive")
         market_rng = np.random.default_rng(seed ^ 0xF00D)
-        for day in range(days + exit_days):
+        replay = sc.get("replay_events")
+        if replay is not None:
+            # Recorded FWA activity, repeated end to end until the horizon. The caller supplies
+            # (offset seconds, kind, payload) from one authenticated window of the event log.
+            period = int(sc["replay_period_seconds"])
+            for repeat in range(-(-self.end // period)):
+                for at, kind, payload in replay:
+                    self.push(repeat * period + at, kind, payload)
+        for day in range(days + exit_days if replay is None else 0):
             volume = sc["volume"](day, market_rng)
             successes = int(market_rng.poisson(max(0, volume)))
             refunds = int(market_rng.poisson(successes * sc.get("refunds_per_selection", REFUNDS_PER_SELECTION)))
@@ -385,6 +393,8 @@ def run(sc, n_target, seed, days=365, values=None):
     event_kind = "day"
     market_pending = last_checkpoint_interval = 0
     selected_times, returned_order, applied_changes, active_days_seen = {}, {}, set(), set()
+    response_keep = {}
+    expected_selections = 0.0
     owed_after, event_order = "", 0
     expired_backing = expired_nft = purchaser_returns = late_purchaser_returns = 0
     timed_checkpoint_times = []
@@ -476,12 +486,15 @@ def run(sc, n_target, seed, days=365, values=None):
             elif event_kind == "acquisition":
                 market_pending -= 1
                 assert market_pending >= 0
-                A = int(payload)
+                # A replayed acquisition carries its recorded foreign totalWeight (1/ETH).
+                successful, foreign_weight = payload if isinstance(payload, tuple) else (payload, W_o)
+                A = int(successful)
                 chosen = None
-                if payload:
+                if successful:
                     act = [i for i, p in v.positions.items() if p.status == ACTIVE]
                     weights = [E / v.positions[i].backing for i in act]
-                    W = W_o + sum(weights)
+                    W = foreign_weight + sum(weights)
+                    expected_selections += sum(weights) / W
                     # Conditional counterfactual selection, not replay of a real VRF word.
                     draw = rng.random() * W
                     for i, weight in zip(act, weights):
@@ -504,15 +517,21 @@ def run(sc, n_target, seed, days=365, values=None):
                         trace_state("selection", d)
                         if trace is not None:
                             trace[-1]["listing_id"] = chosen
-                        if clock.response_delay is not None:
-                            clock.push(now + int(clock.response_delay), "response", chosen)
+                        delay, kept = clock.response_delay, None
+                        if "response_sampler" in sc:
+                            # Empirical purchaser behaviour: (seconds or None for silence, kept).
+                            delay, kept = sc["response_sampler"](rng)
+                            response_keep[chosen] = kept
+                        if delay is not None:
+                            clock.push(now + int(delay), "response", chosen)
                 journal.append((chosen, absolute_now if chosen is not None else 0))
                 v.completed_prefix += 1
             elif event_kind == "response":
                 p = v.positions.get(payload)
                 if p and p.status == ALLOCATED:
                     late_purchaser_returns += int(absolute_now >= selected_times[payload] + clock.SETTLEMENT)
-                    if rng.random() < sc.get("keep", 0.0):
+                    kept = response_keep.pop(payload, None)
+                    if kept if kept is not None else rng.random() < sc.get("keep", 0.0):
                         v.record_keep(payload, v.settlement_fee_bps)
                     else:
                         v.bid_settled(payload)
@@ -1079,7 +1098,8 @@ def run(sc, n_target, seed, days=365, values=None):
                 expired_backing_reclaims=expired_backing, expired_nft_reclaims=expired_nft,
                 purchaser_responses=purchaser_returns, late_purchaser_responses=late_purchaser_returns,
                 timed_checkpoint_count=len(timed_checkpoint_times), timed_pass_limit_hits=timed_pass_limits)
-    result.update(sync_credit_sweeps=sync_credit_sweeps, sync_active_fee_claims=sync_active_fee_claims,
+    result.update(expected_own_selections=expected_selections, own_selections=selected,
+                  sync_credit_sweeps=sync_credit_sweeps, sync_active_fee_claims=sync_active_fee_claims,
                   sync_fee_receipts_wei=sync_fee_receipts, sync_collection_quote_wei=sync_collection_quote,
                   operation_end_routine_paid_wei=operation_end_routine_paid,
                   operation_end_routine_budget_wei=operation_end_routine_budget,

@@ -1,76 +1,162 @@
 {
- "block": 26418573,
- "positions_listed": 29,
- "staged_after_listing": 0,
- "deposited": 1990121185000000000,
- "claimed": 1976995382678932508,
- "holder_result": -13125802321067492,
- "keeper_pay": 4125986789800000,
- "keeper_net": 659482624011539,
- "mints": 9,
- "ledger_gap": 0,
- "reverted": 0,
- "sent": 20,
- "log": [
-  {
-   "tag": "deployed",
-   "balance": 10000000000000000,
-   "lastNav": 0,
-   "totalShares": 1000000000000000,
+ "fork_block": 26450200,
+ "fork_hash": "0xda7052eb890b621f2ed635feb0af056e155f801305427af666aa7930d4baabc5",
+ "vault": "0x2113cd2d86788331e4ef44e4e428da0a112f68d6",
+ "values": {
+  "fwa": "0x958C41181182e76F221331b2755b77D9e1426A98",
+  "shapes": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+  "packs": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+  "owner": "0x37Dcd875c4E367e080f1e05F18F10dB0D45a65B5",
+  "seedWei": 10000000000000000,
+  "minEdgeBps": 100,
+  "bufferBps": 0,
+  "distributionBps": 0,
+  "payMarkupBps": 0,
+  "keeperShareBps": 2500,
+  "allocatedBoundBps": 1000,
+  "packUnitsMask": 8,
+  "gasCeilingWei": 500000000,
+  "essentialCeilingWei": 2000000000,
+  "maxTipWei": 50000000,
+  "workFeeWei": 20000000000000,
+  "reserveWei": 5000000000000000,
+  "tvlCapWei": 2000000000000000000,
+  "routineCapWei": 30000000000000000,
+  "routineRatePerDayWei": 10000000000000000,
+  "essentialCapWei": 0,
+  "essentialRatePerDayWei": 0
+ },
+ "real_owner_replaced": "0xCB43078C32423F5348Cab5885911C3B5faE217F9",
+ "phases": {
+  "partial": {
+   "shares_requested": 98536324327737536,
+   "shares_remaining": 98536324327737536,
+   "charge_wei": 56000000000000,
+   "protected": {
+    "pendingDepositTotal": 0,
+    "redemptionReserve": 1,
+    "distributionReserve": 0,
+    "claimableTotal": 0,
+    "processingPool": 0
+   },
+   "open": 12,
+   "idle": 2
+  },
+  "holder_workflow": {
+   "holder_claims_wei": 1974982962034276543,
+   "keeper_pay_wei": 678575299465000,
+   "holder_balance_change_wei": -16145496644398700,
+   "deposit_wei": 1990081341000000000,
+   "charges_wei": 100876000000000,
+   "holder_tx_gas_wei": 946241678675243,
+   "holder_operator_spent_wei": 878124410105564,
+   "holder_operator_paid_wei": 0,
+   "holder_operator_calls": [
+    {
+     "label": "liquidate",
+     "gas_used": 294210,
+     "cost": 27616124035080,
+     "pay": 0
+    },
+    {
+     "label": "unlist",
+     "gas_used": 3475392,
+     "cost": 307831070474688,
+     "pay": 0
+    },
+    {
+     "label": "liquidate",
+     "gas_used": 1760348,
+     "cost": 150950457121800,
+     "pay": 0
+    },
+    {
+     "label": "liquidate",
+     "gas_used": 271336,
+     "cost": 22309064667552,
+     "pay": 0
+    },
+    {
+     "label": "liquidate",
+     "gas_used": 439857,
+     "cost": 29357054655390,
+     "pay": 0
+    },
+    {
+     "label": "unlist",
+     "gas_used": 3102935,
+     "cost": 200943656516570,
+     "pay": 0
+    },
+    {
+     "label": "liquidate",
+     "gas_used": 1760348,
+     "cost": 111952406387956,
+     "pay": 0
+    },
+    {
+     "label": "liquidate",
+     "gas_used": 436352,
+     "cost": 27164576246528,
+     "pay": 0
+    }
+   ],
+   "shares_remaining": 0,
+   "total_shares": 1000000000000000,
+   "dead_shares": 1000000000000000,
+   "vault_balance_wei": 10025117557698457,
    "open": 0,
    "idle": 0,
    "loose": 0,
-   "tokens": 0,
-   "keeper": 10002610294435075415,
-   "holder": 6019830288336319875
+   "protected": {
+    "pendingDepositTotal": 0,
+    "redemptionReserve": 2,
+    "distributionReserve": 0,
+    "claimableTotal": 0,
+    "processingPool": 0
+   }
   },
-  {
-   "tag": "priced",
-   "balance": 34295047456460000,
-   "lastNav": 2000000000000000000,
-   "totalShares": 198703964627475487,
-   "open": 29,
-   "idle": 0,
-   "loose": 3,
-   "tokens": 0,
-   "keeper": 10003871709668960155,
-   "holder": 4029779212690212183
-  },
-  {
-   "tag": "deployed capital",
-   "balance": 34295047456460000,
-   "lastNav": 2000000000000000000,
-   "totalShares": 198703964627475487,
-   "open": 29,
-   "idle": 0,
-   "loose": 3,
-   "tokens": 0,
-   "keeper": 10003871709668960155,
-   "holder": 4029779212690212183
-  },
-  {
-   "tag": "partial withdrawal",
-   "balance": 10297523403760373,
-   "lastNav": 998497411501810372,
-   "totalShares": 99851982313737744,
-   "open": 14,
-   "idle": 2,
-   "loose": 0,
-   "tokens": 0,
-   "keeper": 10003567171817742251,
-   "holder": 5018224182397984112
-  },
-  {
-   "tag": "wound down",
-   "balance": 9999815531267492,
-   "lastNav": 9999776672067490,
-   "totalShares": 1000000000000000,
+  "owner_wind_down": {
+   "holder_claims_wei": 1974973974730979156,
+   "keeper_pay_wei": 634796856665000,
+   "holder_balance_change_wei": -15213054456054434,
+   "owner_spent_wei": 897148080047313,
+   "owner_paid_wei": 0,
    "open": 0,
    "idle": 0,
    "loose": 0,
-   "tokens": 0,
-   "keeper": 10003269777059086954,
-   "holder": 6006671859867857778
+   "vault_balance_wei": 10030765303795844,
+   "winding_down": true,
+   "total_shares": 1000000000000000,
+   "protected": {
+    "pendingDepositTotal": 0,
+    "redemptionReserve": 1,
+    "distributionReserve": 0,
+    "claimableTotal": 0,
+    "processingPool": 0
+   }
   }
- ]
+ },
+ "keeper": {
+  "stats": {
+   "sent": 12,
+   "mined": 10,
+   "reverted": 0,
+   "replaced": 0,
+   "dropped": 0,
+   "reorged": 2,
+   "skipped_expected": 0,
+   "skipped_loss": 0,
+   "spent_wei": 5560742789590908,
+   "paid_wei": 7130358965225000
+  },
+  "reverted": 0
+ },
+ "senders": {
+  "deposit, requestRedeem, claim": "holder, own gas",
+  "unlist, liquidate, sync during exit (keeper.py --max-loss-wei)": "holder in steps 2-3; owner in step 4; own gas, pay clipped to zero",
+  "checkpoint": "normal keeper; paid from the request charges (processingPool)",
+  "restock, list, routine sync": "normal keeper; paid from free vault ETH within the routine budget",
+  "startWindDown": "owner, own gas"
+ }
 }
