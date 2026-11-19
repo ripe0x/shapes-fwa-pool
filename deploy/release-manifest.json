@@ -1,0 +1,60 @@
+{
+ "name": "PackVault mainnet canary",
+ "sources": {
+  "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520",
+  "remappings.txt": "638e1bbb5593b0f20280b3c050dc924c319bfe2a0781d3b8372c908f397ad429",
+  "script/Deploy.s.sol": "2a059502479a22360346994c7e5246fff96db98bff3f03a8586b610f0ac23d36",
+  "script/DeployCore.sol": "9246881b6c6fe32325ce1af731e083f5ed68a79b95f170f8db0cc93fa4e7d2b3",
+  "script/deploy.sh": "6705aa23a1db0b28f4a74efbecb78b248eb04e7a66dc609b6bb293e85fa1a89c",
+  "script/verify.sh": "82758a1622d930c8be892a6da7238221394f2279d9ff49d6b36c1c7a9f9ae4e6",
+  "src/KeeperPolicy.sol": "612d2ccce98e642e89586372eeecfd31e6ceb7d0ecdf9df8c77899afc9010929",
+  "src/PackVault.sol": "38c9f37988377a0a9dca9b5026c28ba33b519bbe406608d0ac8c1add24b1d801",
+  "src/VaultLib.sol": "1310c034a0cca8f5e3f62ab076d6626d7947d6ce4456da2803a9e572535e430c",
+  "src/interfaces/External.sol": "d50229cf80a4a036c9ba3f4f8bb60452129ee51dc7ca0263ad612b2ea76e499d",
+  "script/release.py": "3d4f36df808d51db10017c466bd751548d59da5acaa262beb069239ff4baa74d"
+ },
+ "toolchain": {
+  "solc": "0.8.30",
+  "evm": "cancun",
+  "optimizer_runs": 200,
+  "via_ir": true,
+  "bytecode_hash": "none",
+  "lib_tree": "482e26dfec90bbb4fd986fc4fcadbd97cf16017a",
+  "keeper_image_foundry": "1.8.1"
+ },
+ "build": {
+  "PackVault": {
+   "runtime_bytes": 24136,
+   "runtime_sha256": "efcc334d6009c4a521caf07b69b6cbf58762d0765b96cd5fb55c03aaa5697d37",
+   "initcode_sha256": "a259476b35a3ca85019425971bbc7e160c480e3ca6ddcf863e34c38cc5b24ca5"
+  },
+  "VaultLib": {
+   "runtime_bytes": 24304,
+   "runtime_sha256": "b6526ce9839b3635fe9f9e0b90525762e1c1e47d0d5da1c30a282af65a947fd7",
+   "initcode_sha256": "acda2e1419edef58f4cf6342a1a9278b53222a39d6aabaf21ca28c61f2fd06a0",
+   "create2_address": "0xFb4f180f662f1c159D5eD7b99B76d32D45b19D43"
+  },
+  "KeeperPolicyV1": {
+   "runtime_bytes": 216,
+   "runtime_sha256": "d8f3f70dfb224ca9923e6e2b0be70ba2cd35c27255b590427af3c7b95dc54410",
+   "initcode_sha256": "bc250c40cc4ddd7728ee14de982638b83e92f42fe9a3abb4c6a4d22a33884da9"
+  }
+ },
+ "deployment_values": "deploy/canary.json",
+ "values": {
+  "deploy/canary.json": "530dbc542ae3dc4ab9e6a1e39218fccef7c5b2d80a5057835d23b9ef6f69138c",
+  "deploy/mainnet.json": "2f991eb24ea71a48e79f75304ee7086e8cd95e04cc504e901a4923e35faf3224"
+ },
+ "keeper": {
+  "keeper/Dockerfile": "54675df4109b6b91f5e750816fdf20fb410942992fbebacb9b14d82dc5211243",
+  "keeper/entrypoint.sh": "e8005aef5da385dea47dd75c988631cbc928eb73993a2c0150d67dbfcf4e5214",
+  "keeper/requirements.txt": "aed414c4157dd12cba962363a8c9f561a2e5dcddbf20ee4c2ea9ff41ad4e913c",
+  "keeper/keeper.py": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb",
+  "keeper/policy.py": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b",
+  "keeper/tx.py": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230",
+  "keeper/index.py": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63",
+  "fly.keeper-primary.toml": "d0562149088fff773d7abedd4e643e131c07eb988c5542197d05dfe4d71bde5f",
+  "fly.keeper-backup.toml": "5ad276a78fc08c2fc8badf7b70b4794cb19e0043e3b080081323d9041a57a79b"
+ },
+ "evidence": {}
+}
