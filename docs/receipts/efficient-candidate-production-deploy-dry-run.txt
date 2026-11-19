@@ -1,0 +1,49 @@
+chain 1, values deploy/rehearse-efficient-candidate-dry.json, simulation only
+Compiling 1 files with Solc 0.8.30
+Solc 0.8.30 finished in 2.27s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:204:35:
+    |
+204 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:609:5:
+    |
+609 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Script ran successfully.
+
+== Return ==
+vault: contract PackVault 0x2113CD2D86788331E4ef44E4E428DA0a112F68D6
+
+== Logs ==
+  PackVault 0x2113CD2D86788331E4ef44E4E428DA0a112F68D6
+  KeeperPolicy 0x2d478b38A5eEaDB8F2E5962d5aD36A15119D7DB6
+  postflight passed
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 1
+
+Estimated max fee per gas: 0.570674562 gwei
+Estimated base fee per gas: 0.285274781 gwei
+Estimated max priority fee per gas: 0.000125 gwei
+
+Estimated total gas used for script: 14964970
+
+Estimated amount required: 0.00854012770009314 ETH
+
+==========================
+
+SIMULATION COMPLETE. To broadcast these transactions, add --broadcast and wallet configuration(s) to the previous command. See forge script --help for more.
+
+Transactions saved to: /Users/dd/.codex/worktrees/da17/shapes-fwa-pool/broadcast/Deploy.s.sol/1/dry-run/run-latest.json
+
+Sensitive values saved to: /Users/dd/.codex/worktrees/da17/shapes-fwa-pool/cache/Deploy.s.sol/1/dry-run/run-latest.json
+
+Warning: Detected artifacts built from source files that no longer exist. Run `forge clean` to make sure builds are in sync with project files.
+ - /Users/dd/.codex/worktrees/da17/shapes-fwa-pool/foundry-pp/DeployHelper42.sol

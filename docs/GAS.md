@@ -1,6 +1,6 @@
 # Efficient journal gas and compensation
 
-The current revision keeps fixed quotes while calibrating enforceable jobs. Economic acceptance
+The current source prepares measured fixed work quotes; the candidate has not been broadcast. Economic acceptance
 remains open: O2 is above1,750,000 quoted gas, recurring expense must be paid from vault cash,
 and exposed successful-foreign bills remain missing. No spending allowance or accepted outcome
 has changed. The active implementation scope is `EFFICIENT-JOURNAL-REVISION.md`.
@@ -16,8 +16,9 @@ checkpoint charges remain protected in the processing pool. Foreign records earn
 | Additional Shape in a pack |35,000|
 | Paid primary mint and ten-way split |2,200,000|
 | List base / admitted position |280,000 /825,000|
-| Sync ordinary base / qualifying foreign-tail base |85,000 /85,000; choose one|
-| Completed global journal record |30,000|
+| Sync ordinary base / required holder-tail base |85,000 /110,000; choose one|
+| Actual qualified distribution-only proof |80,000 added to required-tail base only|
+| Completed global journal record |22,000|
 | Own selection / terminal reconciliation / head prune |160,000 /120,000 /45,000|
 | Unlist base / moved position |340,000 /285,000|
 | Liquidate base / ordinary pack / actual packed Shape burned |75,000 /80,000 /35,000|
@@ -33,7 +34,17 @@ sync envelope. Optional tails and provably unexposed advances are unpaid. No com
 All sync uses routine permission even during redemption or wind-down; D64 retains caller-funded
 unlisting/liquidation. A supplied terminal list cannot manufacture a smaller paid journal job.
 
-## Current measured scope
+## Current actual receipts and pending candidate
+
+The approved8559 baseline completed318 transactions/17.501610827424708864 ETH aggregate value and restored its entry without topups. Default holder/distribution singleton bills are122,411/202,253 gas; both ordinary gates decline at the baseline115,000 quote. Full128 bills2,233,060. The standalone full-holder checkpoint bills346,017 at0.2/0.5/2 gwei, with ordinary preflight accepted, protected buckets and claim checked. Q360 headroom is13,983 gas (4.04%) for this fixture. Total pay also includes the work fee.
+
+The candidate's132,000/212,000 holder/distribution singleton quotes are supported by that measured work difference, but require fresh candidate receipts. Its additional80,000 qualified-proof component is outside the original literal-only family and needs the exact owner amendment. All0.5 gwei inventory proposals were unavailable, so Q_PACK stays325,000. Fresh affected O2 remains1,919,655; O6 remains0.0002 ETH.
+
+At candidate quotes,18,281 perfectly packed records with a final qualified distribution tail imply0.207221 ETH at0.5 gwei, before own work/additional tails, above0.15 ETH steady30-day refill. This is quote arithmetic, not billed cost or returns. The candidate policy's retained-max-markup reserve envelope is0.00577555 ETH (0.00593555 with20,000,000,000,000 wei work fee); it is informational, not an approved reserve change. Exact evidence: `receipts/efficient-journal-baseline-and-candidate.md` and candidate amendment.
+
+Everything below describes the pre-receipt phase and its named source. It is retained as history; its pending-receipt statements and85k/30k arithmetic are superseded above.
+
+## Earlier measured scope
 
 `receipts/efficient-focused-results.json` binds the five real refund/journal/distribution tests,
 seventeen affected lifecycle/selection tests, unexposed authentic successful history, fourteen

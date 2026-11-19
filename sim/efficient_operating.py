@@ -35,10 +35,10 @@ def context(database):
     return dict(block=block, timestamp=end, completed30d=len(statuses), successful30d=successes), gas
 
 
-def case(values, principal, seed, volume, price, gas, days=30, exit_days=30, rescue=False, trace=None):
+def case(values, principal, seed, volume, price, gas, days=30, exit_days=30, rescue=False, trace=None, timing=None):
     sc = F.Scenario(volume=F.const(volume), gwei=price - .05, deposit_wei=principal,
                     exit_all=True, exit_days=exit_days, user_gas_proxy=gas,
-                    holder_rescue_sync=rescue, trace_sink=trace)
+                    holder_rescue_sync=rescue, trace_sink=trace, **(timing or {}))
     return F.run(sc, 1 if principal == 15 * 10**16 else 27 if principal < 2 * F.E else 100,
                  seed, days=days, values=values)
 
@@ -71,14 +71,89 @@ def focused_checks(gas):
                 explicit_holder_rescue=rescued)
 
 
+def timed_checks(history, gas):
+    """Conditional scenarios plus authentic fixture clock/accounting evidence, no RPC stubs."""
+    values = json.loads((ROOT / 'deploy/mainnet.json').read_text())
+    values.update(routineCapWei=3 * 10**17, routineRatePerDayWei=10**16)
+    timing = dict(timed=True, start_timestamp=history['timestamp'], poll_seconds=60,
+                  receipt_seconds=36, vrf_seconds=60)
+    rows, traces = {}, {}
+    for name, response, volume in [('zero', 120, 0), ('timely', 120, 609),
+                                    ('silent', None, 609), ('late', 7200, 609)]:
+        trace = []
+        rows[name] = case(values, 68 * 10**17, 8, volume, .2, gas, days=2, exit_days=2,
+                          trace=trace, timing=dict(timing, purchaser_response_seconds=response))
+        traces[name] = trace
+        r = rows[name]
+        assert r['ledger_gap_wei'] == 0 and not r['unknown_user_gas_calls']
+        assert r['routine_keeper_paid_wei'] <= r['routine_period_permission_upper_wei']
+        assert all(t['timestamp'] % F.OperatingClock.INTERVAL >= F.OperatingClock.BLACKOUT_START
+                   for t in trace if t['action'] == 'checkpoint')
+        intervals = [t['timestamp'] // F.OperatingClock.INTERVAL for t in trace if t['action'] == 'checkpoint']
+        assert len(intervals) == len(set(intervals))
+        assert all(t['timestamp'] >= history['timestamp'] + 2 * F.DAY for t in trace if t['action'] == 'request-redeem')
+        assert all(t['timestamp'] >= history['timestamp'] for t in trace if t['action'] == 'claim')
+    assert rows['zero']['exit_complete'] and rows['zero']['holder_claimed_wei'] > 0
+    assert rows['zero']['fees_received_wei'] == rows['zero']['backing_lost_wei'] == 0
+    assert rows['timely']['exit_complete'] and rows['timely']['purchaser_responses'] > 0
+    assert rows['timely']['expired_backing_reclaims'] == rows['timely']['late_purchaser_responses'] == 0
+    assert rows['silent']['expired_backing_reclaims'] > 0 and not rows['silent']['purchaser_responses']
+    assert rows['late']['expired_backing_reclaims'] > 0 and rows['late']['late_purchaser_responses'] > 0
+    # The driver does not postpone every return/relisting until the next daily step.
+    trace = traces['timely']
+    response_times = [t['timestamp'] for t in trace if t['action'] == 'purchaser-response']
+    assert any(a < b['timestamp'] < (a // F.DAY + 1) * F.DAY
+               for a in response_times for b in trace if b['action'] == 'list')
+    # Real allocation times distinguish an allocation that can reach the next blackout
+    # before expiry from one that cannot. These are recorded events, not invented RPC results.
+    fixtures = json.loads((ROOT / 'test/fixtures/selection.json').read_text())
+    phases = {}
+    for block, fixture in fixtures.items():
+        at = fixture['fulTimestamp']
+        until = (F.OperatingClock.BLACKOUT_START - at % F.OperatingClock.INTERVAL) % F.OperatingClock.INTERVAL
+        phases[block] = dict(allocated_at=at, seconds_to_blackout=until, expiry=at + 3600)
+    assert sorted(v['seconds_to_blackout'] for v in phases.values()) == [1429, 37213]
+    # The same recorded position projection crosses the policy's exact eligibility edge.
+    source_trace = [json.loads(line) for line in (OUT / 'current-three-arg-reconcile-trace.jsonl').read_text().splitlines()]
+    selected = next(r for r in source_trace if r['step'] == 'selected')['positions'][0]
+    state = F.charge_state(150_000_000, 1)
+    state.listings = [F.policy.Listing(selected['id'], F.ALLOCATED, allocated_at=selected['liveAllocatedAt'])]
+    state.settlement_window = 3600
+    state.now = selected['liveAllocatedAt'] + 3599
+    assert not any(a[0] == 'sync' for a in F.policy.plan(state))
+    state.now += 1
+    assert any(a[0] == 'sync' and selected['id'] in a[1] for a in F.policy.plan(state))
+    # Legacy half-redemption still uses the archived daily path, with exact share arithmetic.
+    legacy = F.run(F.Scenario(volume=F.const(15), gwei=.15, redeem=[(10, .5)]), 30, 8, days=20)
+    assert legacy['checkpoints'] == 2 and legacy['external_exit_gas_proxy_wei'] > 0 and legacy['ledger_gap_wei'] == 0
+    return dict(timing=timing, rows=rows, traces=traces, authentic_fixture_phases=phases,
+                legacy_partial_redemption=legacy,
+                limits=['Conditional generated request/completion times and purchaser choices are scenario assumptions, not real VRF replay or observed purchaser response behavior.',
+                        'Effects occur atomically at the fresh modeled read;36seconds delay the next receipt-confirmed read. This optimistic inclusion assumption does not model fees, reverted races, variable block time or transaction latency across a boundary.',
+                        'At exact timestamp ties, market events precede keeper reads. Purchasers may respond after3600seconds until reclaim wins; expiry itself does not transfer assets.',
+                        'Static recorded foreign pool and per-completion fee/selection approximation remain. Successful journal compensation and keeper profitability still require separate actual receipts/preflight.',
+                        'NFT-reclaim expiry branch is implemented but not reached by these accepted-backing scenarios; no fabricated low-backing protocol fixture is supplied.',
+                        'These short conditional paths validate clock/accounting interactions. They do not reproduce the prepriced-holder cash-cycle or establish recommended budget, expected returns or annual acceptance.'])
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--label', default='baseline')
     ap.add_argument('--db', type=Path, default=DB)
     ap.add_argument('--self-check-only', action='store_true')
+    ap.add_argument('--timed-checks', action='store_true', help='focused opt-in timestamp scenarios only; never runs the matrix')
     ap.add_argument('--seeds', default='3,8,19')
     a = ap.parse_args()
     history, gas = context(a.db.resolve())
+    if a.timed_checks:
+        paths = ['sim/forward.py', 'sim/efficient_operating.py', 'sim/vault.py', 'keeper/policy.py']
+        frozen = {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in paths}
+        result = timed_checks(history, gas)
+        assert frozen == {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in paths}
+        result.update(context=history, source_sha256=frozen, command=[sys.executable, *sys.argv], exit_status=0)
+        (OUT / 'efficient-operating-timed-checks.json').write_text(json.dumps(result, indent=2) + '\n')
+        print('PASS four conditional timed scenarios, exact fixture expiry boundary, blackout/interval/claim checks and legacy partial-redemption compatibility')
+        return
     checks = focused_checks(gas)
     paths = ['sim/forward.py', 'sim/vault.py', 'sim/efficient_operating.py', 'keeper/policy.py',
              'src/PackVault.sol', 'src/VaultLib.sol', 'deploy/mainnet.json', 'deploy/canary.example.json']

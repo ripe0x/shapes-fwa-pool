@@ -18,6 +18,7 @@ equally over active listings; selection odds proportional to 1 / backing. FWA to
 """
 import json
 import copy
+import heapq
 from itertools import islice
 from fractions import Fraction
 from collections import deque
@@ -239,6 +240,56 @@ def economic_nav(v, credit):
     return value
 
 
+class OperatingClock:
+    """Opt-in scenario calendar; external events are hypotheses, never RPC answers.
+
+    Requests stop during the real blackout. Fixed response/VRF delays are explicit
+    scenario inputs. A keeper pass waits for each conditional receipt before its next
+    read; after at most40calls (or no affordable action) it waits the configured poll.
+    """
+    INTERVAL, BLACKOUT_START, SETTLEMENT = 43_200, 42_300, 3_600
+
+    def __init__(self, sc, seed, days, exit_days):
+        self.start = int(sc["start_timestamp"])
+        self.end = (days + exit_days) * DAY
+        self.poll = int(sc.get("poll_seconds", 60))
+        self.receipt_delay = int(sc.get("receipt_seconds", 36))
+        self.response_delay = sc.get("purchaser_response_seconds", 120)
+        self.events, self.serial = [], 0
+        if self.poll <= 0 or self.receipt_delay <= 0:
+            raise ValueError("timed polling and receipt delay must be positive")
+        market_rng = np.random.default_rng(seed ^ 0xF00D)
+        for day in range(days + exit_days):
+            volume = sc["volume"](day, market_rng)
+            successes = int(market_rng.poisson(max(0, volume)))
+            refunds = int(market_rng.poisson(successes * sc.get("refunds_per_selection", REFUNDS_PER_SELECTION)))
+            for successful in [True] * successes + [False] * refunds:
+                at = day * DAY + int(market_rng.integers(DAY))
+                # Preserve the sampled count while moving blackout requests to the next opening.
+                phase = (self.start + at) % self.INTERVAL
+                if phase >= self.BLACKOUT_START:
+                    at += self.INTERVAL - phase
+                self.push(at, "request", successful)
+                self.push(at + int(sc.get("vrf_seconds", 60)), "acquisition", successful)
+        self.push(0, "keeper", 40)
+        self.push(days * DAY, "cutoff")
+        for day, fraction in sc.get("redeem", []):
+            self.push(day * DAY, "redemption", fraction)
+
+    def push(self, at, kind, payload=None):
+        if at > self.end:
+            return
+        # Explicit tie convention: market completion/response before the keeper's fresh read.
+        priority = 1 if kind == "keeper" else 0
+        self.serial += 1
+        heapq.heappush(self.events, (at, priority, self.serial, kind, payload))
+
+    def __iter__(self):
+        while self.events:
+            at, _, _, kind, payload = heapq.heappop(self.events)
+            yield at, kind, payload
+
+
 def run(sc, n_target, seed, days=365, values=None):
     rng = np.random.default_rng(seed)
     others = POOL
@@ -281,6 +332,15 @@ def run(sc, n_target, seed, days=365, values=None):
     operation_end_idle = operation_end_funding = operation_end_loose = operating_active_days = 0
     rescue_sync = sc.get("holder_rescue_sync", False)
     trace = sc.get("trace_sink")
+    timed = sc.get("timed", False)
+    clock = OperatingClock(sc, seed, days, exit_days) if timed else None
+    now = absolute_now = 0
+    event_kind = "day"
+    market_pending = last_checkpoint_interval = 0
+    selected_times, applied_changes, active_days_seen = {}, set(), set()
+    expired_backing = expired_nft = purchaser_returns = late_purchaser_returns = 0
+    timed_checkpoint_times = []
+    timed_pass_limits = 0
     routine_paid = essential_paid = request_paid = 0
     routine_unfunded = unpaid_routine_calls = zero_quote_sync_calls = 0
     last_unfunded_offer = last_cash_shortfall = last_permission_shortfall = 0
@@ -297,7 +357,7 @@ def run(sc, n_target, seed, days=365, values=None):
 
     def trace_state(action, day):
         if trace is not None:
-            trace.append(dict(day=day, action=action, cash=v.balance, free=v.free(), routine_budget=v.routine_budget,
+            trace.append(dict(day=day, action=action, **(dict(timestamp=absolute_now, event=event_kind) if timed else {}), cash=v.balance, free=v.free(), routine_budget=v.routine_budget,
                               protected=v.redemption_reserve + v.distribution_reserve + v.claimable_total + v.processing_pool,
                               locked=locked_holder(), global_locked=v.locked_shares, positions=len(v.positions),
                               returned_value=sum(p.value for p in v.positions.values() if p.status == SETTLED and p.pack_owned),
@@ -322,18 +382,24 @@ def run(sc, n_target, seed, days=365, values=None):
     allocated_day = {}
     ask, crown = ASK, 0.001
     vol_hist, open_days = [], []
+    if timed:
+        vol_hist = [0] * (days + exit_days + 1)
     checkpoints = accrued = selected = selected_backing = missed_alloc = 0
     listing_ready_day = 0
     waits = sc.get("staging", STAGING)
     max_calls = sc.get("max_keeper_calls_per_day", 512)
     self_serve = sc.get("self_serve_exits", True)  # D64: the withdrawing holder executes unpaid exit work
 
-    for d in range(days + exit_days):
-        v.sync_budget(d * DAY)
+    ticks = clock if timed else ((d * DAY, "day", None) for d in range(days + exit_days))
+    for now, event_kind, payload in ticks:
+        d = now // DAY
+        absolute_now = (clock.start if timed else 0) + now
+        v.sync_budget(now)
         gas = int((g_of(d) if callable(g_of) else g_of) * GWEI)
         for day, key, val in sc.get("changes", []):
-            if day != d:
+            if day != d or (timed and (day, key) in applied_changes):
                 continue
+            applied_changes.add((day, key))
             if key == "crown":
                 crown = val
             elif key == "ask":
@@ -350,69 +416,130 @@ def run(sc, n_target, seed, days=365, values=None):
                                       price=min(gas + tip, ceiling), mint_fee=mint_fee,
                                       buffer_bps=values["bufferBps"], min_edge_bps=values["minEdgeBps"])
 
-        for i, d0 in list(allocated_day.items()):
-            if d >= d0 + 1:
-                del allocated_day[i]
-                if rng.random() < sc.get("keep", 0.0):
-                    v.record_keep(i, v.settlement_fee_bps)
-                else:
-                    v.bid_settled(i)
+        if timed:
+            A = 0
+            if event_kind == "request":
+                market_pending += 1
+            elif event_kind == "acquisition":
+                market_pending -= 1
+                assert market_pending >= 0
+                A = int(payload)
+                chosen = None
+                if payload:
+                    act = [i for i, p in v.positions.items() if p.status == ACTIVE]
+                    weights = [E / v.positions[i].backing for i in act]
+                    W = W_o + sum(weights)
+                    # Conditional counterfactual selection, not replay of a real VRF word.
+                    draw = rng.random() * W
+                    for i, weight in zip(act, weights):
+                        draw -= weight
+                        if draw < 0:
+                            chosen = i
+                            break
+                    fee = int((1 + SUR) * (1 - CUT) * (1 - crown) / W * E)
+                    for i in act:
+                        v.accrue(i, fee)
+                        accrued += fee
+                    if chosen is not None:
+                        p = v.positions[chosen]
+                        credit += p.pending_fees
+                        p.pending_fees = 0
+                        p.status = ALLOCATED
+                        selected_times[chosen] = absolute_now
+                        selected_backing += p.backing
+                        selected += 1
+                        trace_state("selection", d)
+                        if trace is not None:
+                            trace[-1]["listing_id"] = chosen
+                        if clock.response_delay is not None:
+                            clock.push(now + int(clock.response_delay), "response", chosen)
+                journal.append((chosen, absolute_now if chosen is not None else 0))
+                v.completed_prefix += 1
+            elif event_kind == "response":
+                p = v.positions.get(payload)
+                if p and p.status == ALLOCATED:
+                    late_purchaser_returns += int(absolute_now >= selected_times[payload] + clock.SETTLEMENT)
+                    if rng.random() < sc.get("keep", 0.0):
+                        v.record_keep(payload, v.settlement_fee_bps)
+                    else:
+                        v.bid_settled(payload)
+                    purchaser_returns += 1
+                    trace_state("purchaser-response", d)
+            for i, p in v.positions.items():
+                p.expired = p.status == ALLOCATED and absolute_now >= selected_times.get(i, absolute_now) + clock.SETTLEMENT
+            if event_kind == "acquisition":
+                vol_hist[d] += A
+            if event_kind == "keeper":
+                open_days.append(len(v.positions))
+                if d < days and any(p.status == ACTIVE for p in v.positions.values()):
+                    active_days_seen.add(d)
+                operating_active_days = len(active_days_seen)
+        else:
+            for i, d0 in list(allocated_day.items()):
+                if d >= d0 + 1:
+                    del allocated_day[i]
+                    if rng.random() < sc.get("keep", 0.0):
+                        v.record_keep(i, v.settlement_fee_bps)
+                    else:
+                        v.bid_settled(i)
 
-        # Daily sampling approximates selection timing, but each position uses its actual B.
-        # Clamp the sampled set to A so the approximation cannot invent journal records.
-        act = [i for i, p in v.positions.items() if p.status == ACTIVE]
-        n = len(act)
-        if d < days:
-            operating_active_days += int(n > 0)
-        weights = np.array([E / v.positions[i].backing for i in act])
-        W = W_o + float(weights.sum())
-        share = float(weights.sum()) / W if n else 0
-        vol = sc["volume"](d, rng) * max(0.0, 1 - sc.get("elasticity", 0) * share)
-        A = int(rng.poisson(vol)) if vol > 0 else 0
-        vol_hist.append(A)
-        chosen = []
-        if n and A:
-            per_listing = int((1 + SUR) * (1 - CUT) * (1 - crown) / W * E)
-            qs = weights / W
-            p_days = 1 - (1 - qs) ** A
-            chosen = [i for i, hit in zip(act, rng.random(n) < p_days) if hit]
-            if len(chosen) > A:
-                chosen = rng.choice(chosen, A, replace=False).tolist()
-            chosen_set = set(chosen)
-            for i, q_i, p_day in zip(act, qs, p_days):
-                p = v.positions[i]
-                if i in chosen_set:
-                    before_sel = int(per_listing * (1 / q_i - A * (1 - q_i) ** A / p_day))
-                    credit += p.pending_fees + before_sel
-                    accrued += before_sel
-                    p.pending_fees = 0
-                    p.status = ALLOCATED  # FWA changed; the vault's book changes only in sync below
-                    allocated_day[i] = d
-                    selected_backing += p.backing
-                else:
-                    v.accrue(i, per_listing * A)
-                    accrued += per_listing * A
-            selected += len(chosen)
-        refunds = int(rng.poisson(A * sc.get("refunds_per_selection", REFUNDS_PER_SELECTION)))
-        journal.extend((i, d * DAY) for i in chosen)
-        journal.extend((None, 0) for _ in range(A - len(chosen) + refunds))
-        v.completed_prefix += A + refunds
+            # Daily sampling approximates selection timing, but each position uses its actual B.
+            # Clamp the sampled set to A so the approximation cannot invent journal records.
+            act = [i for i, p in v.positions.items() if p.status == ACTIVE]
+            n = len(act)
+            if d < days:
+                operating_active_days += int(n > 0)
+            weights = np.array([E / v.positions[i].backing for i in act])
+            W = W_o + float(weights.sum())
+            share = float(weights.sum()) / W if n else 0
+            vol = sc["volume"](d, rng) * max(0.0, 1 - sc.get("elasticity", 0) * share)
+            A = int(rng.poisson(vol)) if vol > 0 else 0
+            vol_hist.append(A)
+            chosen = []
+            if n and A:
+                per_listing = int((1 + SUR) * (1 - CUT) * (1 - crown) / W * E)
+                qs = weights / W
+                p_days = 1 - (1 - qs) ** A
+                chosen = [i for i, hit in zip(act, rng.random(n) < p_days) if hit]
+                if len(chosen) > A:
+                    chosen = rng.choice(chosen, A, replace=False).tolist()
+                chosen_set = set(chosen)
+                for i, q_i, p_day in zip(act, qs, p_days):
+                    p = v.positions[i]
+                    if i in chosen_set:
+                        before_sel = int(per_listing * (1 / q_i - A * (1 - q_i) ** A / p_day))
+                        credit += p.pending_fees + before_sel
+                        accrued += before_sel
+                        p.pending_fees = 0
+                        p.status = ALLOCATED  # FWA changed; the vault's book changes only in sync below
+                        allocated_day[i] = d
+                        selected_backing += p.backing
+                    else:
+                        v.accrue(i, per_listing * A)
+                        accrued += per_listing * A
+                selected += len(chosen)
+            refunds = int(rng.poisson(A * sc.get("refunds_per_selection", REFUNDS_PER_SELECTION)))
+            journal.extend((i, d * DAY) for i in chosen)
+            journal.extend((None, 0) for _ in range(A - len(chosen) + refunds))
+            v.completed_prefix += A + refunds
 
-        blackout_ok = rng.random() >= sc.get("checkpoint_miss", 0.0)
+        blackout_ok = True if timed else rng.random() >= sc.get("checkpoint_miss", 0.0)
         congested = sc.get("congested") and sc["congested"](d)
-        open_days.append(len(v.positions))
+        if not timed:
+            open_days.append(len(v.positions))
         calls = 0
-        checkpoint_done = False
+        checkpoint_done = timed and last_checkpoint_interval == absolute_now // OperatingClock.INTERVAL
         holder_finished = False
-        for blackout in (False, True):
-            while not congested and not holder_finished and calls < max_calls:
-                listings = [policy.Listing(i, p.status, allocated_at=p.allocated_at, pending_fees=p.pending_fees,
+        phases = ([absolute_now % clock.INTERVAL >= clock.BLACKOUT_START] if event_kind == "keeper" else []) if timed else (False, True)
+        for blackout in phases:
+            while not congested and not holder_finished and calls < (1 if timed else max_calls):
+                listings = [policy.Listing(i, p.status, allocated_at=selected_times.get(i, p.allocated_at) if timed else p.allocated_at, pending_fees=p.pending_fees,
                                            value=p.value, backing=p.backing) for i, p in v.positions.items()]
                 st = policy.State(
-                    now=d * DAY, gas_price=gas + tip, base_fee=gas, gas_ceiling=ceiling, max_tip=tip,
+                    now=absolute_now, gas_price=gas + tip, base_fee=gas, gas_ceiling=ceiling, max_tip=tip,
                     markup_bps=values["payMarkupBps"], share_bps=values["keeperShareBps"], k=k, backing=backing,
-                    min_edge_bps=values["minEdgeBps"], mint_fee=mint_fee, settlement_window=10**12,
-                    blackout=blackout, queue_drained=(blackout_ok or not blackout) and d >= listing_ready_day,
+                    min_edge_bps=values["minEdgeBps"], mint_fee=mint_fee, settlement_window=clock.SETTLEMENT if timed else 10**12,
+                    blackout=blackout, queue_drained=(market_pending == 0 if timed else (blackout_ok or not blackout) and d >= listing_ready_day),
                     checkpoint_done_this_interval=checkpoint_done, listings=listings, idle_packs=len(v.idle_packs),
                     recovery_packs=len(v.recovery_packs), loose_shapes=v.loose_shapes,
                     free=v.free(), idle_eth=v.idle(), owed_estimate=v.owed_estimate(),
@@ -422,7 +549,7 @@ def run(sc, n_target, seed, days=365, values=None):
                     journal_cursor=v.acquisition_cursor, completed_prefix=v.completed_prefix,
                     pending_receipts=len(v.receipts), routine_budget=v.routine_budget,
                     essential_budget=v.essential_budget, essential_cap=values["essentialCapWei"],
-                    recent_volume=float(np.mean(vol_hist[-7:])), work_fee=work_fee,
+                    recent_volume=float(np.mean(vol_hist[max(0, d - 6):d + 1] if timed else vol_hist[-7:])), work_fee=work_fee,
                     slowdown_volume=sc.get("slowdown", 0.0), essential_ceiling=essential_ceiling,
                     pack_units_mask=values["packUnitsMask"], reserve=values["reserveWei"],
                     processing_pool=v.processing_pool, distribution_bps=v.distribution_bps,
@@ -499,6 +626,7 @@ def run(sc, n_target, seed, days=365, values=None):
 
                 for action in planned:
                     fn = action[0]
+                    action_meta = {}
                     if fn == "sync":
                         unexposed = not v.positions and not v.receipts and not v.active_count and not v.active_backing and not v.allocated_value
                         rebase_count = len(journal) if unexposed else 0
@@ -514,10 +642,15 @@ def run(sc, n_target, seed, days=365, values=None):
                             assert all(i is None for i, _ in journal)
                             entries = []
                         own_ids = [i for i, _ in entries if i is not None]
+                        expired_ids = [i for i in action[1] if timed and i in v.positions
+                                       and v.positions[i].status == ALLOCATED and v.positions[i].expired
+                                       and (v.positions[i].state == ALLOCATED or i in own_ids)]
                         resolved = [i for i in action[1] if i in v.positions and
                                     (v.positions[i].status == WITHDRAWN or
                                      (v.positions[i].status == SETTLED and
-                                      (v.positions[i].state == ALLOCATED or i in own_ids)))]
+                                      (v.positions[i].state == ALLOCATED or i in own_ids)) or i in expired_ids)]
+                        reclaim_cash = sum(v.positions[i].backing * (10_000 - v.settlement_fee_bps) // 10_000
+                                           for i in expired_ids if v.positions[i].backing * (10_000 - v.settlement_fee_bps) // 10_000 >= v.positions[i].value)
                         prospective = [v.allocation_queue[j] for j in range(v.allocation_head,
                                       min(len(v.allocation_queue), v.allocation_head + policy.MAX_BATCH["prune"]))] + own_ids
                         pruned = 0
@@ -530,7 +663,9 @@ def run(sc, n_target, seed, days=365, values=None):
                             continue
                         checkpoint_due = (st.blackout and st.queue_drained and not st.checkpoint_done_this_interval
                                           and (st.pending_deposits or st.locked_shares or st.distribution_bps))
-                        tail_q = Q["journal_tail"] + len(entries) * Q["journal"] + pruned * Q["pruned"]
+                        tail_base = Q["journal_tail"] + (Q["distribution_proof"]
+                            if st.distribution_bps and not (st.pending_deposits or st.locked_shares) else 0)
+                        tail_q = tail_base + len(entries) * Q["journal"] + pruned * Q["pruned"]
                         distribution_probe = v
                         if pruned and st.distribution_bps and not (st.pending_deposits or st.locked_shares):
                             distribution_probe = copy.deepcopy(v)
@@ -541,7 +676,7 @@ def run(sc, n_target, seed, days=365, values=None):
                                              or (entries and tail_paid))
                         required_tail = (entries and len(entries) < policy.MAX_BATCH["journal"]
                                          and not own_ids and not resolved and tail_paid)
-                        base_q = Q["journal_tail"] if required_tail else Q["sync"]
+                        base_q = tail_base if required_tail else Q["sync"]
                         gas_q = base_q + (len(entries) * Q["journal"] if journal_paid_work else 0) + len(own_ids) * Q["selected"] \
                             + len(resolved) * Q["synced"] + pruned * Q["pruned"]
                         if ((unexposed and not v.tracked_value) or (rebase_count and not pruned)
@@ -556,7 +691,7 @@ def run(sc, n_target, seed, days=365, values=None):
                             unknown_user_gas += int("unexposed_sync" not in user_gas)
                             holder_calls["sync"] += 1
                             zero_quote_sync_calls += 1
-                        if not affordable(gas_q, len(resolved), False, liability=essential):
+                        if not affordable(gas_q, len(resolved), False, cash_delta=reclaim_cash, liability=essential):
                             continue
                         if rebase_count:
                             assert v.advance_unexposed()
@@ -568,6 +703,16 @@ def run(sc, n_target, seed, days=365, values=None):
                                 v.select(i, at)
                             v.acquisition_cursor += 1
                         for i in resolved:
+                            if i in expired_ids:
+                                p = v.positions[i]
+                                if p.backing * (10_000 - v.settlement_fee_bps) // 10_000 >= p.value:
+                                    v.record_keep(i, v.settlement_fee_bps)
+                                    expired_backing += 1
+                                    trace_state("expiry-backing", d)
+                                else:
+                                    v.bid_settled(i)
+                                    expired_nft += 1
+                                    trace_state("expiry-nft", d)
                             if v.receipts.get(i, (0,))[0] == 1:
                                 v.consume_keep(i)
                             else:
@@ -581,6 +726,9 @@ def run(sc, n_target, seed, days=365, values=None):
                     elif fn == "harvest":
                         ids = action[1]
                         amt = credit + sum(v.positions[i].pending_fees for i in ids)
+                        if timed:
+                            action_meta = dict(harvest_amount=amt, harvested_credit=credit,
+                                               harvested_pending={i: v.positions[i].pending_fees for i in ids})
                         gas_q = Q["harvest"] + Q["harvested"] * len(ids)
                         funding_cap = None if policy.quote(st, gas_q) * 10_000 <= amt * st.share_bps else 0
                         liability = essential and v.owed_estimate() > v.free() + v.pending_total
@@ -646,6 +794,9 @@ def run(sc, n_target, seed, days=365, values=None):
                         credit = 0
                         checkpoints += 1
                         checkpoint_done = True
+                        if timed:
+                            last_checkpoint_interval = absolute_now // clock.INTERVAL
+                            timed_checkpoint_times.append(absolute_now)
                         pay(gas_q, 1, essential, funding_cap, liability=essential)
                     elif fn == "restock":
                         units, proposals = action[1], action[2]
@@ -658,13 +809,14 @@ def run(sc, n_target, seed, days=365, values=None):
                         v.restock(len(proposals), units, mint_fee, proposals)
                         pay(gas_q, len(proposals))
                     elif fn == "list":
-                        if d < listing_ready_day:
-                            continue
-                        wait = waits[rng.integers(len(waits))] / DAY if waits is not None and len(waits) else 0.0
-                        first = d + int(np.ceil(rng.random() + wait))
-                        if first > d + 1:
-                            listing_ready_day = first - 1
-                            continue
+                        if not timed:
+                            if d < listing_ready_day:
+                                continue
+                            wait = waits[rng.integers(len(waits))] / DAY if waits is not None and len(waits) else 0.0
+                            first = d + int(np.ceil(rng.random() + wait))
+                            if first > d + 1:
+                                listing_ready_day = first - 1
+                                continue
                         proposals = []
                         cash = 0
                         for proposal in action[1]:
@@ -690,20 +842,29 @@ def run(sc, n_target, seed, days=365, values=None):
                     executed = True
                     calls += 1
                     trace_state(fn, d)
+                    if timed and trace is not None:
+                        trace[-1].update(action_meta)
                     if exit_all and exit_requested and fn == "checkpoint":
                         claim_available(gas + tip, d)
                         holder_finished = not v.share_balance("h") and not locked_holder() and not v.locked_shares
                     break  # The real keeper re-reads state after every successful transaction.
                 if not executed:
                     break
+        if timed and event_kind == "keeper":
+            remaining = payload - calls
+            timed_pass_limits += int(calls and not remaining)
+            delay = clock.receipt_delay if calls else 0
+            clock.push(now + delay + (0 if calls and remaining else clock.poll), "keeper", remaining if calls and remaining else 40)
         if calls == max_calls:
             call_limit_days += 1
         redemptions = list(sc.get("redeem", []))
-        if d == days - 1:
+        if (event_kind == "cutoff") if timed else (d == days - 1):
             operation_end_backlog = len(journal)
             operation_end_cash, operation_end_keeper_paid, operation_end_fees = v.balance, v.keeper_paid, v.fees_received
             operation_end_idle, operation_end_funding, operation_end_loose = v.idle_value, v.idle_funding, v.loose_shapes * policy.UNIT
-        if exit_all:
+        if timed:
+            redemptions = [(d, 1.0)] if event_kind == "cutoff" and exit_all else ([(d, payload)] if event_kind == "redemption" else [])
+        elif exit_all:
             redemptions.append((days - 1, 1.0))
         for day, frac in redemptions:
             if day == d:
@@ -766,14 +927,16 @@ def run(sc, n_target, seed, days=365, values=None):
                   - v.settlement_fees - unreconciled_keep - holder_claimed - holder_cancelled - physical)
     assert ledger_gap == 0, ("operating asset ledger", ledger_gap)
     assert routine_paid + essential_paid + request_paid == v.keeper_paid
+    if timed:
+        assert accrued == v.fees_received + credit + sum(p.pending_fees for p in v.positions.values()), "external fee conservation"
     if exit_complete:
         assert not v.locked_shares and not v.receipts
         value_end = holder_claimed + holder_cancelled + holder_keeper_pay - holder_gas
         ret = value_end / paid_in - 1
-    elapsed = d + 1
+    elapsed = now / DAY if timed else d + 1
     result = dict(ret=ret * 365 / (elapsed if exit_all else days), keeper=v.keeper_paid / deposit, mint=v.mint_fees / deposit,
                 fees=v.fees_received / deposit, lost=v.backing_lost / deposit, util=deployed / max(1, end_nav),
-                positions=len(v.positions), pos_mean=float(np.mean(open_days)), pos_max=max(open_days),
+                positions=len(v.positions), pos_mean=float(np.mean(open_days)), pos_max=max(open_days, default=0),
                 checkpoints=checkpoints, journal_paid=journal_paid / deposit, journal_backlog=len(journal),
                 journal_own=journal_own, journal_foreign=journal_foreign, journal_pruned=journal_pruned, journal_rebased=journal_rebased,
                 terminal_work=terminal_work, pending_receipts=len(v.receipts), end_pricing_blocked=end_blocked,
@@ -791,7 +954,7 @@ def run(sc, n_target, seed, days=365, values=None):
                 mint_fees_wei=v.mint_fees, backing_lost_wei=v.backing_lost,
                 journal_paid_wei=journal_paid, elapsed_days=elapsed,
                 external_exit_gas_proxy_wei=holder_maintenance_gas - holder_keeper_pay if exit_all else self_serve_cost,
-                vol=float(np.mean(vol_hist)), operating_days=days, exit_requested=exit_requested,
+                vol=float(np.mean(vol_hist[:d + 1] if timed else vol_hist)), operating_days=days, exit_requested=exit_requested,
                 exit_complete=exit_complete, exit_days_elapsed=max(0, elapsed - days),
                 holder_claimed_wei=holder_claimed, holder_cancelled_wei=holder_cancelled,
                 holder_keeper_pay_wei=holder_keeper_pay, holder_gas_proxy_cost_wei=holder_gas,
@@ -821,7 +984,14 @@ def run(sc, n_target, seed, days=365, values=None):
                 physical_assets_wei=physical, vault_cash_wei=v.balance, holder_liability_wei=v.redemption_reserve + v.distribution_reserve + v.claimable_total,
                 ledger_gap_wei=ledger_gap, routine_initial_cap_wei=values["routineCapWei"],
                 routine_refill_per_day_wei=values["routineRatePerDayWei"],
-                routine_period_permission_upper_wei=values["routineCapWei"] + d * values["routineRatePerDayWei"])
+                routine_period_permission_upper_wei=values["routineCapWei"] + now * values["routineRatePerDayWei"] // DAY,
+                timed_mode=timed, elapsed_seconds=now if timed else (d + 1) * DAY,
+                expired_backing_reclaims=expired_backing, expired_nft_reclaims=expired_nft,
+                purchaser_responses=purchaser_returns, late_purchaser_responses=late_purchaser_returns,
+                timed_checkpoint_count=len(timed_checkpoint_times), timed_pass_limit_hits=timed_pass_limits)
+    if timed:
+        result.update(external_fees_generated_wei=accrued, unharvested_fee_credit_wei=credit,
+                      unharvested_listing_fees_wei=sum(p.pending_fees for p in v.positions.values()))
     for name in op_names:
         result[f"keeper_paid_{name}_wei"] = op_paid[name]
         result[f"keeper_calls_{name}"] = op_calls[name]

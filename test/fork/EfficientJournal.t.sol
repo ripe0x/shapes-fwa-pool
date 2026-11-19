@@ -59,6 +59,8 @@ contract EfficientJournalTest is ForkBase {
     }
 
     function test_fullJournalJobCannotBeShrunkByIrrelevantTerminalIds() public {
+        VaultLib.Params memory p = vault.getParams(); p.distributionBps = 5000;
+        vm.prank(owner); vault.setParams(p);
         uint64 cursor = _refund(128);
         uint256 snapshot = vm.snapshotState();
         vm.prank(keeper); uint256 normalPay = vault.sync(new uint256[](0), 0, 0);
@@ -89,7 +91,7 @@ contract EfficientJournalTest is ForkBase {
         toBlackout();
         uint256 pool = vault.processingPool();
         vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), 0, 1);
-        assertEq(paid, (VaultLib.Q_SYNC + 32 * VaultLib.Q_JOURNAL) * 0.2 gwei);
+        assertEq(paid, (VaultLib.Q_REQUIRED_TAIL + 32 * VaultLib.Q_JOURNAL) * 0.2 gwei);
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
         assertEq(vault.processingPool(), pool);
         assertEq(vault.pendingDepositTotal(), escrow);
@@ -136,8 +138,17 @@ contract EfficientJournalTest is ForkBase {
         assertTrue(accepted);
         toBlackout();
         uint256 witness = TestVaultOps.witness(vault);
+        uint256 snapshot = vm.snapshotState();
+        uint256 cursor = vault.acquisitionCursor();
+        uint256 cash = address(vault).balance;
+        vm.expectRevert(VaultLib.Payment.selector);
+        vm.prank(keeper); vault.sync(new uint256[](0), witness + 1e9, 1);
+        assertEq(vault.acquisitionCursor(), cursor, "refused proof payment rolls back the journal");
+        vm.prank(keeper); assertEq(vault.sync(new uint256[](0), witness + 1e9, 0), 0);
+        assertEq(address(vault).balance, cash, "invalid witness earns no proof premium");
+        assertTrue(vm.revertToState(snapshot));
         vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), witness, 1);
-        assertEq(paid, (VaultLib.Q_SYNC + VaultLib.Q_JOURNAL) * 0.2 gwei);
+        assertEq(paid, (VaultLib.Q_REQUIRED_TAIL + VaultLib.Q_DISTRIBUTION_PROOF + VaultLib.Q_JOURNAL) * 0.2 gwei);
         assertEq(vault.pendingDepositTotal(), 0); assertEq(vault.lockedShares(), 0);
         vm.prank(keeper); vault.checkpoint(witness, 0);
         assertGe(vault.distributionReserve(), 0.01 ether);

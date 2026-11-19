@@ -1,5 +1,7 @@
 # Keeper operations and recovery
 
+Prepared calibration candidate: journal22,000/record; required holder-tail base110,000; actual qualified distribution-only proof80,000; ordinary sync base85,000. No proof payment for full/own jobs, failed eligibility or unexposed advancement. Candidate receipts await the exact new owner amendment; baseline receipt and ordinary-preflight results are in `receipts/efficient-journal-baseline-and-candidate.md`. Q_PACK remains325,000.
+
 `keeper/keeper.py` executes one operation, checks its receipt, then replans. `policy.py` owns the
 economic decisions and is imported by the simulation. `tx.py` retains nonce, replacement, restart,
 lost-response and receipt-reorg handling. The vault authenticates financial facts independently.

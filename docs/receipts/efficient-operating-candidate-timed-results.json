@@ -1,0 +1,134 @@
+{
+  "scope": "Focused frozen-candidate timed checks only; original Q30 evidence immutable.",
+  "source_sha256": {
+    "sim/forward.py": "f36f9295aec5c41583e2c6a6763134c2f1dc30a33f5e8790e55c96747685daa7",
+    "sim/efficient_operating.py": "027df41dfb2e6d9153c465351863ca4fa3af95afb89a50ac3491e1e847832e90",
+    "sim/vault.py": "e958d86859ff9ddd9e2766459683f77cf9caea9ac87691be6360d2e92614ba7a",
+    "keeper/policy.py": "8e6ee88e5a1b86712c11c1d6d264844c48d820f576646631ed14bdec681061d0",
+    "src/PackVault.sol": "448106b8915413badef411355a5cb729ca15046743be768919d74e9349ddcd8b",
+    "src/VaultLib.sol": "8223991816433e0aff0b50253d6daa212d822f5545ad53ca04482efbf94d5252",
+    "deploy/mainnet.json": "bcf29731a40d403a77c8380b3f4b691406995b2182ce42bb90d7d2993f76b489",
+    "deploy/canary.example.json": "f50e7a3dd992c2ff7e155471fbef727ac0ae4e6ffbd0e418bdf8dfd4d3665015"
+  },
+  "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python3",
+    "/private/tmp/efficient-operating-candidate-timed-driver.py"
+  ],
+  "exit_status": 0,
+  "driver_source": "from pathlib import Path\nimport sys,json,hashlib,subprocess\nROOT=Path('/Users/dd/.codex/worktrees/da17/shapes-fwa-pool')\nsys.path.insert(0,str(ROOT/'sim'))\nimport efficient_operating as E\npaths=['sim/forward.py','sim/efficient_operating.py','sim/vault.py','keeper/policy.py','src/PackVault.sol','src/VaultLib.sol','deploy/mainnet.json','deploy/canary.example.json']\nsha=lambda p:hashlib.sha256((ROOT/p).read_bytes()).hexdigest()\nfrozen={p:sha(p) for p in paths}\nhistory,gas=E.context(Path('/Users/dd/CascadeProjects/shapes-fwa-pool/sim/data/fwa.sqlite'))\nresult=E.timed_checks(history,gas)\nassert frozen=={p:sha(p) for p in paths},'candidate changed during checks'\nresult.update(context=history,user_gas_proxy=gas,source_sha256=frozen,quote_schedule=E.F.policy.Q,command=[sys.executable,*sys.argv],revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),exit_status=0,source_of_funds='Vault free ETH, holder charges and received FWA income; holder pays explicitly underfunded exit work, no subsidy.',candidate='journal22000, holder tail110000, distribution proof80000; pending owner broadcast authority, no chain calls in this run')\np=ROOT/'docs/receipts/efficient-operating-candidate-timed-checks.json'\np.write_text(json.dumps(result,indent=2)+'\\n')\nprint('PASS four candidate conditional timed paths and focused clock/expiry/claim/legacy checks. No full matrix or chain calls.')\nfor name,r in result['rows'].items():\n print(name,{k:r[k] for k in ['exit_complete','fully_paid_routine','unpaid_routine_calls','holder_calls_harvest','fees_received_wei','keeper_paid_harvest_wei','ledger_gap_wei']})\n",
+  "driver_sha256": "9380bc73ec9b72366c28e85ebb6aa81cc0807d547647ec4d724135c61951c7c2",
+  "artifact_sha256": {
+    "docs/receipts/efficient-operating-candidate-timed-checks.json": "de028017ab4c807b49443a82cad04817aaf131228f7ccc54e3a1e2eac0c26d83",
+    "docs/receipts/efficient-operating-candidate-timed-checks.txt": "856ce11728baff8c24a30a6b4b0009a15f8056fa8fd620ef4525bb13f1a5fcb0",
+    "docs/receipts/efficient-operating-candidate-timed-results.md": "b9b7de4789b1f1526e4a05605014558b75ebdc34b64d66f3264d8af493addb1c",
+    "docs/receipts/efficient-operating-timed-checks.json": "bf860d925beceb90fe5a3198474d15818d31d5342c1d963396f76b87d5c7f481"
+  },
+  "quote_schedule": {
+    "checkpoint": 360000,
+    "restock": 280000,
+    "pack": 325000,
+    "pack_unit": 35000,
+    "mint": 2200000,
+    "list": 280000,
+    "listed": 825000,
+    "sync": 85000,
+    "journal_tail": 110000,
+    "distribution_proof": 80000,
+    "synced": 120000,
+    "journal": 22000,
+    "selected": 160000,
+    "pruned": 45000,
+    "unlist": 340000,
+    "unlisted": 285000,
+    "liquidate": 75000,
+    "liq_pack": 80000,
+    "redeem_shape": 35000,
+    "liq_shape": 65000,
+    "recovery_base": 100000,
+    "recovery_shape": 35000,
+    "recovery_unseal": 70000,
+    "harvest": 125000,
+    "harvested": 80000
+  },
+  "revision": "15348d1e89c18eefe00349615a9092911c123d17",
+  "results": {
+    "cases": 4,
+    "complete_exits": 3,
+    "fully_paid_routine": 1,
+    "zero_gap_asset_ledgers": 4,
+    "zero_gap_external_fee_ledgers": 4
+  },
+  "fee_assertion": "external_fees_generated_wei == fees_received_wei + unharvested_fee_credit_wei + unharvested_listing_fees_wei",
+  "harvest_diagnosis": {
+    "zero": {
+      "harvest_calls": 0,
+      "membership_harvest_count": 0,
+      "distinct_memberships": 0,
+      "max_harvests_before_selection": 0,
+      "harvested_amount_wei": 0,
+      "checkpoint_or_other_received_fee_wei": 0,
+      "fee_conservation_gap_wei": 0,
+      "underpaid_holder_harvest_calls": 0,
+      "underpaid_holder_sync_calls": 0,
+      "fully_paid_routine": true
+    },
+    "timely": {
+      "harvest_calls": 990,
+      "membership_harvest_count": 15813,
+      "distinct_memberships": 111,
+      "max_harvests_before_selection": 198,
+      "harvested_amount_wei": 1819168941380021572,
+      "checkpoint_or_other_received_fee_wei": 0,
+      "fee_conservation_gap_wei": 0,
+      "underpaid_holder_harvest_calls": 44,
+      "underpaid_holder_sync_calls": 0,
+      "fully_paid_routine": false
+    },
+    "silent": {
+      "harvest_calls": 1123,
+      "membership_harvest_count": 15895,
+      "distinct_memberships": 118,
+      "max_harvests_before_selection": 196,
+      "harvested_amount_wei": 1916686416113682250,
+      "checkpoint_or_other_received_fee_wei": 0,
+      "fee_conservation_gap_wei": 0,
+      "underpaid_holder_harvest_calls": 45,
+      "underpaid_holder_sync_calls": 0,
+      "fully_paid_routine": false
+    },
+    "late": {
+      "harvest_calls": 965,
+      "membership_harvest_count": 15419,
+      "distinct_memberships": 115,
+      "max_harvests_before_selection": 196,
+      "harvested_amount_wei": 1862151985294759769,
+      "checkpoint_or_other_received_fee_wei": 0,
+      "fee_conservation_gap_wei": 0,
+      "underpaid_holder_harvest_calls": 45,
+      "underpaid_holder_sync_calls": 0,
+      "fully_paid_routine": false
+    }
+  },
+  "historical_gas_proxy": {
+    "deposit": 194439,
+    "request_redeem": 136609,
+    "claim": 90679,
+    "checkpoint": 255435,
+    "unexposed_sync": 121884
+  },
+  "limits": [
+    "Conditional generated request/completion times and purchaser choices are scenario assumptions, not real VRF replay or observed purchaser response behavior.",
+    "Effects occur atomically at the fresh modeled read;36seconds delay the next receipt-confirmed read. This optimistic inclusion assumption does not model fees, reverted races, variable block time or transaction latency across a boundary.",
+    "At exact timestamp ties, market events precede keeper reads. Purchasers may respond after3600seconds until reclaim wins; expiry itself does not transfer assets.",
+    "Static recorded foreign pool and per-completion fee/selection approximation remain. Successful journal compensation and keeper profitability still require separate actual receipts/preflight.",
+    "NFT-reclaim expiry branch is implemented but not reached by these accepted-backing scenarios; no fabricated low-backing protocol fixture is supplied.",
+    "These short conditional paths validate clock/accounting interactions. They do not reproduce the prepriced-holder cash-cycle or establish recommended budget, expected returns or annual acceptance.",
+    "No successful-foreign real billed receipt or exact actual keeper profitability claim is supplied by this model run.",
+    "Completed exits may include caller-paid underfunded routine harvest; rescue_sync=False only forbids unpaid sync.",
+    "Annualized raw ret is retained only for compatibility, never an achieved/expected annual return."
+  ],
+  "things_that_do_not_make_sense": [
+    "Lower journal quotes do not resolve repeated active-membership harvesting expense.",
+    "Completed exits depending on holder-paid underfunded work cannot be called fully funded."
+  ]
+}

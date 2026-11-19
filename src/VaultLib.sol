@@ -85,8 +85,9 @@ library VaultLib {
     uint256 internal constant Q_LIST = 280_000;
     uint256 internal constant Q_LISTED = 825_000;
     uint256 internal constant Q_SYNC = 85_000;
-    uint256 internal constant Q_REQUIRED_TAIL = 85_000;
-    uint256 internal constant Q_JOURNAL = 30_000; // each completed global acquisition
+    uint256 internal constant Q_REQUIRED_TAIL = 110_000;
+    uint256 internal constant Q_DISTRIBUTION_PROOF = 80_000;
+    uint256 internal constant Q_JOURNAL = 22_000; // each completed global acquisition
     uint256 internal constant Q_SELECTED = 160_000; // own selection bookkeeping
     uint256 internal constant Q_SYNCED = 120_000; // terminal or recovered return
     uint256 internal constant Q_PRUNED = 45_000; // resolved allocation head
@@ -711,16 +712,18 @@ library VaultLib {
         if ((unexposed && b.trackedValue == 0) || work.processed + work.resolved + work.pruned == 0) return (0, 0);
         bool journalPaid = work.processed == MAX_JOURNAL || work.own + work.resolved != 0;
         bool requiredTail;
+        uint256 tailBase = Q_REQUIRED_TAIL;
         if (!journalPaid && work.processed != 0 && checkpointMode != 0) {
             journalPaid = f.isPurchaseBlackout() && f.unsettledAcquisitionCount() == 0;
             if (journalPaid && checkpointMode == 2) {
+                tailBase += Q_DISTRIBUTION_PROOF;
                 journalPaid = _distributionTail(p, b, f, witnessId,
-                    Q_REQUIRED_TAIL + work.processed * Q_JOURNAL + work.pruned * Q_PRUNED);
+                    tailBase + work.processed * Q_JOURNAL + work.pruned * Q_PRUNED);
             }
             requiredTail = journalPaid;
         }
         if (!journalPaid && work.own + work.resolved + work.pruned == 0) return (0, 0);
-        gasQ = (requiredTail ? Q_REQUIRED_TAIL : Q_SYNC) + (journalPaid ? work.processed * Q_JOURNAL : 0) + work.own * Q_SELECTED
+        gasQ = (requiredTail ? tailBase : Q_SYNC) + (journalPaid ? work.processed * Q_JOURNAL : 0) + work.own * Q_SELECTED
             + work.resolved * Q_SYNCED + work.pruned * Q_PRUNED;
         units = work.resolved;
     }

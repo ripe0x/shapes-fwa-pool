@@ -1,12 +1,12 @@
-# Efficient journal revision in progress
+# Efficient journal revision: receipts complete, candidate prepared
 
-2026-11-18. Current scope and measured limits: `EFFICIENT-JOURNAL-RESULTS.md`.
-The new128-record jobs, required-tail eligibility, routine sync, returned-bid discovery and restock
-optimization supersede the16-record job and essential-sync descriptions below. Current runtime
-is24,451 bytes. Numerical quotes and allowances remain unchanged pending actual receipts.
-The earlier342,766 checkpoint deduction is withdrawn because it double-subtracted finalized
-refunds; the current direct finalized sample is345,937. Standalone signed receipts remain pending.
-The prepared new local batch needs separate owner approval. No milestone acceptance is claimed.
+2026-11-18. The approved baseline passed: **318/540 transactions**, **17.501610827424708864/32 simulated ETH** aggregate value,8.3 ETH funded once and no topups. The owned8559 node is restored to entry;8557 is untouched. Standalone full-holder checkpoint billed **346,017 gas** and passed ordinary keeper preflight at0.2/0.5/2 gwei. O6 passes its0.0002 ETH bound; O2 remains1,919,655 versus1,750,000.
+
+Baseline default singleton quotes underpay holder and distribution tails. A measured candidate uses22k/record,110k holder-tail base and80k actual qualified distribution-proof work, keeping ordinary85k and pack325k. It passes focused checks and independent review; runtime24,451/23,001 bytes. **The new proof component exceeds the original literal-only approval and has not been broadcast.** An exact bounded amendment is prepared. No allowance or accepted outcome changed.
+
+The opt-in timed model fixes inherited daily-clock assumptions, but its conditional scenarios expose repeated harvest expense and underpaid holder harvests. Funding and holder-return acceptance remain blocked. Current detail: `receipts/efficient-journal-baseline-and-candidate.md`; historical and current scope: `EFFICIENT-JOURNAL-RESULTS.md`.
+
+Things that don't make sense: cheaper journal work alone does not fund all own work; complete accounting and exits do not establish funded operation or acceptable returns.
 
 Everything below is prior revision evidence for its named source, retained as history.
 

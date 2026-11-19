@@ -53,12 +53,12 @@ def main():
     assert plan(state(listings=act, free=E, pending_deposits=10**17, **spike)) == []
 
     # Absolute envelope cash at0.5gwei: list8=(280k+8*825k)*0.55gwei=0.003784ETH;
-    # routine journal128+prune16=(85k+128*30k+16*45k)*0.55gwei=0.00255475ETH.
-    assert reserve_need(state()) == 6_338_750_000_000_000
+    # routine journal128+prune16=(85k+128*22k+16*45k)*0.55gwei=0.00199155ETH.
+    assert reserve_need(state()) == 5_775_550_000_000_000
     s = state(essential_ceiling=2 * G, work_fee=20_000_000_000_000)
-    assert reserve_need(s) == 6_498_750_000_000_000
+    assert reserve_need(s) == 5_935_550_000_000_000
     unpaid = state(essential_ceiling=2 * G, work_fee=20_000_000_000_000, essential_cap=0)
-    assert reserve_need(unpaid) == 6_498_750_000_000_000  # Sync is routine even with unpaid exits.
+    assert reserve_need(unpaid) == 5_935_550_000_000_000  # Sync is routine even with unpaid exits.
     assert "RESERVE_BELOW_NEED" in {c for c, _, _ in status(state(reserve=10**15))}
     assert P.checkpoint_cost(state(open_positions=301)) == P.checkpoint_cost(state(open_positions=10_000))
     assert P.request_charge(state(open_positions=1000)) == P.request_charge(state(open_positions=10_000))
@@ -82,7 +82,7 @@ def main():
                                    distribution_bps=5000, distribution_due=False, witness_id=91)))
     blocked = state(journal_cursor=0, completed_prefix=128, open_positions=1, free=E,
                     idle_eth=E, idle_packs=1, routine_budget=1, markup_bps=0)
-    assert P.journal_backlog_floor(blocked) == 785_000_000_000_000
+    assert P.journal_backlog_floor(blocked) == 580_200_000_000_000
     assert "sync" in fns(plan(blocked))
     assert not {"restock", "list"} & set(fns(plan(blocked)))
     assert "MAINTENANCE_UNFUNDED" in {c for c, _, _ in status(blocked)}

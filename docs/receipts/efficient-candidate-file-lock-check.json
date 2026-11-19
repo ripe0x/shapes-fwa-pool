@@ -1,0 +1,5 @@
+{
+  "result": "Second independent open is refused while first lock held",
+  "scope": "Actual OS flock only; no launcher execution, RPC or transaction",
+  "first_probe": "Opening /dev/fd duplicates the existing open-file description, so it legitimately shares the lock; this was an invalid independent-open test, not a launcher failure."
+}

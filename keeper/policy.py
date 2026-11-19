@@ -6,8 +6,8 @@ A call is planned only when the vault pays for it (necessary work, or value well
 or when holders need it (redemption liquidity, wind-down). Everything is recomputed each pass, so
 an interrupted keeper resumes from chain state alone.
 
-Gas classes (D45). Below the vault's gas ceiling the keeper is reimbursed at its bid, so every
-planned call pays for itself. Above the ceiling, reimbursement is priced at the ceiling, so only
+Gas classes (D45). Fixed quotes can underpay a planned candidate; the executor checks the
+actual offer and signed-call estimate before accepting it. Above the ceiling only
 liability work is planned: redemption liquidity, the checkpoint that prices a redemption, and
 wind-down. Everything else (new packs, relists, fee harvests, deposit pricing, token
 burns) waits for gas to fall. Whether a keeper accepts the loss on liability work above the
@@ -27,7 +27,7 @@ ACTIVE, ALLOCATED, WITHDRAWN, SETTLED = 1, 2, 3, 4
 # The vault's quoted-gas schedule, line for line (PackVault Q_* constants, D56). Pay is a quote
 # fixed by the operation and its completed work, never the caller's gas.
 Q = dict(checkpoint=360_000, restock=280_000, pack=325_000, pack_unit=35_000, mint=2_200_000,
-         list=280_000, listed=825_000, sync=85_000, journal_tail=85_000, synced=120_000, journal=30_000, selected=160_000,
+         list=280_000, listed=825_000, sync=85_000, journal_tail=110_000, distribution_proof=80_000, synced=120_000, journal=22_000, selected=160_000,
          pruned=45_000, unlist=340_000, unlisted=285_000, liquidate=75_000, liq_pack=80_000,
          redeem_shape=35_000, liq_shape=65_000, recovery_base=100_000, recovery_shape=35_000,
          recovery_unseal=70_000, harvest=125_000, harvested=80_000)
@@ -357,7 +357,7 @@ def reserve_need(s):
 
 
 def journal_backlog_floor(s):
-    """Packed journal envelope; own transitions and terminal work can add cost."""
+    """Packed journal floor; own transitions, terminal work and distribution proof can add cost."""
     if not s.open_positions and not s.active_count and not s.pending_receipts and not s.listings:
         return 0
     records = s.completed_prefix - s.journal_cursor
@@ -392,7 +392,7 @@ def status(s, planned=None):
     if s.journal_cursor < s.completed_prefix:
         out.append(("JOURNAL_CATCHUP", "wait", f"{s.completed_prefix - s.journal_cursor} completed global entries remain"))
         floor = journal_backlog_floor(s)
-        out.append(("JOURNAL_FUNDING", "info", f"packed backlog envelope {floor} wei; free {s.free} wei; routine permission {s.routine_budget} wei"))
+        out.append(("JOURNAL_FUNDING", "info", f"packed journal floor {floor} wei; free {s.free} wei; routine permission {s.routine_budget} wei"))
         if floor > min(s.free, s.routine_budget):
             out.append(("MAINTENANCE_UNFUNDED", "wait", "new exposure waits for maintenance cash or routine permission"))
     if s.pending_receipts:

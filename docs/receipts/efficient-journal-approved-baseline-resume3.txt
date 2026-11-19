@@ -1,0 +1,58 @@
+Resume32 no-gain observation and remaining approved jobs;229 cumulative transactions retained
+{"label": "distribution journal32/markup0/price200000000", "estimate": 722877, "billed_gas": 717897, "keeper_paid_wei": 209000000000000, "actual_cost_wei": 143579400000000}
+{"label": "distribution journal32/markup0/price500000000", "estimate": 722877, "billed_gas": 717897, "keeper_paid_wei": 522500000000000, "actual_cost_wei": 358948500000000}
+{"label": "distribution journal32/markup1000/price200000000", "estimate": 722540, "billed_gas": 717560, "keeper_paid_wei": 229900000000000, "actual_cost_wei": 143512000000000}
+{"label": "distribution journal32/markup1000/price500000000", "estimate": 722540, "billed_gas": 717560, "keeper_paid_wei": 574750000000000, "actual_cost_wei": 358780000000000}
+{"label": "holder journal32/markup0/price200000000", "estimate": 643029, "billed_gas": 638049, "keeper_paid_wei": 209000000000000, "actual_cost_wei": 127609800000000}
+{"label": "holder journal32/markup0/price500000000", "estimate": 643029, "billed_gas": 638049, "keeper_paid_wei": 522500000000000, "actual_cost_wei": 319024500000000}
+{"label": "holder journal32/markup1000/price200000000", "estimate": 642692, "billed_gas": 637712, "keeper_paid_wei": 229900000000000, "actual_cost_wei": 127542400000000}
+{"label": "holder journal32/markup1000/price500000000", "estimate": 642692, "billed_gas": 637712, "keeper_paid_wei": 574750000000000, "actual_cost_wei": 318856000000000}
+{"label": "holder journal31/markup0/price200000000", "estimate": 626388, "billed_gas": 621408, "keeper_paid_wei": 203000000000000, "actual_cost_wei": 124281600000000}
+{"label": "holder journal31/markup0/price500000000", "estimate": 626388, "billed_gas": 621408, "keeper_paid_wei": 507500000000000, "actual_cost_wei": 310704000000000}
+{"label": "holder journal31/markup1000/price200000000", "estimate": 626051, "billed_gas": 621071, "keeper_paid_wei": 223300000000000, "actual_cost_wei": 124214200000000}
+{"label": "holder journal31/markup1000/price500000000", "estimate": 626051, "billed_gas": 621071, "keeper_paid_wei": 558250000000000, "actual_cost_wei": 310535500000000}
+{"label": "holder journal17/markup0/price200000000", "estimate": 393470, "billed_gas": 388490, "keeper_paid_wei": 119000000000000, "actual_cost_wei": 77698000000000}
+{"label": "holder journal17/markup0/price500000000", "estimate": 393470, "billed_gas": 388490, "keeper_paid_wei": 297500000000000, "actual_cost_wei": 194245000000000}
+{"label": "holder journal17/markup1000/price200000000", "estimate": 393133, "billed_gas": 388153, "keeper_paid_wei": 130900000000000, "actual_cost_wei": 77630600000000}
+{"label": "holder journal17/markup1000/price500000000", "estimate": 393133, "billed_gas": 388153, "keeper_paid_wei": 327250000000000, "actual_cost_wei": 194076500000000}
+{"label": "holder journal16/markup0/price200000000", "estimate": 376837, "billed_gas": 371857, "keeper_paid_wei": 113000000000000, "actual_cost_wei": 74371400000000}
+{"label": "holder journal16/markup0/price500000000", "estimate": 376837, "billed_gas": 371857, "keeper_paid_wei": 282500000000000, "actual_cost_wei": 185928500000000}
+{"label": "holder journal16/markup1000/price200000000", "estimate": 376500, "billed_gas": 371520, "keeper_paid_wei": 124300000000000, "actual_cost_wei": 74304000000000}
+{"label": "holder journal16/markup1000/price500000000", "estimate": 376500, "billed_gas": 371520, "keeper_paid_wei": 310750000000000, "actual_cost_wei": 185760000000000}
+{"label": "holder journal15/markup0/price200000000", "estimate": 360203, "billed_gas": 355223, "keeper_paid_wei": 107000000000000, "actual_cost_wei": 71044600000000}
+{"label": "holder journal15/markup0/price500000000", "estimate": 360203, "billed_gas": 355223, "keeper_paid_wei": 267500000000000, "actual_cost_wei": 177611500000000}
+{"label": "holder journal15/markup1000/price200000000", "estimate": 359866, "billed_gas": 354886, "keeper_paid_wei": 117700000000000, "actual_cost_wei": 70977200000000}
+{"label": "holder journal15/markup1000/price500000000", "estimate": 359866, "billed_gas": 354886, "keeper_paid_wei": 294250000000000, "actual_cost_wei": 177443000000000}
+{"label": "holder journal7/markup0/price200000000", "estimate": 227156, "billed_gas": 222176, "keeper_paid_wei": 59000000000000, "actual_cost_wei": 44435200000000}
+{"label": "holder journal7/markup0/price500000000", "estimate": 227156, "billed_gas": 222176, "keeper_paid_wei": 147500000000000, "actual_cost_wei": 111088000000000}
+{"label": "holder journal7/markup1000/price200000000", "estimate": 226819, "billed_gas": 221839, "keeper_paid_wei": 64900000000000, "actual_cost_wei": 44367800000000}
+{"label": "holder journal7/markup1000/price500000000", "estimate": 226819, "billed_gas": 221839, "keeper_paid_wei": 162250000000000, "actual_cost_wei": 110919500000000}
+{"label": "holder journal3/markup0/price200000000", "estimate": 160644, "billed_gas": 155664, "keeper_paid_wei": 35000000000000, "actual_cost_wei": 31132800000000}
+{"label": "holder journal3/markup0/price500000000", "estimate": 160644, "billed_gas": 155664, "keeper_paid_wei": 87500000000000, "actual_cost_wei": 77832000000000}
+{"label": "holder journal3/markup1000/price200000000", "estimate": 160307, "billed_gas": 155327, "keeper_paid_wei": 38500000000000, "actual_cost_wei": 31065400000000}
+{"label": "holder journal3/markup1000/price500000000", "estimate": 160307, "billed_gas": 155327, "keeper_paid_wei": 96250000000000, "actual_cost_wei": 77663500000000}
+{"label": "holder journal2/markup0/price200000000", "estimate": 144017, "billed_gas": 139037, "keeper_paid_wei": 29000000000000, "actual_cost_wei": 27807400000000}
+{"label": "holder journal2/markup0/price500000000", "estimate": 144017, "billed_gas": 139037, "keeper_paid_wei": 72500000000000, "actual_cost_wei": 69518500000000}
+{"label": "holder journal2/markup1000/price200000000", "estimate": 143680, "billed_gas": 138700, "keeper_paid_wei": 31900000000000, "actual_cost_wei": 27740000000000}
+{"label": "holder journal2/markup1000/price500000000", "estimate": 143680, "billed_gas": 138700, "keeper_paid_wei": 79750000000000, "actual_cost_wei": 69350000000000}
+{"label": "distribution journal1/markup0/price200000000", "estimate": 207233, "billed_gas": 202253, "keeper_paid_wei": 23000000000000, "actual_cost_wei": 40450600000000}
+{"label": "distribution journal1/markup0/price500000000", "estimate": 207233, "billed_gas": 202253, "keeper_paid_wei": 57500000000000, "actual_cost_wei": 101126500000000}
+Traceback (most recent call last):
+  File "/private/tmp/efficient-journal-resume3.py", line 28, in <module>
+    if count==1:origin=b.distribution_cases(origin,count,witness)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_rehearsal.py", line 573, in distribution_cases
+    gain=self.snapshot();self.matrix(gain,count,witness,'distribution',self.profile['distribution_prices'])
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_rehearsal.py", line 551, in matrix
+    row=self.send('keeper',self.vault,'sync(uint256[],uint256,uint256)',('[]',witness,0),label=f'{mode} journal{count}/markup{markup}/price{price}',measure=True)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_rehearsal.py", line 272, in send
+    dispatch=self.ordinary_dispatch(sig,args) if ordinary else dict(required=False,reason='controlled operator inventory/setup fixture, not ordinary batch-size selection')
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/efficient-journal-recovery-review.py", line 69, in checked_dispatch
+    return original(sig, args, absent=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_rehearsal.py", line 333, in ordinary_dispatch
+    raise RuntimeError('ordinary keeper did not dispatch expected work after bounded index catchup')
+RuntimeError: ordinary keeper did not dispatch expected work after bounded index catchup

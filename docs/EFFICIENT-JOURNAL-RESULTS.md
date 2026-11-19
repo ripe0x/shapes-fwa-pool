@@ -1,9 +1,8 @@
 # Efficient journal revision results
 
-2026-11-18, working revision based on `d1b59f1`. **Implementation verification is distinct from
-milestone acceptance.** The existing PR remains draft. No numerical compensation, allowance,
-refill, fee, mint policy, accepted outcome or owner signature has changed in this revision so far.
-The owner's exact scope is recorded in `EFFICIENT-JOURNAL-REVISION.md` and D69.
+2026-11-18. **Implementation verification is distinct from milestone acceptance.** The PR remains draft. The approved baseline has passed and its exact receipts support a prepared numerical quote candidate, not yet broadcast. No allowance, refill, fee, mint policy, accepted outcome or signature changed. Current measurements, candidate options and limits: `receipts/efficient-journal-baseline-and-candidate.md`; exact amendment: `receipts/efficient-journal-candidate-amendment.json`. Runtime is24,451/23,001 bytes.
+
+The detailed pre-receipt report below is retained for its named source. Statements there that the8559 batch awaits approval, full-holder bills are pending or all quotes are unchanged describe the earlier phase. Current source proposes22k records,110k holder tails and80k actual qualified proof work. The owner-approved scope remains `EFFICIENT-JOURNAL-REVISION.md` and D69.
 
 The contract executes an automatic journal job, bounded independently by 128 global records,
 16 actual own transitions,16 supplied terminal IDs and16 pruned heads. It stops before consuming

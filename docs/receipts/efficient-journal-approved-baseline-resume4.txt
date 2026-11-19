@@ -1,0 +1,11 @@
+Resume two max-markup singleton distribution receipts, holder1 and full-holder receipts; cumulative297 retained
+{"label": "distribution journal1/markup1000/price200000000", "estimate": 206896, "billed_gas": 201916, "keeper_paid_wei": 25300000000000, "actual_cost_wei": 40383200000000}
+{"label": "distribution journal1/markup1000/price500000000", "estimate": 206896, "billed_gas": 201916, "keeper_paid_wei": 63250000000000, "actual_cost_wei": 100958000000000}
+{"label": "holder journal1/markup0/price200000000", "estimate": 127391, "billed_gas": 122411, "keeper_paid_wei": 23000000000000, "actual_cost_wei": 24482200000000}
+{"label": "holder journal1/markup0/price500000000", "estimate": 127391, "billed_gas": 122411, "keeper_paid_wei": 57500000000000, "actual_cost_wei": 61205500000000}
+{"label": "holder journal1/markup1000/price200000000", "estimate": 127054, "billed_gas": 122074, "keeper_paid_wei": 25300000000000, "actual_cost_wei": 24414800000000}
+{"label": "holder journal1/markup1000/price500000000", "estimate": 127054, "billed_gas": 122074, "keeper_paid_wei": 63250000000000, "actual_cost_wei": 61037000000000}
+{"label": "controlled genuine partial-holder setup", "estimate": 291561, "billed_gas": 278975, "keeper_paid_wei": 92000000000000, "actual_cost_wei": 55795000000000}
+{"label": "ordinary standalone full-holder checkpoint/price200000000", "estimate": 377803, "billed_gas": 346017, "keeper_paid_wei": 92000000000000, "actual_cost_wei": 69203400000000}
+{"label": "ordinary standalone full-holder checkpoint/price500000000", "estimate": 377803, "billed_gas": 346017, "keeper_paid_wei": 200000000000000, "actual_cost_wei": 173008500000000}
+{"label": "ordinary standalone full-holder checkpoint/price2000000000", "estimate": 377803, "billed_gas": 346017, "keeper_paid_wei": 740000000000000, "actual_cost_wei": 692034000000000}

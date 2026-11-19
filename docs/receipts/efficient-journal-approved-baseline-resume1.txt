@@ -1,0 +1,16 @@
+Resuming verified owned node 96649 same funded entry; no restart/reset/topup
+{"label": "ordinary first holder pricing", "estimate": 261060, "billed_gas": 238874, "keeper_paid_wei": 92000000000000, "actual_cost_wei": 47774800000000}
+Traceback (most recent call last):
+  File "/private/tmp/efficient-journal-resume-baseline.py", line 24, in <module>
+    try:b.run()
+        ^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_rehearsal.py", line 595, in run
+    if self.profile['restock_inventory_paths']:self.stock_cases()
+                                               ^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_rehearsal.py", line 534, in stock_cases
+    row=self.send('keeper',self.vault,'restock(uint256,uint256[],uint256)',(3,proposals,0),label=f'stock/{label}/price{price}',measure=True,ordinary=False)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.codex/worktrees/da17/shapes-fwa-pool/keeper/efficient_journal_rehearsal.py", line 280, in send
+    if checked!=estimate:raise RuntimeError('ordinary keeper estimate differs from exact operator estimate')
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: ordinary keeper estimate differs from exact operator estimate
