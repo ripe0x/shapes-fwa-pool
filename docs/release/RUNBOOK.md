@@ -75,7 +75,9 @@ Spending bounds (wei facts are in `src/VaultLib.sol` and tests):
 
 Funding before deployment: deployer holds the 0.01 ETH seed plus deployment gas, **11,096,220 gas**
 measured (VaultLib 5,318,397, KeeperPolicyV1 100,155, PackVault 5,677,668): 0.0055 ETH at
-0.5 gwei, 0.022 ETH at 2 gwei. Primary keeper wallet 0.05 ETH, backup 0.02 ETH.
+0.5 gwei, 0.022 ETH at 2 gwei. The live simulation on 2026-11-19 (`script/deploy.sh deploy/canary.json`,
+sender = owner) passed postflight; Forge's padded estimate was 14,857,203 gas and 0.01112 ETH
+including the seed at a 0.75 gwei max fee. Primary keeper wallet 0.05 ETH, backup 0.02 ETH.
 
 ## 4. Commands
 
