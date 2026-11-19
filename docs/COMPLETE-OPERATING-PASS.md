@@ -96,10 +96,54 @@ The primary timed comparisons use the current aggregate foreign weight. The arch
 
 ## Evidence and limits
 
-The final evidence bundle contains actual submitted local transaction receipts, exact `minPay` calldata estimates, ordinary keeper profitability results, protected balance checks, source hashes and runtime identity. Receipt gas includes finalized refunds. Diagnostic isolated frame measurements are labeled separately. The foreign receipt setup is restored from authenticated fork execution; the measured transactions are mined on an owned local node. The full holder checkpoint redeems all live holder shares in a one position fixture with a 3 ETH dead seed; it does not claim to liquidate every seed asset.
+The final evidence bundle contains actual submitted local transaction receipts, exact `minPay` calldata estimates, ordinary keeper profitability results, protected balance checks, source hashes and runtime identity. Receipt gas includes finalized refunds. Diagnostic isolated frame measurements are labeled separately. The foreign receipt setup is restored from authenticated fork execution; the measured transactions are mined on an owned local node. The full holder checkpoint prices all live holder shares and funds their redemption reserve in a one position fixture with a 3 ETH dead seed. The seed and one active position remain. That checkpoint receipt measures pricing and reserve funding, rather than a complete liquidation or the holder's later claim transaction.
+
+All twelve final foreign and checkpoint receipts submit actual 80% `minPay` calls at 0.2 and 0.5 gwei. All pass ordinary keeper preflight, cover billed costs and preserve protected balances. The retained fork tests pass five cases; the optional export test passes separately for all four fixture sizes.
+
+| Measured operation | Billed gas | Quoted gas | Actual records |
+| --- | ---: | ---: | --- |
+| Required singleton | 131,692 | 142,000 | One successful foreign record |
+| Required small tail | 150,482 to 150,494 | 164,000 | Two successful foreign records |
+| Required large tail | 2,466,724 | 2,870,000 | 125 successful foreign records |
+| Full journal batch | 2,512,081 | 2,901,000 | 125 successful foreign records and three genuine deadline refunds |
+| Full batch with attached fee collection | 2,621,560 | 3,021,000 | The same mixed batch, with one actual active fee claim |
+| Full live holder checkpoint | 295,510 | 360,000 | All live shares priced and their redemption reserve funded |
+
+The foreign fixture has zero flat work fee and zero markup, so its checkpoint payment at 0.5 gwei is 0.00018 ETH. The separately verified O6 scenario includes the configured work fee and pays 0.0002 ETH. The two attached collection cases reduce only local vault free cash to exercise the funding branch, preserving protected balances and genuine accrued FWA fees. They establish billed cost and eligibility in that explicit calibration; the separate timed model supplies the complete operating cash scenarios.
+
+The ten final construction receipts cover three shape, four shape and thirty shape paths, including the four shape leftover branch that justified the quote correction. All cover billed costs and pass ordinary preflight. See [foreign receipts](receipts/complete-foreign-journal.json), [construction receipts](receipts/complete-cost-receipts.json) and [final validation](receipts/complete-final-validation.json).
 
 The fork reconciliation replays a full cycle and a partial redemption followed by complete wind down. The Python model matches every financial bucket to the wei. Focused contract tests cover useful work eligibility, fee debts, duplicate and padded candidates, distribution thresholds, budget exhaustion, unit recipes and permission limits.
 
-The timed results report a holder return only after the modeled claim completes. Static foreign weight, prescribed purchaser timing, one named stochastic seed and caller gas proxies make them conditional engineering scenarios. They establish behavior under those inputs, not an expected investment return or the formal trailing 30 day historical return gate. The original outcome signature is not reused for this candidate. Refill rounding in the timed driver can conservatively understate permission by tiny amounts because it materializes refill at each event; the independent review records a one wei example. This does not create cash, and both fork financial reconciliations remain exact.
+The timed results report a holder return only after the modeled claim completes. Static foreign weight, prescribed purchaser timing, one named stochastic seed and caller gas proxies make them conditional engineering scenarios. They establish behavior under those inputs, not an expected investment return or the formal trailing 30 day historical return gate. A pure 128 successful record receipt and the combined maximum of 16 own transitions with journal and collection work remain outside the submitted receipt coverage. Authentic live returned pack coverage also remains narrower than the keeper's historical payload, restart and reorg tests. The original outcome signature is not reused for this candidate. Refill rounding in the timed driver can conservatively understate permission by tiny amounts because it materializes refill at each event; the independent review records a one wei example. This does not create cash, and both fork financial reconciliations remain exact.
+
+## Reproducing the submitted receipts
+
+Run from the repository root with the recorded Foundry tool versions, Solidity 0.8.30 and the keeper Python dependencies installed. The historical input JSON is included. Its generator, `python3 sim/complete_foreign_fixture.py`, is optional when using those retained inputs. Generated state files and model caches are excluded from the deliverable.
+
+```bash
+for count in 1 2 125 128
+do
+    EXPORT_COMPLETE_FOREIGN=true COMPLETE_FOREIGN_COUNT="$count" \
+    forge test \
+        --match-path test/fork/CompleteForeignJournal.t.sol \
+        --match-test test_exportSuccessfulForeignReceiptFixture \
+        --rpc-url https://mainnet.gateway.tenderly.co \
+        --fork-retries 30 \
+        --fork-retry-backoff 5000 \
+        --compute-units-per-second 100 \
+        --out /tmp/pr2-foreign-final-out \
+        --cache-path /tmp/pr2-foreign-final-cache \
+        -vv
+done
+
+python3 keeper/complete_foreign_receipts.py \
+    --counts 1 2 125 128 \
+    --artifacts /tmp/pr2-foreign-final-out
+
+COMPLETE_COST_PROFILE=extra-unit python3 keeper/complete_cost_receipts.py
+```
+
+Each receipt runner starts and terminates its own local node. The foreign runner uses port 8562 and the construction runner uses port 8561. Their upstream RPC access supplies fork state; measured transactions are submitted only to those owned local nodes.
 
 PR 2 stays draft. No merge, public deployment, real funds or new owner outcome signature are included in this pass.

@@ -1,0 +1,12 @@
+No files changed, compilation skipped
+
+Ran 6 tests for test/fork/CompleteForeignJournal.t.sol:CompleteForeignJournalTest
+[PASS] test_125SuccessfulForeignRecordsAndThreeRefundsFill128Batch() (gas: 210560030)
+[PASS] test_125SuccessfulForeignRequiredTail() (gas: 209378740)
+[SKIP] test_exportSuccessfulForeignReceiptFixture() (gas: 0)
+[PASS] test_successfulForeignEarlyTailCannotCollectPayment() (gas: 1384324)
+[PASS] test_successfulForeignSingletonRequiredTail() (gas: 1976173)
+[PASS] test_successfulForeignTwoRecordRequiredTail() (gas: 1864467)
+Suite result: ok. 5 passed; 0 failed; 1 skipped; finished in 15.85s (18.83s CPU time)
+
+Ran 1 test suite in 15.85s (15.85s CPU time): 5 tests passed, 0 failed, 1 skipped (6 total tests)

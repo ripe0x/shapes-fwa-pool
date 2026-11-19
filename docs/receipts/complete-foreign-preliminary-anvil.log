@@ -1,0 +1,303 @@
+
+
+                             _   _
+                            (_) | |
+      __ _   _ __   __   __  _  | |
+     / _` | | '_ \  \ \ / / | | | |
+    | (_| | | | | |  \ V /  | | | |
+     \__,_| |_| |_|   \_/   |_| |_|
+
+    1.9.0 (6056c5845d 2026-11-02T20:28:32.434285913Z)
+    https://github.com/foundry-rs/foundry
+
+Available Accounts
+==================
+
+
+Private Keys
+==================
+
+
+Wallet
+==================
+Mnemonic:          test test test test test test test test test test test junk
+Derivation path:   m/44'/60'/0'/0/
+
+
+Fork
+==================
+Endpoint:       https://mainnet.gateway.tenderly.co/
+Block number:   26417085
+Block hash:     0xce34ab123f5e512c4d0653007fcd8f84d45ead65ee307273b287f71da6b7146d
+Chain ID:       1
+
+Base Fee
+==================
+
+366480736
+
+Gas Limit
+==================
+
+60000000
+
+Genesis Timestamp
+==================
+
+1795063476
+
+Genesis Number
+==================
+
+0
+
+Listening on 127.0.0.1:8562
+web3_clientVersion
+anvil_dumpState
+anvil_loadState
+evm_setNextBlockTimestamp
+evm_mine
+
+    Block Number: 26417092
+    Block Hash: 0x3b485185f1e3e2928223b2ad64d73f1df5bf0a6b05ee00e085bd6ed202574e9f
+    Block Time: "Sun, 15 Nov 2026 11:46:01 +0000"
+
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_getCode
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+evm_snapshot
+anvil_setNextBlockBaseFeePerGas
+eth_getBlockByNumber
+evm_setNextBlockTimestamp
+evm_mine
+
+    Block Number: 26417093
+    Block Hash: 0x4390558713b7e1b051b662ae9bccf8cb34fd3171c4c517154594f64c049428cc
+    Block Time: "Sun, 15 Nov 2026 11:46:02 +0000"
+
+eth_getBlockByNumber
+eth_getBlockByNumber
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+eth_chainId
+eth_chainId
+eth_estimateGas
+eth_chainId
+eth_chainId
+eth_chainId
+eth_estimateGas
+eth_getBalance
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+eth_chainId
+eth_getTransactionCount
+eth_sendRawTransaction
+eth_getTransactionReceipt
+
+    Transaction: 0x0faa104adb1d5882cae8a333677d12f01640e8baf2cefce12c9614eecb8ce46b
+    Gas used: 131680
+
+    Block Number: 26417094
+    Block Hash: 0x9e88c559de3461ab30ea71380eec1f89013cf85a5813b3e44b296a6080adac47
+    Block Time: "Sun, 15 Nov 2026 11:46:03 +0000"
+
+eth_getTransactionReceipt
+eth_getTransactionReceipt
+eth_getBalance
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+evm_revert
+evm_snapshot
+anvil_setNextBlockBaseFeePerGas
+eth_getBlockByNumber
+evm_setNextBlockTimestamp
+evm_mine
+
+    Block Number: 26417093
+    Block Hash: 0x73241f66782c483778a558568243c5e63a5cee732fc43b13055b5d8172457590
+    Block Time: "Sun, 15 Nov 2026 11:46:02 +0000"
+
+eth_getBlockByNumber
+eth_getBlockByNumber
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+eth_chainId
+eth_chainId
+eth_estimateGas
+eth_chainId
+eth_chainId
+eth_chainId
+eth_estimateGas
+eth_getBalance
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+eth_chainId
+eth_getTransactionCount
+eth_sendRawTransaction
+eth_getTransactionReceipt
+
+    Transaction: 0xf371c9d39cd6ef12b58e3274ce95f51ea313901d0d5884f7d069ff7c9e392fc4
+    Gas used: 131692
+
+    Block Number: 26417094
+    Block Hash: 0xbfa64a7176bc2880e66275c042fcfd05906e9cc91514020b56ebaf985fda6dda
+    Block Time: "Sun, 15 Nov 2026 11:46:03 +0000"
+
+eth_getTransactionReceipt
+eth_getTransactionReceipt
+eth_getBalance
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_chainId
+anvil_nodeInfo
+anvil_metadata
+eth_call
+evm_revert
+evm_snapshot

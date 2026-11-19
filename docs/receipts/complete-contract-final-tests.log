@@ -1,0 +1,70 @@
+Captured Forge test-result stdout sections after the final pack-unit quote and routine-rate ceiling changes.
+Compiler diagnostics and tool transport envelopes are omitted. This is not the full process stdout.
+
+Ran 1 test for test/fork/CompleteHarvest.t.sol:CompleteCreditTest
+[PASS] test_profileCreditIncrementAtDiagnosticPrice() (gas: 49322555)
+Logs:
+  same own journal job with credit retained billed gas: 279306
+  same own journal job with economical credit swept billed gas: 298823
+  attached fee credit sweep incremental billed gas: 19517
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 4.34s (3.66s CPU time)
+
+Ran 2 tests for test/fork/CompleteHarvest.t.sol:CompleteHarvestTest
+[PASS] test_profileActiveFundingIncrementAtDiagnosticPrice() (gas: 66815323)
+Logs:
+  same journal active fee candidate with enough cash billed gas: 2281335
+  same journal with necessary active fee claim billed gas: 2361607
+  attached first active fee claim incremental billed gas: 80272
+
+[PASS] test_profileRefundedRequiredSingletonAfterFundingGate() (gas: 705527)
+Logs:
+  required refunded singleton with funding checks isolated billed gas: 129457
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 4.71s (266.64ms CPU time)
+
+Ran 2 tests for test/fork/ForkKeeperPay.t.sol:ForkKeeperPayTest
+[PASS] test_budgetsBoundSpendingOverTime() (gas: 8306815)
+[PASS] test_newRoutineRateCeilingOnlyRefillsPermission() (gas: 301307)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 2.80s (41.92ms CPU time)
+
+Ran 2 tests for test/fork/RestockEfficiency.t.sol:RestockEfficiencyTest
+[PASS] test_fourUnitLeftoversAndMixedMintsPreserveExactRecipe() (gas: 9531447)
+Logs:
+  four first leftover6 call meter plus intrinsic: 2924988
+  four first leftover6 isolated receipt-equivalent gas: 2898086
+  four first leftover6 finalized frame refund: 88000
+  four first leftover6 isolated gross before refund: 2986086
+  four first leftover6 keeper pay wei: 601000000000000
+  four first leftover6 newly paid mints: 1
+  four mixed old6 new10 call meter plus intrinsic: 3098906
+  four mixed old6 new10 isolated receipt-equivalent gas: 3071801
+  four mixed old6 new10 finalized frame refund: 76500
+  four mixed old6 new10 isolated gross before refund: 3148301
+  four mixed old6 new10 keeper pay wei: 706000000000000
+  four mixed old6 new10 newly paid mints: 1
+  four leftover only0 call meter plus intrinsic: 1197390
+  four leftover only0 isolated receipt-equivalent gas: 1170288
+  four leftover only0 finalized frame refund: 56400
+  four leftover only0 isolated gross before refund: 1226688
+  four leftover only0 keeper pay wei: 266000000000000
+  four leftover only0 newly paid mints: 0
+
+[PASS] test_maximumThirtyUnitNoLeftovers() (gas: 21132674)
+Logs:
+  thirty units ten small packs call meter plus intrinsic: 9942408
+  thirty units ten small packs isolated receipt-equivalent gas: 9913724
+  thirty units ten small packs finalized frame refund: 263700
+  thirty units ten small packs isolated gross before refund: 10177424
+  thirty units ten small packs keeper pay wei: 2226000000000000
+  thirty units ten small packs newly paid mints: 3
+  thirty units one large pack call meter plus intrinsic: 7960573
+  thirty units one large pack isolated receipt-equivalent gas: 7933665
+  thirty units one large pack finalized frame refund: 241300
+  thirty units one large pack isolated gross before refund: 8174965
+  thirty units one large pack keeper pay wei: 2001000000000000
+  thirty units one large pack newly paid mints: 3
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 6.22s (2.87s CPU time)
+
+Ran 4 test suites in 18.07s (18.07s CPU time): 7 tests passed, 0 failed, 0 skipped (7 total tests)

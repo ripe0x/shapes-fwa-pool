@@ -1,0 +1,53 @@
+Captured Forge test-result stdout sections from the main focused run.
+Compiler diagnostics and tool transport envelopes are omitted. This is not the full process stdout.
+
+Ran 3 tests for test/fork/CompleteHarvest.t.sol:CompleteCreditTest
+[PASS] test_economicCreditIsSweptOnceWithVerifiedOwnWork() (gas: 49038471)
+[PASS] test_profileCreditIncrementAtDiagnosticPrice() (gas: 49322247)
+Logs:
+  same own journal job with credit retained billed gas: 279306
+  same own journal job with economical credit swept billed gas: 298823
+  attached fee credit sweep incremental billed gas: 19517
+
+[PASS] test_terminalCashPrecedesFeeCollectionAndDustWaitsForCheckpoint() (gas: 49172364)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 11.09s (10.43s CPU time)
+
+Ran 13 tests for test/fork/CompleteHarvest.t.sol:CompleteHarvestTest
+[PASS] test_ampleCashNeverClaimsActiveFeesForPay() (gas: 64506816)
+[PASS] test_budgetPermissionCannotBeReplacedWithFeeIncome() (gas: 64542212)
+[PASS] test_cashShortfallClaimsOnlyFirstUsefulPositionAndKeepsProtectedCash() (gas: 65007210)
+[PASS] test_distributionTailProvesTheFullCollectionCostBeforePayingIt() (gas: 2711297)
+[PASS] test_duplicateCannotSupplyTheMissingSecondFeeBalance() (gas: 64607671)
+[PASS] test_firstCashCoveringPrefixCannotBePaddedToPassTheFeeShareGate() (gas: 64586043)
+[PASS] test_insufficientRealFeesDoNotCausePartialPaidHarvest() (gas: 64514593)
+[PASS] test_irrelevantAndDuplicateIdsDoNotIncreaseFundingPayment() (gas: 67003449)
+[PASS] test_nonEconomicFundingCannotConsumeFees() (gas: 64582109)
+[PASS] test_optionalTailAndNoProgressCannotCreateFundingWork() (gas: 373777)
+[PASS] test_profileActiveFundingIncrementAtDiagnosticPrice() (gas: 66815323)
+Logs:
+  same journal active fee candidate with enough cash billed gas: 2281335
+  same journal with necessary active fee claim billed gas: 2361607
+  attached first active fee claim incremental billed gas: 80272
+
+[PASS] test_profileRefundedRequiredSingletonAfterFundingGate() (gas: 705527)
+Logs:
+  required refunded singleton with funding checks isolated billed gas: 129457
+
+[PASS] test_standaloneHarvestCannotSpendBudgetAndPreservesNav() (gas: 512562)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 4.53s (1.29s CPU time)
+
+Ran 5 tests for test/fork/EfficientJournal.t.sol:EfficientJournalTest
+[PASS] test_distributionFlagCannotPayForTailWithoutDistributableGain() (gas: 1320868)
+[PASS] test_distributionOnlyTailAllowsRealCheckpointAfterItsExpense() (gas: 1870032)
+[PASS] test_fullJournalJobCannotBeShrunkByIrrelevantTerminalIds() (gas: 70259586)
+[PASS] test_lockedSharesKeepSyncRoutineWithZeroEssentialBudget() (gas: 67980008)
+[PASS] test_smallForeignTailIsUnpaidUntilRealCheckpointWindow() (gas: 18900162)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 240.49s (220.61s CPU time)
+
+Ran 3 tests for test/fork/ForkIncrementalProduction.t.sol:ForkProductionFeeWitnessTest
+[PASS] test_duplicateHarvestRejectedWithoutDebtChangeOrPay() (gas: 48325472)
+[PASS] test_liveDebtWitnessAndHarvestMatchIndividualFeeSum() (gas: 49205385)
+[PASS] test_realFailedHarvestPreservesDebtAndPaysNothing() (gas: 48535455)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 12.85s (10.02s CPU time)
+
+Ran 4 test suites in 268.96s (268.95s CPU time): 24 tests passed, 0 failed, 0 skipped (24 total tests)

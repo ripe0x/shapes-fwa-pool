@@ -1,0 +1,116 @@
+{
+  "source_sha256": {
+    "src/PackVault.sol": "38c9f37988377a0a9dca9b5026c28ba33b519bbe406608d0ac8c1add24b1d801",
+    "src/VaultLib.sol": "1310c034a0cca8f5e3f62ab076d6626d7947d6ce4456da2803a9e572535e430c",
+    "src/KeeperPolicy.sol": "612d2ccce98e642e89586372eeecfd31e6ceb7d0ecdf9df8c77899afc9010929",
+    "src/interfaces/External.sol": "d50229cf80a4a036c9ba3f4f8bb60452129ee51dc7ca0263ad612b2ea76e499d",
+    "keeper/policy.py": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b",
+    "keeper/keeper.py": "32cc4754c35312960b4334a921ab7ef76cad98ebfa1299702dda55929f6b7db6",
+    "keeper/tx.py": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230",
+    "keeper/index.py": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63",
+    "sim/vault.py": "574967a741ceb4cabdaca366302d0fc8006029537a61b0d74dab6495d251529c",
+    "sim/forward.py": "2af21c78565fd760c6d991602a7178e65b3e1da03ad9bc0a07cfc04b77037d24",
+    "test/fork/ForkReconcile.t.sol": "7f3850e05f1b58fe509b127643ac452071007e801a11e879ad27ca189a5c8414",
+    "test/fork/ForkPartialReconcile.t.sol": "1e47036316c3471575abd8d1a06f36e2c87ddec63ffd1f28e74f9982bb48dc82",
+    "test/scenario/VaultFlow.t.sol": "324d0e538fbb977ae63bd1ff2fe770032d2317a9a05e7b970aaf8e9ac4da75da",
+    "test/utils/TestVaultOps.sol": "f2397c303b8e33b5664efde087a678cc54f3a2c41dc12f4f5f0a25530e10ec9d",
+    "test/utils/ReconcileTrace.sol": "263db09582efe0fba32e835812a6adc2725a4a5c73b84102af1c11113b93f320"
+  },
+  "source_set_sha256": "0a770cc491d2fe4f49e05d7ab87e4878d9abe5c690ee62ba971aa1666fabe8eb",
+  "checks": [
+    {
+      "command": [
+        "forge",
+        "test",
+        "--use",
+        "/home/agent/.local/share/svm/0.8.30/solc-0.8.30",
+        "--rpc-url",
+        "https://mainnet.gateway.tenderly.co",
+        "--fork-retries",
+        "30",
+        "--fork-retry-backoff",
+        "5000",
+        "--compute-units-per-second",
+        "100",
+        "--threads",
+        "1",
+        "-vv",
+        "--match-path",
+        "test/fork/Fork*Reconcile.t.sol"
+      ],
+      "log": "complete-fork-reconcile.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "python3",
+        "sim/reconcile.py"
+      ],
+      "log": "complete-python-reconcile.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "forge",
+        "test",
+        "--use",
+        "/home/agent/.local/share/svm/0.8.30/solc-0.8.30",
+        "--rpc-url",
+        "https://mainnet.gateway.tenderly.co",
+        "--fork-retries",
+        "30",
+        "--fork-retry-backoff",
+        "5000",
+        "--compute-units-per-second",
+        "100",
+        "--threads",
+        "1",
+        "-vv",
+        "--match-path",
+        "test/scenario/VaultFlow.t.sol",
+        "--match-test",
+        "test_flow_(max_load|gas_spike)"
+      ],
+      "log": "complete-o2-o6.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "python3",
+        "keeper/test_policy.py"
+      ],
+      "log": "complete-keeper-policy.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "python3",
+        "sim/test_vault.py"
+      ],
+      "log": "complete-python-vault.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "python3",
+        "sim/test_forward.py"
+      ],
+      "log": "complete-python-forward.txt",
+      "exit_code": 0
+    }
+  ],
+  "status": "passed",
+  "started_at_unix": 1795064623.7763078,
+  "finished_at_unix": 1795064694.1725435,
+  "log_normalization": {
+    "docs/receipts/complete-o2-o6.txt": {
+      "change": "Removed trailing spaces from two empty separator lines; test output and results are unchanged.",
+      "line_numbers": [
+        25,
+        87
+      ],
+      "original_sha256": "037851867383535bc494ed65f3cbeeff647691b5d5b59f5c72fcd799b5be91e4",
+      "normalized_sha256": "056f90c5baf25cb88928f0f2af9b29eb60dd9d6aeace52de319b277abc93d09f"
+    }
+  }
+}
