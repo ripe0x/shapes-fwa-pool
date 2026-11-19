@@ -6,12 +6,12 @@
   "script/Deploy.s.sol": "2a059502479a22360346994c7e5246fff96db98bff3f03a8586b610f0ac23d36",
   "script/DeployCore.sol": "9246881b6c6fe32325ce1af731e083f5ed68a79b95f170f8db0cc93fa4e7d2b3",
   "script/deploy.sh": "6705aa23a1db0b28f4a74efbecb78b248eb04e7a66dc609b6bb293e85fa1a89c",
-  "script/verify.sh": "82758a1622d930c8be892a6da7238221394f2279d9ff49d6b36c1c7a9f9ae4e6",
+  "script/verify.sh": "fbb2a3dd7be2ee6e2942ff0c98b1bf37899330348526d251c2c076d72ef119c2",
   "src/KeeperPolicy.sol": "612d2ccce98e642e89586372eeecfd31e6ceb7d0ecdf9df8c77899afc9010929",
   "src/PackVault.sol": "38c9f37988377a0a9dca9b5026c28ba33b519bbe406608d0ac8c1add24b1d801",
   "src/VaultLib.sol": "1310c034a0cca8f5e3f62ab076d6626d7947d6ce4456da2803a9e572535e430c",
   "src/interfaces/External.sol": "d50229cf80a4a036c9ba3f4f8bb60452129ee51dc7ca0263ad612b2ea76e499d",
-  "script/release.py": "3d4f36df808d51db10017c466bd751548d59da5acaa262beb069239ff4baa74d"
+  "script/release.py": "c8b9687af60dc01cf597bbc5ed6b7712cd8701c351b805d698bd128ca3e31bf7"
  },
  "toolchain": {
   "solc": "0.8.30",
@@ -47,14 +47,22 @@
  },
  "keeper": {
   "keeper/Dockerfile": "54675df4109b6b91f5e750816fdf20fb410942992fbebacb9b14d82dc5211243",
-  "keeper/entrypoint.sh": "e8005aef5da385dea47dd75c988631cbc928eb73993a2c0150d67dbfcf4e5214",
+  "keeper/entrypoint.sh": "3c45f8f7710480f440059a426e300d8490c4081ad2e9b6b03eba84cde18d1b0f",
   "keeper/requirements.txt": "aed414c4157dd12cba962363a8c9f561a2e5dcddbf20ee4c2ea9ff41ad4e913c",
   "keeper/keeper.py": "ccc26aa7249d9249b4303347b534d86dad6a93b942791c93414e27bc5f8647eb",
-  "keeper/policy.py": "69513760d831b7e879ce19b6662a6d69ee2691bfd62125d0c7e9b26009f8352b",
+  "keeper/policy.py": "bcefd49d37f37ac792a40bc0e928a700f163c06e7d8ac0e06577e488b0b5f561",
   "keeper/tx.py": "da9b69933c0c17368df323c725c051cc78fb908e92001fe82f6b5e713bc6a230",
   "keeper/index.py": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63",
   "fly.keeper-primary.toml": "d0562149088fff773d7abedd4e643e131c07eb988c5542197d05dfe4d71bde5f",
   "fly.keeper-backup.toml": "5ad276a78fc08c2fc8badf7b70b4794cb19e0043e3b080081323d9041a57a79b"
  },
- "evidence": {}
+ "evidence": {
+  "docs/receipts/formal-assessment.json": "45864c846940509c4d561cd029f1299a0d6d718f7f92673a375dacb93fcc224e",
+  "docs/receipts/release-rehearsal/result.json": "e411228d87b23f87f2cd4301caeec1f32d4880632aec840bc1ec07015da2419e",
+  "docs/receipts/image-rehearsal/ci-44577532617.json": "18cd1358234c9dede0137d09ed73ce09ae234902c2cfc7dd82caaede62b502ab",
+  "docs/receipts/release-review.md": "8391d1b0654c79392094c70a198de28327fecb04fdbbbe8d39083edd620e1090",
+  "docs/receipts/release-verify/SUMMARY.md": "b739688948908789fda69c51df311c46a722c838cb286014932a043bef90d8c0",
+  "docs/receipts/allocation-burst-coverage.md": "a4d5fcaf898bcc40fa4184678f321cf1d104c63b444b53561435e3c53977497d",
+  "asset-flow.json": "226c8e341787202636d706aa374942fcc2fb016d6bea6815966fd094132cc2d1"
+ }
 }
