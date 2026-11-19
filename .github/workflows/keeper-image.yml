@@ -23,6 +23,7 @@ jobs:
       - name: Toolchain pinned like the image
         run: |
           FOUNDRY=$(sed -n 's/.*foundryup --install \([^ ]*\).*/\1/p' keeper/Dockerfile)
+          export FOUNDRY_DIR="$HOME/.foundry"
           curl -L https://foundry.paradigm.xyz | bash
           ~/.foundry/bin/foundryup --install "$FOUNDRY"
           echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
