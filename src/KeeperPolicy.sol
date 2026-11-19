@@ -10,8 +10,8 @@ interface IKeeperPolicy {
     /// @notice Nonzero; the vault checks it before accepting a policy address.
     function policyVersion() external view returns (uint256);
 
-    /// @param op          PackVault.OP_* (1 restock, 2 list, 3 sync, 4 activate, 5 unlist,
-    ///                    6 liquidate, 7 harvest, 8 checkpoint).
+    /// @param op          PackVault.OP_* (1 restock, 2 list, 3 sync, 5 unlist, 6 liquidate,
+    ///                    8 checkpoint). Operations 4 and 7 are retired.
     /// @param units       completed units of work the vault counted (packs built, positions
     ///                    listed, resolved, activated or unlisted, items liquidated, 1 checkpoint).
     /// @param gasAllowance the vault's calibrated quoted gas for this work (base + per unit).

@@ -7,6 +7,52 @@ from vault import ACTIVE, ALLOCATED, OWED, BPS, E, UNIT, Vault
 
 
 class VaultAccountingTest(unittest.TestCase):
+    def fee_funding_vault(self, cash=0, budget=10**18):
+        v = self.vault()
+        v.restock(3, 3, 10**15)
+        for i in range(1, 4):
+            v.list(i, 363 * 10**14 + i * 10_000)
+            v.accrue(i, 1_500_000)
+        v.balance = cash
+        v.routine_budget = budget
+        return v
+
+    def test_sync_funding_claims_only_cash_covering_prefix(self):
+        v = self.fee_funding_vault()
+        before = copy.deepcopy(v.__dict__)
+        quote = lambda gas, units: gas + 20 * units
+        # Three fees are needed by this full128-record job; duplicate candidates earn nothing.
+        gas, credit, ids = v.sync_fee_plan([1, 1, 2, 3], 0, 2_901_000, 0, quote, 2500)
+        self.assertEqual((gas, credit, ids), (3_181_000, 0, [1, 2, 3]))
+        self.assertEqual(v.__dict__, before, 'preview cannot collect before ordinary preflight accepts')
+        v.balance = 4_000_000
+        self.assertEqual(v.sync_fee_plan([1, 2, 3], 0, 2_901_000, 0, quote, 2500), (2_901_000, 0, []))
+
+    def test_sync_credit_is_economic_and_no_work_cannot_collect(self):
+        v = self.fee_funding_vault()
+        quote = lambda gas, units: gas
+        self.assertEqual(v.sync_fee_plan([1], 200_000, 85_000, 0, quote, 2500), (125_000, 200_000, []))
+        self.assertEqual(v.sync_fee_plan([1], 200_000, 0, 0, quote, 2500), (0, 0, []))
+        v.routine_budget = 100_000
+        self.assertEqual(v.sync_fee_plan([1], 200_000, 85_000, 0, quote, 2500), (85_000, 0, []))
+
+    def test_sync_funding_stops_at_first_covering_prefix_even_when_fee_share_fails(self):
+        v = self.fee_funding_vault()
+        v.positions[1].pending_fees = 250_000
+        quote = lambda gas, units: gas
+        self.assertEqual(v.sync_fee_plan([1, 2], 0, 85_000, 0, quote, 2500), (85_000, 0, []))
+        # Uneconomic tiny credit may ride a needed claim, but its separate cost is included.
+        self.assertEqual(v.sync_fee_plan([2, 3], 10_000, 85_000, 0, quote, 2500), (245_000, 10_000, [2]))
+
+    def test_sync_collection_never_borrows_protected_cash_or_permission(self):
+        v = self.fee_funding_vault(cash=10_000_000)
+        v.claimable_total = v.balance
+        quote = lambda gas, units: gas
+        self.assertEqual(v.free(), 0)
+        self.assertEqual(v.sync_fee_plan([1], 0, 85_000, 0, quote, 2500), (205_000, 0, [1]))
+        v.routine_budget = 84_999
+        self.assertEqual(v.sync_fee_plan([1], 10_000_000, 85_000, 0, quote, 2500), (85_000, 0, []))
+
     def test_journal_stops_before_seventeenth_own_transition(self):
         v = Vault(seed=100 * E, balance=100 * E, reserve=0)
         v.restock(10, 3, 10**15); v.restock(10, 3, 10**15)

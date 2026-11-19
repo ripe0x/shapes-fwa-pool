@@ -26,11 +26,12 @@ ACTIVE, ALLOCATED, WITHDRAWN, SETTLED = 1, 2, 3, 4
 
 # The vault's quoted-gas schedule, line for line (PackVault Q_* constants, D56). Pay is a quote
 # fixed by the operation and its completed work, never the caller's gas.
-Q = dict(checkpoint=360_000, restock=280_000, pack=325_000, pack_unit=35_000, mint=2_200_000,
-         list=280_000, listed=825_000, sync=85_000, journal_tail=110_000, distribution_proof=80_000, synced=120_000, journal=22_000, selected=160_000,
+Q = dict(checkpoint=360_000, restock=280_000, pack=325_000, pack_unit=100_000, mint=2_200_000,
+         list=280_000, listed=825_000, sync=85_000, journal_tail=120_000, distribution_proof=80_000, synced=120_000, journal=22_000, selected=180_000,
          pruned=45_000, unlist=340_000, unlisted=285_000, liquidate=75_000, liq_pack=80_000,
          redeem_shape=35_000, liq_shape=65_000, recovery_base=100_000, recovery_shape=35_000,
-         recovery_unseal=70_000, harvest=125_000, harvested=80_000)
+         recovery_unseal=70_000, harvest=125_000, harvested=80_000,
+         sync_credit=40_000, sync_funding=40_000)
 POSITION_VALUE = 663 * 10**14  # 0.0663 ETH: what request charges are scaled by
 Q_POSITION_SYNC = Q["journal"] + Q["selected"] + Q["synced"] + Q["pruned"]
 CYCLE_GAS = Q_POSITION_SYNC + Q["listed"] + Q["harvested"]  # a bid cycle's quoted gas (gates)
@@ -75,6 +76,7 @@ class State:
     owed_estimate: int = 0
     pending_deposits: int = 0
     locked_shares: int = 0
+    total_shares: int = 0  # includes the permanent 1e15 dead shares; distinguishes a full holder exit
     fee_credit: int = 0
     open_positions: int = 0  # aggregate count, never len(the bounded hydrated candidate set)
     active_count: int = 0
@@ -235,6 +237,24 @@ def unwind_charge(s):
     return quote(s, Q["unlisted"] + Q["liq_pack"] + 3 * Q["redeem_shape"], 2, True)
 
 
+def sync_funding_candidates(s, terminal_ids, active, checkpoint_due):
+    """Optional bounded candidates; exact eligibility belongs to ordinary contract preflight.
+
+    A fully funded worst-case job needs no active IDs. Otherwise the planner offers prefixes
+    in increasing length, so the executor can find the smallest useful call without guessing
+    the number of own journal transitions, terminal inflows or pruned heads.
+    """
+    records = min(MAX_BATCH["journal"], s.completed_prefix - s.journal_cursor)
+    base = Q["journal_tail"] + Q["distribution_proof"] if checkpoint_due else Q["sync"]
+    upper = quote(s, base + records * Q["journal"] + MAX_BATCH["selected"] * Q["selected"]
+                  + len(terminal_ids) * Q["synced"] + MAX_BATCH["prune"] * Q["pruned"], len(terminal_ids))
+    if s.free >= upper or s.routine_budget < quote(s, Q["sync"]):
+        return []
+    candidates = sorted((l for l in active if l.pending_fees and l.id not in terminal_ids),
+                        key=lambda l: (-l.pending_fees, l.id))
+    return list(dict.fromkeys(l.id for l in candidates))[:MAX_BATCH["sync"]]
+
+
 def plan(s):
     """Ordered list of calls for this pass. Each is a tuple: (function, args...)."""
     out = []
@@ -258,20 +278,42 @@ def plan(s):
         or s.own_journal_pending or checkpoint_due)
     # All sync work uses routine funding, including while holders are withdrawing.
     if (due or journal_due or s.allocation_stale) and not spike:
-        out.append(("sync", due[:MAX_BATCH["sync"]], s.witness_id))
+        ids = due[:MAX_BATCH["sync"]]
+        # Ordinary preflight tries the no-claim job first, then the shortest funded prefix.
+        # The executor replans after one successful call; these are alternatives, not a batch.
+        out.append(("sync", ids, s.witness_id))
+        fees = []
+        for candidate in sync_funding_candidates(s, ids, active, checkpoint_due):
+            fees.append(candidate)
+            terminals = ids[:MAX_BATCH["sync"] - len(fees)]
+            if not terminals and not journal_due and not s.allocation_stale:
+                break  # Active candidates alone cannot create a paid job.
+            out.append(("sync", terminals + fees, s.witness_id))
 
     redeeming = shortfall > 0  # deploy nothing this pass while redeemers wait for ETH
     # FWA's live fees leave no edge: every further cycle loses, so unwind (the vault allows it).
     broken = s.k < 10**18 + s.min_edge_bps * 10**14
 
-    # 2. Fees: claim when the vault would pay for it (pay <= share of the take), or when
-    #    redeemers need ETH and fees are the cheapest source.
-    earning = sorted((l for l in active if l.pending_fees), key=lambda l: -l.pending_fees)[:MAX_BATCH["harvest"]]
-    amount = s.fee_credit + sum(l.pending_fees for l in earning)
-    hcost = quote(s, Q["harvest"] + Q["harvested"] * len(earning))
-    if amount and ((hcost * BPS <= amount * s.share_bps and not spike) or shortfall):
-        out.append(("harvest", sorted(l.id for l in earning)))  # the vault takes ids ascending, no repeats
-        shortfall = max(0, shortfall - amount)
+    # 2. Standalone claims are unpaid holder work. Use them only when a partial redemption
+    #    can be filled without destroying productive listings, and the bounded claim is
+    #    cheaper than one unlist. Full exits collect the same fees through unlisting and
+    #    checkpoint, so they never pay for a redundant claim first.
+    full_exit = s.total_shares and s.locked_shares + 10**15 >= s.total_shares
+    credit_checkpoint = checkpoint_due and not catchup and not due and not s.pending_receipts and not s.allocation_stale
+    if credit_checkpoint:
+        shortfall = max(0, shortfall - s.fee_credit)
+    earning, amount = [], 0 if credit_checkpoint else s.fee_credit
+    if shortfall and s.locked_shares and not full_exit and not s.winding_down:
+        for listing in sorted((l for l in active if l.pending_fees), key=lambda l: (-l.pending_fees, l.id)):
+            if amount >= shortfall or len(earning) == MAX_BATCH["harvest"]:
+                break
+            earning.append(listing)
+            amount += listing.pending_fees
+        hgas = Q["harvest"] + Q["harvested"] * len(earning)
+        # A due checkpoint already sweeps fee credit without a separate transaction.
+        if amount >= shortfall and hgas < Q["unlist"] + Q["unlisted"] and not (not earning and credit_checkpoint):
+            out.append(("harvest", sorted(l.id for l in earning)))
+            shortfall = 0
 
     # 3. Redemption liquidity or wind-down: idle inventory first, then unlist (needs FWA's
     #    queue drained), then liquidate what unlisting returned.

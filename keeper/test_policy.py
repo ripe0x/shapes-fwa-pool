@@ -32,7 +32,8 @@ def main():
     s = state(listings=act + settled, idle_packs=2, idle_eth=E, free=E, pending_deposits=10**17,
               open_positions=11, fee_credit=10**16)
     got = fns(plan(s))
-    assert {"sync", "harvest", "list"} <= set(got), got
+    assert {"sync", "list"} <= set(got), got
+    assert "harvest" not in got
     assert "checkpoint" not in got  # terminal work must be reconciled, then re-read before pricing
     assert "checkpoint" in fns(plan(state(listings=act, free=E, pending_deposits=10**17)))
 
@@ -45,12 +46,52 @@ def main():
               owed_estimate=3 * E // 10, open_positions=11, fee_credit=10**16, **spike)
     got = fns(plan(s))
     assert set(got) <= {"sync", "harvest", "liquidate", "unlist", "checkpoint"}, got
-    assert {"harvest", "unlist", "liquidate"} <= set(got)
+    assert {"unlist", "liquidate"} <= set(got)
+    assert "harvest" not in got  # A claim that cannot fund the cash gap would precede the same unlists.
     assert "sync" not in got
     assert "checkpoint" not in got
     assert fns(plan(state(listings=act, free=E, locked_shares=E, owed_estimate=3 * E // 10, **spike))) == ["checkpoint"]
     assert {"unlist", "liquidate"} <= set(fns(plan(state(listings=act, winding_down=True, idle_packs=1, **spike))))
     assert plan(state(listings=act, free=E, pending_deposits=10**17, **spike)) == []
+
+    # Active fee claims are candidates on real bounded maintenance, never a paid recurring job.
+    fees = [Listing(i, ACTIVE, pending_fees=i * 10**15) for i in range(1, 30)]
+    ample = state(listings=fees, free=E, fee_credit=E, blackout=False)
+    assert "harvest" not in fns(plan(ample))
+    funded_sync = state(listings=fees + settled, free=0, completed_prefix=128, open_positions=30)
+    choices = [step for step in plan(funded_sync) if step[0] == "sync"]
+    assert choices[0][1] == [30] and choices[1][1] == [30, 29], choices
+    assert len(choices[-1][1]) == 16
+    funded_sync.free = E
+    assert plan(funded_sync)[0][1] == [30], "already funded jobs do not carry redundant active IDs"
+    funded_sync.free, funded_sync.routine_budget = 0, 0
+    assert plan(funded_sync)[0][1] == [30], "active fees cannot fix exhausted spending permission"
+    one_own = state(listings=[Listing(1, ACTIVE, pending_fees=10**15)], free=0,
+                    own_journal_pending=True, completed_prefix=1, open_positions=2,
+                    routine_budget=150_000_000_000_000, markup_bps=0)
+    assert plan(one_own)[1][1] == [1], "upper16-own bound must not hide a funded one-own job"
+    two_own = state(listings=[Listing(i, ACTIVE, pending_fees=500_000) for i in (1, 2)],
+                    own_journal_pending=True, completed_prefix=2, open_positions=4,
+                    free=0, base_fee=1, max_tip=0, gas_price=1, markup_bps=0, routine_budget=1_000_000)
+    assert [step[1] for step in plan(two_own) if step[0] == "sync"] == [[], [1], [1, 2]], \
+        "exact preflight must reach the funded two-claim alternative"
+    full_terminals = state(listings=[Listing(i, SETTLED) for i in range(30, 46)] + fees,
+                           free=0, routine_budget=E)
+    choices = [step for step in plan(full_terminals) if step[0] == 'sync']
+    assert choices[0][1] == list(range(30, 46))
+    assert choices[1][1] == list(range(30, 45)) + [29]
+    assert all(len(step[1]) <= 16 for step in choices)
+    assert all(any(i >= 30 for i in step[1]) for step in choices), 'fee-only no-op is not an alternative'
+    # A small holder redemption can claim just enough real fees, unpaid, rather than unwind.
+    partial = state(listings=fees, free=0, locked_shares=E, total_shares=3 * E,
+                    owed_estimate=45 * 10**15, blackout=False)
+    assert plan(partial)[0] == ("harvest", [28, 29])
+    assert "unlist" not in fns(plan(partial))
+    partial.total_shares = E + 10**15
+    assert "harvest" not in fns(plan(partial)), "full holder exit collects fees while unlisting"
+    credit_only = state(listings=fees, fee_credit=10**16, free=0, locked_shares=E,
+                        total_shares=3 * E, owed_estimate=10**16)
+    assert fns(plan(credit_only)) == ["checkpoint"], "checkpoint already collects sufficient credit"
 
     # Absolute envelope cash at0.5gwei: list8=(280k+8*825k)*0.55gwei=0.003784ETH;
     # routine journal128+prune16=(85k+128*22k+16*45k)*0.55gwei=0.00199155ETH.

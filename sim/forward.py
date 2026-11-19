@@ -33,7 +33,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent / "keeper"))
 import policy  # noqa: E402
 import bisect  # noqa: E402
-from vault import ACTIVE, ALLOCATED, SETTLED, WITHDRAWN, Vault  # noqa: E402
+from vault import ACTIVE, ALLOCATED, SETTLED, WITHDRAWN, OWED, Vault  # noqa: E402
 
 DB = ROOT / "data/fwa.sqlite"
 OUT = ROOT / "out"
@@ -290,12 +290,57 @@ class OperatingClock:
             yield at, kind, payload
 
 
+def bounded_policy_positions(v, now, settlement_window, returned_order, selected_times, owed_after=""):
+    """Model the event index's fixed candidate classes, without an omniscient policy input.
+
+    The simulator owns external state so it can project these classes in memory. Production
+    obtains the identical bounded classes from indexed SQL queries, then hydrates their IDs.
+    Text ID ordering matches keeper/index.py's TEXT primary keys.
+    """
+    limit = policy.MAX_BATCH["sync"]  # keeper.keeper.MAX_CANDIDATES
+    positions = v.positions
+    returned = sorted((i for i, p in positions.items()
+                       if p.status == SETTLED and p.pack_owned and p.state != OWED),
+                      key=lambda i: returned_order.get(i, (selected_times.get(i, 0), i)))[:limit]
+    due = list(returned)
+    for i in sorted(v.receipts, key=str)[:limit]:
+        if len(due) == limit:
+            break
+        if i not in due:
+            due.append(i)
+    selected = sorted((i for i, p in positions.items()
+                       if p.state == ACTIVE and p.status in (ALLOCATED, SETTLED)),
+                      key=lambda i: (selected_times.get(i, 0), i))[:limit]
+    due += selected
+    due += sorted((i for i, p in positions.items()
+                   if p.state == ALLOCATED and p.allocated_at <= now - settlement_window),
+                  key=lambda i: (positions[i].allocated_at, str(i)))[:limit]
+    owed = sorted((i for i, p in positions.items() if p.state == OWED), key=str)
+    rotation = [i for i in owed if str(i) > owed_after][:limit]
+    rotation += [i for i in owed if str(i) <= owed_after][:limit - len(rotation)]
+    if rotation:
+        owed_after = str(rotation[-1])
+    due += rotation
+    active = sorted((i for i, p in positions.items() if p.state == ACTIVE),
+                    key=lambda i: (positions[i].fee_debt, str(i)))[:limit]
+    return list(dict.fromkeys(due + active)), owed_after
+
+
 def run(sc, n_target, seed, days=365, values=None):
     rng = np.random.default_rng(seed)
-    others = POOL
-    if sc.get("pool_scale", 1.0) != 1.0:
-        others = rng.choice(POOL, int(len(POOL) * sc["pool_scale"]))
-    W_o, N_o = float(np.sum(1 / others)), len(others)
+    if "foreign_pool_weight" in sc:
+        # Timed scenarios need only the authenticated aggregate inverse-backing weight.
+        # Do not invent per-listing records when the historical SQLite archive is absent.
+        if sc.get("pool_scale", 1.0) != 1.0:
+            raise ValueError("aggregate snapshot cannot sample individual foreign listings")
+        W_o = float(sc["foreign_pool_weight"])
+        if W_o <= 0 or not np.isfinite(W_o):
+            raise ValueError("foreign pool weight must be positive and finite")
+    else:
+        others = POOL
+        if sc.get("pool_scale", 1.0) != 1.0:
+            others = rng.choice(POOL, int(len(POOL) * sc["pool_scale"]))
+        W_o = float(np.sum(1 / others))
     g_of = sc.get("gwei", 0.15)  # scenario basefee; the actual bid also includes maxTip
     deposit = sc.get("deposit_wei", int((n_target * (0.0363 + 0.03) + 0.06 + 0.11) * E))
     values = values or json.loads((ROOT.parent / "deploy/mainnet.json").read_text())
@@ -329,6 +374,8 @@ def run(sc, n_target, seed, days=365, values=None):
     exit_requested = False
     operation_end_backlog = 0
     operation_end_cash = operation_end_keeper_paid = operation_end_fees = 0
+    operation_end_routine_paid = operation_end_routine_budget = 0
+    operating_budget_marks = {}
     operation_end_idle = operation_end_funding = operation_end_loose = operating_active_days = 0
     rescue_sync = sc.get("holder_rescue_sync", False)
     trace = sc.get("trace_sink")
@@ -337,12 +384,14 @@ def run(sc, n_target, seed, days=365, values=None):
     now = absolute_now = 0
     event_kind = "day"
     market_pending = last_checkpoint_interval = 0
-    selected_times, applied_changes, active_days_seen = {}, set(), set()
+    selected_times, returned_order, applied_changes, active_days_seen = {}, {}, set(), set()
+    owed_after, event_order = "", 0
     expired_backing = expired_nft = purchaser_returns = late_purchaser_returns = 0
     timed_checkpoint_times = []
     timed_pass_limits = 0
     routine_paid = essential_paid = request_paid = 0
     routine_unfunded = unpaid_routine_calls = zero_quote_sync_calls = 0
+    sync_credit_sweeps = sync_active_fee_claims = sync_fee_receipts = sync_collection_quote = 0
     last_unfunded_offer = last_cash_shortfall = last_permission_shortfall = 0
     op_names = ("sync", "harvest", "unlist", "liquidate", "checkpoint", "restock", "list")
     op_paid = dict.fromkeys(op_names, 0)
@@ -392,9 +441,13 @@ def run(sc, n_target, seed, days=365, values=None):
 
     ticks = clock if timed else ((d * DAY, "day", None) for d in range(days + exit_days))
     for now, event_kind, payload in ticks:
+        event_order += 1
         d = now // DAY
         absolute_now = (clock.start if timed else 0) + now
         v.sync_budget(now)
+        if d <= days and d % 30 == 0 and str(d) not in operating_budget_marks:
+            operating_budget_marks[str(d)] = dict(elapsed_seconds=now, routine_budget_wei=v.routine_budget,
+                routine_paid_wei=routine_paid, free_wei=v.free(), positions=len(v.positions))
         gas = int((g_of(d) if callable(g_of) else g_of) * GWEI)
         for day, key, val in sc.get("changes", []):
             if day != d or (timed and (day, key) in applied_changes):
@@ -463,6 +516,7 @@ def run(sc, n_target, seed, days=365, values=None):
                         v.record_keep(payload, v.settlement_fee_bps)
                     else:
                         v.bid_settled(payload)
+                        returned_order[payload] = (absolute_now, event_order)
                     purchaser_returns += 1
                     trace_state("purchaser-response", d)
             for i, p in v.positions.items():
@@ -533,8 +587,12 @@ def run(sc, n_target, seed, days=365, values=None):
         phases = ([absolute_now % clock.INTERVAL >= clock.BLACKOUT_START] if event_kind == "keeper" else []) if timed else (False, True)
         for blackout in phases:
             while not congested and not holder_finished and calls < (1 if timed else max_calls):
+                hydrated = list(v.positions)
+                if timed:
+                    hydrated, owed_after = bounded_policy_positions(v, absolute_now, clock.SETTLEMENT,
+                                                                     returned_order, selected_times, owed_after)
                 listings = [policy.Listing(i, p.status, allocated_at=selected_times.get(i, p.allocated_at) if timed else p.allocated_at, pending_fees=p.pending_fees,
-                                           value=p.value, backing=p.backing) for i, p in v.positions.items()]
+                                           value=p.value, backing=p.backing) for i in hydrated for p in [v.positions[i]]]
                 st = policy.State(
                     now=absolute_now, gas_price=gas + tip, base_fee=gas, gas_ceiling=ceiling, max_tip=tip,
                     markup_bps=values["payMarkupBps"], share_bps=values["keeperShareBps"], k=k, backing=backing,
@@ -543,7 +601,8 @@ def run(sc, n_target, seed, days=365, values=None):
                     checkpoint_done_this_interval=checkpoint_done, listings=listings, idle_packs=len(v.idle_packs),
                     recovery_packs=len(v.recovery_packs), loose_shapes=v.loose_shapes,
                     free=v.free(), idle_eth=v.idle(), owed_estimate=v.owed_estimate(),
-                    pending_deposits=v.pending_total, locked_shares=v.locked_shares, fee_credit=credit,
+                    pending_deposits=v.pending_total, locked_shares=v.locked_shares,
+                    total_shares=v.total_shares, fee_credit=credit,
                     open_positions=len(v.positions), active_count=v.active_count, idle_value=v.idle_value,
                     idle_funding=v.idle_funding,
                     journal_cursor=v.acquisition_cursor, completed_prefix=v.completed_prefix,
@@ -554,9 +613,10 @@ def run(sc, n_target, seed, days=365, values=None):
                     pack_units_mask=values["packUnitsMask"], reserve=values["reserveWei"],
                     processing_pool=v.processing_pool, distribution_bps=v.distribution_bps,
                     allocation_stale=(v.allocation_head < len(v.allocation_queue) and
-                                      v.allocation_queue[v.allocation_head] not in v.positions),
-                    own_journal_pending=any(p.state == ACTIVE and p.status in (ALLOCATED, SETTLED)
-                                            for p in v.positions.values()))
+                                      (v.allocation_queue[v.allocation_head] not in v.positions or
+                                       v.positions[v.allocation_queue[v.allocation_head]].state != ALLOCATED)),
+                    own_journal_pending=any(v.positions[i].state == ACTIVE and v.positions[i].status in (ALLOCATED, SETTLED)
+                                            for i in hydrated))
                 if backing:
                     up = lambda a, b: -(-a // b)
                     keep_bps = int(S_FEE * 10_000)
@@ -576,7 +636,7 @@ def run(sc, n_target, seed, days=365, values=None):
                 essential = v.locked_shares != 0
                 executed = False
 
-                def affordable(gas_q, units=0, ess=False, funding_cap=None, cash_delta=0, liability=False):
+                def affordable(gas_q, units=0, ess=False, funding_cap=None, cash_delta=0, liability=False, final_candidate=True):
                     nonlocal skipped_funding, routine_unfunded
                     nonlocal last_unfunded_offer, last_cash_shortfall, last_permission_shortfall
                     offer = policy.pay_v1(st, gas_q, units, ess)
@@ -585,6 +645,8 @@ def run(sc, n_target, seed, days=365, values=None):
                     holder_fallback = self_serve and liability and (not exit_all or fn != "sync"
                         or (rescue_sync and exit_requested and v.locked_shares))
                     if paid < offer and not holder_fallback:
+                        if not final_candidate:
+                            return False  # A shorter preflight prefix is not an operating stall.
                         skipped_funding += 1
                         last_unfunded_offer = offer
                         last_cash_shortfall = max(0, offer - max(0, v.free() + cash_delta))
@@ -609,7 +671,7 @@ def run(sc, n_target, seed, days=365, values=None):
                         essential_paid += paid
                     else:
                         routine_paid += paid
-                        unpaid_routine_calls += int(paid < offer)
+                        unpaid_routine_calls += int(paid < offer and fn != "harvest")
                     if self_serve and liability:
                         # Proxy from the operation quote, not a measured gas claim. Kept outside
                         # vault NAV because the withdrawing holder pays this gas personally.
@@ -624,7 +686,7 @@ def run(sc, n_target, seed, days=365, values=None):
                             holder_calls[fn] += 1
                     return paid
 
-                for action in planned:
+                for action_index, action in enumerate(planned):
                     fn = action[0]
                     action_meta = {}
                     if fn == "sync":
@@ -682,6 +744,17 @@ def run(sc, n_target, seed, days=365, values=None):
                         if ((unexposed and not v.tracked_value) or (rebase_count and not pruned)
                                 or (not journal_paid_work and not own_ids and not resolved and not pruned)):
                             gas_q = 0
+                        base_gas_q = gas_q
+                        funding_probe = distribution_probe if required_tail and st.distribution_bps \
+                            and not (st.pending_deposits or st.locked_shares) else v
+                        gas_q, take_credit, fee_ids = funding_probe.sync_fee_plan(
+                            action[1], credit, gas_q, len(resolved),
+                            lambda g, u: policy.quote(st, g, u), st.share_bps,
+                            Q["sync_credit"], Q["sync_funding"], Q["harvested"],
+                            cash_delta=reclaim_cash,
+                            distribution_tail=bool(required_tail and st.distribution_bps
+                                                   and not (st.pending_deposits or st.locked_shares)))
+                        fee_receipts = take_credit + sum(v.positions[i].pending_fees for i in fee_ids)
                         if exit_all and gas_q == 0:
                             if not (exit_requested and v.locked_shares):
                                 continue  # No operator gratuity is invented for an unpaid job.
@@ -691,7 +764,9 @@ def run(sc, n_target, seed, days=365, values=None):
                             unknown_user_gas += int("unexposed_sync" not in user_gas)
                             holder_calls["sync"] += 1
                             zero_quote_sync_calls += 1
-                        if not affordable(gas_q, len(resolved), False, cash_delta=reclaim_cash, liability=essential):
+                        if not affordable(gas_q, len(resolved), False,
+                                          cash_delta=reclaim_cash + fee_receipts, liability=essential,
+                                          final_candidate=not any(a[0] == "sync" for a in planned[action_index + 1:])):
                             continue
                         if rebase_count:
                             assert v.advance_unexposed()
@@ -718,6 +793,19 @@ def run(sc, n_target, seed, days=365, values=None):
                             else:
                                 v.sync_owned(i)
                         assert v.prune(policy.MAX_BATCH["prune"]) == pruned
+                        for i in fee_ids:
+                            v.harvest_listing(i)
+                        if fee_receipts:
+                            v.receive_fees(fee_receipts)
+                        credit -= take_credit
+                        sync_credit_sweeps += int(take_credit != 0)
+                        sync_active_fee_claims += len(fee_ids)
+                        sync_fee_receipts += fee_receipts
+                        sync_collection_quote += policy.quote(st, gas_q, len(resolved)) - policy.quote(st, base_gas_q, len(resolved))
+                        if timed:
+                            action_meta = dict(sync_credit=take_credit, sync_fee_ids=fee_ids,
+                                               sync_fee_receipts=fee_receipts,
+                                               sync_collection_gas=gas_q - base_gas_q)
                         journal_paid += pay(gas_q, len(resolved), False, liability=essential)
                         journal_own += len(own_ids)
                         journal_foreign += len(entries) - len(own_ids)
@@ -730,7 +818,7 @@ def run(sc, n_target, seed, days=365, values=None):
                             action_meta = dict(harvest_amount=amt, harvested_credit=credit,
                                                harvested_pending={i: v.positions[i].pending_fees for i in ids})
                         gas_q = Q["harvest"] + Q["harvested"] * len(ids)
-                        funding_cap = None if policy.quote(st, gas_q) * 10_000 <= amt * st.share_bps else 0
+                        funding_cap = 0  # Standalone fee collection never earns keeper compensation.
                         liability = essential and v.owed_estimate() > v.free() + v.pending_total
                         if not affordable(gas_q, funding_cap=funding_cap, cash_delta=amt, liability=liability):
                             continue
@@ -861,6 +949,7 @@ def run(sc, n_target, seed, days=365, values=None):
         if (event_kind == "cutoff") if timed else (d == days - 1):
             operation_end_backlog = len(journal)
             operation_end_cash, operation_end_keeper_paid, operation_end_fees = v.balance, v.keeper_paid, v.fees_received
+            operation_end_routine_paid, operation_end_routine_budget = routine_paid, v.routine_budget
             operation_end_idle, operation_end_funding, operation_end_loose = v.idle_value, v.idle_funding, v.loose_shapes * policy.UNIT
         if timed:
             redemptions = [(d, 1.0)] if event_kind == "cutoff" and exit_all else ([(d, payload)] if event_kind == "redemption" else [])
@@ -898,7 +987,8 @@ def run(sc, n_target, seed, days=365, values=None):
     end_nav = economic_nav(v, credit)
     unexposed = not v.positions and not v.receipts and not v.active_count and not v.active_backing and not v.allocated_value
     end_blocked = bool((journal and not unexposed) or v.receipts or (v.allocation_head < len(v.allocation_queue) and
-                       v.allocation_queue[v.allocation_head] not in v.positions)
+                       (v.allocation_queue[v.allocation_head] not in v.positions or
+                        v.positions[v.allocation_queue[v.allocation_head]].state != ALLOCATED))
                        or v.allocated_value * 10_000 > end_nav * v.allocated_bound_bps)
     assert len(journal) == v.completed_prefix - v.acquisition_cursor
     assert journal_own + journal_foreign + journal_rebased == v.acquisition_cursor
@@ -989,6 +1079,11 @@ def run(sc, n_target, seed, days=365, values=None):
                 expired_backing_reclaims=expired_backing, expired_nft_reclaims=expired_nft,
                 purchaser_responses=purchaser_returns, late_purchaser_responses=late_purchaser_returns,
                 timed_checkpoint_count=len(timed_checkpoint_times), timed_pass_limit_hits=timed_pass_limits)
+    result.update(sync_credit_sweeps=sync_credit_sweeps, sync_active_fee_claims=sync_active_fee_claims,
+                  sync_fee_receipts_wei=sync_fee_receipts, sync_collection_quote_wei=sync_collection_quote,
+                  operation_end_routine_paid_wei=operation_end_routine_paid,
+                  operation_end_routine_budget_wei=operation_end_routine_budget,
+                  operating_budget_marks=operating_budget_marks)
     if timed:
         result.update(external_fees_generated_wei=accrued, unharvested_fee_credit_wei=credit,
                       unharvested_listing_fees_wei=sum(p.pending_fees for p in v.positions.values()))

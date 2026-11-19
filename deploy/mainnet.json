@@ -18,7 +18,7 @@
  "reserveWei": 5000000000000000,
  "tvlCapWei": 340282366920938463463374607431768211455,
  "routineCapWei": 100000000000000000,
- "routineRatePerDayWei": 5000000000000000,
+ "routineRatePerDayWei": 20000000000000000,
  "essentialCapWei": 0,
  "essentialRatePerDayWei": 0
 }

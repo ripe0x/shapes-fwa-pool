@@ -1,3 +1,32 @@
+# Final operating compensation
+
+The current implementation and acceptance limits are in [Complete operating pass](COMPLETE-OPERATING-PASS.md). Actual signed receipts are in `receipts/complete-cost-receipts.json` and `receipts/complete-foreign-journal.json`. Source identity and focused checks are in `receipts/complete-final-validation.json` and `receipts/complete-contract-summary.json`.
+
+| Component | Final quoted gas |
+| --- | ---: |
+| Checkpoint |360,000|
+| Restock base / reference three shape pack |280,000 /325,000|
+| Each additional shape in the pack |100,000|
+| Paid primary mint and ten way split |2,200,000|
+| List base / admitted position |280,000 /825,000|
+| Ordinary sync base / required tail base |85,000 /120,000; choose one|
+| Qualified distribution proof |80,000|
+| Completed global journal record |22,000|
+| Own selection / terminal reconciliation / head prune |180,000 /120,000 /45,000|
+| Economical fee credit withdrawal inside eligible sync |40,000|
+| Necessary active fee funding inside eligible sync |40,000 plus 80,000 per actual claim|
+| Standalone harvest |Unpaid|
+
+Unlisting, liquidation, oversized gift recovery and the work fee retain their existing schedules. Fixed compensation is capped by policy, free cash and permission. Extra collection costs must satisfy the fee share restraint. Caller gas never determines vault compensation.
+
+A current signed four shape leftover call at 0.5 gwei exposed an underpayment under the old 35,000 extra unit slope. The final 100,000 slope repairs it; all ten final affected signed cost receipts cover billed expense and pass ordinary preflight. The original three shape quotes and O2 result remain unchanged. Larger packs have deliberately conservative compensation. Owner settings different from the tested work fee, markup and price need their own willingness check.
+
+Final runtime is 24,136 bytes for PackVault and 24,304 bytes for VaultLib, below 24,576. Q360 remains within O6's 0.0002 ETH payment at the routine ceiling. O2 still misses its original 1,750,000 quoted gas target:1,919,655.
+
+Everything below is historical evidence for its named source. It is preserved unchanged and must not be read as the current schedule, current runtime or outstanding work list.
+
+---
+
 # Efficient journal gas and compensation
 
 The current fixed-work candidate passed its exact owner-approved local batch; no public deployment is implied. Economic acceptance

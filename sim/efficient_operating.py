@@ -2,9 +2,12 @@
 """Bounded illustrative operating/complete-exit comparison, never an annual return gate."""
 import argparse
 import hashlib
+import importlib.util
 import json
 import sqlite3
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import forward as F
@@ -24,6 +27,11 @@ def context(database):
     successes = sum(s == 2 for s in statuses)
     F.REFUNDS_PER_SELECTION = (len(statuses) - successes) / successes
     db.close()
+    return dict(block=block, timestamp=end, completed30d=len(statuses), successful30d=successes), receipt_gas()
+
+
+def receipt_gas():
+    """Explicit historical caller-cost proxies; current keeper receipts are separate evidence."""
     actions = [json.loads(line) for line in (OUT / 'review-journal-replacement-actions.jsonl').read_text().splitlines()]
     deposit = next(a['receipt'] for a in actions if a.get('function') == 'deposit()')
     old = json.loads((OUT / 'review-journal-calibration-summary.json').read_text())['exit']['rows']
@@ -32,15 +40,182 @@ def context(database):
            'claim': next(r['billed_gas'] for r in old if r['label'] == 'exit claim'),
            'checkpoint': next(r['billed_gas'] for r in old if r['label'] == 'exit checkpoint'),
            'unexposed_sync': 121_884}
-    return dict(block=block, timestamp=end, completed30d=len(statuses), successful30d=successes), gas
+    return gas
 
 
 def case(values, principal, seed, volume, price, gas, days=30, exit_days=30, rescue=False, trace=None, timing=None):
-    sc = F.Scenario(volume=F.const(volume), gwei=price - .05, deposit_wei=principal,
+    values = dict(values)
+    if price == 0:
+        values['maxTipWei'] = 0
+    sc = F.Scenario(volume=F.const(volume), gwei=max(0, price - values['maxTipWei'] / F.GWEI), deposit_wei=principal,
                     exit_all=True, exit_days=exit_days, user_gas_proxy=gas,
                     holder_rescue_sync=rescue, trace_sink=trace, **(timing or {}))
     return F.run(sc, 1 if principal == 15 * 10**16 else 27 if principal < 2 * F.E else 100,
                  seed, days=days, values=values)
+
+
+def load_baseline(ref, directory):
+    """Load the recorded implementation with only an aggregate-input adapter.
+
+    The old timed driver used the foreign position array solely for sum(1/backing).
+    Replacing that initialization with the identical authenticated sum does not invent
+    foreign records or alter policy, accounting, event order or transaction eligibility.
+    """
+    commit = subprocess.check_output(['git', 'rev-parse', ref], cwd=ROOT, text=True).strip()
+    hashes = {}
+    for relative in ('sim/forward.py', 'sim/vault.py', 'keeper/policy.py', 'deploy/mainnet.json'):
+        contents = subprocess.check_output(['git', 'show', f'{commit}:{relative}'], cwd=ROOT)
+        hashes[relative] = hashlib.sha256(contents).hexdigest()
+        if relative == 'sim/forward.py':
+            old = ('    others = POOL\n'
+                   '    if sc.get("pool_scale", 1.0) != 1.0:\n'
+                   '        others = rng.choice(POOL, int(len(POOL) * sc["pool_scale"]))\n'
+                   '    W_o, N_o = float(np.sum(1 / others)), len(others)\n')
+            assert contents.decode().count(old) == 1, 'baseline aggregate adapter no longer matches'
+            contents = contents.decode().replace(old, '    W_o = float(sc["foreign_pool_weight"])\n').encode()
+        target = directory / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(contents)
+    saved = {name: sys.modules.get(name) for name in ('policy', 'vault')}
+    old_path = list(sys.path)
+    try:
+        for name in saved:
+            sys.modules.pop(name, None)
+        spec = importlib.util.spec_from_file_location('complete_pass_baseline', directory / 'sim/forward.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    finally:
+        sys.path[:] = old_path
+        for name, previous in saved.items():
+            if previous is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = previous
+    return module, dict(commit=commit, source_sha256=hashes,
+                        adapter='Foreign aggregate initialization only: W_o=float(sc[foreign_pool_weight]).')
+
+
+def complete_pass(args):
+    """Timed operating and actually claimed exit comparisons with no historical DB dependency."""
+    source = json.loads(args.aggregate_context.read_text())
+    snapshot = source['snapshots'][args.snapshot]
+    assert snapshot['settlementWindow'] == F.OperatingClock.SETTLEMENT
+    gas = receipt_gas()
+    timing = dict(timed=True, start_timestamp=snapshot['timestamp'], poll_seconds=60,
+                  receipt_seconds=36, vrf_seconds=60, purchaser_response_seconds=120,
+                  foreign_pool_weight=snapshot['totalWeight'] / F.E,
+                  refunds_per_selection=5090 / 13191, exempt=snapshot['oracleExemptPacks'])
+    paths = ['sim/forward.py', 'sim/vault.py', 'sim/efficient_operating.py', 'keeper/policy.py',
+             'deploy/canary.json', 'deploy/canary.example.json', 'deploy/mainnet.json']
+    frozen = {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in paths}
+    sizes = [('larger', 'mainnet', 68 * 10**17),
+             ('canary', 'canary.example', 1_960_100_000_000_000_000),
+             ('first-position', 'canary.example', 15 * 10**16)]
+    rows = []
+    short_regression = []
+    diagnostics = []
+    seeds = [int(seed) for seed in args.seeds.split(',')]
+    cache_path = ROOT / 'sim/out/complete-operating-cache.json'
+    cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+    with tempfile.TemporaryDirectory(prefix='shapes-complete-baseline-') as temp:
+        baseline, baseline_source = load_baseline(args.baseline_ref, Path(temp))
+        previous_configs = {name: json.loads(subprocess.check_output(
+            ['git', 'show', f'{baseline_source["commit"]}:deploy/{name}.json'], cwd=ROOT))
+            for name in ('canary.example', 'mainnet')}
+
+        def execute(implementation, version, params, principal, volume, price, seed, days, exit_days, clock):
+            params = dict(params)
+            if price == 0:
+                params['maxTipWei'] = 0
+            core = baseline_source if version == 'baseline' else {p: frozen[p] for p in ('sim/forward.py', 'sim/vault.py', 'keeper/policy.py')}
+            inputs = dict(core=core, params=params, principal=principal, volume=volume, price=price,
+                          seed=seed, days=days, exit_days=exit_days, timing=clock, gas=gas)
+            key = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
+            if key not in cache:
+                scenario = implementation.Scenario(volume=implementation.const(volume),
+                    gwei=max(0, price - params['maxTipWei'] / F.GWEI), deposit_wei=principal,
+                    exit_all=True, exit_days=exit_days, user_gas_proxy=gas, **clock)
+                result = implementation.run(scenario, 1, seed, days=days, values=params)
+                assert result['ledger_gap_wei'] == 0 and result['unknown_user_gas_calls'] == 0
+                assert result['routine_keeper_paid_wei'] <= result['routine_period_permission_upper_wei']
+                result.pop('ret', None)
+                cache[key] = dict(inputs=inputs, result=result)
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                temporary = cache_path.with_suffix('.tmp')
+                temporary.write_text(json.dumps(cache, indent=2) + '\n')
+                temporary.replace(cache_path)
+            return dict(cache[key]['result'])
+
+        historical = source['snapshots']['recorded']
+        regression_timing = dict(timing, start_timestamp=historical['timestamp'],
+                                 foreign_pool_weight=historical['totalWeight'] / F.E, exempt=True)
+        for version, implementation in [('baseline', baseline), ('candidate', F)]:
+            params = json.loads((ROOT / 'deploy/mainnet.json').read_text())
+            params.update(routineCapWei=3 * 10**17, routineRatePerDayWei=10**16)
+            result = execute(implementation, version, params, 68 * 10**17, 609, .2, 8, 2, 2, regression_timing)
+            short_regression.append(dict(version=version, **result))
+            print(f'short {version}: exit={result["exit_complete"]} funded={result["fully_paid_routine"]} '
+                  f'harvest={result["keeper_paid_harvest_wei"] / F.E:.6f}eth', flush=True)
+        cases = [(size, config, principal, price, volume, seed)
+                 for size, config, principal in sizes for price in (.2, .5, 0)
+                 for volume in (71, 439.7) for seed in seeds]
+        priority = {('larger', .5, 439.7): 0, ('canary', .2, 439.7): 1}
+        cases.sort(key=lambda row: priority.get((row[0], row[3], row[4]), 2))
+        for size, config, principal, price, volume, seed in cases:
+            values = previous_configs[config]
+            versions = [('baseline', baseline), ('candidate', F)] if args.paired_matrix else [('candidate', F)]
+            for version, implementation in versions:
+                params = dict(values)
+                result = execute(implementation, version, params, principal, volume, price, seed,
+                                 args.days, args.exit_days, timing)
+                rows.append(dict(version=version, size=size, config=config, permissions='previous-default',
+                                 seed=seed, total_price_gwei=price, successful_volume_per_day=volume,
+                                 holder_realized_return_bps=(result['holder_net_realized_wei'] * 10_000
+                                     / result['holder_paid_in_wei'] if result['exit_complete'] else None),
+                                 **result))
+                print(f'{version} {size} {price}gwei {volume}/day seed{seed}: '
+                      f'exit={result["exit_complete"]} funded={result["fully_paid_routine"]} '
+                      f'creator={result["creator_mint_fees_wei"] / F.E:.6f}eth', flush=True)
+                if (version == 'candidate' and volume == 439.7 and ((size == 'larger' and price == .5) or (size == 'canary' and price in (.2, .5)))):
+                    proposals = [('previous-limit-comparison', 3 * 10**17, 10**16, args.days),
+                                 ('applied-refill', 10**17 if size == 'larger' else 3 * 10**16,
+                                  2 * 10**16 if size == 'larger' else 10**16, args.days)]
+                    if size == 'larger':
+                        proposals += [('applied-refill-90days', 10**17, 2 * 10**16, 90)]
+                    for label, cap, rate, operating_days in proposals:
+                        maximum = dict(params, routineCapWei=cap, routineRatePerDayWei=rate)
+                        stress = execute(F, version, maximum, principal, volume, price, seed,
+                                         operating_days, args.exit_days, timing)
+                        diagnostics.append(dict(size=size, seed=seed, config=config,
+                            permissions=label, total_price_gwei=price,
+                            successful_volume_per_day=volume, **stress))
+                        print(f'diagnostic {size} {label}: exit={stress["exit_complete"]} '
+                              f'funded={stress["fully_paid_routine"]} '
+                              f'budget={stress["operation_end_routine_budget_wei"] / F.E:.6f}eth', flush=True)
+    assert frozen == {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in paths}
+    report = dict(source_sha256=frozen, baseline=baseline_source, aggregate_context=source,
+                  configuration_inputs={name: json.loads((ROOT / f'deploy/{name}.json').read_text())
+                                        for name in ('canary', 'canary.example', 'mainnet')},
+                  previous_configuration_inputs=previous_configs,
+                  selected_snapshot=args.snapshot, timing=timing, user_gas_proxy=gas,
+                  command=[sys.executable, *sys.argv], rows=rows, short_regression=short_regression,
+                  short_regression_timing=regression_timing, permission_diagnostics=diagnostics,
+                  source_of_funds='Initial seed, holder principal and actually collected FWA fees only. No topups, forecast fee credits, operator losses or creator fee recycling.',
+                  limits=[
+                      'Generated acquisition and purchaser events are conditional counterfactual scenarios, not authenticated VRF replay or observed future volume.',
+                      'The static authenticated foreign totalWeight is sufficient for this model. No foreign listing distribution was reconstructed or fabricated; the external pool does not react to the vault.',
+                      '5090 refunded /13191 successful completions is the previously archived30day ratio, held constant as an explicit scenario input.',
+                      'The two-day comparison retains the prior conditional exemption assumption with the recorded pool weight for comparability. Packs were not actually oracle-exempt at that recorded block; the primary matrix uses the independently authenticated current exemption and current weight.',
+                      'The18comparison rows explicitly load the previous default configurations from the baseline commit. Applied refill diagnostics match current mainnet0.1ETH/0.02ETH per day and canary0.03ETH/0.01ETH per day; the former0.3ETH cap/0.01ETH per day limit is retained as a separate comparison. No permission setting adds cash.',
+                      'Candidate policy receives the same16-ID indexed active and terminal classes as the keeper, including text-ID ordering and persistent owed rotation. This fixes the prior model\'s unrestricted policy projection; the historical baseline remains the recorded implementation.',
+                      'Transaction effects occur atomically on the fresh modeled read. The36second receipt delay spaces subsequent reads; inclusion races and reverted transaction costs are absent.',
+                      'Keeper expenses are full quoted actual eligible work, not receipt-derived actual operator profit. Holder deposit/request/claim/checkpoint costs use historical receipt proxies and variable exit work uses its quoted gas component.',
+                      'Zero gas removes both basefee and tip while retaining protocol mint fees and configured flat work fees.',
+                      'A holder return is reported only after a complete actual modeled claim; any residual mark on an incomplete exit is kept separately. No annualization or expected return is claimed.'])
+    target = OUT / f'complete-operating-{args.label}.json'
+    target.write_text(json.dumps(report, indent=2) + '\n')
+    print(f'Saved {target}: {len(rows)} timed scenario cases', flush=True)
+    return report
 
 
 def focused_checks(gas):
@@ -98,7 +273,8 @@ def timed_checks(history, gas):
     assert rows['timely']['exit_complete'] and rows['timely']['purchaser_responses'] > 0
     assert rows['timely']['expired_backing_reclaims'] == rows['timely']['late_purchaser_responses'] == 0
     assert rows['silent']['expired_backing_reclaims'] > 0 and not rows['silent']['purchaser_responses']
-    assert rows['late']['expired_backing_reclaims'] > 0 and rows['late']['late_purchaser_responses'] > 0
+    assert rows['late']['expired_backing_reclaims'] > 0
+    assert rows['late']['late_purchaser_responses'] == rows['late']['purchaser_responses']
     # The driver does not postpone every return/relisting until the next daily step.
     trace = traces['timely']
     response_times = [t['timestamp'] for t in trace if t['action'] == 'purchaser-response']
@@ -143,7 +319,17 @@ def main():
     ap.add_argument('--self-check-only', action='store_true')
     ap.add_argument('--timed-checks', action='store_true', help='focused opt-in timestamp scenarios only; never runs the matrix')
     ap.add_argument('--seeds', default='3,8,19')
+    ap.add_argument('--complete-pass', action='store_true', help='matched timed baseline/candidate operating and complete-exit comparison')
+    ap.add_argument('--aggregate-context', type=Path, default=OUT / 'complete-operating-context.json')
+    ap.add_argument('--snapshot', choices=('recorded', 'current'), default='current')
+    ap.add_argument('--baseline-ref', default='e9cee61')
+    ap.add_argument('--paired-matrix', action='store_true', help='also run historical baseline for every long scenario')
+    ap.add_argument('--days', type=int, default=30)
+    ap.add_argument('--exit-days', type=int, default=30)
     a = ap.parse_args()
+    if a.complete_pass:
+        complete_pass(a)
+        return
     history, gas = context(a.db.resolve())
     if a.timed_checks:
         paths = ['sim/forward.py', 'sim/efficient_operating.py', 'sim/vault.py', 'keeper/policy.py']

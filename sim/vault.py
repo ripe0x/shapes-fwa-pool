@@ -282,6 +282,52 @@ class Vault:
         p.fee_debt = debt
         p.pending_fees = 0
 
+    def sync_fee_plan(self, ids, credit, gas_q, units, quote, share_bps,
+                      credit_gas=40_000, funding_gas=40_000, claim_gas=80_000,
+                      cash_delta=0, distribution_tail=False):
+        """Preview VaultLib._fundSync without applying a transaction that may be declined.
+
+        `quote(gas, units)` is the full bytecode payment envelope. Terminal proceeds are
+        supplied through `cash_delta`; protected balances remain excluded by free().
+        The returned credit and active IDs are collected only with the eligible sync.
+        """
+        if gas_q == 0:
+            return gas_q, 0, []
+        cost = quote(gas_q, units)
+        if self.routine_budget < cost:
+            return gas_q, 0, []
+        free, taken_credit = self.free() + cash_delta, 0
+        original_credit = credit
+        proof = lambda gas: not distribution_tail or self.distribution_tail(quote(gas, 0), original_credit)
+        combined = quote(gas_q + credit_gas, units)
+        if (credit and combined <= self.routine_budget
+                and (combined - cost) * BPS <= credit * share_bps and proof(gas_q + credit_gas)):
+            taken_credit, credit = credit, 0
+            free += taken_credit
+            gas_q += credit_gas
+            cost = combined
+        if free >= cost:
+            return gas_q, taken_credit, []
+        claims, fees = [], credit
+        for listing_id in ids:
+            p = self.positions.get(listing_id)
+            if (not p or p.state != ACTIVE or p.status != ACTIVE
+                    or listing_id in claims or not p.pending_fees):
+                continue
+            claims.append(listing_id)
+            fees += p.pending_fees
+            funded_gas = gas_q + funding_gas + len(claims) * claim_gas + (credit_gas if credit else 0)
+            combined = quote(funded_gas, units)
+            if free + fees < combined:
+                continue
+            # The first cash-covering prefix is final. Padding cannot qualify a failing
+            # fee share or permission check, or manufacture another claim's compensation.
+            if (combined > self.routine_budget or (combined - cost) * BPS > fees * share_bps
+                    or not proof(funded_gas)):
+                return gas_q, taken_credit, []
+            return funded_gas, taken_credit + credit, claims
+        return gas_q, taken_credit, []
+
     def pending_active_fees(self, witness_id=None):
         if self.active_count == 0:
             return 0

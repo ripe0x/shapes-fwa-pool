@@ -1,3 +1,15 @@
+# Complete operating pass
+
+2026-11-18. The remaining contract, keeper and economic changes are implemented together. Standalone harvesting is caller funded. Economical fee credit and the smallest necessary active fee prefix can fund verified sync work, with protected cash, fee share, budget and distribution checks enforced onchain. The keeper uses bounded exact preflight alternatives and the model follows the same indexed candidates.
+
+Paid primary shapes mints, mint fees, the split and pack recipe, one authoritative book and the absence of a total position ceiling are preserved. Routine spending is funded by actual vault cash. The refill is sized from complete operation and exit scenarios, including a 90 day permission drift check; creator revenue is separate.
+
+**Current result and evidence: [Complete operating pass](COMPLETE-OPERATING-PASS.md).** That document is the current decision record and explains the precise receipt and simulation scope. The original O2 threshold still fails at 1,919,655 versus 1,750,000; O6 remains 0.0002 ETH. PR 2 remains draft, with no merge, public deployment or new outcome signature.
+
+Everything below is historical evidence for its named revision. Its proposed next steps and missing evidence statements are superseded by the current pass above.
+
+---
+
 # Efficient journal revision: candidate measured, economics blocked
 
 2026-11-18. The approved baseline and amended candidate passed: **517/540 transactions**, **27.869594973162081536/32 simulated ETH** aggregate value, 8.3 ETH funded once, no topups. The 199-transaction candidate required no repair. The owned 8559 node is restored to entry; 8557 is untouched. Code remains `aa38fab`.

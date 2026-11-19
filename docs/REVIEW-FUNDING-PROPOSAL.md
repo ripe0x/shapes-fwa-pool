@@ -1,3 +1,9 @@
+# Archived funding proposal
+
+The autonomous completion pass has implemented the harvesting rule and selected measured refill settings. Read [Complete operating pass](COMPLETE-OPERATING-PASS.md) for current decisions, actual cash and permission results, and remaining acceptance limits. The proposal below is preserved as historical context.
+
+---
+
 # Measured journal candidate and funding decision
 
 The owner-approved amended local candidate passed on the exact `aa38fab` source. Combined baseline/candidate usage is 517/540 transactions and 27.869594973162081536/32 simulated ETH aggregate value. Initial 8.3 ETH funding was not topped up. The 199-transaction candidate needed no repair, and restored the owned 8559 entry state. Quote selection is locally verified; operating acceptance remains blocked.

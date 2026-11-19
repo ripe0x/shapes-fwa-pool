@@ -66,29 +66,30 @@ library VaultLib {
     uint256 internal constant MAX_KEEPER_SHARE_BPS = 5_000;
     uint256 internal constant MAX_ALLOCATED_BOUND_BPS = 1_000;
     uint256 internal constant MAX_ROUTINE_CAP = 0.3 ether;
-    uint256 internal constant MAX_ROUTINE_RATE = 0.01 ether;
+    uint256 internal constant MAX_ROUTINE_RATE = 0.02 ether;
     uint256 internal constant MAX_ESSENTIAL_CAP = 0.1 ether;
     uint256 internal constant MAX_ESSENTIAL_RATE = 0.005 ether;
     uint256 internal constant MAX_PACK_UNITS = 30; // a first build from empty inventory fits EIP-7825 (audit E11)
     uint256 internal constant MIN_PACK_UNITS = 3;
     uint256 internal constant SHAPES_PER_MINT = 10;
 
-    /// Quoted gas schedule: a base per call plus a marginal amount per completed unit, from billed
-    /// gas on real receipts (keeper/measure_gas.py, docs/GAS.md). Each base sits at most at the
-    /// measured fixed cost of a call divided by 1.1, so splitting a job never earns a second base.
+    /// Fixed gas quotes from billed receipts (keeper/measure_gas.py, docs/GAS.md). The journal
+    /// always consumes its full bounded job; only a required checkpoint can pay for a foreign
+    /// tail. Fee collection has no independently paid entry point. These eligibility rules keep
+    /// callers from splitting work merely to collect additional bases.
     // One checkpoint per interval cannot be split, so it is quoted at measured billed gas.
     uint256 internal constant Q_CHECKPOINT = 360_000;
     uint256 internal constant Q_RESTOCK = 280_000;
     uint256 internal constant Q_PACK = 325_000; // createPack at the three-Shape reference size
-    uint256 internal constant Q_PACK_UNIT = 35_000; // each additional packed Shape
+    uint256 internal constant Q_PACK_UNIT = 100_000; // each additional packed Shape
     uint256 internal constant Q_MINT = 2_200_000; // one 0.1 ETH mint split ten ways (2.10M-2.26M by block)
     uint256 internal constant Q_LIST = 280_000;
     uint256 internal constant Q_LISTED = 825_000;
     uint256 internal constant Q_SYNC = 85_000;
-    uint256 internal constant Q_REQUIRED_TAIL = 110_000;
+    uint256 internal constant Q_REQUIRED_TAIL = 120_000;
     uint256 internal constant Q_DISTRIBUTION_PROOF = 80_000;
     uint256 internal constant Q_JOURNAL = 22_000; // each completed global acquisition
-    uint256 internal constant Q_SELECTED = 160_000; // own selection bookkeeping
+    uint256 internal constant Q_SELECTED = 180_000; // own selection bookkeeping
     uint256 internal constant Q_SYNCED = 120_000; // terminal or recovered return
     uint256 internal constant Q_PRUNED = 45_000; // resolved allocation head
     uint256 internal constant Q_POSITION_SYNC = Q_JOURNAL + Q_SELECTED + Q_SYNCED + Q_PRUNED;
@@ -101,8 +102,9 @@ library VaultLib {
     uint256 internal constant Q_RECOVERY_SHAPE = 35_000;
     uint256 internal constant Q_RECOVERY_UNSEAL = 70_000;
     uint256 internal constant Q_LIQ_SHAPE = 65_000;
-    uint256 internal constant Q_HARVEST = 125_000;
     uint256 internal constant Q_HARVESTED = 80_000; // per listing with fees claimed
+    uint256 internal constant Q_CREDIT = 40_000;
+    uint256 internal constant Q_FUND = 40_000;
     /// A 3-unit position (0.03 ETH pack + ~0.0363 backing): what request charges are scaled by.
     uint256 internal constant POSITION_VALUE = 0.0663 ether;
 
@@ -691,9 +693,18 @@ library VaultLib {
         delete b.receipts[id];
     }
 
-    function syncChanges(Params storage p, Book storage b, IFWAV2 f, IShapePacks packs,
+    function syncChanges(Params storage p, Budget storage budget, Book storage b, IFWAV2 f, IShapePacks packs,
         uint256[] calldata ids, uint256 checkpointMode, uint256 witnessId)
         external returns (uint256 gasQ, uint256 units)
+    {
+        bool distributionTail;
+        (gasQ, units, distributionTail) = _syncChanges(p, b, f, packs, ids, checkpointMode, witnessId);
+        if (gasQ != 0) gasQ = _fundSync(p, budget, b, f, ids, gasQ, units, distributionTail, witnessId);
+    }
+
+    function _syncChanges(Params storage p, Book storage b, IFWAV2 f, IShapePacks packs,
+        uint256[] calldata ids, uint256 checkpointMode, uint256 witnessId)
+        private returns (uint256 gasQ, uint256 units, bool distributionTail)
     {
         if (ids.length > MAX_TERMINALS) revert BadBatch();
         Work memory work;
@@ -709,7 +720,7 @@ library VaultLib {
         work.pruned = prune(b, MAX_PRUNES);
         if (work.processed + work.resolved + work.pruned == 0 && !rebased) revert Nothing();
         // Rebase is unpaid. Empty-vault head cleanup also cannot consume its bootstrap cash.
-        if ((unexposed && b.trackedValue == 0) || work.processed + work.resolved + work.pruned == 0) return (0, 0);
+        if ((unexposed && b.trackedValue == 0) || work.processed + work.resolved + work.pruned == 0) return (0, 0, false);
         bool journalPaid = work.processed == MAX_JOURNAL || work.own + work.resolved != 0;
         bool requiredTail;
         uint256 tailBase = Q_REQUIRED_TAIL;
@@ -722,10 +733,61 @@ library VaultLib {
             }
             requiredTail = journalPaid;
         }
-        if (!journalPaid && work.own + work.resolved + work.pruned == 0) return (0, 0);
+        if (!journalPaid && work.own + work.resolved + work.pruned == 0) return (0, 0, false);
         gasQ = (requiredTail ? tailBase : Q_SYNC) + (journalPaid ? work.processed * Q_JOURNAL : 0) + work.own * Q_SELECTED
             + work.resolved * Q_SYNCED + work.pruned * Q_PRUNED;
         units = work.resolved;
+        distributionTail = requiredTail && checkpointMode == 2;
+    }
+
+    /// @dev Terminal proceeds arrive first. Only real paid work may sweep economical credit or
+    ///      claim the first bounded fee prefix needed to fund its complete payment envelope.
+    function _fundSync(Params storage p, Budget storage budget, Book storage b, IFWAV2 f,
+        uint256[] calldata ids, uint256 gasQ, uint256 units, bool distributionTail, uint256 witnessId)
+        private returns (uint256)
+    {
+        (uint256 routine,) = budgetNow(p, budget);
+        uint256 cost = quote(p, gasQ, units, false);
+        if (routine < cost) return gasQ;
+        uint256 credit = f.feeCredit(address(this));
+        uint256 combined = quote(p, gasQ + Q_CREDIT, units, false);
+        if (credit != 0 && combined <= routine && (combined - cost) * BPS <= credit * p.keeperShareBps
+            && (!distributionTail || _distributionTail(p, b, f, witnessId, gasQ + Q_CREDIT))) {
+            _withdrawCredit(b, f);
+            gasQ += Q_CREDIT;
+            cost = combined;
+            credit = 0;
+        }
+        uint256 free = ISyncVault(address(this)).freeEth();
+        if (free >= cost) return gasQ;
+        uint256[] memory claims = new uint256[](ids.length);
+        uint256 count;
+        uint256 fees = credit;
+        for (uint256 i; i < ids.length; ++i) {
+            uint256 id = ids[i];
+            if (b.positions[id].state != ACTIVE || listing(f, id).status != LISTING_ACTIVE) continue;
+            bool duplicate;
+            for (uint256 j; j < count; ++j) if (claims[j] == id) duplicate = true;
+            if (duplicate) continue;
+            uint256 pending = f.pendingFees(id);
+            if (pending == 0) continue;
+            claims[count++] = id;
+            fees += pending;
+            uint256 fundedGas = gasQ + Q_FUND + count * Q_HARVESTED + (credit != 0 ? Q_CREDIT : 0);
+            combined = quote(p, fundedGas, units, false);
+            if (free + fees < combined) continue;
+            // Once enough cash was found, extra IDs cannot increase the claim or its payment.
+            if (combined > routine || (combined - cost) * BPS > fees * p.keeperShareBps
+                || (distributionTail && !_distributionTail(p, b, f, witnessId, fundedGas))) return gasQ;
+            assembly ("memory-safe") { mstore(claims, count) }
+            uint256 before = address(this).balance;
+            if (!_claimFees(b, f, claims)) return gasQ;
+            if (credit != 0) _withdrawCredit(b, f);
+            uint256 received = address(this).balance - before;
+            if (free + received < combined || (combined - cost) * BPS > received * p.keeperShareBps) revert Payment();
+            return fundedGas;
+        }
+        return gasQ;
     }
 
     function _distributionTail(Params storage p, Book storage b, IFWAV2 f, uint256 witnessId, uint256 gasQ)
@@ -854,15 +916,16 @@ library VaultLib {
         returnPack(b, id, owned);
     }
 
-    function harvest(Book storage b, IFWAV2 f, uint256[] calldata ids) external returns (uint256 n) {
+    function harvest(Book storage b, IFWAV2 f, uint256[] calldata ids) external {
         if (ids.length > MAX_BATCH) revert BadBatch();
-        uint256 eligible;
         for (uint256 i; i < ids.length; ++i) {
             if (i != 0 && ids[i] <= ids[i - 1]) revert BadBatch();
-            Position memory p = b.positions[ids[i]];
-            IFWAView.Listing memory l = listing(f, ids[i]);
-            if (p.state == ACTIVE && l.status == LISTING_ACTIVE && f.pendingFees(ids[i]) != 0) ++eligible;
         }
+        _claimFees(b, f, ids);
+        if (f.feeCredit(address(this)) != 0) _withdrawCredit(b, f);
+    }
+
+    function _claimFees(Book storage b, IFWAV2 f, uint256[] memory ids) private returns (bool claimed) {
         b.controlled = true;
         if (ids.length != 0) {
             try f.claimListingFees(ids) {
@@ -870,16 +933,19 @@ library VaultLib {
                     IFWAView.Listing memory l = listing(f, ids[i]);
                     if (b.positions[ids[i]].state == ACTIVE && l.status == LISTING_ACTIVE) updateFeeDebt(b, ids[i], l.feeDebt);
                 }
-                n = eligible;
+                claimed = true;
             } catch {}
         }
-        if (f.feeCredit(address(this)) != 0) f.withdrawEarnings();
         b.controlled = false;
     }
 
     function harvestCredit(Book storage b, IFWAV2 f) external {
+        if (f.feeCredit(address(this)) != 0) _withdrawCredit(b, f);
+    }
+
+    function _withdrawCredit(Book storage b, IFWAV2 f) private {
         b.controlled = true;
-        if (f.feeCredit(address(this)) != 0) f.withdrawEarnings();
+        f.withdrawEarnings();
         b.controlled = false;
     }
 

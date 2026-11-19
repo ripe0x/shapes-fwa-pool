@@ -1,3 +1,9 @@
+# Current completion status
+
+The integrated operating pass and final evidence are in [Complete operating pass](COMPLETE-OPERATING-PASS.md). This supersedes the implementation and evidence gaps described in the historical review sections below to the extent explicitly measured there. The original O2 failure and need for a new outcome acceptance remain visible. No historic signature approves this candidate.
+
+---
+
 # Efficient journal revision in progress
 
 2026-11-18. Current scope and measured limits: `EFFICIENT-JOURNAL-RESULTS.md`.

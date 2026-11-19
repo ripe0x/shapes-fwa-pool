@@ -70,7 +70,7 @@ contract PackVault is ReentrancyGuard {
     // Operation 4 (staged activation) is retired; policy identifiers remain stable.
     uint256 internal constant OP_UNLIST = 5;
     uint256 internal constant OP_LIQUIDATE = 6;
-    uint256 internal constant OP_HARVEST = 7;
+    // Operation 7 (standalone paid harvest) is retired; caller-funded collection remains.
     uint256 internal constant OP_CHECKPOINT = 8;
     uint256 public constant MAX_WORK_FEE = VaultLib.MAX_WORK_FEE; // per unit of work (D55, D56)
     /// Spending budgets: capacity and refill per day, maxima in bytecode (D56).
@@ -333,7 +333,7 @@ contract PackVault is ReentrancyGuard {
         if (block.timestamp / INTERVAL != lastCheckpointInterval) {
             checkpointMode = pendingDepositTotal != 0 || lockedShares != 0 ? 1 : params.distributionBps != 0 ? 2 : 0;
         }
-        (uint256 gasQ, uint256 units) = VaultLib.syncChanges(params, book, fwa, packs, listingIds, checkpointMode, witnessId);
+        (uint256 gasQ, uint256 units) = VaultLib.syncChanges(params, _budget, book, fwa, packs, listingIds, checkpointMode, witnessId);
         return _pay(OP_SYNC, gasQ, units, false, minPay, type(uint256).max);
     }
 
@@ -373,17 +373,14 @@ contract PackVault is ReentrancyGuard {
         return _pay(OP_UNLIST, VaultLib.Q_UNLIST + moved * VaultLib.Q_UNLISTED, moved, essential, minPay, type(uint256).max);
     }
 
-    /// @notice Pull FWA fees into the vault: pending fees of `activeIds` (they keep earning) and
-    ///         credited fees of resolved listings. Paid only if the pay is a small share of it.
-    ///         Gas is quoted only for the vault's own listings that had fees to claim.
+    /// @notice Caller-funded fee collection. Paid collection is limited to necessary funding of
+    ///         verified sync work; holders can collect earlier without spending the vault's margin.
     function harvest(uint256[] calldata activeIds, uint256 minPay) external nonReentrant returns (uint256) {
+        if (minPay != 0) revert Payment();
         uint256 before = address(this).balance;
-        uint256 n = VaultLib.harvest(book, fwa, activeIds);
-        uint256 amount = address(this).balance - before;
-        if (amount == 0) revert Nothing();
-        // Optional work: paid only when the quote is at most keeperShareBps of the fees collected.
-        uint256 g = VaultLib.Q_HARVEST + n * VaultLib.Q_HARVESTED;
-        return _pay(OP_HARVEST, g, 0, false, minPay, _quote(g, 0, false) * BPS > amount * params.keeperShareBps ? 0 : type(uint256).max);
+        VaultLib.harvest(book, fwa, activeIds);
+        if (address(this).balance == before) revert Nothing();
+        return 0;
     }
 
     function _harvest() internal {

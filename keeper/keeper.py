@@ -280,9 +280,10 @@ def read_state(vault, slowdown, burn=False):
     reserves = pending + num(at(vault, "redemptionReserve()(uint256)")) + \
         num(at(vault, "distributionReserve()(uint256)")) + num(at(vault, "claimableTotal()(uint256)")) + processing_pool
     locked = num(at(vault, "lockedShares()(uint256)"))
+    supply = num(at(vault, "totalShares()(uint256)"))
     owed = 0
     if locked:
-        owed = -(-locked * num(at(vault, "lastNav()(uint256)")) // num(at(vault, "totalShares()(uint256)")))
+        owed = -(-locked * num(at(vault, "lastNav()(uint256)")) // supply)
     tokens = read_tokens(vault, index.token_candidates(policy.MAX_BATCH["tokens"]) if burn else [], head)
     state = policy.State(
         now=now, gas_price=base_fee + tip, base_fee=base_fee, gas_ceiling=ceiling,
@@ -296,7 +297,7 @@ def read_state(vault, slowdown, burn=False):
         recovery_packs=num(at(vault, "recoveryPackCount()(uint256)")),
         loose_shapes=num(at(vault, "looseShapeCount()(uint256)")),
         free=max(0, balance - reserves), idle_eth=num(at(vault, "idleEth()(uint256)")), owed_estimate=owed,
-        pending_deposits=pending, locked_shares=locked, pack_units_mask=mask,
+        pending_deposits=pending, locked_shares=locked, total_shares=supply, pack_units_mask=mask,
         essential_ceiling=ess_ceiling, essential_cap=_ec, processing_pool=processing_pool,
         fee_credit=num(at(FWA, "feeCredit(address)(uint256)", vault)),
         open_positions=num(at(vault, "openListingCount()(uint256)")), active_count=total[3], witness_id=witness,
@@ -435,6 +436,11 @@ def refresh_after_race(operation, reason, benign, refreshed):
     return False
 
 
+def plan_key(step):
+    """Declining one funding prefix must not suppress every other bounded sync candidate."""
+    return (step[0], tuple(step[1]), step[2]) if step[0] == "sync" else (step[0],)
+
+
 def run_pass(a, tm):
     """One pass: settle any in-flight transaction, then plan, preflight and send one call at a
     time, waiting for each receipt and re-reading the chain before choosing the next."""
@@ -466,7 +472,7 @@ def run_pass(a, tm):
             break
         if had_pending:
             state = stable_read_state(a.vault, a.slowdown_volume, a.burn_tokens)
-        steps = [st for st in policy.plan(state) if st[0] not in skip]
+        steps = [st for st in policy.plan(state) if plan_key(st) not in skip]
         codes = policy.status(state)  # from the full plan: skips in this pass are this keeper's choice
         HEALTH.update(block=head, status=codes + declined, policy=policy_info(a.vault))
         if sent == 0:
@@ -492,7 +498,7 @@ def run_pass(a, tm):
             if refresh_after_race(step[0], why, benign, refreshed):
                 print(f"refresh {step[0]}: {why}; reindexing and quoting at a new pinned block")
                 continue
-            skip.add(step[0])
+            skip.add(plan_key(step))
             if benign:
                 if step[0] in ("restock", "list") and why in txm.ADMISSION_WAIT:
                     declined.append(("ADMISSION_WAIT", "wait", "live FWA listing admission changed; retry after its backlog/economics changes"))
@@ -516,11 +522,13 @@ def run_pass(a, tm):
         cost_, need, accepted = profitability_gate(est, bid, pay, a.fail_rate_bps, a.min_return_bps,
                                                   max_loss, billed_ratio(tm, step[0]))
         if not accepted and step[0] != "burnTokens":  # burns are the operator's opt-in cost
-            skip.add(step[0])
+            skip.add(plan_key(step))
             tm.state["stats"]["skipped_loss"] += 1
             # Liability work this keeper declined: holders wait on it, so monitoring must see it.
-            declined.append(("LIABILITY_WORK_SKIPPED", "action",
-                             f"{step[0]} needs --max-loss-wei >= {cost_ - pay} or lower gas"))
+            alternatives = step[0] == "sync" and any(st[0] == "sync" for st in steps[1:])
+            if not alternatives:
+                declined.append(("LIABILITY_WORK_SKIPPED", "action",
+                                 f"{step[0]} needs --max-loss-wei >= {cost_ - pay} or lower gas"))
             print(f"skip {step[0]}: pay {pay} wei < cost ~{need} wei beyond --max-loss-wei {max_loss}")
             continue
         # minPay: pay and this keeper's gas both move with basefee, so the floor is relative: 80% of
@@ -531,14 +539,14 @@ def run_pass(a, tm):
         # revert is not sent. A state change between this check and inclusion can still revert it.
         est2, why2, _ = tm.preflight(a.vault, args, fees)
         if est2 is None:
-            skip.add(step[0])
+            skip.add(plan_key(step))
             tm.state["stats"]["skipped_expected"] += 1
             print(f"skip {step[0]}: the signed call would revert ({why2})")
             continue
         if est2 > est and step[0] != "burnTokens":
             signed_cost = execution_cost(est2, bid, a.fail_rate_bps, billed_ratio(tm, step[0]))
             if pay + max_loss < signed_cost * (10_000 + a.min_return_bps) // 10_000:
-                skip.add(step[0])
+                skip.add(plan_key(step))
                 tm.state["stats"]["skipped_loss"] += 1
                 print(f"skip {step[0]}: signed-call cost ~{signed_cost} exceeds accepted payment/loss")
                 continue
@@ -554,7 +562,11 @@ def run_pass(a, tm):
         last = tm.state["counted"][-1] if tm.state["counted"] else None
         if last and last["label"] == step[0] and not last["status"]:
             failed += 1
-            skip.add(step[0])
+            skip.add(plan_key(step))
+        elif last and last["status"]:
+            skip.clear()  # Successful work changes funding and candidate eligibility.
+            declined[:] = [entry for entry in declined if not
+                           (entry[0] == "LIABILITY_WORK_SKIPPED" and entry[2].startswith(step[0] + " "))]
     if tm:
         tm.save()
         HEALTH.update(pending=tm.state["pending"], stats=tm.state["stats"], errors=tm.state["errors"][-5:],

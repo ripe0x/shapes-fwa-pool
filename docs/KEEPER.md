@@ -1,6 +1,8 @@
 # Keeper operations and recovery
 
-Locally measured calibration candidate: journal 22,000/record; required holder-tail base 110,000; actual qualified distribution-only proof 80,000; ordinary sync base 85,000. No proof payment for full/own jobs, failed eligibility or unexposed advancement. All 24 candidate journal rows pass the ordinary preflight gate and show positive calibration-receipt net; signed 80% estimates are separately recorded. Current receipts are in `receipts/efficient-journal-candidate-summary.json`; baseline context is `receipts/efficient-journal-baseline-and-candidate.md`. Successful-foreign receipts remain missing. Q_PACK remains 325,000.
+Current operation is documented in [Complete operating pass](COMPLETE-OPERATING-PASS.md). The final journal schedule is 22,000 per record,120,000 for a required tail,80,000 for its qualified distribution proof and 85,000 for an ordinary sync. Own selections quote 180,000. Actual successful foreign and full holder checkpoint receipts include signed 80% minimum payments and ordinary profitability preflight.
+
+Standalone `harvest` is unpaid. Eligible sync may sweep economical credit or claim only the active fee prefix needed to fund its completed work. The ordinary keeper tries the basic sync first, then bounded funding prefixes through exact contract preflight. Declining one prefix does not discard the operation. Full exits collect fees through unlisting and checkpoint; a cheaper manual partial redemption claim remains available.
 
 `keeper/keeper.py` executes one operation, checks its receipt, then replans. `policy.py` owns the
 economic decisions and is imported by the simulation. `tx.py` retains nonce, replacement, restart,
@@ -47,14 +49,14 @@ a bounded candidate set. Complete portfolio getters are absent from the producti
 | --- | --- |
 | `restock(units, backingProposals, minPay)` | allowed pack size; at most 30 total new units; actual proposed funding plus maintained waiting-inventory funding |
 | `list(backingProposals, minPay)` | at most 8 proposals, each an unused 10,000 wei multiple inside the live target interval and every economic gate |
-| `sync(ids, witnessId, minPay)` | automatic job: at most 128 global records, 16 actual own selections, 16 supplied terminal IDs and 16 pruned heads; independent bounds |
+| `sync(ids, witnessId, minPay)` | automatic job: at most 128 global records, 16 actual own selections, 16 supplied terminal or active funding IDs and 16 pruned heads; independent bounds |
 | `checkpoint(witnessId, minPay)` | one authenticated live fee witness when active count is nonzero; complete journal, no receipts, clean nonexpired allocation head, blackout and drained requests |
 | `unlist(ids, minPay)` / `harvest(ids, minPay)` | at most 16 IDs; harvest IDs strictly ascending; crown exit protection remains |
 | `liquidate(maxCount, minPay)` | at most 16 items and 30 ordinary backing units; oversized gifts use an isolated claim of at most 30 Shapes |
 | `burnTokens(ids)` | at most 16 candidates; unpaid; stale IDs cannot block credit withdrawal and burning |
 
 Operation identifier 4 (old staged activation) is retired. New admission atomically requires an
-ordinary Active listing, even after a drained-queue precheck. Other operation identifiers retain
+ordinary Active listing, even after a drained-queue precheck. Operation7, standalone paid harvesting, is also retired. Other operation identifiers retain
 meaning. An unconsumed old identifier is retired before its returned pack can be reused.
 
 When authoritative onchain aggregates prove no outstanding FWA exposure, checkpoint and first

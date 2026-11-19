@@ -352,7 +352,7 @@ contract ForkKeeperPayTest is ForkBase {
         vm.prank(owner);
         vm.expectRevert(PackVault.OutOfBounds.selector);
         vault.setParams(up);
-        up.routineRate = 0.01 ether + 1;
+        up.routineRate = 0.02 ether + 1;
         up.routineCap = 0.3 ether;
         vm.prank(owner);
         vm.expectRevert(PackVault.OutOfBounds.selector);
@@ -362,6 +362,31 @@ contract ForkKeeperPayTest is ForkBase {
         setCaps(0.001 ether, q.essentialCap);
         (r,) = vault.budget();
         assertEq(r, 0.001 ether, "lowered cap clamps the level");
+    }
+
+    function test_newRoutineRateCeilingOnlyRefillsPermission() public {
+        VaultLib.Params memory p = vault.getParams();
+        p.routineCap = 0;
+        vm.prank(owner); vault.setParams(p);
+        p.routineCap = 0.1 ether; p.routineRate = 0.02 ether;
+        uint256 cash = address(vault).balance;
+        vm.prank(owner); vault.setParams(p);
+        (uint256 routine, uint256 essential) = vault.budget();
+        assertEq(routine, 0, "raising the ceiling grants no immediate spending permission");
+        assertEq(vault.getParams().routineRate, 0.02 ether);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
+        (routine,) = vault.budget();
+        assertEq(routine, 0.02 ether);
+        assertEq(address(vault).balance, cash, "refill creates permission, never ETH");
+        vm.warp(vm.getBlockTimestamp() + 10 days);
+        (routine, essential) = vault.budget();
+        assertEq(routine, p.routineCap, "capacity remains independently bounded");
+        assertEq(essential, p.essentialCap, "routine rate does not change essential capacity");
+        assertEq(address(vault).balance, cash);
+        p.routineRate = 0.02 ether + 1;
+        vm.expectRevert(PackVault.OutOfBounds.selector);
+        vm.prank(owner); vault.setParams(p);
+        assertEq(vault.getParams().routineRate, 0.02 ether, "over-limit change is atomic");
     }
 
     /// 8 (essential): routine work cannot use the essential budget: with routine empty, unwinding

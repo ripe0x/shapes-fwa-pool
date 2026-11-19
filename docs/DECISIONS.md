@@ -998,3 +998,24 @@ ten-way splitting, recipes and creator fees; execution savings alone do not redu
 Bid settlement events now independently identify returned packs, with historical upgrade replay,
 retained unseen selections, independent expiry/OWED discovery and canonical rollback checks.
 This index supplies candidates, not completeness or accounting authority.
+
+
+## D70. Fee collection follows verified work (engineering, 2026-11-18)
+
+The owner asked to finish the remaining design and implementation autonomously in one integrated pass. Keep one vault and the incremental book, preserve primary mint revenue, and resolve harvesting, recurring funding and verification together.
+
+Standalone harvesting is now caller funded. Positive minimum payment reverts, while zero retains manual fee collection. Verified paid sync may sweep economical credit and, only if its actual protected free cash remains insufficient, collect the first distinct active fee prefix that funds the completed job. The incremental fee collection quote must fit the existing fee share restraint and the whole payment must fit routine permission. Terminal proceeds arrive first. Distribution eligibility uses the full combined cost. No optional tail, duplicate, padding or empty call can create compensated collection.
+
+The keeper tries the ordinary sync and bounded funding alternatives through the contract's exact preflight. It sends the shortest profitable call and replans after the receipt. This avoids maintaining a separate approximate eligibility formula. Full exits collect fees through unlisting and checkpoint. A cheap manual partial redemption claim remains available.
+
+Required tail and own selection quotes become 120,000 and 180,000 after measurement. The ordinary base remains 85,000 and each journal record remains 22,000. New collection components are 40,000 for credit and 40,000 plus 80,000 per actual active fee claim. The extra shape slope becomes 100,000 after a signed four shape leftover receipt exposed underpayment. Three shape construction, mint, listing and checkpoint quotes remain unchanged. The original O2 failure remains explicit.
+
+## D71. Refill operating permission at the measured spending rate (engineering, 2026-11-18)
+
+The completed operation and exit model separates actual cash from permission. Larger initial buckets concealed a recurring deficit. The mainnet high activity case spends about 0.0155 ETH per day in the thirty day test, while the old hard maximum replenished 0.01 ETH per day. Raising capacity alone is temporary.
+
+Choose mainnet capacity 0.1 ETH with 0.02 ETH per day refill, and canary capacity 0.03 ETH with 0.01 ETH per day refill. Raise only the routine refill hard maximum from 0.01 to 0.02 ETH per day. Other hard caps, protected liabilities, mint fees and the routine gas ceiling remain unchanged. There is no minimum TVL or recurring creator subsidy.
+
+These are spending permissions, funded only by real unencumbered vault cash. They increase authorized maintenance outflow over time and do not create operating income. The larger vault's ninety day stress case pays every routine job, keeps permission near capacity at each monthly observation and completes the holder exit. Small vault losses and zero demand remain visible. Results are conditional engineering scenarios with explicit pool, volume, purchaser timing and caller gas inputs.
+
+No original acceptance threshold or outcome signature is silently changed. Current evidence and limits are in `COMPLETE-OPERATING-PASS.md`. PR 2 remains draft; this decision records implementation work, not a public deployment or merge.
