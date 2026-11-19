@@ -6,27 +6,14 @@ and is what `script/deploy.sh` checks before a public broadcast. Nothing is acce
 Requirement IDs are given with their meaning because "O1" and "O2" mean different things in
 `OWNER-REQUIREMENTS.md` and `asset-flow.json`.
 
-## A1. Holder return requirement fails at the canary's 2 ETH size
+## A1. Holder return at the canary's 2 ETH size (updated after D75)
 
-Requirement: OWNER-REQUIREMENTS A.3/A.8, B2 O1 (holder return ≥10% a year at trailing-30-day
-successful volume, tokens zero, every expense, 0.5 gwei). Measured at block 26,450,200, 360 days
-plus exit, 16 seeds, complete claims only:
-
-| Principal | Median | Mean | p10 | Losing seeds |
-|---|---:|---:|---:|---:|
-| 1.96 ETH (canary) | −5.3% | +5.3% | −67% | 9 of 16 |
-| 6.8 ETH | +76% | +75% | +34% | 1 of 16 |
-| 20 ETH | +49% | +50% | +18% | 0 of 16 |
-
-Cause: routine keeper pay for the shared FWA journal is about 1.5 ETH a year at 0.5 gwei whatever
-the vault's size; a 2 ETH vault's edge does not cover it. No small code correction changes that
-without cutting supported keeper pay, which the requirements forbid.
-
-| Option | Effect | Cost to holders |
-|---|---|---|
-| **Deploy the 2 ETH canary as an owner-funded functional test, reviewed after 14 days or 5 real selections** (recommended) | Proves live VRF timing, gas and keepers; economics are not expected to clear the hurdle at this size | about 0.06 ETH of routine pay over 14 days at 0.5 gwei; a full year's downside at p10 is −67% |
-| Raise the canary cap to about 7 ETH | Clears the hurdle in the model | more capital exposed before any live evidence |
-| Do not deploy | No exposure | none |
+Requirement: OWNER-REQUIREMENTS A.3/A.8, B2 O1. After the scan proof (D75), 400 seeds at 0.5 gwei:
+**median +40.5%, mean +62.7%, p10 −62%, 33% of years lose** (0.15 gwei: median +88%, 23.5% lose).
+The gate as defined (median) passes. The loss tail is selection luck at small size, not keeper
+cost. Decision for the owner: accept a third of canary years losing (up to about two thirds of
+principal at p5) as the price of a live test, or start larger (20 ETH, 32 seeds: 3% lose).
+Details: `docs/KEEPER-ECONOMICS.md`.
 
 ## A2. O2 construction expense exception (asset-flow O2, "what building costs holders")
 
