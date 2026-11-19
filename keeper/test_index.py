@@ -297,6 +297,58 @@ def exercise_vault_reorg(R):
     return result
 
 
+def rotation_tests(directory):
+    """More than sixteen authentic returned packs surface across bounded successive keeper
+    passes, with a process restart mid-rotation and a reorg (prefix rollback + replay) restoring
+    the same projection. Only the cached PositionUpdated book states are synthetic; the eighteen
+    allocation identifiers are unchanged mainnet records from one real depositor, as in
+    discovery_tests. No fabricated resolution events: the owed class is the one candidate class
+    that rotates by a persisted cursor, so successive passes need none."""
+    fixture = json.loads(Path(__file__).with_name("fixtures").joinpath("returned-events.json").read_text())
+    row = fixture["scale_rows"][0]
+    vault = row["depositor"]
+    ids = [int(log["topics"][2], 16) for log in row["older_allocations"] + [row["events"][0]["log"]]]
+    assert len(set(ids)) == 18 and len(ids) == 18, "authentic record set exceeds the per-class bound of 16"
+    path = directory / "rotation.sqlite"
+    start = 1
+    # Each real returned pack is an OWED (state=3) vault position awaiting reclaim.
+    owed_logs = [dict(pos(id_, state=3, backing=4 * 10**16 + i * 10_000, block=start, idx=i), address=vault)
+                 for i, id_ in enumerate(ids)]
+    book = I.EventIndex(path, 1, vault, start)
+    book.append(start, start, "rotation-prefix", owed_logs)
+
+    def one_pass(b):
+        active, due = b.candidates(16, 16)
+        assert not active and len(due) <= 16, (len(active), len(due))
+        return set(due)
+
+    seen = one_pass(book)
+    assert len(seen) == 16, seen  # first pass is bounded to the per-class quota
+    book.close()  # interrupted pass: restart the keeper process on the same file
+    book = I.EventIndex(path, 1, vault.upper(), start)
+    for _ in range(5):
+        seen |= one_pass(book)
+        if seen == set(ids):
+            break
+    assert seen == set(ids), "every authentic returned pack surfaces across bounded interrupted passes"
+
+    # Reorg: roll the committed prefix back, replay the retained events, the same projection resumes.
+    before = {r["id"]: r["state"] for r in book.db.execute("SELECT id,state FROM positions")}
+    book.rollback(start - 1)
+    assert not book.candidates(16, 16)[1], "rollback clears the owed projection and its rotation cursor"
+    book.append(start, start, "rotation-prefix", owed_logs)
+    assert {r["id"]: r["state"] for r in book.db.execute("SELECT id,state FROM positions")} == before
+    replayed = set()
+    for _ in range(5):
+        replayed |= one_pass(book)
+        if replayed == set(ids):
+            break
+    assert replayed == set(ids), "reorg replay restores the same full returned set across passes"
+    book.close()
+    print("keeper discovery: >16 authentic returned packs surface across bounded interrupted passes; "
+          "reorg replay restores the projection: pass")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--canonical-read-check", action="store_true", help="also check discovery-hash repair against real Tenderly block hashes")
@@ -304,3 +356,4 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as d:
         projection_tests(Path(d))
         discovery_tests(Path(d), options.canonical_read_check)
+        rotation_tests(Path(d))

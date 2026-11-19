@@ -240,6 +240,33 @@ contract CompleteForeignJournalTest is SelectionBase {
         _assertExposure();
     }
 
+    /// @notice The largest authentically reachable single sync (goal 2 base / goal 3): a full
+    ///         128-record foreign journal in one call. Measures receipt-equivalent gas (cold
+    ///         state) under the normal transaction limit and asserts the keeper's padded estimate
+    ///         fits EIP-7825. The 16 own transitions a maximal sync could add are not authentically
+    ///         reachable (no real VRF burst selects 17 vault listings); their gas is bounded
+    ///         analytically in docs/receipts/allocation-burst-coverage.md, never measured here.
+    function test_full128ForeignJournalSyncReceiptGasFitsCap() public {
+        _replayForeignHistory(); _threeDeadlineRefunds();
+        vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
+        bytes memory input = abi.encodeCall(PackVault.sync, (new uint256[](0), 0, uint256(1)));
+        uint256 intrinsic = 21_000;
+        for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
+        // Receipt-equivalent: cold every contract the sync touches, as a mined transaction would.
+        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(vault.keeperPolicy()));
+        vm.cool(address(FWA)); vm.cool(address(PACKS)); vm.cool(keeper);
+        vm.prank(keeper);
+        uint256 g = gasleft();
+        (bool ok, bytes memory ret) = address(vault).call(input);
+        uint256 used = g - gasleft() + intrinsic;
+        if (!ok) assembly ("memory-safe") { revert(add(ret, 32), mload(ret)) }
+        emit log_named_uint("full 128-record foreign journal sync receipt-equivalent gas", used);
+        emit log_named_uint("full 128-record foreign journal sync pay wei", abi.decode(ret, (uint256)));
+        assertEq(vault.acquisitionCursor(), uint256(begin) + 128, "one call drains the full 128-record journal");
+        _assertExposure();
+        assertLt((used * 125 + 99) / 100, 16_777_216, "128-record journal plus 25% keeper gas margin fits EIP-7825");
+    }
+
     function test_125SuccessfulForeignRequiredTail() public {
         _replayForeignHistory(); _paidTail(125);
     }

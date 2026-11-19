@@ -1,0 +1,58 @@
+{
+ "description": "Full-history VRF selection scan (sim/find_selection.py, count=30 vault listings) over FWA acquisition logs. Each candidate is a real acquisition request whose real VRF word selects a vault listing when the vault posts 30 listings just before the request AND the acquisition queue is empty at the request AND no listing activates/reprices/leaves between the vault insertion and the selection (find_selection DISRUPT guard).",
+ "total_candidates": 47,
+ "block_span": [
+  26165373,
+  26417086
+ ],
+ "block_span_size": 251713,
+ "busiest_day_acquisitions": 11817,
+ "closest_five_consecutive_candidate_gaps_blocks": [
+  {
+   "gap_blocks": 17,
+   "req_block_a": 26311241,
+   "req_block_b": 26311258,
+   "purchaser_a": "0x7b3748e8e35fd1f1f6fc7656494de4bc6c61a888",
+   "purchaser_b": "0x31963b060d71ee24a6d458b75aa85e63b99bd7fb",
+   "same_purchaser": false
+  },
+  {
+   "gap_blocks": 68,
+   "req_block_a": 26264119,
+   "req_block_b": 26264187,
+   "purchaser_a": "0xf305bfda7af48e3cb6218f3f4aa9595cfb15a523",
+   "purchaser_b": "0xf305bfda7af48e3cb6218f3f4aa9595cfb15a523",
+   "same_purchaser": true
+  },
+  {
+   "gap_blocks": 125,
+   "req_block_a": 26214167,
+   "req_block_b": 26214292,
+   "purchaser_a": "0x48aae1669d4cf7988a227b3d68d9d6e9f02840ee",
+   "purchaser_b": "0x48aae1669d4cf7988a227b3d68d9d6e9f02840ee",
+   "same_purchaser": true
+  },
+  {
+   "gap_blocks": 204,
+   "req_block_a": 26308178,
+   "req_block_b": 26308382,
+   "purchaser_a": "0x6330cdfe9ab3b9f9600f61f9ef5c06477bfd8d58",
+   "purchaser_b": "0x5ec19b48741322ec4c54fd642ffc7ed306ef4a4c",
+   "same_purchaser": false
+  },
+  {
+   "gap_blocks": 218,
+   "req_block_a": 26385033,
+   "req_block_b": 26385251,
+   "purchaser_a": "0x4de365ea3b8e94f30b4d5bfd9d89fae323bee55d",
+   "purchaser_b": "0x4de365ea3b8e94f30b4d5bfd9d89fae323bee55d",
+   "same_purchaser": true
+  }
+ ],
+ "why_17_own_selections_unreachable": [
+  "Each candidate requires the FWA acquisition queue EMPTY at the request so the vault inserted listings activate deterministically into known slots; with a non-empty queue FWA private staging FIFO reorders activation and the slot/weight the VRF word selects against cannot be reconstructed or controlled.",
+  "A journal accumulating 17 own selections needs 17 real acquisitions each selecting a distinct vault listing within ONE pinned fork pre-state, the vault holding all its listings active across the whole burst with no intervening sync and no disrupting listing event.",
+  "The 47 candidates over 251713 blocks are sparse and each is single-selection, queue-empty; the closest consecutive pair is 17 blocks apart with different purchasers and disrupting listing activity between them (that disruption is exactly why find_selection emits them as separate candidates). No 17-request burst meeting the exact-weight, queue-empty, no-disruption constraints exists in real history.",
+  "vm.createSelectFork re-forks and drops local state, so candidates at different blocks cannot be chained onto one fork; the suite is single-fork replay by design (AGENTS.md: never vm.transact)."
+ ]
+}
