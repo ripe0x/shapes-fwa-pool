@@ -24,6 +24,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -126,13 +127,13 @@ class Keeper:
     """One keeper worker: the production container, or the same command as a host process."""
 
     def __init__(self, name, keystore, password, data, image, rpc=RPC, poll=5, health=8788):
-        self.name, self.keystore, self.password, self.data, self.image, self.rpc, self.poll, self.health = \
+        self.name, self.keystore, self.password, self.data, self.image, self.rpc, self.poll, self.health_port = \
             name, keystore, password, data, image, rpc, poll, health
         self.proc = None
 
     def start(self):
         env = dict(os.environ, VAULT=VAULT, RPC_URL=self.rpc, POLL_SECONDS=str(self.poll), KEEPER_ARGS="",
-                   HEALTH_PORT=str(self.health),
+                   HEALTH_PORT=str(self.health_port),
                    KEEPER_KEYSTORE_JSON=Path(self.keystore).read_text(), KEEPER_KEYSTORE_PASSWORD=self.password)
         if self.image:  # values travel as inherited environment, never in argv
             sh("docker", "run", "-d", "--name", self.name, "--network", "host", "--mount",
@@ -145,7 +146,7 @@ class Keeper:
             self.proc = subprocess.Popen(["python3", "keeper/keeper.py", VAULT, "--send", "--keystore", self.keystore,
                                           "--password-file", self.password_file(), "--rpc", self.rpc,
                                           "--state", f"{self.data}/keeper-state.json", "--index", f"{self.data}/keeper-index.sqlite",
-                                          "--loop", str(self.poll), "--confirmations", "2", "--health-port", "0"],
+                                          "--loop", str(self.poll), "--confirmations", "2", "--health-port", str(self.health_port)],
                                          cwd=ROOT, stdout=self.log, stderr=subprocess.STDOUT)
 
     def password_file(self):
@@ -153,6 +154,15 @@ class Keeper:
         path.write_text(self.password)
         path.chmod(0o600)
         return path
+
+    def health(self):
+        """The worker's own /health answer (served on 127.0.0.1; 503 still carries the body)."""
+        try:
+            return json.loads(urllib.request.urlopen(f"http://127.0.0.1:{self.health_port}/health", timeout=5).read())
+        except urllib.error.HTTPError as e:
+            return json.loads(e.read())
+        except OSError:
+            return None
 
     def logs(self):
         if self.image:
@@ -169,9 +179,11 @@ class Keeper:
 
     def stored(self):
         """Saved transaction state and index head, read from the volume as a separate process."""
-        code = ("import json,sqlite3;s=json.load(open('/data/keeper-state.json'));"
+        code = ("import json,os,sqlite3\nif not os.path.exists('/data/keeper-state.json'): print('null'); raise SystemExit\n"
+                "s=json.load(open('/data/keeper-state.json'));"
                 "h=sqlite3.connect('/data/keeper-index.sqlite').execute('select max(end) from ranges').fetchone()[0];"
-                "print(json.dumps(dict(stats=s['stats'],pending=s['pending'],counted=len(s['counted']),head=h)))")
+                "c=[dict(label=e['label'],block=e['block'],status=e['status'],gas_used=e['gas_used'],pay=e['pay']) for e in s['counted']];"
+                "print(json.dumps(dict(stats=s['stats'],pending=s['pending'],counted=c,head=h)))")
         if self.image:
             out = sh("docker", "run", "--rm", "--mount", f"type=volume,source={self.data},target=/data",
                      "--entrypoint", "python3", self.image, "-c", code)
@@ -269,8 +281,23 @@ def main():
         dropped = rpc("eth_getTransactionReceipt", DropFirstSend.dropped[0])
         evidence["dropped_transaction_status"] = dropped and int(dropped["status"], 16)
         assert after["stats"]["mined"] >= before["stats"]["mined"] and after["head"] >= before["head"], "state or index lost"
-        assert after["stats"]["reverted"] == 0, "a keeper transaction reverted"
-        evidence["backup"] = backup.stored()
+        # The backup polls slowly and may find nothing to send; it must still complete clean passes.
+        wait_for("backup completes a clean pass", lambda: (h := backup.health()) is not None
+                 and h["block"] > 0 and h["pass_errors"] == 0, seconds=600)
+        evidence["backup"] = dict(stored=backup.stored(), health=backup.health())
+        # Two live keepers can race for the same work; the loser reverts and pays its gas. Any
+        # revert that is not a lost race (same operation mined by the other worker within 2 blocks)
+        # fails the rehearsal.
+        mine = (after or {}).get("counted", [])
+        other = ((evidence["backup"]["stored"] or {}).get("counted", []))
+        races = []
+        for a_, b_ in ((mine, other), (other, mine)):
+            for e in a_:
+                if not e["status"]:
+                    won = [x for x in b_ if x["status"] and x["label"] == e["label"] and abs(x["block"] - e["block"]) <= 2]
+                    assert won, f"a keeper transaction reverted without a race: {e}"
+                    races.append(dict(lost=e, won=won[0]))
+        evidence["lost_races"] = races
         keeper_nonce = num(cast("nonce", keys["primary"][2]))
         evidence["primary_nonce"] = keeper_nonce
         evidence["primary_sends_counted"] = after["stats"]["sent"]
