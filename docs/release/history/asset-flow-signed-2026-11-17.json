@@ -1,0 +1,142 @@
+{
+ "source_paths": [
+  "src",
+  "script",
+  "foundry.toml",
+  "deploy"
+ ],
+ "evidence_paths": [
+  "test/scenario/VaultFlow.t.sol",
+  "test/utils/FlowBreakdown.sol",
+  "test/fork/ForkSelection.t.sol",
+  "test/fork/ForkBase.sol",
+  "test/utils/TestVaultOps.sol"
+ ],
+ "scorecard_dir": "docs/receipts/flow",
+ "review_dir": "audit",
+ "required_regimes": [
+  "init",
+  "max_load",
+  "inactive_short",
+  "inactive_long",
+  "gas_spike",
+  "oracle_change",
+  "keeper_delay",
+  "withdrawals",
+  "settled_unclaimed",
+  "distributions",
+  "wind_down",
+  "acquire_bid",
+  "acquire_keep",
+  "acquire_silent",
+  "staged_activation",
+  "tokens"
+ ],
+ "drift_groups": [
+  [
+   "inactive_short",
+   "inactive_long"
+  ]
+ ],
+ "drift_threshold_bps": 500,
+ "test_command": "forge test --match-path test/scenario/VaultFlow.t.sol --rpc-url https://mainnet.gateway.tenderly.co --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100",
+ "outcomes": [
+  {
+   "id": "O1",
+   "text": "DRAFT. Where a bid ends: on a bid outcome the vault keeps the pack and the whole backing leaves (0.9 to the purchaser, 0.1 to FWA), the posted backing per selection (0.0333 to 0.0360 ETH at canary values, D62; 0.0363 in this regime); the vault's edge is the fee share it keeps.",
+   "metric": "destinations.backing to purchaser and FWA on a bid",
+   "max_wei": "40000000000000000",
+   "regimes": [
+    "acquire_bid",
+    "staged_activation"
+   ]
+  },
+  {
+   "id": "O2",
+   "text": "DRAFT. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling; 2 gwei for redemption and wind-down work) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint (quoted at measured gas, D61), 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; budgets cap all pay at 0.041 ETH a day; the owner can stop pay at once.",
+   "metric": "facts.keeper_gas_per_position",
+   "max": 1750000,
+   "regimes": [
+    "max_load"
+   ]
+  },
+  {
+   "id": "O3",
+   "text": "DRAFT. How it ends for holders: after wind-down each holder's claim equals their share of the vault's value to the wei (value priced before that checkpoint's keeper pay, which falls on the shares that stay), and no shares are left locked.",
+   "metric": "facts.holder_claim_gap_wei",
+   "max": 0,
+   "regimes": [
+    "wind_down"
+   ]
+  },
+  {
+   "id": "O4",
+   "text": "DRAFT. What is left at the end: only the dead-share seed slice remains in the vault, about 0.0105 ETH (the 0.01 ETH seed plus deploy-address dust).",
+   "metric": "facts.vault_eth_at_end_wei",
+   "max": 12000000000000000,
+   "regimes": [
+    "wind_down"
+   ]
+  },
+  {
+   "id": "O5",
+   "text": "DRAFT. Liabilities are never deployable (D32): escrowed deposits, redemption and distribution reserves and settled-but-unclaimed ETH never become spendable. Checked after every keeper call in every regime (the test fails otherwise) and measured here with an entitlement settled to claimable: spendable ETH above the unowed balance is 0 wei.",
+   "metric": "facts.spendable_over_unowed_wei",
+   "regimes": [
+    "settled_unclaimed"
+   ],
+   "max": 0
+  },
+  {
+   "id": "O6",
+   "text": "DRAFT. Can it stall and what restarts it (gas): no call is refused for gas price. Routine work is paid up to the 0.5 gwei ceiling; above it the keeper waits. Exit work (unlisting and liquidating for redemptions or wind-down) is unpaid at canary values (D64): withdrawers, or the owner in a wind-down, run it at their own gas, and redeemers pay no unwind charge. Checkpoints are paid from the request charges. A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid.",
+   "metric": "facts.checkpoint_pay_wei",
+   "max": 200000000000000,
+   "regimes": [
+    "gas_spike"
+   ]
+  },
+  {
+   "id": "O7",
+   "text": "DRAFT. FWA token rewards (D43): claimed and burned, never sold. Supply falls by exactly the claimed amount and the burn pays the caller no ETH, so holders pay no gas and get no token value.",
+   "metric": "facts.burn_paid_any_eth",
+   "max": 0,
+   "regimes": [
+    "tokens"
+   ]
+  },
+  {
+   "id": "O8",
+   "text": "DRAFT. Oracle failure cannot trap assets (D34): with FWA's floor oracle repointed so no quote can be read, nothing new lists unless FWA exempts the collection from its oracle (then no cap applies, D62), yet the kicked pack is back in inventory and a holder redeeming everything is paid (measured 0.9975 ETH of a 1 ETH deposit).",
+   "metric": "facts.redemption_paid_after_repoint_wei",
+   "regimes": [
+    "oracle_change"
+   ],
+   "min": 950000000000000000
+  },
+  {
+   "id": "O9",
+   "text": "DRAFT. What a holder pays if nothing is ever bought: entering, building, unwinding and exiting with zero acquisitions costs holders at most 1.5% of deposits (measured 0.46%: Shapes mint fees and keeper gas).",
+   "metric": "facts.holder_loss_bps",
+   "max": 150,
+   "regimes": [
+    "wind_down"
+   ]
+  },
+  {
+   "id": "O10",
+   "text": "DRAFT. A listing made while FWA's queue is busy would be staged and earn nothing. The vault refuses to list while the queue is busy (D62, audit B), so nothing it lists is staged; once the queue drains the relist goes in active.",
+   "metric": "facts.relist_active_after_drain",
+   "min": 1,
+   "regimes": [
+    "staged_activation"
+   ]
+  }
+ ],
+ "explained": [],
+ "approval": {
+  "outcomes_sha256": "452c764dd8e55493b945a931c872d56a461c3380159253a4ef067f8533ddf5d2",
+  "date": "2026-11-17",
+  "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgT10UwBigHu/hL3vKFUPPNoDIN6\n6Wsrnx17avHqp4qC8AAAAKYXNzZXQtZmxvdwAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gt\nZWQyNTUxOQAAAECR/pXtVSCvuIbhLboFaXRNU/lEf2ROnh+4c9mTDyLAUWZSAG0Ys3R6Hv\nl2O8L7IKvCfZRhDHdb9kTD/g2DeK8L\n-----END SSH SIGNATURE-----\n"
+ }
+}

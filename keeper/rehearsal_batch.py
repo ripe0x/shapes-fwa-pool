@@ -2,8 +2,10 @@
 """Prepare, or run an explicitly owner-approved local-only integration rehearsal.
 
 --plan only prints the complete proposed batch. --execute-approved-local-batch is an execution
-entry point, not approval: the operator must obtain the owner's bounded approval beforehand.
+entry point, not approval: the operator must hold the owner's authority for a local campaign.
 No keys are created. Six fresh label-derived actors use Anvil impersonation on our own process.
+The fork block is a fresh pin for each campaign (--fork-block, recorded with its hash); the
+historical default 26,418,539 is the 2026-11-18 campaign.
 """
 import argparse
 import hashlib
@@ -19,9 +21,10 @@ from pathlib import Path
 from eth_utils import keccak, to_checksum_address
 
 ROOT = Path(__file__).resolve().parent.parent
-RPC = "http://127.0.0.1:8557"
+PORT = int(os.environ.get("PACK_VAULT_LOCAL_PORT", 8557))
+RPC = f"http://127.0.0.1:{PORT}"
 FORK_RPC = "https://mainnet.gateway.tenderly.co"
-FORK_BLOCK = 26_418_539
+FORK_BLOCK = int(os.environ.get("PACK_VAULT_FORK_BLOCK", 26_418_539))
 MAX_GAS = 16_777_216
 CODE_SIZE = 24_576
 ACTOR_ETH = 10 * 10**18
@@ -31,6 +34,7 @@ ORACLE = "0xaA4D9009a4664604b57644bF13e447E9036727DC"
 ORACLE_OWNER = "0x9306342f408185180987bBe69B5AFDCaD5e971b4"  # pinned deployed owner(), read 2026-11-18
 ENV_MANIFEST = "PACK_VAULT_LOCAL_BATCH"
 CURRENT_DEPLOYMENT = None
+PHASES = None
 SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
 
@@ -70,8 +74,8 @@ def values(calibration=False):
 
 def plan():
     return dict(
-        name="position-integration-local-26418539", endpoint=RPC, chain_id=1,
-        node_command=["anvil", "--host", "127.0.0.1", "--port", "8557", "--accounts", "0", "--silent",
+        name=f"position-integration-local-{FORK_BLOCK}", endpoint=RPC, chain_id=1,
+        node_command=["anvil", "--host", "127.0.0.1", "--port", str(PORT), "--accounts", "0", "--silent",
                       "--fork-url", FORK_RPC, "--fork-block-number", str(FORK_BLOCK), "--fork-retry-backoff", "5000",
                       "--retries", "30", "--base-fee", "150000000",
                       "--code-size-limit", str(CODE_SIZE), "--gas-limit", str(MAX_GAS), "--enable-tx-gas-limit"],
@@ -83,7 +87,7 @@ def plan():
         phase_isolation="evm_snapshot/revert reuses the single funded baseline between phases; no second balance credit",
         phases=[
             "Fresh production script/deploy.sh deployment and postflight; 2ETH canary lifecycle using normal keeper/index, restart, tokens/burn, oracle kick, policy swap, gas spike, redemption, wind-down",
-            "Fresh production deployment for fixed-block quiet lifecycle (rehearse_current.py --expected-fork-block26418539), same2ETH canary values and budgets; restart normal keeper; full holder roundtrip",
+            "Fresh production deployment for the holder workflow and a separate owner wind-down (rehearse_current.py), selected canary values and budgets; restart normal keeper; holder-run exits with loss limits",
             "Fresh12ETH test-only calibration vault, same budgets; <=6ETH deposits by each of two holders; masks3+30; max16 listing/unlisting/harvest/token/sync items, total30Shapes restock/liquidation, exact fee witness checkpoints",
             "Genuine external FWA acquire requests in bounded batches, expire through real processor, measure1/16 refunded global journal entries and higher gas; withdraw actual refund; no fabricated VRF success",
         ],
@@ -101,7 +105,7 @@ def load_manifest():
     if m["endpoint"] != RPC or m["fork_block"] != FORK_BLOCK or m["max_gas"] != MAX_GAS:
         raise RuntimeError("local batch boundaries changed")
     # PID ownership prevents treating an arbitrary loopback proxy or unrelated Anvil as our node.
-    owners = raw("lsof", "-nP", "-tiTCP:8557", "-sTCP:LISTEN").splitlines()
+    owners = raw("lsof", "-nP", f"-tiTCP:{PORT}", "-sTCP:LISTEN").splitlines()
     if set(owners) != {str(m["pid"])}:
         raise RuntimeError("endpoint is not exclusively owned by this task's Anvil process")
     os.kill(m["pid"], 0)
@@ -205,7 +209,7 @@ def deploy(v, label):
         raise RuntimeError(f"refusing to overwrite existing values: {path}")
     path.write_text(json.dumps(v, indent=2) + "\n")
     try:
-        env = {**os.environ, "RPC_URL": RPC, "I_AM_THE_OWNER": "yes",
+        env = {**os.environ, "RPC_URL": RPC,
                "FORGE_WALLET_ARGS": f"--unlocked --sender {ACTORS['deployer']}",
                "FOUNDRY_GAS_LIMIT": str(MAX_GAS)}
         # Forge's offchain script harness embeds creation code and exceeds EIP170. Keep its
@@ -266,7 +270,7 @@ def run_approved(calibration_first=False):
     if os.environ.get(ENV_MANIFEST):
         raise RuntimeError("refusing nested or inherited rehearsal batch")
     with socket.socket() as s:
-        s.bind(("127.0.0.1", 8557))  # fail before spawning if any service already owns the endpoint
+        s.bind(("127.0.0.1", PORT))  # fail before spawning if any service already owns the endpoint
     work = Path(tempfile.mkdtemp(prefix="pack-vault-integration-batch-"))
     node_log = open(work / "anvil.log", "w")
     proc = subprocess.Popen(plan()["node_command"], stdout=node_log, stderr=subprocess.STDOUT, cwd=ROOT)
@@ -301,8 +305,8 @@ def run_approved(calibration_first=False):
         env = {**os.environ, "FOUNDRY_GAS_LIMIT": str(MAX_GAS)}
         env.pop("FOUNDRY_CODE_SIZE_LIMIT", None)
         baseline = rpc("evm_snapshot")
-        scripts = (["measure_gas.py", "rehearse_canary.py", "rehearse_current.py"] if calibration_first else
-                   ["rehearse_canary.py", "rehearse_current.py", "measure_gas.py"])
+        scripts = PHASES or (["measure_gas.py", "rehearse_canary.py", "rehearse_current.py"] if calibration_first else
+                             ["rehearse_canary.py", "rehearse_current.py", "measure_gas.py"])
         for number, script in enumerate(scripts):
             if number:
                 if not rpc("evm_revert", baseline):
@@ -346,7 +350,19 @@ if __name__ == "__main__":
     group.add_argument("--plan", action="store_true")
     group.add_argument("--execute-approved-local-batch", action="store_true")
     parser.add_argument("--calibration-first", action="store_true", help="approved calibration first; keep node paused until source quote freeze")
+    parser.add_argument("--fork-block", type=int, help="fresh pinned block for a new campaign")
+    parser.add_argument("--port", type=int)
+    parser.add_argument("--phases", nargs="+", help="phase scripts to run, in order (default: all three)")
     args = parser.parse_args()
+    # Phase scripts are child processes: they read the same pins from the environment.
+    if args.fork_block or args.port:
+        if args.fork_block:
+            os.environ["PACK_VAULT_FORK_BLOCK"] = str(args.fork_block)
+        if args.port:
+            os.environ["PACK_VAULT_LOCAL_PORT"] = str(args.port)
+        os.execv(sys.executable, [sys.executable, __file__, *[a for a in sys.argv[1:] if a not in
+                 ("--fork-block", str(args.fork_block), "--port", str(args.port))]])
+    PHASES = args.phases
     if args.plan:
         print(json.dumps(plan(), indent=2))
     else:

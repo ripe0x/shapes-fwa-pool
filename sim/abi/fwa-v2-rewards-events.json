@@ -1,0 +1,487 @@
+{
+ "address": "0xA54b44C7a894AA19C49734A753D01f9B8C5f6516",
+ "source": "https://sourcify.dev/server/v2/contract/1/0xA54b44C7a894AA19C49734A753D01f9B8C5f6516?fields=all",
+ "runtimeMatch": "match",
+ "source_artifact_sha256": "ed57e18a163199981957cf93bdb826c35045ae06febee40070408aa56574c6b7",
+ "abi": [
+  {
+   "name": "AccruedTokensClaimed",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "caller",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    },
+    {
+     "name": "ethSpent",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    },
+    {
+     "name": "tokenOut",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "AcquisitionRewardRefunded",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "requestId",
+     "type": "uint256",
+     "indexed": true,
+     "internalType": "uint256"
+    },
+    {
+     "name": "epoch",
+     "type": "uint64",
+     "indexed": true,
+     "internalType": "uint64"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "AcquisitionRewardRegistered",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "requestId",
+     "type": "uint256",
+     "indexed": true,
+     "internalType": "uint256"
+    },
+    {
+     "name": "purchaser",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    },
+    {
+     "name": "epoch",
+     "type": "uint64",
+     "indexed": true,
+     "internalType": "uint64"
+    },
+    {
+     "name": "caller",
+     "type": "address",
+     "indexed": false,
+     "internalType": "address"
+    },
+    {
+     "name": "tokenSlice",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    },
+    {
+     "name": "builderRewardBps",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "AcquisitionTokenAccrued",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "caller",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    },
+    {
+     "name": "requestId",
+     "type": "uint256",
+     "indexed": true,
+     "internalType": "uint256"
+    },
+    {
+     "name": "slice",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "BuilderRewardBpsUpdated",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "bps",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "BuybackSet",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "buyback",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "DepositorTokensAccrued",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "depositor",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    },
+    {
+     "name": "listingId",
+     "type": "uint256",
+     "indexed": true,
+     "internalType": "uint256"
+    },
+    {
+     "name": "amount",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "EmptyEpochSwept",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "epoch",
+     "type": "uint256",
+     "indexed": true,
+     "internalType": "uint256"
+    },
+    {
+     "name": "to",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    },
+    {
+     "name": "amount",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "EpochsStarted",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "timestamp",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "FWASet",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "fwa",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "ListingRewardActivated",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "listingId",
+     "type": "uint256",
+     "indexed": true,
+     "internalType": "uint256"
+    },
+    {
+     "name": "depositor",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    },
+    {
+     "name": "backing",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    },
+    {
+     "name": "sqrtBacking",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "ListingRewardRemoved",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "listingId",
+     "type": "uint256",
+     "indexed": true,
+     "internalType": "uint256"
+    },
+    {
+     "name": "depositor",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "ListingRewardRepriced",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "listingId",
+     "type": "uint256",
+     "indexed": true,
+     "internalType": "uint256"
+    },
+    {
+     "name": "backing",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    },
+    {
+     "name": "sqrtBacking",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "OwnershipHandoverCanceled",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "pendingOwner",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "OwnershipHandoverRequested",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "pendingOwner",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "OwnershipTransferred",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "oldOwner",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    },
+    {
+     "name": "newOwner",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "ProtocolTokensRedistributed",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "amount",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "PurchaserTokensClaimed",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "purchaser",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    },
+    {
+     "name": "epoch",
+     "type": "uint256",
+     "indexed": true,
+     "internalType": "uint256"
+    },
+    {
+     "name": "amount",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "PurchaserTokensRouted",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "epoch",
+     "type": "uint256",
+     "indexed": true,
+     "internalType": "uint256"
+    },
+    {
+     "name": "amount",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "SettlementBuilderRewardAccrued",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "listingId",
+     "type": "uint256",
+     "indexed": true,
+     "internalType": "uint256"
+    },
+    {
+     "name": "caller",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    },
+    {
+     "name": "protocolFee",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    },
+    {
+     "name": "slice",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "TokenBuyAllowanceWithdrawn",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "caller",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    },
+    {
+     "name": "amount",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "TokensRescued",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "to",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    },
+    {
+     "name": "amount",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  },
+  {
+   "name": "TokensWithdrawn",
+   "type": "event",
+   "inputs": [
+    {
+     "name": "depositor",
+     "type": "address",
+     "indexed": true,
+     "internalType": "address"
+    },
+    {
+     "name": "amount",
+     "type": "uint256",
+     "indexed": false,
+     "internalType": "uint256"
+    }
+   ],
+   "anonymous": false
+  }
+ ]
+}

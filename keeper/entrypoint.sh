@@ -4,6 +4,11 @@
 set -eu
 umask 077
 : "${VAULT:?VAULT address}" "${KEEPER_KEYSTORE_JSON:?secret}" "${KEEPER_KEYSTORE_PASSWORD:?secret}"
+# The Fly configs ship with a zero VAULT until script/release.py keeper-config writes the deployed one.
+case "$VAULT" in
+  0x[0-9a-fA-F]*[1-9a-fA-F]*) ;;
+  *) echo "refusing to start: VAULT is unset or zero" >&2; exit 1 ;;
+esac
 printf '%s' "$KEEPER_KEYSTORE_JSON" > /tmp/keystore.json
 printf '%s' "$KEEPER_KEYSTORE_PASSWORD" > /tmp/keystore.pw
 unset KEEPER_KEYSTORE_JSON KEEPER_KEYSTORE_PASSWORD

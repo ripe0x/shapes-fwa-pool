@@ -662,6 +662,8 @@ def main():
         sys.exit("--send needs --account (a cast keystore name), --keystore with --password-file, "
                  "or --from on an unlocked local node")
     tm = None
+    if a.send and cast("code", a.vault) in ("", "0x"):
+        sys.exit(f"--send refused: no contract at {a.vault}")
     if a.send:
         if a.keystore:  # an encrypted keystore file and its password file (containers); never a raw key
             auth = ["--keystore", a.keystore, "--password-file", a.password_file]

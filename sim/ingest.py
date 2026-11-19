@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Phase 0.2: ingest every FWA V2 and FWAV2Rewards log into SQLite (sim/data/fwa.sqlite).
 
-Resumable: continues from the highest fully ingested block. Logs are decoded with the
-verified ABIs vendored in punk-or-bust/refs; args are stored as JSON (ints as decimal
-strings so wei values keep full precision).
+Resumable: continues from the highest fully ingested block. Logs are decoded with the event
+ABIs vendored in sim/abi (Sourcify full matches; each file records its source and artifact hash);
+args are stored as JSON (ints as decimal strings so wei values keep full precision).
 
 Usage: sim/ingest.py [to_block]    (MAINNET_RPC_URL overrides the Tenderly default)
 """
@@ -20,15 +20,15 @@ from eth_abi import decode
 from eth_utils import keccak
 
 RPC = os.environ.get("MAINNET_RPC_URL", "https://mainnet.gateway.tenderly.co")
-REFS = Path(os.environ.get("FWA_REFS", Path.home() / "CascadeProjects/punk-or-bust/refs"))
+ABI = Path(__file__).parent / "abi"
 CONTRACTS = {
-    "0x958c41181182e76f221331b2755b77d9e1426a98": REFS / "fwa-v2/FWAV2.json",
-    "0xa54b44c7a894aa19c49734a753d01f9b8c5f6516": REFS / "fwa-v2-rewards/FWAV2Rewards.json",
+    "0x958c41181182e76f221331b2755b77d9e1426a98": ABI / "fwa-v2-events.json",
+    "0xa54b44c7a894aa19c49734a753d01f9b8c5f6516": ABI / "fwa-v2-rewards-events.json",
     # CollectionFloorOracle, ABI from Sourcify (full match).
     "0xaa4d9009a4664604b57644bf13e447e9036727dc": Path(__file__).parent / "abi/oracle.json",
 }
 START_BLOCK = 25_944_000
-DB = Path(__file__).parent / "data/fwa.sqlite"
+DB = Path(os.environ.get("FWA_DB", Path(__file__).parent / "data/fwa.sqlite"))
 
 
 def abi_type(p):

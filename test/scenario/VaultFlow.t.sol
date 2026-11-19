@@ -38,8 +38,9 @@ import {
 ///         units, never as ETH buckets: tokens are claimed and burned, worth zero to holders (D43),
 ///         so they never enter the ETH conservation sum.
 ///
-///         Parameters are the canary values (deploy/canary.example.json): gas ceiling 0.5 gwei,
-///         reserve 0.005 ETH, TVL cap 2 ETH, bounded work, 10% keeper premium, 25% keeper share.
+///         Parameters are the selected canary deployment values (deploy/canary.json): gas ceiling
+///         0.5 gwei, reserve 0.005 ETH, TVL cap 2 ETH, routine budget 0.03 ETH refilling 0.01 ETH a day,
+///         no essential budget, no markup, 25% keeper share.
 ///         Stated variations are named in each regime that needs one (distributions on; the real
 ///         VRF fixtures carry SelectionBase's own deploy, noted in the selection regimes).
 /// @dev Split into two test contracts sharing this base: one contract holding every regime
@@ -97,25 +98,27 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         vm.deal(bob, 50 ether);
     }
 
-    function _canary() internal pure returns (VaultLib.Params memory p) {
-        p.minEdgeBps = 100;
-        p.bufferBps = 0;
-        p.distributionBps = 0;
-        p.payMarkupBps = 0; // canary: envelope = V1 pay
-        p.keeperShareBps = 2_500;
-        p.allocatedBoundBps = 1_000;
-        p.packUnitsMask = uint64(8); // bit 3 set: 3-unit packs
-        p.gasCeiling = 0.5 gwei;
-        p.essentialCeiling = 2 gwei; // canary: redemption work paid up to 2 gwei
-        p.maxTip = 0.05 gwei;
-        p.workFee = 0.00002 ether;
-
-        p.reserve = 0.005 ether;
-        p.tvlCap = 2 ether;
-        p.routineCap = 0.03 ether; // canary budgets (deploy/canary.example.json)
-        p.routineRate = 0.0008 ether;
-        p.essentialCap = 0; // canary: exit work unpaid, withdrawers run it (D64)
-        p.essentialRate = 0;
+    /// @dev The selected canary deployment values, read from deploy/canary.json (the file
+    ///      script/deploy.sh broadcasts), so every regime runs the configuration that ships.
+    function _canary() internal view returns (VaultLib.Params memory p) {
+        string memory v = vm.readFile("deploy/canary.json");
+        p.minEdgeBps = uint16(vm.parseJsonUint(v, ".minEdgeBps"));
+        p.bufferBps = uint16(vm.parseJsonUint(v, ".bufferBps"));
+        p.distributionBps = uint16(vm.parseJsonUint(v, ".distributionBps"));
+        p.payMarkupBps = uint16(vm.parseJsonUint(v, ".payMarkupBps"));
+        p.keeperShareBps = uint16(vm.parseJsonUint(v, ".keeperShareBps"));
+        p.allocatedBoundBps = uint16(vm.parseJsonUint(v, ".allocatedBoundBps"));
+        p.packUnitsMask = uint64(vm.parseJsonUint(v, ".packUnitsMask"));
+        p.gasCeiling = uint64(vm.parseJsonUint(v, ".gasCeilingWei"));
+        p.essentialCeiling = uint64(vm.parseJsonUint(v, ".essentialCeilingWei"));
+        p.maxTip = uint64(vm.parseJsonUint(v, ".maxTipWei"));
+        p.workFee = uint64(vm.parseJsonUint(v, ".workFeeWei"));
+        p.reserve = uint128(vm.parseJsonUint(v, ".reserveWei"));
+        p.tvlCap = uint128(vm.parseJsonUint(v, ".tvlCapWei"));
+        p.routineCap = uint64(vm.parseJsonUint(v, ".routineCapWei"));
+        p.routineRate = uint64(vm.parseJsonUint(v, ".routineRatePerDayWei"));
+        p.essentialCap = uint64(vm.parseJsonUint(v, ".essentialCapWei"));
+        p.essentialRate = uint64(vm.parseJsonUint(v, ".essentialRatePerDayWei"));
     }
 
     function _deploy(uint256 seed, VaultLib.Params memory p) internal {

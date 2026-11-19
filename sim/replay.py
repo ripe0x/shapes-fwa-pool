@@ -80,8 +80,14 @@ def main():
         elif ev in ("NFTAllocated", "ListingWithdrawn", "ListingKicked"):
             active.discard(int(a["listingId"]))
 
+    # Archive completeness: every acquisition sequence number is present and processed once.
+    for name in ("AcquisitionSequenced", "AcquisitionProcessed"):
+        seq = sorted(int(a["sequence"]) for _, _, _, _, e, a in logs if e == name)
+        if seq != list(range(1, len(seq) + 1)):
+            mismatched += 1
+            print(f"{name} sequence numbers are not contiguous from 1")
     print(f"EarningsAccrued checked {checked:,}; exact matches {checked - mismatched:,}; "
-          f"mismatches {mismatched:,}")
+          f"mismatches {mismatched:,}; acquisition sequences contiguous")
     for e in examples:
         print("  block {} listing {} predicted {} chain {}".format(*e))
     return mismatched
