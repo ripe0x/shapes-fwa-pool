@@ -2,20 +2,20 @@
   "owner_answer": "Approve this local batch",
   "approved_plan_sha256": "1c7e115fe1f62751f0b0bc6c478817d214e1bd97c1f1f09259d9cb48ff1340fd",
   "approval_source": "Explicit user reply to the prepared8559 batch question;540transactions/32simulatedETH aggregate/8.3simulatedETH once/no topups; one quote-only candidate",
-  "phase": "baseline passed; candidate prepared, exact owner amendment pending",
+  "phase": "approved amended candidate passed; entry restored",
   "endpoint": "http://127.0.0.1:8559",
   "owned_pid": 96649,
   "work_directory": "/private/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/efficient-journal-baseline-eqm_12s8",
   "active_driver": null,
   "active_log": null,
-  "quotes_changed": "Prepared source candidate only; no candidate broadcast",
+  "quotes_changed": "Candidate measured locally under exact amendment; no public deployment or owner outcome acceptance",
   "repairs": [
     "Restored exact frozen Deploy artifact bytecode after ABI-only cache failure; no transaction occurred on that failed attempt.",
     "Reconciled6successful receipts after pending timestamp changed mint gas estimates; pin parent+1 pending timestamp without changing existing estimate-equality, affordability, receipt or gas-limit checks.",
     "Recorded actual no-gain candidate plus zero-offer preflight decline without any transaction.",
     "Read-only retries for public fork HTTP2 failure; original cumulative counters preserved."
   ],
-  "next_action": "Prepare and verify calibrated work quotes; original160k tail-only family cannot cover measured202253gas distribution singleton. Any candidate-family amendment requires exact owner authority before candidate broadcasts.",
+  "next_action": "Keep PR draft. Resolve successful-foreign receipt/combined-own gaps and evaluate enforceable useful-harvest work before accepting funding or holder returns; no allowance increase recommended.",
   "limits": "No public-chain transaction,real funds,reset,topup,new signer,owner signature or merge authority.",
   "baseline_broadcasts": 318,
   "baseline_external_transaction_value_wei": 17501610827424708864,
@@ -23,5 +23,12 @@
   "baseline_results_sha256": "36456b7191f6b9b47c9d609636ecbd461ebb18afaaed5a65462678d4ded6252f",
   "candidate_amendment_sha256": "23aaa40e8dd8d8cdaac03ba3662bb83dc39b3ef64d5b17c8d5a5a7687af99089",
   "candidate_verification": "docs/receipts/efficient-quote-candidate-verification.json",
-  "baseline_inputs_unchanged_during_batch": true
+  "baseline_inputs_unchanged_during_batch": true,
+  "candidate_owner_answer": "Approve the amended local candidate batch",
+  "candidate_approval_source": "Explicit user reply to exact amendment SHA23aaa40e8dd8d8cdaac03ba3662bb83dc39b3ef64d5b17c8d5a5a7687af99089",
+  "candidate_broadcasts": 199,
+  "cumulative_broadcasts": 517,
+  "cumulative_external_transaction_value_wei": 27869594973162081536,
+  "candidate_results_sha256": "2e9f459dd783833cef7c938eebf2d229e3198ba06c85f366bc994de54e4b5942",
+  "candidate_repair_transactions": 0
 }

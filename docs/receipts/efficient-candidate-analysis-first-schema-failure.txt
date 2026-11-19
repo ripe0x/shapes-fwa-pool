@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/private/tmp/efficient-journal-analyze-candidate.py", line 17, in <module>
+    assert r['external_value_wei']==b['external_value_wei']+sum(x['value_wei'] for x in r['actions'])+10**16
+                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/efficient-journal-analyze-candidate.py", line 17, in <genexpr>
+    assert r['external_value_wei']==b['external_value_wei']+sum(x['value_wei'] for x in r['actions'])+10**16
+                                                                ~^^^^^^^^^^^^^
+KeyError: 'value_wei'

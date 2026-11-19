@@ -1,5 +1,7 @@
 # Approved baseline receipts and prepared quote candidate
 
+The exact amended candidate subsequently passed 199 transactions with no repair. Combined usage 517/540 and 27.869594973162081536/32 simulatedETH; 8.3 funded once/no topups, entry restored. All 24 journal rows pass ordinary preflight and have positive actual calibration-receipt net plus positive full signed-estimate net. Default holder/distribution singleton bills 122,417/202,270, quotes 132k/212k; full 128bill2,233,071, quote 2,901k. Detailed current evidence: `efficient-journal-candidate-summary.json`. The preparation narrative below retains the measured baseline basis; statements that candidate execution remains pending are historical.
+
 The approved baseline passed on the owned 8559 Anvil fork at 26,418,539. It used 318 of 540 transactions and 17.501610827424708864 of 32 simulated ETH aggregate transaction value, including all restored branches. Initial funding was 8.3 ETH once; no topups. The entry head and six funded actor balances/nonces/code were restored; automining is on and the pool empty. 8557 was untouched. Full evidence: `efficient-journal-baseline-results.json`, its cumulative ledger and preserved failure/resume records.
 
 The baseline used 85,000 ordinary/tail base and 30,000 per record. Authentic new requests expired at their actual 30-block deadlines and were processed/refunded, not supplied successful service answers. Natural prefixes 1–128, 40 actual Active positions, 0.2/0.5 gwei and default/maximum 10% policy offers were exercised. These are refunded foreign records. They do not establish exposed successful-foreign execution costs.
@@ -21,7 +23,7 @@ The full-holder checkpoint was prepared through separate transactions, with an e
 
 Inventory receipts at 0.2 gwei billed2,754,533/599,757/2,928,345 gas for first primary mint/leftover-only/mixed-two-pack cases. All corresponding0.5 gwei proposals were economically unavailable and sent no transaction. The original plan therefore forbids lowering Q_PACK; it stays 325,000. O2 remains 1,919,655 versus 1,750,000. O6 remains0.0002 ETH versus its 0.0002 limit in the fresh affected scenario.
 
-## Exact candidate, not yet broadcast
+## Candidate preparation basis, before its approved execution
 
 The distribution proof costs 79,842 more billed gas than the holder singleton and 79,848 more at 32. The original candidate family allowed a tail base of at most 160,000 and records at most 30,000. Its maximum singleton 190,000 still underpays the202,253 distribution bill. This is why a new owner amendment is necessary.
 

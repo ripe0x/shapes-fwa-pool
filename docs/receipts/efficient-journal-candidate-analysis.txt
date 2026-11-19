@@ -1,0 +1,33 @@
+{
+  "base_revision": "aa38fabb2ec60573d7393933839d066426c6059f",
+  "status": "passed",
+  "owner_answer": "Approve the amended local candidate batch",
+  "approved_amendment_sha256": "23aaa40e8dd8d8cdaac03ba3662bb83dc39b3ef64d5b17c8d5a5a7687af99089",
+  "results_sha256": "2e9f459dd783833cef7c938eebf2d229e3198ba06c85f366bc994de54e4b5942",
+  "baseline_results_sha256": "36456b7191f6b9b47c9d609636ecbd461ebb18afaaed5a65462678d4ded6252f",
+  "cumulative_transactions": 517,
+  "candidate_transactions": 199,
+  "cumulative_external_value_wei": 27869594973162081536,
+  "candidate_external_value_wei": 10367984145737372672,
+  "entry_restored": true,
+  "no_gain_cases": 2,
+  "limits": [
+    "Candidate has one Active position; baseline had40. This is not a matched-state estimate of source-only gas savings.",
+    "Expired/refunded foreign records only; successful foreign receipt gap remains.",
+    "Operator calibration sends use minPay0; actual ordinary preflight, signed80percent-minPay estimates and shared default gate are separately recorded.",
+    "Positive observed bills/net/gates do not establish universal keeper profitability, races, combined own maximum, holder returns or release acceptance.",
+    "Original Q360 full-holder standalone receipts remain on the named baseline source; candidate did not repeat that fixture."
+  ]
+}
+holder journal128/markup0/price200000000 2238051 2233071 580200000000000 133585800000000 True
+holder journal128/markup0/price500000000 2238051 2233071 1450500000000000 333964500000000 True
+holder journal64/markup0/price200000000 1175783 1170803 303600000000000 69439400000000 True
+holder journal64/markup0/price500000000 1175783 1170803 759000000000000 173598500000000 True
+distribution journal32/markup0/price500000000 722894 717914 447000000000000 88043000000000 True
+holder journal32/markup0/price200000000 643035 638055 162800000000000 35189000000000 True
+holder journal32/markup0/price500000000 643035 638055 407000000000000 87972500000000 True
+holder journal16/markup0/price200000000 376843 371863 92400000000000 18027400000000 True
+holder journal16/markup0/price500000000 376843 371863 231000000000000 45068500000000 True
+distribution journal1/markup0/price500000000 207250 202270 106000000000000 4865000000000 True
+holder journal1/markup0/price200000000 127397 122417 26400000000000 1916600000000 True
+holder journal1/markup0/price500000000 127397 122417 66000000000000 4791500000000 True

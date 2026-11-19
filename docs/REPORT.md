@@ -1,12 +1,16 @@
-# Efficient journal revision: receipts complete, candidate prepared
+# Efficient journal revision: candidate measured, economics blocked
 
-2026-11-18. The approved baseline passed: **318/540 transactions**, **17.501610827424708864/32 simulated ETH** aggregate value,8.3 ETH funded once and no topups. The owned8559 node is restored to entry;8557 is untouched. Standalone full-holder checkpoint billed **346,017 gas** and passed ordinary keeper preflight at0.2/0.5/2 gwei. O6 passes its0.0002 ETH bound; O2 remains1,919,655 versus1,750,000.
+2026-11-18. The approved baseline and amended candidate passed: **517/540 transactions**, **27.869594973162081536/32 simulated ETH** aggregate value, 8.3 ETH funded once, no topups. The 199-transaction candidate required no repair. The owned 8559 node is restored to entry; 8557 is untouched. Code remains `aa38fab`.
 
-Baseline default singleton quotes underpay holder and distribution tails. A measured candidate uses22k/record,110k holder-tail base and80k actual qualified distribution-proof work, keeping ordinary85k and pack325k. It passes focused checks and independent review; runtime24,451/23,001 bytes. **The new proof component exceeds the original literal-only approval and has not been broadcast.** An exact bounded amendment is prepared. No allowance or accepted outcome changed.
+All 24 candidate journal cases show positive operator-calibration keeper net, positive exact signed-estimate headroom and accepted ordinary preflight. Default holder/distribution singleton bills are 122,417/202,270 gas against 132,000/212,000 quotes; full 128 bills 2,233,071 against 2,901,000. Processing-pool/holder protection and routine classification pass. Calibration sends use `minPay=0`; signed 80% preflight is separate evidence. Refunded records do not prove successful-foreign costs.
 
-The opt-in timed model fixes inherited daily-clock assumptions, but its conditional scenarios expose repeated harvest expense and underpaid holder harvests. Funding and holder-return acceptance remain blocked. Current detail: `receipts/efficient-journal-baseline-and-candidate.md`; historical and current scope: `EFFICIENT-JOURNAL-RESULTS.md`.
+The baseline standalone full-holder checkpoint bills 346,017 gas and passes ordinary preflight at 0.2/0.5/2 gwei. O6 remains 0.0002 ETH; O2 remains 1,919,655 versus 1,750,000. Runtime 24,451/23,001 bytes. The candidate did not repeat the full-holder baseline fixture. No outcome, allowance, fee, minimum TVL or sponsorship assumption changed; no public deployment or release acceptance.
 
-Things that don't make sense: cheaper journal work alone does not fund all own work; complete accounting and exits do not establish funded operation or acceptable returns.
+The corrected conditional timed model completes 3/4 exits, but only zero demand pays every routine job. Frequent harvesting remains an economic blocker.32 of 44 timely underpaid holder harvests hit the existing 25% fee-share zero-payment gate, so permission alone cannot pay those same calls. A bot-only scheduling improvement also cannot constrain other permissionless callers.
+
+Current receipts: `receipts/efficient-journal-candidate-summary.json`; proposed next work and complete conditional cash/return table: `REVIEW-FUNDING-PROPOSAL.md`; detailed scope/history: `EFFICIENT-JOURNAL-RESULTS.md`.
+
+Things that don't make sense: global expense follows unrelated activity; gross fees also replace backing transferred out; complete claims can depend on underpaid routine work. The PR stays draft.
 
 Everything below is prior revision evidence for its named source, retained as history.
 

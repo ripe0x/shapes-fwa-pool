@@ -1,3 +1,59 @@
+# Measured journal candidate and funding decision
+
+The owner-approved amended local candidate passed on the exact `aa38fab` source. Combined baseline/candidate usage is 517/540 transactions and 27.869594973162081536/32 simulated ETH aggregate value. Initial 8.3 ETH funding was not topped up. The 199-transaction candidate needed no repair, and restored the owned 8559 entry state. Quote selection is locally verified; operating acceptance remains blocked.
+
+The current measured schedule is 85,000 ordinary base, 22,000 per completed record, 110,000 required holder-tail base and 80,000 extra only for actual qualified distribution-proof work. Pack 325,000 and all deployment values remain. All 24 candidate journal cases have positive calibration-receipt keeper net, positive full signed-estimate headroom and accepted ordinary preflight. These were refunded records. Successful-foreign receipts and combined own maxima remain gaps. Details: `receipts/efficient-journal-candidate-summary.json`.
+
+## Actual cash source and spending permission
+
+Vault free ETH, earned FWA fees and returned principal supply cash; protected holder buckets do not. Request charges fund their existing checkpoint pool. Creator mint revenue is a separate recipient flow, never an assumed recurring subsidy. Spending permission supplies no cash.
+
+The following arithmetic holds exposure throughout the archived 18,281-record window, packs 128-record jobs perfectly, and assumes one final eligible distribution tail. It excludes own work, additional required tails and actual execution billing. Unexposed intervals can advance unpaid. This is a recorded-window expense comparison, not a forecast.
+
+| Regime | Global journal quote over 30 days | Average quote/day | Existing refill/day | Initial cap plus 30-day refill |
+|---|---:|---:|---:|---:|
+| Mainnet, 0.2 gwei |0.0828884 ETH|~0.00276295 ETH|0.005 ETH|0.25 ETH|
+| Mainnet, 0.5 gwei |0.207221 ETH|~0.00690737 ETH|0.005 ETH|0.25 ETH|
+| Canary, 0.2 gwei |0.0828884 ETH|~0.00276295 ETH|0.0008 ETH|0.054 ETH|
+
+Canary's global-only amount is 4.14442% of its 2 ETH deposit cap over this window, before its own work. This is an expense/capital ratio, not a net-return estimate. At 0.5 gwei mainnet's initial cap can temporarily cover the global-only refill deficit; it does not establish recurring coverage. No allowance change is proposed on incomplete economics.
+
+## Complete conditional operating paths
+
+The corrected opt-in model uses 3600-second expiry, distinct 12-hour/15-minute blackout windows, 60-second polls and 40 calls/pass. It uses conditional market/response assumptions and historical or quote gas proxies. The old daily 112-case ledger outputs are explicitly unsuitable for operating/return acceptance. Neither model is an expected-return forecast or a full timed fork replay.
+
+| Candidate conditional path | Exit completes | Fully paid routine work | Underpaid holder harvests | Holder net after caller-gas proxy |
+|---|---|---|---:|---:|
+| Zero demand |Yes|Yes|0|-0.073071229658515459 ETH|
+| Timely 120-second purchaser |Yes|No|44|-0.155298663096359599 ETH|
+| Silent purchaser |No|No|45|Incomplete, no realized-return claim|
+| Late 7200-second purchaser |Yes|No|45|+0.095939180762570863 ETH|
+
+These paths start with 6.8 ETH principal plus modeled holder charges, run two operating days and at most two exit days at 0.2 gwei, seed 8, with 609 successful selections/day plus the recorded refund ratio in busy cases. That 609 is a conditional stress input, not a replay of the archived window's 439.7 successful/day. They already assume 0.3 ETH initial permission and 0.01 ETH/day refill within hard maxima. No actual parameter changed. Assets and independent external-fee ledgers reconcile to zero wei gaps, but three exits are not three funded-operation passes.
+
+Own work includes sync/terminal/pruning, harvesting, building, relisting, unlisting, liquidation, checkpoint and claims. Whole paid mints, remaining inventory and actual modeled claims are included. Timely gross received fees are 1.819168941380021572 ETH, backing transferred out 1.60792901857869 ETH, harvest pay 0.266081233333330390 ETH, mint fees 0.027 ETH and holder gas proxy 0.0202763454 ETH. Harvest pay alone exceeds gross fees minus transferred backing by 0.054841310531998818 ETH on this particular path, before other operating expenses. Principal recovery is not yield, and creator revenue is not credited back to holders.
+
+Of timely's 44 underpaid holder harvests, 32 hit the 25% realized-fee payment gate and necessarily receive zero at those call states even if permission is increased; corresponding cash deltas confirm the entire fee inflow remains in the vault. Late has 33 such calls among 45. Raising the allowance therefore cannot reimburse every recorded exit call under the current rule. Different policies can produce different trajectories; this does not hold those trajectories fixed as a forecast.
+
+## Recommendation and remaining decision
+
+Keep the PR draft. Do not raise an outcome limit, reduce truthful compensation, impose a minimum TVL or assume creator sponsorship to obtain a pass. Finish successful-foreign evidence when an authentic permitted setup is available. Preserve the one vault, incremental book, paid mints and existing holder liabilities.
+
+The next focused economic experiment should use fee credit first, avoid redundant harvesting before a ready checkpoint, and collect active fees only for a concrete eligible upkeep or exit cash gap. Preserve cash-raising work before a partial redemption checkpoint. This is a proposed scheduling rule, not an implemented or measured saving. The exact next-job cost must include own transitions; the displayed journal floor is insufficient.
+
+A bot-only improvement cannot impose a vault-wide expense guarantee: permissionless callers can still earn current repeated harvest payments. Enforcing useful paid harvest jobs onchain is a separate payment-eligibility design, with gas/size, liquidity and full-exit verification. The current 125-byte PackVault headroom makes that design consequential. Detailed tradeoffs: `receipts/efficient-harvest-next-step.md`. No new policy, allowance, live action or outcome acceptance is authorized by this proposal.
+
+## Things that don't make sense
+
+- A 25% cap on gross fees can exceed the strategy's net edge after backing leaves.
+- Permission can be insufficient, but increasing it cannot bypass the existing zero-payment gate or provide ETH.
+- Complete claims and exact accounting can still depend on underpaid holder work.
+- Global upkeep remains expensive for a small vault even after efficient batching and compensation.
+
+---
+
+The superseded proposals below are retained for their named historical inputs.
+
 # Superseded funding proposal
 
 The owner superseded the recommendation below with the efficient-journal revision dated2026-11-18
