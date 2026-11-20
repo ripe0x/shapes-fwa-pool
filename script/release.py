@@ -4,8 +4,8 @@
   script/release.py manifest                    write deploy/release-manifest.json (after forge build)
   script/release.py check <values>              sources, build, values, keeper and evidence match it
   script/release.py check <values> --broadcast  also the owner's signature on the acceptance package
-  script/release.py postflight <vault> <values> read a deployed vault back against manifest and values
-  script/release.py keeper-config <vault> <values>  postflight, then set VAULT in both Fly configs
+  script/release.py postflight <vault> <values> [owner] read a deployed vault back against manifest and values
+  script/release.py keeper-config <vault> <values> [owner]  postflight, then set VAULT in both Fly configs
 
 The owner accepts a release by signing the sha256 of docs/release/acceptance.json (which names the
 manifest hash) with the key in deploy/allowed_signers, namespace packvault-release:
@@ -157,7 +157,7 @@ def first(raw):
     return raw.split()[0]
 
 
-def postflight(vault, values):
+def postflight(vault, values, owner=None):
     """Read the deployed vault and its library and policy back; stop on any difference."""
     m, v = json.loads(MANIFEST.read_text()), json.loads(Path(values).read_text())
     fail = []
@@ -179,7 +179,8 @@ def postflight(vault, values):
     for refs in links(artifact("VaultLib")["deployedBytecode"]):
         for r in refs:
             check(lcode[r["start"]:r["start"] + 20].hex() == scan[2:].lower(), "VaultLib links another ScanLib")
-    check(cast("call", vault, "owner()(address)").lower() == v["owner"].lower(), "owner")
+    owner = owner or v["owner"]  # after a D76 handover, pass the current owner
+    check(cast("call", vault, "owner()(address)").lower() == owner.lower(), "owner")
     for k, sig in (("fwa", "fwa()(address)"), ("shapes", "shapes()(address)"), ("packs", "packs()(address)")):
         check(cast("call", vault, sig).lower() == v[k].lower(), k)
     check(first(cast("call", policy, "policyVersion()(uint256)")) == "1", "policy version")
@@ -203,7 +204,7 @@ def postflight(vault, values):
     check(int(first(cast("balance", vault))) >= v["seedWei"], "seed balance")
     if fail:
         sys.exit("postflight FAILED: " + "; ".join(fail))
-    print(f"postflight passed: {vault} policy {policy} library {lib} owner {v['owner']}")
+    print(f"postflight passed: {vault} policy {policy} library {lib} owner {owner}")
     print("verification commands (Etherscan; ETHERSCAN_API_KEY from your environment):")
     print(f"  forge verify-contract {scan} src/ScanLib.sol:ScanLib --chain mainnet --watch")
     print(f"  forge verify-contract {lib} src/VaultLib.sol:VaultLib --chain mainnet "
@@ -213,8 +214,8 @@ def postflight(vault, values):
           f"--libraries src/VaultLib.sol:VaultLib:{lib} --watch")
 
 
-def keeper_config(vault, values):
-    postflight(vault, values)
+def keeper_config(vault, values, owner=None):
+    postflight(vault, values, owner)
     for name in ("fly.keeper-primary.toml", "fly.keeper-backup.toml"):
         path = ROOT / name
         text, n = re.subn(r'^  VAULT = "0x[0-9a-fA-F]{40}"', f'  VAULT = "{vault}"', path.read_text(), flags=re.M)
@@ -234,9 +235,9 @@ def main():
         if found:
             sys.exit(1)
         print("release check passed" + (" with owner signature" if "--broadcast" in args else " (no signature checked)"))
-    elif cmd == "postflight" and len(args) == 2:
+    elif cmd == "postflight" and len(args) in (2, 3):
         postflight(*args)
-    elif cmd == "keeper-config" and len(args) == 2:
+    elif cmd == "keeper-config" and len(args) in (2, 3):
         keeper_config(*args)
     else:
         sys.exit(__doc__)

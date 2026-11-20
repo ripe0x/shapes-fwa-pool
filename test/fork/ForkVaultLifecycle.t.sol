@@ -6,6 +6,7 @@ import {TestVaultOps} from "../utils/TestVaultOps.sol";
 import {ForkBase, IFwaAdmin, IOwnable} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
+import {IKeeperPolicy} from "../../src/KeeperPolicy.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {Charges} from "../utils/Charges.sol";
 import {LISTING_ACTIVE, LISTING_WITHDRAWN} from "../../src/interfaces/External.sol";
@@ -262,42 +263,56 @@ contract ForkVaultLifecycleTest is ForkBase {
         vault.setParams(defaultParams());
     }
 
-    /// D76: the owner moves by direct transfer or two-step handover; renouncing is disabled so the
-    /// vault always keeps someone who can pause, stop pay and wind down.
-    function test_ownerTransferAndHandover() public {
+    /// D76: the owner moves only by the two-step handover; one-step transfer and renouncing are
+    /// disabled so the vault always keeps a controllable owner that can pause, stop pay and wind down.
+    function test_ownerHandoverOnly() public {
         address next = makeAddr("nextOwner");
-        vm.prank(keeper);
+        vm.prank(owner);
         vm.expectRevert(Ownable.Unauthorized.selector);
-        vault.transferOwnership(keeper);
+        vault.transferOwnership(next);
         vm.prank(owner);
         vm.expectRevert(Ownable.Unauthorized.selector);
         vault.renounceOwnership();
+        // Only the owner completes; a request alone changes nothing.
+        vm.prank(next);
+        vault.requestOwnershipHandover();
+        vm.prank(keeper);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        vault.completeOwnershipHandover(next);
+        // Cancelled requests and expired ones (after 48 hours) cannot be completed.
+        vm.prank(next);
+        vault.cancelOwnershipHandover();
         vm.prank(owner);
-        vm.expectRevert(Ownable.NewOwnerIsZeroAddress.selector);
-        vault.transferOwnership(address(0));
+        vm.expectRevert(Ownable.NoHandoverRequest.selector);
+        vault.completeOwnershipHandover(next);
+        vm.prank(next);
+        vault.requestOwnershipHandover();
+        vm.warp(block.timestamp + 48 hours + 1);
+        vm.prank(owner);
+        vm.expectRevert(Ownable.NoHandoverRequest.selector);
+        vault.completeOwnershipHandover(next);
 
+        vm.prank(next);
+        vault.requestOwnershipHandover();
+        vm.warp(block.timestamp + 48 hours);
         vm.prank(owner);
-        vault.transferOwnership(next);
+        vault.completeOwnershipHandover(next);
         assertEq(vault.owner(), next);
         vm.prank(owner);
         vm.expectRevert(Ownable.Unauthorized.selector);
         vault.guard(true, true);
         vm.prank(next);
-        vault.guard(true, false);
-        assertTrue(vault.depositsPaused());
-
-        // Two-step: the new key requests, the current owner completes within 48 hours.
-        vm.prank(owner);
-        vault.requestOwnershipHandover();
-        vm.prank(next);
-        vault.completeOwnershipHandover(owner);
-        assertEq(vault.owner(), owner);
-        vm.prank(next);
-        vm.expectRevert(Ownable.Unauthorized.selector);
-        vault.startWindDown();
-        vm.prank(owner);
         vault.startWindDown();
         assertTrue(vault.windingDown());
+    }
+
+    function test_zeroOwnerRejectedAtDeploy() public {
+        IKeeperPolicy policy = vault.keeperPolicy();
+        VaultLib.Params memory p = defaultParams();
+        vm.deal(owner, 1 ether);
+        vm.prank(owner);
+        vm.expectRevert(Ownable.NewOwnerIsZeroAddress.selector);
+        new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, address(0), p, policy);
     }
 
     function test_paramsBoundsAppliedAtOnce() public {

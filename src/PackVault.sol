@@ -211,6 +211,7 @@ contract PackVault is ReentrancyGuard, Ownable {
         packs = packs_;
         rewards = IFWARewards(fwa_.rewards());
         token = IFWAToken(fwa_.token());
+        if (owner_ == address(0)) revert NewOwnerIsZeroAddress();
         _initializeOwner(owner_);
         deploymentBlock = block.number;
         book.acquisitionCursor = fwa_.nextSequenceToProcess();
@@ -787,9 +788,15 @@ contract PackVault is ReentrancyGuard, Ownable {
         (depositsPaused, listingPaused) = (pauseDeposits, pauseListing);
     }
 
-    /// @notice Disabled: an ownerless vault could never pause, change pay or wind down. Ownership
-    ///         moves only by `transferOwnership` or the two-step handover (Solady Ownable, D76).
+    /// @notice Disabled (D76): an ownerless vault could never pause, change pay or wind down, and a
+    ///         one-step transfer to a mistyped or uncontrollable address would be the same. Ownership
+    ///         moves only by the two-step handover: the new key calls `requestOwnershipHandover`,
+    ///         then the owner calls `completeOwnershipHandover` within 48 hours.
     function renounceOwnership() public payable override {
+        revert Unauthorized();
+    }
+
+    function transferOwnership(address) public payable override {
         revert Unauthorized();
     }
 

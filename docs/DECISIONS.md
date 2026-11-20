@@ -1078,16 +1078,26 @@ work unit, no premium), ceilings, budgets, the canary's D71 refill (0.01 ETH a d
 assessed as an alternative), essential pay disabled (D64), liabilities, the trailing-30-day gate.
 Results and limits: `docs/KEEPER-ECONOMICS.md`.
 
-## D76. The owner is transferable and cannot be renounced (owner, 2026-11-20)
+## D76. The owner moves only by two-step handover and cannot be renounced (owner, 2026-11-20)
 
-`owner` was immutable, so a leaked hot key or a later move to a hardware wallet or Safe needed a new
-vault and every holder exiting. PackVault now inherits Solady `Ownable` (already a dependency):
-`transferOwnership` (one step, current owner) and the two-step handover (`requestOwnershipHandover`
-by the new key, `completeOwnershipHandover` by the current owner within 48 hours). `owner()` keeps
-its ABI; the owner check is Solady's `onlyOwner`, so non-owner calls revert `Unauthorized()` instead of
-`NotOwner()`. `renounceOwnership` always reverts: an ownerless vault could never pause, stop keeper
-pay or wind down. The owner's powers are unchanged (D58, D59): parameters within bytecode bounds,
-keeper policy, pauses, wind-down; it still cannot take assets. Whoever holds the role inherits the
-same keeper-pay bound (current budget plus 0.025 ETH a day). Solady's owner functions are `payable`;
-ETH sent with them joins the vault balance exactly as a plain transfer to `receive()` already does.
-PackVault runtime 24,489 bytes (87 under EIP-170). Test: `ForkVaultLifecycle.test_ownerTransferAndHandover`.
+`owner` was immutable, so moving the role to a hardware wallet or Safe needed a new vault and every
+holder exiting. PackVault now inherits Solady `Ownable` (already a dependency) and allows only its
+two-step handover: the new key calls `requestOwnershipHandover`, then the current owner calls
+`completeOwnershipHandover` within 48 hours (a Safe makes the request as one of its own
+transactions). One-step `transferOwnership` and `renounceOwnership` always revert: either could
+leave the vault with no controllable owner (a mistyped or uncontrollable address, or zero), and then
+nothing could ever pause, stop keeper pay or wind down. The constructor rejects a zero owner.
+`owner()` keeps its ABI; checks use Solady's `onlyOwner`, so non-owner calls revert `Unauthorized()`
+instead of `NotOwner()`.
+
+What it solves: planned migration, and moving away from a key suspected of exposure before an
+attacker uses it. It does not recover a key already used by an attacker (the attacker can hand the
+role on, and nothing reverses that) or a lost key; there is no second recovery authority.
+
+Unchanged: the owner's powers (D58, D59): parameters within bytecode bounds, keeper policy, pauses,
+wind-down; it still cannot take assets, and the keeper-pay bound (current budget plus 0.025 ETH a
+day) moves with the role without growing. Solady's handover functions are `payable`; ETH sent with
+them becomes holder NAV at once and is not refundable, exactly like a plain transfer to `receive()`.
+`script/release.py postflight|keeper-config <vault> <values> [owner]` takes the current owner after a
+handover. PackVault runtime in the manifest. Tests: `ForkVaultLifecycle.test_ownerHandoverOnly`,
+`test_zeroOwnerRejectedAtDeploy`.

@@ -13,8 +13,8 @@ are history for their named candidates.
 | Release commit and manifest | named in [acceptance.json](acceptance.json): `commit`, `manifest_sha256` |
 | Manifest | [deploy/release-manifest.json](../../deploy/release-manifest.json): source hashes, toolchain, normalized runtimes, values, keeper inputs, evidence |
 | Compiler | solc 0.8.30, optimizer 200 runs, via IR, Cancun, no metadata hash; `lib/` tree pinned by git |
-| PackVault | 24,489 runtime bytes (87 under EIP-170); initcode 27,262 |
-| VaultLib | 24,304 runtime bytes (272 under); CREATE2 address `0xFb4f180f662f1c159D5eD7b99B76d32D45b19D43` (salt 0, factory `0x4e59…956C`) |
+| PackVault | 24,459 runtime bytes (117 under EIP-170); initcode 27,252 |
+| VaultLib | 24,440 runtime bytes (136 under); CREATE2 address `0xFb4f180f662f1c159D5eD7b99B76d32D45b19D43` (salt 0, factory `0x4e59…956C`) |
 | KeeperPolicyV1 | 216 runtime bytes |
 | Keeper image | `keeper/Dockerfile`, Python 3.12, cast/Foundry 1.8.1 (`FOUNDRY_DIR` pinned), dependencies pinned in `keeper/requirements.txt` |
 | Deployment values | [deploy/canary.json](../../deploy/canary.json) |
