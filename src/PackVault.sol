@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
+import {Ownable} from "solady/auth/Ownable.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {FixedPointMathLib as M} from "solady/utils/FixedPointMathLib.sol";
 import {VaultLib} from "./VaultLib.sol";
@@ -41,11 +42,12 @@ import {
 ///
 ///      Trust: FWA, its rewards module, Shapes, ShapePacks and the FWA token are immutable
 ///      addresses fixed here. FWA's owner can change fees, the floor quote and admission; every
-///      such change is read live, never cached. One owner (D59) sets parameters and the keeper
-///      policy at once, inside bytecode bounds (D58), pauses and starts wind-down. The owner
+///      such change is read live, never cached. One owner (D59; transferable, never renounced,
+///      D76) sets parameters and the keeper policy at once, inside bytecode bounds (D58), pauses
+///      and starts wind-down. The owner
 ///      cannot take assets directly; a compromised owner can raise keeper pay to the bytecode
 ///      maxima and keep for itself, bounded by the budgets' balance and refill rates.
-contract PackVault is ReentrancyGuard {
+contract PackVault is ReentrancyGuard, Ownable {
     using SafeTransferLib for address;
 
     // ------------------------------------------------------------------ constants
@@ -87,7 +89,6 @@ contract PackVault is ReentrancyGuard {
     IShapePacks public immutable packs;
     IFWARewards public immutable rewards;
     IFWAToken public immutable token;
-    address public immutable owner;
     uint256 public immutable deploymentBlock;
 
     // ------------------------------------------------------------------ parameters
@@ -180,7 +181,6 @@ contract PackVault is ReentrancyGuard {
     event Claimed(address indexed holder, uint256 amount);
     event WindDownStarted();
 
-    error NotOwner();
     error OutOfBounds();
     error Paused();
     error WindingDown();
@@ -211,7 +211,7 @@ contract PackVault is ReentrancyGuard {
         packs = packs_;
         rewards = IFWARewards(fwa_.rewards());
         token = IFWAToken(fwa_.token());
-        owner = owner_;
+        _initializeOwner(owner_);
         deploymentBlock = block.number;
         book.acquisitionCursor = fwa_.nextSequenceToProcess();
         book.pendingPlusOne = 1;
@@ -765,8 +765,7 @@ contract PackVault is ReentrancyGuard {
     // ------------------------------------------------------------------ roles
 
     /// @notice Owner sets parameters at once, within the bytecode bounds (D58: no delay).
-    function setParams(VaultLib.Params calldata p) external {
-        if (msg.sender != owner) revert NotOwner();
+    function setParams(VaultLib.Params calldata p) external onlyOwner {
         // Budgets accrue at the old rates up to now; the new caps then only clamp, never refill.
         _syncBudget();
         params = p;
@@ -777,21 +776,24 @@ contract PackVault is ReentrancyGuard {
 
     /// @notice Owner replaces the keeper payment policy at once (D57, D58). The vault still caps
     ///         every offer at its envelope, free ETH and budget.
-    function setPolicy(address policy) external {
-        if (msg.sender != owner) revert NotOwner();
+    function setPolicy(address policy) external onlyOwner {
         VaultLib.checkPolicy(policy);
         emit PolicyChanged(address(keeperPolicy), policy);
         keeperPolicy = IKeeperPolicy(policy);
     }
 
     /// @notice Owner pauses or resumes deposits and listing. Wind-down is one-way.
-    function guard(bool pauseDeposits, bool pauseListing) external {
-        if (msg.sender != owner) revert NotOwner();
+    function guard(bool pauseDeposits, bool pauseListing) external onlyOwner {
         (depositsPaused, listingPaused) = (pauseDeposits, pauseListing);
     }
 
-    function startWindDown() external {
-        if (msg.sender != owner) revert NotOwner();
+    /// @notice Disabled: an ownerless vault could never pause, change pay or wind down. Ownership
+    ///         moves only by `transferOwnership` or the two-step handover (Solady Ownable, D76).
+    function renounceOwnership() public payable override {
+        revert Unauthorized();
+    }
+
+    function startWindDown() external onlyOwner {
         windingDown = true;
         depositsPaused = true;
         listingPaused = true;

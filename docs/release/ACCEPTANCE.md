@@ -35,7 +35,9 @@ Canary routine pay at most 0.04 ETH in the first 24 h, then 0.01 ETH a day. With
 maximum set at once, a compromised owner key reaches at most the current budget plus 0.025 ETH a
 day: about 0.055 ETH in the first 24 h. Request-funded checkpoint pay is separate: at most
 0.00074 ETH per 12 h interval at canary settings, only from request charges. The owner key is one
-hot EIP-7702 account, not the multisig or hardware wallet B3 assumed.
+hot EIP-7702 account, not the multisig or hardware wallet B3 assumed. Since D76 the owner can be
+moved (`transferOwnership`, or the two-step handover) to a hardware wallet or Safe without a new
+vault; renouncing is disabled.
 
 ## A5. Coverage limits
 

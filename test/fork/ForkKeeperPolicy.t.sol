@@ -6,6 +6,7 @@ import {TestVaultOps} from "../utils/TestVaultOps.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {ForkBase} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {Ownable} from "solady/auth/Ownable.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {IKeeperPolicy, KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
 import {Charges} from "../utils/Charges.sol";
@@ -128,7 +129,7 @@ contract ForkKeeperPolicyTest is ForkBase {
         uint256 dc = vault.deployCharge();
 
         vm.prank(bob);
-        vm.expectRevert(PackVault.NotOwner.selector);
+        vm.expectRevert(Ownable.Unauthorized.selector);
         vault.setPolicy(address(v2));
         vm.expectEmit(true, true, false, false, address(vault));
         emit PackVault.PolicyChanged(v1, address(v2));
@@ -174,7 +175,7 @@ contract ForkKeeperPolicyTest is ForkBase {
         vm.stopPrank();
         address ok = address(new KeeperPolicyFlat());
         vm.prank(keeper);
-        vm.expectRevert(PackVault.NotOwner.selector);
+        vm.expectRevert(Ownable.Unauthorized.selector);
         vault.setPolicy(ok);
         vm.expectRevert(PackVault.OutOfBounds.selector);
         new PackVault(FWA, SHAPES, PACKS, owner, defaultParams(), KeeperPolicyV1(eoa));
@@ -221,7 +222,7 @@ contract ForkKeeperPolicyTest is ForkBase {
     /// Only the owner pauses; pauses are one-way.
     function test_ownerPauses() public {
         vm.prank(keeper);
-        vm.expectRevert(PackVault.NotOwner.selector);
+        vm.expectRevert(Ownable.Unauthorized.selector);
         vault.guard(true, false);
         vm.prank(owner);
         vault.guard(true, false);

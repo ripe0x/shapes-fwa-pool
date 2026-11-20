@@ -1077,3 +1077,17 @@ Unchanged: the payment formula (quoted gas x min(basefee + 0.05 gwei, 0.5 gwei) 
 work unit, no premium), ceilings, budgets, the canary's D71 refill (0.01 ETH a day; main's 0.0008 is
 assessed as an alternative), essential pay disabled (D64), liabilities, the trailing-30-day gate.
 Results and limits: `docs/KEEPER-ECONOMICS.md`.
+
+## D76. The owner is transferable and cannot be renounced (owner, 2026-11-20)
+
+`owner` was immutable, so a leaked hot key or a later move to a hardware wallet or Safe needed a new
+vault and every holder exiting. PackVault now inherits Solady `Ownable` (already a dependency):
+`transferOwnership` (one step, current owner) and the two-step handover (`requestOwnershipHandover`
+by the new key, `completeOwnershipHandover` by the current owner within 48 hours). `owner()` keeps
+its ABI; the owner check is Solady's `onlyOwner`, so non-owner calls revert `Unauthorized()` instead of
+`NotOwner()`. `renounceOwnership` always reverts: an ownerless vault could never pause, stop keeper
+pay or wind down. The owner's powers are unchanged (D58, D59): parameters within bytecode bounds,
+keeper policy, pauses, wind-down; it still cannot take assets. Whoever holds the role inherits the
+same keeper-pay bound (current budget plus 0.025 ETH a day). Solady's owner functions are `payable`;
+ETH sent with them joins the vault balance exactly as a plain transfer to `receive()` already does.
+PackVault runtime 24,489 bytes (87 under EIP-170). Test: `ForkVaultLifecycle.test_ownerTransferAndHandover`.

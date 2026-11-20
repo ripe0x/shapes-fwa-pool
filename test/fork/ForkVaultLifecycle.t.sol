@@ -5,6 +5,7 @@ import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
 import {ForkBase, IFwaAdmin, IOwnable} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {Ownable} from "solady/auth/Ownable.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {Charges} from "../utils/Charges.sol";
 import {LISTING_ACTIVE, LISTING_WITHDRAWN} from "../../src/interfaces/External.sol";
@@ -257,8 +258,46 @@ contract ForkVaultLifecycleTest is ForkBase {
         assertEq(address(vault).balance, bal);
         assertEq(owner.balance, gBal);
         vm.prank(keeper);
-        vm.expectRevert(PackVault.NotOwner.selector);
+        vm.expectRevert(Ownable.Unauthorized.selector);
         vault.setParams(defaultParams());
+    }
+
+    /// D76: the owner moves by direct transfer or two-step handover; renouncing is disabled so the
+    /// vault always keeps someone who can pause, stop pay and wind down.
+    function test_ownerTransferAndHandover() public {
+        address next = makeAddr("nextOwner");
+        vm.prank(keeper);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        vault.transferOwnership(keeper);
+        vm.prank(owner);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        vault.renounceOwnership();
+        vm.prank(owner);
+        vm.expectRevert(Ownable.NewOwnerIsZeroAddress.selector);
+        vault.transferOwnership(address(0));
+
+        vm.prank(owner);
+        vault.transferOwnership(next);
+        assertEq(vault.owner(), next);
+        vm.prank(owner);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        vault.guard(true, true);
+        vm.prank(next);
+        vault.guard(true, false);
+        assertTrue(vault.depositsPaused());
+
+        // Two-step: the new key requests, the current owner completes within 48 hours.
+        vm.prank(owner);
+        vault.requestOwnershipHandover();
+        vm.prank(next);
+        vault.completeOwnershipHandover(owner);
+        assertEq(vault.owner(), owner);
+        vm.prank(next);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        vault.startWindDown();
+        vm.prank(owner);
+        vault.startWindDown();
+        assertTrue(vault.windingDown());
     }
 
     function test_paramsBoundsAppliedAtOnce() public {
