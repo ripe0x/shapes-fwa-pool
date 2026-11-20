@@ -1077,3 +1077,27 @@ Unchanged: the payment formula (quoted gas x min(basefee + 0.05 gwei, 0.5 gwei) 
 work unit, no premium), ceilings, budgets, the canary's D71 refill (0.01 ETH a day; main's 0.0008 is
 assessed as an alternative), essential pay disabled (D64), liabilities, the trailing-30-day gate.
 Results and limits: `docs/KEEPER-ECONOMICS.md`.
+
+## D76. The owner moves only by two-step handover and cannot be renounced (owner, 2026-11-20)
+
+`owner` was immutable, so moving the role to a hardware wallet or Safe needed a new vault and every
+holder exiting. PackVault now inherits Solady `Ownable` (already a dependency) and allows only its
+two-step handover: the new key calls `requestOwnershipHandover`, then the current owner calls
+`completeOwnershipHandover` within 48 hours (a Safe makes the request as one of its own
+transactions). One-step `transferOwnership` and `renounceOwnership` always revert: either could
+leave the vault with no controllable owner (a mistyped or uncontrollable address, or zero), and then
+nothing could ever pause, stop keeper pay or wind down. The constructor rejects a zero owner.
+`owner()` keeps its ABI; checks use Solady's `onlyOwner`, so non-owner calls revert `Unauthorized()`
+instead of `NotOwner()`.
+
+What it solves: planned migration, and moving away from a key suspected of exposure before an
+attacker uses it. It does not recover a key already used by an attacker (the attacker can hand the
+role on, and nothing reverses that) or a lost key; there is no second recovery authority.
+
+Unchanged: the owner's powers (D58, D59): parameters within bytecode bounds, keeper policy, pauses,
+wind-down; it still cannot take assets, and the keeper-pay bound (current budget plus 0.025 ETH a
+day) moves with the role without growing. Solady's handover functions are `payable`; ETH sent with
+them becomes holder NAV at once and is not refundable, exactly like a plain transfer to `receive()`.
+`script/release.py postflight|keeper-config <vault> <values> [owner]` takes the current owner after a
+handover. PackVault runtime in the manifest. Tests: `ForkVaultLifecycle.test_ownerHandoverOnly`,
+`test_zeroOwnerRejectedAtDeploy`.

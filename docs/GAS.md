@@ -22,7 +22,7 @@ Unlisting, liquidation, oversized gift recovery and the work fee retain their ex
 
 A current signed four shape leftover call at 0.5 gwei exposed an underpayment under the old 35,000 extra unit slope. The final 100,000 slope repairs it; all ten final affected signed cost receipts cover billed expense and pass ordinary preflight. The original three shape quotes and O2 result remain unchanged. Larger packs have deliberately conservative compensation. Owner settings different from the tested work fee, markup and price need their own willingness check.
 
-Final runtime is 24,136 bytes for PackVault, 24,440 bytes for VaultLib and 1,935 bytes for ScanLib (D75), below 24,576. Q360 remains within O6's 0.0002 ETH payment at the routine ceiling. O2 still misses its original 1,750,000 quoted gas target:1,919,655.
+Final runtime is 24,459 bytes for PackVault (24,136 before D76's owner handover), 24,440 bytes for VaultLib and 1,935 bytes for ScanLib (D75), below 24,576. Q360 remains within O6's 0.0002 ETH payment at the routine ceiling. O2 still misses its original 1,750,000 quoted gas target:1,919,655.
 
 Everything below is historical evidence for its named source. It is preserved unchanged and must not be read as the current schedule, current runtime or outstanding work list.
 
