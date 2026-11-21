@@ -43,7 +43,7 @@ no central strategy contract, custodian, registry or keeper coordinator.
 | Relisting returned packs (`list`) | Checkpoints in FWA's blackout, epoch pricing | `rescue` untracked NFTs |
 | Position book, journal and own-position scan, settlement (`sync`) | Pro-rata redemptions, claims, distributions | `setListingPaused`, reversible exit mode |
 | Fee collection inside paid work; caller-funded `harvest` | Protected liabilities in `_free` | `_free` = balance, `_idle` = balance − reserve |
-| Authenticated keep/kick receipt identification (`receive`) | Redemption shortfall and liquidation need | One-time factory initialization |
+| Settlement from FWA's own listing record and pack ownership; `receive` receipts gate pricing (D84) | Redemption shortfall and liquidation need | One-time factory initialization |
 | Unlisting and liquidation, bounded recovery of oversized packs | One-way wind-down, deposit pause | |
 | Keeper pay by quote, budgets, policy offer, `minPay` | Deploy and unwind charges | |
 | Token claim and burn (never valued) | | |
@@ -53,10 +53,13 @@ no central strategy contract, custodian, registry or keeper coordinator.
 
 New packs: 0.06 ETH = one 0.05 Shape + one 0.01 Shape minted straight into the pack
 (`ShapePacks.createPack([], [1, 1, 0, …])`): two paid primary mints, 0.002 ETH at the 0.001 fee.
-Backing at the 0.5 gwei ceiling: 0.06515847 ETH (1.086 × P). A selected purchaser keeps a pack
-worth 0.06 rather than take FWA's best bid (91.5% token bid: 0.05962 ETH) by 0.0003 ETH after the
-gas to redeem it. Each keep returns B (1 − s) = 0.06451 ETH to the account and triggers a
-replacement build with fresh mints; each bid returns the pack for relisting without a mint.
+Backing: 0.06489617486338 ETH (1.082 × P), fixed by the rule, not by keeper settings (D85). A
+selected purchaser keeps a pack worth 0.06 rather than take FWA's best bid (the 91.5% token bid:
+0.05938 ETH) by 0.0003 ETH after 160,000 gas to redeem it at up to 2 gwei. Each keep returns
+B (1 − s) = 0.06424721 ETH to the account and triggers a replacement build with fresh mints; each bid
+returns the pack for relisting without a mint. FWA pays keeps and kick refunds by pushing ETH; if
+the account's `receive` ever fails, FWA force-sends it and `sync` still resolves the listing from
+FWA's record (D84).
 Rule and gates: D80. Measured construction gas: D79.
 
 ## 4. Contract and deployment costs

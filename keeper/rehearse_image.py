@@ -181,7 +181,8 @@ class Keeper:
         """Saved transaction state and index head, read from the volume as a separate process."""
         code = ("import json,os,sqlite3\nif not os.path.exists('/data/keeper-state.json'): print('null'); raise SystemExit\n"
                 "s=json.load(open('/data/keeper-state.json'));"
-                "h=sqlite3.connect('/data/keeper-index.sqlite').execute('select max(end) from ranges').fetchone()[0];"
+                "import glob\n"  # one index file per account; the head is the lowest across them
+                "h=min((sqlite3.connect(p).execute('select max(end) from ranges').fetchone()[0] or 0 for p in glob.glob('/data/index-*.sqlite')), default=None);"
                 "c=[dict(label=e['label'],block=e['block'],status=e['status'],gas_used=e['gas_used'],pay=e['pay']) for e in s['counted']];"
                 "print(json.dumps(dict(stats=s['stats'],pending=s['pending'],counted=c,head=h)))")
         if self.image:

@@ -42,6 +42,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -258,8 +259,10 @@ def run_keeper(*extra, state_dir=None, keeper_addr=None, keystore=None, pwfile=N
         for _ in range(6):
             r = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT)
             out = r.stdout + r.stderr
-            if not r.returncode or "read failed" not in out:
+            # The production loop retries on its next pass; here a throttled RPC read is retried.
+            if not r.returncode or not any(x in out for x in ("read failed", "Transport", "timed out")):
                 break
+            time.sleep(10)
         print(f"  [{tag}] " + out.replace("\n", "\n  "), flush=True)
         if r.returncode:
             raise RuntimeError(f"keeper exited {r.returncode}: {out[-2000:]}")
