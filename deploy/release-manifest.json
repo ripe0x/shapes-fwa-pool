@@ -74,9 +74,9 @@
  },
  "keeper": {
   "keeper/Dockerfile": "54675df4109b6b91f5e750816fdf20fb410942992fbebacb9b14d82dc5211243",
-  "keeper/entrypoint.sh": "3c45f8f7710480f440059a426e300d8490c4081ad2e9b6b03eba84cde18d1b0f",
+  "keeper/entrypoint.sh": "07e21998a23f57ea944ccd972d6e9ddc2b9cb1c6e4c5d47c079b5468c06d58c9",
   "keeper/requirements.txt": "aed414c4157dd12cba962363a8c9f561a2e5dcddbf20ee4c2ea9ff41ad4e913c",
-  "keeper/keeper.py": "80c117fbd3907670d6a40a15672624ba71ec95a83ce0afa53b70e5d8f4b83ced",
+  "keeper/keeper.py": "b05bdf8c817c6777d2083df1c1014933d9e5196d9da3af760ede19f48328d042",
   "keeper/policy.py": "28800bc48488f1f8e2d0efb135d4563420496583be328c570f25363fc03f657b",
   "keeper/tx.py": "4778e14b08c09e28d518fa180c61be7a41880fcd14d3879b05a86a6769e77421",
   "keeper/index.py": "4f037790c23e6ad51cb67d646c540bca39bb240eda9a0a7c5bdb69aac9910f63",
@@ -84,7 +84,7 @@
   "fly.keeper-backup.toml": "5ad276a78fc08c2fc8badf7b70b4794cb19e0043e3b080081323d9041a57a79b"
  },
  "evidence": {
-  "docs/receipts/formal-assessment.json": "45864c846940509c4d561cd029f1299a0d6d718f7f92673a375dacb93fcc224e",
+  "docs/receipts/formal-assessment.json": "bed4232608468b43e18b537699d9a535a99561a93f3d3b06119e1d3bbd9f1b57",
   "docs/receipts/release-rehearsal/result.json": "e411228d87b23f87f2cd4301caeec1f32d4880632aec840bc1ec07015da2419e",
   "docs/receipts/image-rehearsal/ci-44577532617.json": "18cd1358234c9dede0137d09ed73ce09ae234902c2cfc7dd82caaede62b502ab",
   "docs/receipts/release-review.md": "8391d1b0654c79392094c70a198de28327fecb04fdbbbe8d39083edd620e1090",
