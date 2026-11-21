@@ -10,6 +10,12 @@ share and selection odds use FWA's formulas with **all our accounts' listings in
 externality of `sim/forward.py.backtest()` (verified identical to <1e-9 in `test_unified.py`). Tokens
 at zero. Integer-wei conservation checked in the ledger test. 0.5 gwei gas ceiling unless noted.
 
+> **Correction (coordinator, after this report was written):** the receipt
+> `docs/receipts/unified-economics.json` was regenerated with the build call base at 300,000 gas
+> (was 280,000) and returns truncated at −100% (ruin; this model has no cash path, which had produced
+> an impossible −113% p5 for the smallest manager). Numbers in the tables below differ from the
+> receipt by at most about 1 percentage point except the smallest-manager row; the receipt is current.
+
 ## Headline
 
 **Recommend recipe 4 (directly-minted 0.06 packs).** It is the simplest viable direct-mint design,

@@ -326,7 +326,9 @@ def _account_economics(a, scenario, gross_fees, sel, keeps, bids):
            - float(initial_build + deploy + request_charge))
     net_exit = net - float(exit_gas)
     capital = a.capital + request_charge
-    returns = net_exit / capital
+    # ponytail: no cash path. A year's selections are summed without tracking cash, so an account
+    # that would run dry keeps "rebuilding"; truncate at ruin (-100%). Upgrade: event-ordered cash.
+    returns = np.maximum(net_exit / capital, -1.0)
     deployed = a.n * (B + P)                                # backing + pack value embodied
 
     mk = float(np.mean(keeps_eff))

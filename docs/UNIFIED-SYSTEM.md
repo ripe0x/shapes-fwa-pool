@@ -112,24 +112,24 @@ counts and fee split; used for comparisons, not for the gate. Recipes at 2 ETH, 
 
 | Recipe | Mean | p5 | Loss probability | Creator mint fees per ETH a year |
 |---|---:|---:|---:|---:|
-| 0.03 bulk mint + split, bid backing (main) | +78% | −82% | 25% | 0.004 |
+| 0.03 bulk mint + split, bid backing (main) | +80% | −82% | 25% | 0.004 |
 | 0.03 bulk mint + split, keep backing | +380% | +226% | 0% | 0.58 |
-| 0.03 direct mint | −1.7% | −1.7% | 100% | 0.05 |
-| **0.06 direct mint (chosen)** | **+186%** | **+31%** | **2%** | **0.96** |
-| 0.07 direct mint | +146% | −11% | 7% | 1.08 |
+| 0.03 direct mint | −1.8% | −1.8% | 100% | 0.05 |
+| **0.06 direct mint (chosen)** | **+186%** | **+30%** | **2.3%** | **0.96** |
+| 0.07 direct mint | +146% | −12% | 7% | 1.08 |
 
 - Direct 0.03 packs fail the build gate: one keep cannot repay three fresh mints, so kept packs are
   never replaced. Direct 0.07 packs pay the creator slightly more per ETH with a worse tail.
 - The 0.03 split recipe returns more because each pack pays 0.0003 ETH in fees, but it keeps the
   bulk-mint construction, pays the creator 40% less and takes twice the FWA weight per ETH. The 0.06
   recipe is the best simple design for both creator and capital provider; no dynamic sizing.
-- Purchaser behaviour dominates: the 0.06 recipe falls to +81% mean (23% loss) if nobody keeps.
+- Purchaser behaviour dominates: the 0.06 recipe falls to +83% mean (23% loss) if nobody keeps. The study has no cash path: losses are truncated at −100% (ruin) and an account's pack count is fixed, so small-account tails are approximate; the formal gate above has the cash path.
 
 **Pool versus personal managers.**
 
 | Question | Answer (model) |
 |---|---|
-| Same capital, pool or managers? | Pool, always in these runs: 10 ETH pool +182% vs ten 1 ETH managers +163%, from one reserve (0.005 vs 0.05 ETH idle) and higher utilisation (0.98 vs 0.88). |
+| Same capital, pool or managers? | Pool, always in these runs: 10 ETH pool +181% vs ten 1 ETH managers +162%, from one reserve (0.005 vs 0.05 ETH idle) and higher utilisation (0.98 vs 0.88). |
 | Smallest useful manager | ~0.14 ETH (one pack: reserve + B + P + build). Below it nothing lists. With one pack the outcome is a lottery; 0.5 to 1 ETH gives a usable tail. |
 | Value of shared inventory and cash | Utilisation 0.63 (50 × 0.2 ETH managers) / 0.88 (10 × 1 ETH) vs 0.98 pooled; mean +117% / +163% vs +172% at 10 to 20 ETH. |
 | Cost of pooled accounting | ~0.00007 ETH a year of checkpoint pay plus a 0.0002 ETH request charge per flow; negligible beside pooling's benefit. |
