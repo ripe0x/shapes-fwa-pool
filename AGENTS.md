@@ -4,8 +4,8 @@ One Shape-pack strategy on the FWA V2 main pool, two ownership models: the poole
 (`PackVault`) and personal managers (`PackManager` clones from `PackManagerFactory`). Both inherit
 `PackAccount` and run the one strategy implementation in the linked libraries `StrategyLib`,
 `VaultLib` and `ScanLib` against their own storage (D77). Design: `docs/UNIFIED-SYSTEM.md`. Owner
-requirements: `OWNER-REQUIREMENTS.md` (A3 is current). Decisions: `docs/DECISIONS.md`. Status: `docs/REPORT.md`.
-Keeper operations: `docs/KEEPER.md`. Gas: `docs/GAS.md`. Assets: `docs/SYSTEM-MAP.md`, `asset-flow.json`.
+requirements: `OWNER-REQUIREMENTS.md` (A3 and A4 are current). Decisions: `docs/DECISIONS.md`. Status: `docs/REPORT.md`. Release: `docs/release/RUNBOOK.md`.
+Keeper operations: `docs/KEEPER.md`. Gas: `docs/UNIFIED-SYSTEM.md` section 4 (`docs/GAS.md` is history). Assets: `docs/SYSTEM-MAP.md`, `asset-flow.json`.
 
 ## Commands
 
@@ -13,7 +13,7 @@ Keeper operations: `docs/KEEPER.md`. Gas: `docs/GAS.md`. Assets: `docs/SYSTEM-MA
 # Fork tests: mainnet fork on Tenderly's public gateway only. It throttles, so pass the retries.
 forge test --match-path test/fork/<File>.t.sol --rpc-url https://mainnet.gateway.tenderly.co \
   --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100
-CANDIDATE_RUN=1 forge build --sizes  # PackVault 16,970 B; VaultLib 23,409; StrategyLib 12,758; PackManager 12,453
+CANDIDATE_RUN=1 forge build --sizes  # PackVault 16,960 B; VaultLib 23,482; PackManager 12,494
 forge test --match-path test/fork/ForkManager.t.sol ...   # managers, factory, isolation, real-VRF keep/bid
 
 python3 sim/snapshot.py        # Phase 0.1 live reads at one block
@@ -58,6 +58,11 @@ python3 keeper/rehearse_image.py [--image <tag>]   # CI: .github/workflows/keepe
   account defines only `_free`, `_idle` and its own facts (`_checkpointMode`, `_shortfall`, `_need`).
 - FWA pushes keep payments and kick refunds with a 100,000 gas stipend; the clone's receive path
   must stay well inside it (52,363 keep, 35,148 cold kick; `ForkManager.t.sol`).
+- Settlement is classified from FWA's listing record and pack ownership, never from the receipt
+  (D84); the receipt only gates pricing. The checkpoint's allocation proof reads at most 32 queue
+  entries; keep any new pricing check bounded (`ForkReceiptRecovery.t.sol`, `ForkAllocationProof.t.sol`).
+- Purchaser redeem gas in the backing rule is the fixed `PURCHASER_GAS_PRICE` (2 gwei), never a
+  keeper setting (D85).
 - Keeper pay is a fixed quote per operation (D56); never measured gas. The keeper pads the exact
   signed-call estimate 25% and enforces the transaction cap; later state can still invalidate an
   estimate. `cast send` exits 0 on a reverted transaction; check receipt status.

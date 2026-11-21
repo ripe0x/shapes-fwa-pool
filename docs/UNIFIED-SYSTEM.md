@@ -66,28 +66,31 @@ Rule and gates: D80. Measured construction gas: D79.
 
 | Artifact | Runtime bytes (EIP-170 limit 24,576) | Deployed per |
 |---|---:|---|
-| PackVault | 16,970 | pool |
-| PackManager implementation | 12,453 | once (factory constructor) |
-| PackManager clone | 44 | user, 474,076 gas `create` (clone + initialize + discovery) |
+| PackVault | 16,960 | pool |
+| PackManager implementation | 12,494 | once (factory constructor) |
+| PackManager clone | 44 | user, 474,175 gas `create` (clone + initialize + discovery) |
 | PackManagerFactory | 1,365 | once |
-| StrategyLib | 12,758 | once (linked) |
-| VaultLib | 23,409 | once (linked) |
-| ScanLib | 1,935 | once (linked) |
+| VaultLib | 23,482 | once (linked) |
+| StrategyLib, ScanLib | in `deploy/release-manifest.json` | once (linked) |
 | KeeperPolicyV1 | 216 | once, shared |
 
 FWA pushes keep payments and kick refunds with a 100,000 gas stipend. Through the clone's extra
-DELEGATECALL: keep payment 52,363 gas, cold kick refund 35,148 gas (`ForkManager.t.sol`).
+DELEGATECALL: keep payment 52,363 gas, cold kick refund 35,148 gas (`ForkManager.t.sol`). If a future
+repricing ever pushed `receive` past the stipend, FWA force-sends the ETH and `sync` still resolves
+the listing from FWA's record (D84).
 
-One-time deployment, billed on a local Anvil fork through `script/deploy.sh` (receipts,
-`docs/receipts/unified-local-rehearsal.json`): ScanLib 471,981; VaultLib 5,094,213; StrategyLib
-2,817,411; KeeperPolicyV1 100,155; PackVault 4,146,177; PackManagerFactory with its implementation
-3,122,421; **total 15,752,358 gas** (0.0079 ETH at 0.5 gwei). A personal manager then costs its
-owner 462,707 gas to create (0.00023 ETH at 0.5 gwei) and nothing else; there is no fee.
+One-time deployment, billed on a local fork through `script/deploy.sh` at the final source: ScanLib
+634,563; VaultLib 5,140,640; StrategyLib 2,817,411; KeeperPolicyV1 100,155; PackVault 4,143,997;
+PackManagerFactory with its implementation 3,131,319; **total 15,968,085 gas** (0.0080 ETH at
+0.5 gwei, 0.032 ETH at 2 gwei). A personal manager costs its owner 474,175 gas to create and nothing
+else; there is no fee.
 
 Billed operation gas against the fixed quotes (`ForkMaxBatchGas.t.sol`): build 1 pack 1,667,571 vs
 1,685,000; build 8 packs 9,466,009 vs 11,380,000; unlist 8 2,224,463 vs 2,620,000; liquidate 8
 (16 Shapes) 1,129,652 vs 1,275,000; relist 8 6,198,724 vs 6,880,000. Largest batch (build 8 × 30
-units) 10.40M gas, 13.0M with the keeper's 25% pad, under EIP-7825's 16,777,216.
+units) 10.40M gas, 13.0M with the keeper's 25% pad, under EIP-7825's 16,777,216. The checkpoint's
+allocation proof reads at most 32 queue entries: 186,274 gas at the bound against a 222,000 quote,
+and a constant 31,763 gas refusal beyond it whatever the history (D84).
 
 ## 5. Economics
 
@@ -141,63 +144,63 @@ counts and fee split; used for comparisons, not for the gate. Recipes at 2 ETH, 
 
 ## 6. Verification
 
-Candidate source `749503c` (manifest `deploy/release-manifest.json`, unsigned). Every claim below names its run.
+Final source (manifest `deploy/release-manifest.json`, acceptance package unsigned). Every claim names its run.
 
-- Fork tests on the real FWA, Shapes, ShapePacks, oracle and token pool; no mocks. Manager and
-  factory (`ForkManager.t.sol`, 15 tests): lifecycle to the wei, initialization, owner-only controls
-  and two-step handover, pause and zero budgets, isolation from other managers and the pooled vault,
-  cold kick refund under FWA's stipend, reentrant keeper, real-VRF keep, bid and silent outcomes.
-  Ported suites: vault lifecycle 16, adversarial 18, keeper pay 17, keeper policy 7, selection 4,
-  backing 3, tokens 3, invariants 4, asset-flow regimes 16 (0 conservation mismatches), audits 23,
-  production 25, journal/scan/harvest/measure suites, max-batch gas 4. Full candidate run: section 6a.
-- `sim/reconcile.py`: every bucket of the three reconcile fork runs matches the integer model to the
-  wei. Python: `keeper/test_policy.py`, `test_index.py`, `test_inclusion.py`, `sim/test_vault.py`,
-  `test_forward.py`, `test_unified.py` pass.
-- Local deployment rehearsal (Anvil fork, no public writes): deploy and postflight; a manager from
-  the factory; the one keeper built and listed 7 packs in one call, then on owner exit unlisted and
-  redeemed them; the owner withdrew 1 ETH − 0.014 mint fees − 0.001852 keeper pay, to the wei. It
-  found three keeper bugs, all fixed: repeated build proposals, one index file for all accounts, one
-  account's error stopping the pass.
-- Independent security and economic review of the contract diff: no critical or high finding.
-  Holder protections in PackVault are unchanged from main. Low/informational items: see section 7.
-
-### 6a. Full candidate run
-
-`script/verify.sh` with `CANDIDATE_RUN=1` at source revision `749503c` (`docs/receipts/unified-verify/SUMMARY.md`):
-exit 0. Build with sizes; `sim/test_vault.py`, `sim/test_forward.py`, `keeper/test_policy.py`,
-`keeper/test_index.py`, `sim/replay.py`; **268 fork tests passed, 0 failed, 1 skipped** (a fixture
-exporter that runs only on request); the 301-listing and 10,000-position scale tests 3/3; the
-reconciler matches every bucket to the wei on the full cycle, the partial fill and wind-down, and the
-scan path; `release.py check deploy/canary.json` passes (no signature checked). The first run at
-`86edea6` failed one test from a test-helper timing bug (via_ir cached `block.timestamp`), fixed in
-`749503c` and covered by the rerun.
+- **Full candidate run** (`docs/receipts/unified-verify/SUMMARY.md`): `script/verify.sh` with
+  `CANDIDATE_RUN=1`; **276 fork tests passed, 0 failed, 1 opt-in exporter skipped**; the 301-listing
+  and 10,000-position scale tests 3/3; `sim/replay.py` 0 mismatches; the reconciler matches every
+  bucket to the wei on the full cycle, the partial fill and wind-down, and the scan path. All on the
+  real FWA, Shapes, ShapePacks, oracle and token pool; selections only from replayed real VRF.
+- **Payment receipt recovery** (`ForkReceiptRecovery.t.sol`): the account's `receive` is made to fail
+  around one real FWA call, FWA's own SELFDESTRUCT fallback delivers the ETH with no receipt, and the
+  forced keep, the forced default (`finalizeUnsettled`) and a manager's forced kick refund each resolve
+  exactly once, with the same book, cash and NAV as the recorded path; a stranger's payment of the
+  exact amount creates no receipt; the checkpoint refuses to price until the sync. With the real
+  receiver, a sweep over transaction gas never forces an unrecorded payment (65 limits reverted,
+  26 completed and recorded). Removing the checkpoint gate makes the forced-keep test fail.
+- **Bounded pricing** (`ForkAllocationProof.t.sol`): 32-entry boundary, 2,000 tombstones behind an
+  unresolved head refused at the same 31,763 gas as 33, many simultaneous unresolved allocations.
+- **Asset flow:** 16 regimes, outcomes O1–O11 pass (`asset-flow.json`, unsigned).
+- **Production rehearsal** on a fresh mainnet fork (`docs/receipts/unified-production-rehearsal.json`,
+  `keeper/rehearse_unified.py`): all 17 steps pass on the final source: deploy through `script/deploy.sh`,
+  three managers from the factory, one keeper discovering all four accounts, building and listing,
+  pooled deposit, checkpoint, redemption and claim, keep, bid (then relist without a mint), expiry and a
+  forced keep from a real request and its historical VRF word (`keeper/rehearse_selection.py`; only the
+  coordinator's proof check is skipped), manager withdrawals and full exits, keeper restart, a new
+  worker on the same volume, the backup keeper working alone and contending, a paused account not
+  stopping the others, per-account index persistence, a lost transaction response, same-nonce
+  replacement and a reorg; every account reconciles at the end. Encrypted keystores throughout.
+- **Production image** (CI run 44930570759, `docs/receipts/image-rehearsal/ci-44930570759.json`): the
+  pinned image against a fresh fork: keystore signing, primary and backup, a replacement container on
+  the same volume, a lost RPC response. Push CI only builds and smokes the image (under a minute); the
+  fork rehearsal runs on manual dispatch for a release candidate.
+- **Independent review** (`docs/receipts/unified-review.md`): no critical, high or medium finding.
+  Confirmed: the factory has no access to a manager's funds after creation; no manager can move or
+  account another's assets; the pool cannot subsidise managers. A second review of 958b924 found the
+  unbounded allocation proof, fixed in 4794bf5.
 
 ## 7. Remaining launch blockers and owner decisions
 
-1. **Owner signature.** `docs/release/acceptance.json` and `asset-flow.json` outcomes describe the
-   pre-A3 candidate (bid-favouring backing, 0.03 packs). The restated outcomes and the acceptance
-   package need the owner's review and signature before any public broadcast (D73).
-2. **Canary size.** The formal gate passes at 1.96 ETH on the median, but 6 of 16 runs lose and p10
-   is −51%. At 20 ETH no run loses. Choose the canary's size with that tail in view.
+1. **Owner signature.** The restated `asset-flow.json` outcomes and `docs/release/acceptance.json`
+   are unsigned. No broadcast until the owner signs (D73).
+2. **Canary is a technical deployment.** At 2 ETH the formal gate's loss tail is wide (see section 5);
+   the canary verifies operation and exit, not returns. Capital is not raised to improve modeled
+   returns (A4.7).
 3. **Third-party levers on new investment** (exits are unaffected): FWA keeping ShapePacks
-   oracle-exempt; FWA's best bid below about 94.4%; the routine gas ceiling below about 11.9 gwei
-   (D80). Each stops new building and listing in every account at once.
-4. **Release rehearsal tooling.** `keeper/rehearse_canary.py`, `rehearse_current.py`,
-   `rehearsal_batch.py`, `measure_gas.py` and the old calibration scripts target the pre-A3 candidate
-   (restock, loose Shapes) and were not ported; the image rehearsal (`rehearse_image.py`, CI) must be
-   rerun for the new keeper. The local rehearsal above used `script/deploy.sh` and `keeper/keeper.py`
-   directly.
-5. **Monitored assumptions:** FWA's 100,000 gas push stipend (keep payment 52,363 gas today; no
-   fallback if a repricing ever exceeded it); our combined FWA weight share (keeper reports it,
-   flags 10%); the keep incentive counts FWA's token bid at face value.
+   oracle-exempt and its best bid below about 94.4% (D80). Each stops new building and listing in every
+   account at once. The keeper gas ceiling no longer affects listing (D85).
+4. **Accepted residual (D84):** a kick refund force-sent while `receive` fails is not caught by the
+   checkpoint gate; it needs FWA to lift the exemption and a gas repricing at once, and the keeper
+   syncs on `ListingKicked`.
+5. **Monitored assumptions:** FWA's 100,000 gas stipend; our combined FWA weight share (keeper flags
+   10%); FWA's owner-set economics (surcharge, discounts, fees) staying near today's values.
 
 ## 8. Next steps that need the owner
 
-1. Review this document, D77–D83 and OWNER-REQUIREMENTS A3; decide the canary size (item 7.2).
-2. Restate and sign `asset-flow.json` outcomes and `docs/release/acceptance.json` for this candidate.
-3. Approve a current-block rehearsal with the ported rehearsal tooling and the keeper image.
-4. Authorize the public broadcast (`script/deploy.sh deploy/canary.json --broadcast` from the owner's
-   keystore), then keeper funding and Fly deployment with `VAULT` and `FACTORY` set.
-5. Separately decide whether to publish the factory address for personal managers at launch or after
-   the pooled canary has run.
-
+1. Review this document, D77–D85, OWNER-REQUIREMENTS A3 and A4, and `docs/release/ACCEPTANCE.md`.
+2. Sign `docs/release/acceptance.json` (which binds the manifest, values and outcomes) if accepted.
+3. Authorize the public canary broadcast (`script/deploy.sh deploy/canary.json --broadcast` from the
+   owner's keystore), keeper funding (primary 0.05, backup 0.02 ETH) and the Fly deployment with
+   `VAULT` set and `FACTORY` unset (`docs/release/RUNBOOK.md`).
+4. Separately, after the canary assessment, decide whether to offer personal managers publicly
+   (set `FACTORY` for the keepers, publish the factory and `deploy/manager.json`).

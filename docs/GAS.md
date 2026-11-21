@@ -1,3 +1,5 @@
+> **History.** This document describes an earlier candidate (restock, loose Shapes, bid-first backing). Current gas: `docs/UNIFIED-SYSTEM.md` section 4 and the quote constants in `src/VaultLib.sol`. Current release and canary instructions: `docs/release/RUNBOOK.md`.
+
 # Final operating compensation
 
 The current implementation and acceptance limits are in [Complete operating pass](COMPLETE-OPERATING-PASS.md). Actual signed receipts are in `receipts/complete-cost-receipts.json` and `receipts/complete-foreign-journal.json`. Source identity and focused checks are in `receipts/complete-final-validation.json` and `receipts/complete-contract-summary.json`.

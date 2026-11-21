@@ -1,3 +1,5 @@
+> **History.** This document describes an earlier candidate (restock, loose Shapes, bid-first backing). Current gas: `docs/UNIFIED-SYSTEM.md` section 4 and the quote constants in `src/VaultLib.sol`. Current release and canary instructions: `docs/release/RUNBOOK.md`.
+
 > **Current release instructions: [docs/release/RUNBOOK.md](release/RUNBOOK.md)** (2026-11-19). This document is history for the candidate it names; where it gives current instructions, the runbook replaces them.
 
 # Historical mainnet canary plan (launch step E)
