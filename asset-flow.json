@@ -43,9 +43,9 @@
  "outcomes": [
   {
    "id": "O1",
-   "text": "DRAFT. Where a bid ends: on a bid outcome the vault keeps the pack and the whole backing leaves (0.9 to the purchaser, 0.1 to FWA), the posted backing per selection (0.0333 to 0.0360 ETH at canary values, D62; 0.0363 in this regime); the vault's edge is the fee share it keeps.",
+   "text": "UNSIGNED, unified candidate. Where a bid ends: on a bid outcome the vault keeps the pack and the whole backing leaves (FWA's ETH bid 0.9 B to the purchaser, 0.1 B to FWA). Backing is the keep-incentive rule, B = floor_1e4((P - (0.0003 ETH + 160,000 gas x 2 gwei)) / max(ETH bid, token bid)) = 0.06490 ETH for the 0.06 ETH pack (D80, D85); FWA's own clamps bound B below 1.24 P = 0.0744 ETH. The vault's edge is the fee share the listing earned before selection.",
    "metric": "destinations.backing to purchaser and FWA on a bid",
-   "max_wei": "40000000000000000",
+   "max_wei": "75000000000000000",
    "regimes": [
     "acquire_bid",
     "staged_activation"
@@ -53,7 +53,7 @@
   },
   {
    "id": "O2",
-   "text": "DRAFT. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling; 2 gwei for redemption and wind-down work) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint (quoted at measured gas, D61), 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; routine budgets cap pay at 0.03 ETH plus 0.01 ETH a day at canary values (0.02 ETH a day at most in bytecode); the owner can stop pay at once.",
+   "text": "UNSIGNED, unified candidate. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling; 2 gwei for redemption and wind-down work) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint (quoted at measured gas, D61), 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; routine budgets cap pay at 0.03 ETH plus 0.01 ETH a day at canary values (0.02 ETH a day at most in bytecode); the owner can stop pay at once. Measured worst: 1,425,000 quoted gas per position built and listed (max_load).",
    "metric": "facts.keeper_gas_per_position",
    "max": 1750000,
    "regimes": [
@@ -62,7 +62,7 @@
   },
   {
    "id": "O3",
-   "text": "DRAFT. How it ends for holders: after wind-down each holder's claim equals their share of the vault's value to the wei (value priced before that checkpoint's keeper pay, which falls on the shares that stay), and no shares are left locked.",
+   "text": "UNSIGNED, unified candidate. How it ends for holders: after wind-down each holder's claim equals their share of the vault's value to the wei (value priced before that checkpoint's keeper pay, which falls on the shares that stay), and no shares are left locked.",
    "metric": "facts.holder_claim_gap_wei",
    "max": 0,
    "regimes": [
@@ -71,7 +71,7 @@
   },
   {
    "id": "O4",
-   "text": "DRAFT. What is left at the end: only the dead-share seed slice remains in the vault, about 0.0105 ETH (the 0.01 ETH seed plus deploy-address dust).",
+   "text": "UNSIGNED, unified candidate. What is left at the end: only the dead-share seed slice remains in the vault, about 0.0101 ETH (the 0.01 ETH seed plus deploy-address dust; measured 0.010059 ETH).",
    "metric": "facts.vault_eth_at_end_wei",
    "max": 12000000000000000,
    "regimes": [
@@ -80,7 +80,7 @@
   },
   {
    "id": "O5",
-   "text": "DRAFT. Liabilities are never deployable (D32): escrowed deposits, redemption and distribution reserves and settled-but-unclaimed ETH never become spendable. Checked after every keeper call in every regime (the test fails otherwise) and measured here with an entitlement settled to claimable: spendable ETH above the unowed balance is 0 wei.",
+   "text": "UNSIGNED, unified candidate. Liabilities are never deployable (D32): escrowed deposits, redemption and distribution reserves and settled-but-unclaimed ETH never become spendable. Checked after every keeper call in every regime (the test fails otherwise) and measured here with an entitlement settled to claimable: spendable ETH above the unowed balance is 0 wei.",
    "metric": "facts.spendable_over_unowed_wei",
    "regimes": [
     "settled_unclaimed"
@@ -89,7 +89,7 @@
   },
   {
    "id": "O6",
-   "text": "DRAFT. Can it stall and what restarts it (gas): no call is refused for gas price. Routine work is paid up to the 0.5 gwei ceiling; above it the keeper waits. Exit work (unlisting and liquidating for redemptions or wind-down) is unpaid at canary values (D64): withdrawers, or the owner in a wind-down, run it at their own gas, and redeemers pay no unwind charge. Checkpoints are paid from the request charges. A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid.",
+   "text": "UNSIGNED, unified candidate. Can it stall and what restarts it (gas): no call is refused for gas price. Routine work is paid up to the 0.5 gwei ceiling; above it the keeper waits. Exit work (unlisting and liquidating for redemptions or wind-down) is unpaid at canary values (D64): withdrawers, or the owner in a wind-down, run it at their own gas, and redeemers pay no unwind charge. Checkpoints are paid from the request charges. A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid.",
    "metric": "facts.checkpoint_pay_wei",
    "max": 200000000000000,
    "regimes": [
@@ -98,7 +98,7 @@
   },
   {
    "id": "O7",
-   "text": "DRAFT. FWA token rewards (D43): claimed and burned, never sold. Supply falls by exactly the claimed amount and the burn pays the caller no ETH, so holders pay no gas and get no token value.",
+   "text": "UNSIGNED, unified candidate. FWA token rewards (D43): claimed and burned, never sold. Supply falls by exactly the claimed amount and the burn pays the caller no ETH, so holders pay no gas and get no token value.",
    "metric": "facts.burn_paid_any_eth",
    "max": 0,
    "regimes": [
@@ -107,7 +107,7 @@
   },
   {
    "id": "O8",
-   "text": "DRAFT. Oracle failure cannot trap assets (D34): with FWA's floor oracle repointed so no quote can be read, nothing new lists unless FWA exempts the collection from its oracle (then no cap applies, D62), yet the kicked pack is back in inventory and a holder redeeming everything is paid (measured 0.9975 ETH of a 1 ETH deposit).",
+   "text": "UNSIGNED, unified candidate. Oracle failure cannot trap assets (D34): with FWA's floor oracle repointed so no quote can be read, nothing new lists unless FWA exempts the collection from its oracle (then no cap applies, D62), yet the kicked pack is back in inventory and a holder redeeming everything is paid (measured 0.9975 ETH of a 1 ETH deposit).",
    "metric": "facts.redemption_paid_after_repoint_wei",
    "regimes": [
     "oracle_change"
@@ -116,7 +116,7 @@
   },
   {
    "id": "O9",
-   "text": "DRAFT. What a holder pays if nothing is ever bought: entering, building, unwinding and exiting with zero acquisitions costs holders at most 1.5% of deposits (measured 0.46%: Shapes mint fees and keeper gas).",
+   "text": "UNSIGNED, unified candidate. What a holder pays if nothing is ever bought: entering, building, unwinding and exiting with zero acquisitions costs holders at most 1.5% of deposits (measured 1.24%: two paid primary Shapes mints of 0.001 ETH per 0.06 ETH pack built, which are the creator's revenue, plus keeper gas).",
    "metric": "facts.holder_loss_bps",
    "max": 150,
    "regimes": [
@@ -125,14 +125,24 @@
   },
   {
    "id": "O10",
-   "text": "DRAFT. A listing made while FWA's queue is busy would be staged and earn nothing. The vault refuses to list while the queue is busy (D62, audit B), so nothing it lists is staged; once the queue drains the relist goes in active.",
+   "text": "UNSIGNED, unified candidate. A listing made while FWA's queue is busy would be staged and earn nothing. The vault refuses to list while the queue is busy (D62, audit B), so nothing it lists is staged; once the queue drains the relist goes in active.",
    "metric": "facts.relist_active_after_drain",
    "min": 1,
    "regimes": [
     "staged_activation"
    ]
+  },
+  {
+   "id": "O11",
+   "text": "UNSIGNED, unified candidate. Where a keep ends: the purchaser keeps the pack (0.06 ETH of Shapes leaves to them) and the vault gets the backing back less FWA's settlement fee, B (1 - s) = 0.06425 ETH at s = 1%; the fee is at most 5% by FWA's immutable cap, so a keep never returns less than the pack's value (B >= P / 0.95). The replacement pack is minted fresh (two paid primary mints).",
+   "metric": "destinations.FWA settlement fee (keep/silent)",
+   "max_wei": "3300000000000000",
+   "regimes": [
+    "acquire_keep",
+    "acquire_silent"
+   ]
   }
  ],
  "explained": [],
- "approval_history": "docs/release/history/asset-flow-signed-2026-11-17.json (older candidate). This candidate is unsigned; see docs/release/ACCEPTANCE.md."
+ "approval_history": "docs/release/history/asset-flow-signed-2026-11-17.json (older candidate). This unified candidate is unsigned; see docs/release/ACCEPTANCE.md."
 }

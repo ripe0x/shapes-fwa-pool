@@ -227,9 +227,12 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
 
     function _kSync(address who, uint256[] memory ids) internal {
         uint256 b = who.balance;
+        uint256 credit = FWA.feeCredit(address(vault));
         vm.prank(who);
         TestVaultOps.sync(vault, ids, 0);
         keeperPaidCum += who.balance - b;
+        // A sync sweeps the fee credit into the balance when that pays: harvested fee income.
+        feeHarvestedCum += credit - FWA.feeCredit(address(vault));
         _guard();
     }
 
