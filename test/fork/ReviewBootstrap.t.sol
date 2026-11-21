@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import {ForkBase} from "./ForkBase.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
+import {StrategyLib} from "../../src/StrategyLib.sol";
 import {IFWAV2} from "../../src/interfaces/External.sol";
 
 interface ReviewFwaQueue {
@@ -132,7 +133,7 @@ contract ReviewBootstrapTest is ForkBase {
         vm.deal(owner, 1 ether);
         VaultLib.Params memory p = vault.getParams(); p.reserve = 0;
         vm.prank(owner); vault.setParams(p);
-        vm.expectRevert(VaultLib.Payment.selector);
+        vm.expectRevert(StrategyLib.Payment.selector);
         vm.prank(keeper); vault.sync(new uint256[](0), 0, 1);
         assertEq(vault.acquisitionCursor(), beforeCursor, "minPay refusal reverts the cursor advance");
         uint256 beforeKeeper = keeper.balance;
@@ -140,7 +141,7 @@ contract ReviewBootstrapTest is ForkBase {
         assertEq(keeper.balance, beforeKeeper);
         assertEq(address(vault).balance, seed, "zero reserve does not allow bootstrap depletion");
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
-        vm.expectRevert(VaultLib.Nothing.selector);
+        vm.expectRevert(StrategyLib.Nothing.selector);
         vm.prank(keeper); vault.sync(new uint256[](0), 0, 0);
     }
 

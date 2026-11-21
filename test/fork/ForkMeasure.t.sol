@@ -14,6 +14,9 @@ import {
     LISTING_WITHDRAWN
 } from "../../src/interfaces/External.sol";
 
+interface FwaOwned { function owner() external view returns (address); }
+interface FwaExempt { function setOracleExemptCollection(address collection, bool exempt) external; }
+
 /// @notice Phase 0.4: gas and token-route measurements against live mainnet contracts at a pinned
 ///         block. Every call is the real deployed code; this contract plays the vault as depositor.
 ///         Results go to sim/out/gas.json for sim/model.py.
@@ -25,7 +28,12 @@ contract ForkMeasureTest is Test {
     uint160 constant MIN_SQRT_PRICE_PLUS_ONE = 4_295_128_740;
     uint160 constant MAX_SQRT_PRICE_MINUS_ONE = 1_461_446_703_485_210_103_287_273_052_203_988_822_378_723_970_341;
 
-    uint256 constant B = 0.0363 ether; // oracle cap at the pinned block: 0.033 ask x 1.10
+    // Direct-mint recipe (D-direct): a 6-unit pack is one 0.05 and one 0.01 Shape, two paid primary
+    // mints. ShapePacks is oracle-exempt (D62), so a 0.06 ETH pack has no floor cap; back it just
+    // under its value, the way the vault's keep-favoring edge does.
+    uint256 constant UNITS = 6;
+    uint256 constant P = 0.06 ether;
+    uint256 constant B = 0.057 ether;
 
     IPoolManager manager;
     PoolKey key;
@@ -43,6 +51,9 @@ contract ForkMeasureTest is Test {
         vm.deal(address(this), 20 ether);
         SHAPES.setApprovalForAll(address(PACKS), true);
         PACKS.setApprovalForAll(address(FWA), true);
+        // The live exemption (D62) the vault relies on, made by FWA's real owner before anything lists.
+        vm.prank(FwaOwned(address(FWA)).owner());
+        FwaExempt(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         IFWAToken token = IFWAToken(FWA.token());
         manager = IPoolManager(token.poolManager());
         key = token.poolKey();
@@ -63,20 +74,13 @@ contract ForkMeasureTest is Test {
         vm.cool(FWA.floorOracle());
     }
 
-    /// @dev Mint one 0.1 shape and split it into ten 0.01 shapes: three packs' worth plus one.
-    function _shapes() internal returns (uint256[] memory ids) {
+    /// @dev Direct-mint one 6-unit pack: one 0.05 and one 0.01 Shape, two paid primary mints.
+    function _pack6() internal returns (uint256) {
         uint256 fee = SHAPES.mintFee();
-        uint256 big = SHAPES.mint{value: 0.1 ether + fee}(0.1 ether);
-        uint8[] memory outs = new uint8[](10);
-        ids = SHAPES.split(big, outs);
-    }
-
-    function _pack(uint256[] memory ids, uint256 from) internal returns (uint256) {
-        uint256[] memory three = new uint256[](3);
-        for (uint256 i; i < 3; ++i) {
-            three[i] = ids[from + i];
-        }
-        return PACKS.createPack(three, new uint32[](9));
+        uint32[] memory counts = new uint32[](9);
+        counts[1] = 1; // one 0.05 Shape
+        counts[0] = 1; // one 0.01 Shape
+        return PACKS.createPack{value: P + 2 * fee}(new uint256[](0), counts);
     }
 
     function test_measureInventoryAndListing() public {
@@ -86,33 +90,12 @@ contract ForkMeasureTest is Test {
         uint256 fee = SHAPES.mintFee();
         assertEq(fee, 0.001 ether);
 
+        // Direct-mint a 6-unit pack: two paid primary mints (0.05 + 0.01) straight into the pack.
         _cool();
         uint256 g = gasleft();
-        uint256 big = SHAPES.mint{value: 0.1 ether + fee}(0.1 ether);
-        vm.serializeUint(json, "mint_0_1", g - gasleft());
-        assertEq(SHAPES.backingOf(big), 0.1 ether);
-
-        _cool();
-        uint8[] memory outs = new uint8[](10);
-        g = gasleft();
-        uint256[] memory ids = SHAPES.split(big, outs);
-        vm.serializeUint(json, "split_1_into_10", g - gasleft());
-        assertEq(ids.length, 10);
-
-        _cool();
-        g = gasleft();
-        uint256 packId = _pack(ids, 0);
-        vm.serializeUint(json, "create_pack_pull_3", g - gasleft());
-        assertEq(PACKS.valueOf(packId), 0.03 ether);
-
-        // Direct-mint pack for comparison: 3 x (0.01 + fee).
-        uint32[] memory counts = new uint32[](9);
-        counts[0] = 3;
-        _cool();
-        g = gasleft();
-        uint256 minted = PACKS.createPack{value: 3 * (0.01 ether + fee)}(new uint256[](0), counts);
-        vm.serializeUint(json, "create_pack_mint_3", g - gasleft());
-        assertEq(PACKS.valueOf(minted), 0.03 ether);
+        uint256 packId = _pack6();
+        vm.serializeUint(json, "create_pack_mint_6", g - gasleft());
+        assertEq(PACKS.valueOf(packId), P);
 
         _cool();
         g = gasleft();
@@ -123,26 +106,16 @@ contract ForkMeasureTest is Test {
         assertEq(value, B);
         assertEq(status, LISTING_ACTIVE, "empty queue lists straight into the pool");
 
-        // One cap above the oracle cap reverts: the cap rule is live.
-        uint256 second = _pack(ids, 3);
-        vm.expectRevert();
-        FWA.listNFT{value: B + 1}(address(PACKS), second);
-
-        // Batch of 10 listings in one transaction (vault batch shape).
-        uint256[] memory packs10 = new uint256[](10);
-        packs10[0] = second;
-        packs10[1] = _pack(ids, 6);
-        for (uint256 i = 2; i < 10; ++i) {
-            uint256[] memory more = _shapes();
-            packs10[i] = _pack(more, 0);
-        }
+        // Batch of 8 listings in one transaction (the vault's MAX_LIST_BATCH build shape).
+        uint256[] memory packs8 = new uint256[](8);
+        for (uint256 i; i < 8; ++i) packs8[i] = _pack6();
         _cool();
         g = gasleft();
-        uint256[] memory listed = new uint256[](10);
-        for (uint256 i; i < 10; ++i) {
-            listed[i] = FWA.listNFT{value: B}(address(PACKS), packs10[i]);
+        uint256[] memory listed = new uint256[](8);
+        for (uint256 i; i < 8; ++i) {
+            listed[i] = FWA.listNFT{value: B}(address(PACKS), packs8[i]);
         }
-        vm.serializeUint(json, "list_batch_10", g - gasleft());
+        vm.serializeUint(json, "list_batch_8", g - gasleft());
 
         // Fees: none accrue without an acquisition at this block, so the claim reverts.
         assertEq(FWA.pendingFees(listingId), 0);
@@ -165,8 +138,8 @@ contract ForkMeasureTest is Test {
         PACKS.redeem(packId);
         uint256 redeemGas = g - gasleft();
         vm.serializeUint(json, "redeem_pack", redeemGas);
-        // Absolute amount: a 0.03 pack redeems to exactly 0.03 ETH.
-        assertEq(address(this).balance - balBefore, 0.03 ether);
+        // Absolute amount: a 0.06 pack redeems to exactly 0.06 ETH.
+        assertEq(address(this).balance - balBefore, P);
 
         string memory out = vm.serializeUint(json, "block", BLOCK);
         vm.writeJson(out, "sim/out/gas-fork.json");

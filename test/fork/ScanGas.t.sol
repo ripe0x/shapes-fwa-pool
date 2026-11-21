@@ -6,6 +6,7 @@ import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
 import {JournalRequests} from "./EfficientJournal.t.sol";
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {PackAccount} from "../../src/PackAccount.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 
 /// @notice Calibration for Q_SCAN. A vault with N own Active listings and a real foreign backlog
@@ -36,7 +37,7 @@ contract ScanGasTest is ForkBase {
 
     function _listOwn(uint256 n) internal {
         vm.prank(keeper);
-        TestVaultOps.restock(vault, n, 3, 0);
+        TestVaultOps.restock(vault, n, UNITS, 0);
         vm.prank(keeper);
         TestVaultOps.list(vault, n, 0);
         assertEq(vault.openListingCount(), n, "own active listings in place");
@@ -83,7 +84,7 @@ contract ScanGasTest is ForkBase {
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
         this.assertGasContext();
-        bytes memory input = abi.encodeCall(PackVault.sync, (new uint256[](0), uint256(0), uint256(0)));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0)));
         uint256 intrinsic = _intrinsic(input);
         _cold();
         vm.prank(keeper);
@@ -121,12 +122,12 @@ contract ScanGasTest is ForkBase {
     ///         keeper's 25%-padded estimate fits EIP-7825. The own positions are foreign-refunded,
     ///         never selected, so the journal processes 128 foreign records with no own transition.
     function test_full128ForeignJournalReceiptGasFitsCap() public {
-        vm.deal(address(vault), 10 ether);
+        vm.deal(address(vault), 20 ether); // 94 six-unit own listings need ~6 ETH backing plus mints
         _listOwn(94); // 94*30000 = 2,820,000 > 128*22000 = 2,816,000: scan declines, journal runs
         _backlog(128);
         uint64 end = FWA.nextSequenceToProcess();
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei); this.assertGasContext();
-        bytes memory input = abi.encodeCall(PackVault.sync, (new uint256[](0), uint256(0), uint256(1)));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(1)));
         uint256 intrinsic = _intrinsic(input);
         vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(vault.keeperPolicy()));
         vm.cool(address(FWA)); vm.cool(address(PACKS)); vm.cool(keeper);
@@ -151,7 +152,7 @@ contract ScanGasTest is ForkBase {
         uint64 end = FWA.nextSequenceToProcess();
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
-        bytes memory input = abi.encodeCall(PackVault.sync, (new uint256[](0), uint256(0), uint256(0)));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0)));
         uint256 intrinsic = _intrinsic(input);
         _cold();
         vm.prank(keeper);
@@ -203,7 +204,7 @@ contract ScanPaidGasTest is SelectionBase {
         vm.fee(0.5 gwei);
         vm.txGasPrice(0.5 gwei);
 
-        bytes memory input = abi.encodeCall(PackVault.sync, (new uint256[](0), uint256(0), uint256(0)));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0)));
         uint256 intrinsic = 21_000;
         for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
         vm.cool(address(vault));

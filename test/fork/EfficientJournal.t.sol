@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import {ForkBase} from "./ForkBase.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
+import {StrategyLib} from "../../src/StrategyLib.sol";
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
 interface JournalRequests {
@@ -28,7 +29,7 @@ contract EfficientJournalTest is ForkBase {
         vm.prank(alice); vault.deposit{value: deposit}();
         toBlackout(); checkpoint(); toOpen();
         assertGt(vault.shareBalance(alice), 0, "the funded holder owns the priced deposit");
-        vm.prank(keeper); TestVaultOps.restock(vault, 1, 3, 0);
+        vm.prank(keeper); TestVaultOps.restock(vault, 1, UNITS, 0);
         vm.prank(keeper); TestVaultOps.list(vault, 1, 0);
         assertEq(vault.openListingCount(), 1);
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei); this.assertEnvironment();
@@ -85,7 +86,7 @@ contract EfficientJournalTest is ForkBase {
         uint64 cursor = _refund(32);
         uint256 snapshot = vm.snapshotState();
         uint256 cash = address(vault).balance;
-        vm.expectRevert(VaultLib.Payment.selector);
+        vm.expectRevert(StrategyLib.Payment.selector);
         vm.prank(keeper); vault.sync(new uint256[](0), 0, 1);
         assertEq(vault.acquisitionCursor(), cursor);
         vm.prank(keeper); assertEq(vault.sync(new uint256[](0), 0, 0), 0);
@@ -156,7 +157,7 @@ contract EfficientJournalTest is ForkBase {
         uint256 snapshot = vm.snapshotState();
         uint256 cursor = vault.acquisitionCursor();
         uint256 cash = address(vault).balance;
-        vm.expectRevert(VaultLib.Payment.selector);
+        vm.expectRevert(StrategyLib.Payment.selector);
         vm.prank(keeper); vault.sync(new uint256[](0), witness + 1e9, 1);
         assertEq(vault.acquisitionCursor(), cursor, "refused proof payment rolls back the journal");
         vm.prank(keeper); assertEq(vault.sync(new uint256[](0), witness + 1e9, 0), 0);

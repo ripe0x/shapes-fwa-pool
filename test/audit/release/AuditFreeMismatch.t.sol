@@ -29,7 +29,8 @@ contract AuditFreeMismatch is ForkBase {
         checkpoint();
         toOpen();
         vm.prank(keeper);
-        TestVaultOps.restock(vault, 1, 3, 0);
+        // build mints and lists one pack at once; the following list finds no idle pack (no-op).
+        TestVaultOps.restock(vault, 1, UNITS, 0);
         vm.prank(keeper);
         TestVaultOps.list(vault, 1, 0);
         assertEq(TestVaultOps.open(vault).length, 1);

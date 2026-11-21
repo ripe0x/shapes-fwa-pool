@@ -5,6 +5,7 @@ import {TestVaultOps} from "../../utils/TestVaultOps.sol";
 import {DeployCore} from "../../../script/DeployCore.sol";
 import {ForkBase} from "../../fork/ForkBase.sol";
 import {PackVault} from "../../../src/PackVault.sol";
+import {PackAccount} from "../../../src/PackAccount.sol";
 import {KeeperPolicyV1} from "../../../src/KeeperPolicy.sol";
 import {VaultLib} from "../../../src/VaultLib.sol";
 import {Charges} from "../../utils/Charges.sol";
@@ -20,10 +21,10 @@ contract AuditMaxPackGas is ForkBase {
         this.assertGasContext();
         VaultLib.Params memory p = defaultParams();
         p.packUnitsMask = uint64(1) << 63;
-        vm.expectRevert(PackVault.OutOfBounds.selector);
+        vm.expectRevert(VaultLib.OutOfBounds.selector);
         new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
         p.packUnitsMask = uint64(1) << 31;
-        vm.expectRevert(PackVault.OutOfBounds.selector);
+        vm.expectRevert(VaultLib.OutOfBounds.selector);
         new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
 
         p.packUnitsMask = uint64(1) << 30;
@@ -37,15 +38,18 @@ contract AuditMaxPackGas is ForkBase {
         setPackAsk(0.33 ether); // Ceiling 0.363 covers a 0.30 / 0.9 cash bid.
         (,, bool ok) = vault.edge(30);
         assertTrue(ok, "30-unit pack edge must be live");
-        assertEq(vault.looseShapeCount(), 0, "empty inventory");
+        assertEq(vault.idlePackCount(), 0, "empty inventory");
+        assertEq(vault.openListingCount(), 0, "empty inventory");
         uint256[] memory proposals = TestVaultOps.proposals(vault, 1, 30);
         uint256 beforeGas = gasleft();
         vm.prank(keeper);
-        (bool underCap,) = address(vault).call{gas: 16_777_216}(abi.encodeCall(PackVault.restock, (30, proposals, 0)));
+        // build mints the pack straight into ShapePacks and lists it at once (no idle leftover).
+        (bool underCap,) = address(vault).call{gas: 16_777_216}(abi.encodeCall(PackAccount.build, (30, proposals, 0)));
         uint256 used = beforeGas - gasleft();
-        emit log_named_uint("30 unit restock gas", used);
+        emit log_named_uint("30 unit build gas", used);
         assertTrue(underCap, "largest allowed pack builds under the transaction cap");
         assertLt(used, 12_000_000, "with headroom");
-        assertEq(TestVaultOps.idle(vault).length, 1);
+        assertEq(TestVaultOps.idle(vault).length, 0, "build leaves no idle pack");
+        assertEq(TestVaultOps.open(vault).length, 1, "build lists the pack");
     }
 }

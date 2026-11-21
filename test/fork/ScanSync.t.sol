@@ -8,7 +8,9 @@ import {IKeeperPolicy} from "../../src/KeeperPolicy.sol";
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 import {Charges} from "../utils/Charges.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {PackAccount} from "../../src/PackAccount.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
+import {StrategyLib} from "../../src/StrategyLib.sol";
 import {LISTING_ALLOCATED} from "../../src/interfaces/External.sol";
 
 /// @dev A real deployed hostile keeper policy an owner could set: it always offers the maximum.
@@ -32,7 +34,7 @@ contract ScanSyncForeignTest is ForkBase {
         p.payMarkupBps = 0; p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei;
         vm.prank(owner); vault.setParams(p);
         vm.deal(address(vault), 5 ether);
-        vm.prank(keeper); TestVaultOps.restock(vault, 1, 3, 0);
+        vm.prank(keeper); TestVaultOps.restock(vault, 1, UNITS, 0);
         vm.prank(keeper); TestVaultOps.list(vault, 1, 0);
         assertEq(vault.openListingCount(), 1);
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
@@ -55,7 +57,7 @@ contract ScanSyncForeignTest is ForkBase {
     }
 
     function _billedScan() internal returns (uint256 billed, uint256 pay) {
-        bytes memory input = abi.encodeCall(PackVault.sync, (new uint256[](0), uint256(0), uint256(0)));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0)));
         uint256 intrinsic = 21_000;
         for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
         vm.cool(address(vault)); vm.cool(address(FWA)); vm.cool(address(vault.keeperPolicy()));
@@ -77,7 +79,7 @@ contract ScanSyncForeignTest is ForkBase {
         assertEq(pay, 0, "no own selection, no checkpoint: unpaid");
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess(), "one scan cleared it");
         assertEq(address(vault).balance, cash, "no vault cash moved");
-        vm.expectRevert(VaultLib.Nothing.selector);
+        vm.expectRevert(StrategyLib.Nothing.selector);
         vm.prank(keeper); vault.sync(new uint256[](0), 0, 0);
     }
 
@@ -127,12 +129,12 @@ contract ScanSyncForeignTest is ForkBase {
         vm.prank(keeper); uint256 paddedPay = vault.sync(padded, 0, 0);
         assertEq(paddedPay, 0, "irrelevant ids do not manufacture pay");
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
-        vm.expectRevert(VaultLib.Nothing.selector);
+        vm.expectRevert(StrategyLib.Nothing.selector);
         vm.prank(keeper); vault.sync(new uint256[](0), 0, 0);
         assertTrue(vm.revertToState(snapshot));
         vm.prank(keeper); uint256 plainPay = vault.sync(new uint256[](0), 0, 0);
         assertEq(plainPay, paddedPay, "padding changes nothing: a split later call earns no second scan");
-        vm.expectRevert(VaultLib.Nothing.selector);
+        vm.expectRevert(StrategyLib.Nothing.selector);
         vm.prank(keeper); vault.sync(padded, 0, 0);
     }
 }
@@ -218,7 +220,7 @@ contract ScanSyncSelectionTest is SelectionBase {
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
         (uint256 routine,) = vault.budget();
         assertEq(routine, 0, "budget exhausted");
-        vm.expectRevert(PackVault.Payment.selector);
+        vm.expectRevert(StrategyLib.Payment.selector);
         vault.sync(new uint256[](0), 0, 1);
         assertEq(vault.acquisitionCursor(), cursor, "refused pay rolls back the scan: selection still pending");
         // Owner restores a refill rate and cap; time then refills the routine budget.
