@@ -50,7 +50,8 @@ library ReconcileTrace {
         string memory line = string.concat('{"step":"', step, '","pay":', vm.toString(pay), ',"balance":', vm.toString(address(v).balance));
         line = string.concat(line, ',"totalShares":', vm.toString(v.totalShares()), ',"lastNav":', vm.toString(v.lastNav()));
         line = string.concat(line, ',"pendingDepositTotal":', vm.toString(v.pendingDepositTotal()), ',"redemptionReserve":', vm.toString(v.redemptionReserve()), ',"lockedShares":', vm.toString(v.lockedShares()));
-        line = string.concat(line, ',"open":', vm.toString(open.length), ',"idle":', vm.toString(v.idlePackCount()), ',"loose":', vm.toString(v.looseShapeCount()));
+        // Loose Shapes are gone (direct-mint recipe); the field stays 0 so the reconciler's schema is unchanged.
+        line = string.concat(line, ',"open":', vm.toString(open.length), ',"idle":', vm.toString(v.idlePackCount()), ',"loose":0');
         line = string.concat(line, ',"aliceShares":', vm.toString(v.shareBalance(alice)), ',"bobShares":', vm.toString(v.shareBalance(bob)), ',"aliceLocked":', vm.toString(uint256(aLocked)));
         line = string.concat(line, ',"aliceClaimable":', vm.toString(v.claimableEth(alice)), ',"pendingFeesSum":', vm.toString(fees), ',"feeCredit":', vm.toString(v.fwa().feeCredit(address(v))));
         line = string.concat(line, book(v), ',"processingPool":', vm.toString(v.processingPool()));

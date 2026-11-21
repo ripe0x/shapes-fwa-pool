@@ -3,8 +3,9 @@ pragma solidity 0.8.30;
 
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
-import {ForkBase, IFwaAdmin} from "./ForkBase.sol";
+import {ForkBase, IFwaAdmin, IOwnable} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {PackAccount} from "../../src/PackAccount.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {Charges} from "../utils/Charges.sol";
 import {PolicyGreedy} from "./ForkKeeperPolicy.t.sol";
@@ -31,31 +32,35 @@ contract ForkKeeperPayTest is ForkBase {
 
     function _restock(uint256 n) internal returns (uint256 pay) {
         vm.prank(keeper);
-        pay = TestVaultOps.restock(vault, n, 3, 0);
+        pay = TestVaultOps.restock(vault, n, 6, 0);
     }
 
     /// 1-3, 13: the payment is the quote, whatever gas limit, gas use or tip the caller chooses,
     /// and it equals the returned value and the ETH the caller received.
     function test_payIgnoresCallerGasAndTip() public {
         _priced(alice, 1 ether);
-        _restock(3);
         uint256 snap = vm.snapshotState();
         uint256 b = keeper.balance;
         vm.prank(keeper);
-        uint256 p1 = TestVaultOps.list(vault, 3, 0);
+        uint256 p1 = TestVaultOps.restock(vault, 3, 6, 0); // build 3
         assertEq(keeper.balance - b, p1, "returned pay is the paid amount");
-        assertEq(p1, (VaultLib.Q_LIST + 3 * VaultLib.Q_LISTED) * PRICE + 3 * vault.getParams().workFee, "list quote");
+        assertEq(p1, _buildQuote(3) * PRICE + 6 * vault.getParams().workFee, "build quote");
         vm.revertToState(snap);
         vm.txGasPrice(5 gwei); // the caller bids a 4.85 gwei tip
-        uint256[] memory proposals = TestVaultOps.proposals(vault, 3, 3);
+        uint256[] memory proposals = TestVaultOps.proposals(vault, 3, 6);
         vm.prank(keeper);
-        uint256 p2 = vault.list{gas: 15_000_000}(proposals, 0);
+        uint256 p2 = vault.build{gas: 15_000_000}(6, proposals, 0);
         assertEq(p2, p1, "tip and gas limit do not change pay");
         vm.txGasPrice(0.2 gwei);
     }
 
-    function _coldList(uint256[] memory quotes) internal returns (uint256 pay, uint256 used) {
-        bytes memory input = abi.encodeCall(PackVault.list, (quotes, 0));
+    /// @dev Quoted gas for building-and-listing `n` six-unit packs in one call (<= MAX_LIST_BATCH).
+    function _buildQuote(uint256 n) internal pure returns (uint256) {
+        return VaultLib.Q_BUILD + n * (VaultLib.buildGas(2) + VaultLib.Q_LISTED);
+    }
+
+    function _coldBuild(uint256[] memory quotes) internal returns (uint256 pay, uint256 used) {
+        bytes memory input = abi.encodeCall(PackAccount.build, (6, quotes, 0));
         uint256 intrinsic = 21_000;
         for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
         address policy = address(vault.keeperPolicy());
@@ -77,7 +82,6 @@ contract ForkKeeperPayTest is ForkBase {
 
     function _split(bool maximumMarkup) internal {
         _priced(alice, 1 ether);
-        _restock(3);
         uint256 premiumBps;
         if (maximumMarkup) {
             premiumBps = 1_000;
@@ -86,18 +90,18 @@ contract ForkKeeperPayTest is ForkBase {
             PolicyGreedy policy = new PolicyGreedy();
             vm.prank(owner); vault.setPolicy(address(policy));
         }
-        uint256[] memory proposals = TestVaultOps.proposals(vault, 3, 3);
+        uint256[] memory proposals = TestVaultOps.proposals(vault, 3, 6);
         uint256 snap = vm.snapshotState();
-        (uint256 one, uint256 gasOne) = _coldList(proposals);
-        assertEq(one, (VaultLib.Q_LIST + 3 * VaultLib.Q_LISTED) * PRICE * (10_000 + premiumBps) / 10_000
-            + 3 * vault.getParams().workFee, "real replaceable policy reaches the specified envelope");
+        (uint256 one, uint256 gasOne) = _coldBuild(proposals);
+        assertEq(one, _buildQuote(3) * PRICE * (10_000 + premiumBps) / 10_000
+            + 6 * vault.getParams().workFee, "real replaceable policy reaches the specified envelope");
         assertEq(vault.openListingCount(), 3);
         vm.revertToState(snap);
         uint256 split;
         uint256 gasSplit;
         for (uint256 i; i < 3; ++i) {
             uint256[] memory single = new uint256[](1); single[0] = proposals[i];
-            (uint256 paid, uint256 used) = _coldList(single);
+            (uint256 paid, uint256 used) = _coldBuild(single);
             split += paid; gasSplit += used;
         }
         assertEq(vault.openListingCount(), 3);
@@ -105,17 +109,18 @@ contract ForkKeeperPayTest is ForkBase {
         emit log_named_uint("three singleton complete gross gas", gasSplit);
         emit log_named_uint("batch three pay wei", one);
         emit log_named_uint("three singleton pay wei", split);
-        assertEq(split - one, 2 * VaultLib.Q_LIST * PRICE * (10_000 + premiumBps) / 10_000, "exactly two extra bases");
+        // Each split call earns one extra Q_BUILD call base; two extra calls for the split of three.
+        assertEq(split - one, 2 * VaultLib.Q_BUILD * PRICE * (10_000 + premiumBps) / 10_000, "exactly two extra bases");
         assertGt((gasSplit - gasOne) * PRICE, split - one, "the extra calls cost more gas than they earn");
     }
 
     /// 5: repeating completed work pays nothing: it reverts.
     function test_repeatedWorkPaysNothing() public {
         _priced(alice, 1 ether);
-        _restock(2);
-        vm.prank(keeper);
-        TestVaultOps.list(vault, 2, 0);
+        _restock(2); // build mints and lists 2
         uint256[] memory ids = TestVaultOps.open(vault);
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), false);
         setPackAsk(0.03 ether);
         toBlackout();
         IFwaAdmin(address(FWA)).kickListing(ids[0]);
@@ -183,19 +188,19 @@ contract ForkKeeperPayTest is ForkBase {
     /// redeemer, with another holder present to absorb socialized costs: deposit, price, build
     /// and list with its ETH, redeem, unwind, price, claim. Its net after its own gas is negative.
     function test_manufacturedCycleLosesAtMaxima() public {
-        _priced(alice, 1 ether);
+        // Larger deposits than the 3-unit recipe: six-unit packs cost ~0.13 ETH each to list.
+        _priced(alice, 2 ether);
         // Alice's capital is deployed first, so the attacker's redemption really needs unwinding.
-        vm.startPrank(keeper);
-        TestVaultOps.restock(vault, 10, 3, 0);
-        TestVaultOps.list(vault, 10, 0);
-        TestVaultOps.restock(vault, 3, 3, 0);
-        TestVaultOps.list(vault, 3, 0);
-        vm.stopPrank();
+        vm.prank(keeper);
+        TestVaultOps.restock(vault, 13, 6, 0); // build mints and lists 13
         VaultLib.Params memory p = defaultParams();
         p.payMarkupBps = 1_000;
         p.workFee = uint64(vault.MAX_WORK_FEE());
-        p.gasCeiling = 50 gwei;
-        p.essentialCeiling = 50 gwei;
+        // 8 gwei is the effective ceiling maximum at which the 6-unit recipe still lists: above it
+        // the purchaser-redeem margin (160,000 x gasCeiling) pushes the backing below P / 0.95. A
+        // lower cap only lowers the attacker's pay, so the loss conclusion holds a fortiori.
+        p.gasCeiling = 8 gwei;
+        p.essentialCeiling = 8 gwei;
         p.maxTip = 0.05 gwei;
         vm.prank(owner);
         vault.setParams(p);
@@ -209,7 +214,7 @@ contract ForkKeeperPayTest is ForkBase {
         // Deposit, priced by the attacker (basefee 0.15 gwei).
         uint256 ck = vault.requestCharge();
         vm.prank(a);
-        vault.deposit{value: ck + 1 ether}();
+        vault.deposit{value: ck + 2 ether}();
         toBlackout();
         uint256 g = gasleft();
         vm.prank(a);
@@ -217,14 +222,10 @@ contract ForkKeeperPayTest is ForkBase {
         gasUsed = g - gasleft() + 21_000;
         gasCost += gasUsed * 0.15 gwei;
         toOpen();
-        // Build and list with the attacker's ETH (15 positions), at a basefee where the gate lets it.
+        // Build with the attacker's ETH (15 positions), at a basefee where the gate lets it.
         g = gasleft();
-        vm.startPrank(a);
-        TestVaultOps.restock(vault, 10, 3, 0);
-        TestVaultOps.list(vault, 10, 0);
-        TestVaultOps.restock(vault, 5, 3, 0);
-        TestVaultOps.list(vault, 5, 0);
-        vm.stopPrank();
+        vm.prank(a);
+        TestVaultOps.restock(vault, 15, 6, 0);
         gasCost += (g - gasleft() + 5 * 21_000) * 0.15 gwei;
         assertGe(TestVaultOps.open(vault).length, 25, "the attacker's ETH was deployed");
         // Redeem everything; unwind at a 5 gwei spike (essential work pays at the ceiling-capped price).
@@ -258,7 +259,7 @@ contract ForkKeeperPayTest is ForkBase {
             toOpen();
             ids = TestVaultOps.open(vault);
             uint256[] memory single = new uint256[](1); single[0] = ids[0];
-            bool hasInventory = vault.idlePackCount() != 0 || vault.looseShapeCount() != 0;
+            bool hasInventory = vault.idlePackCount() != 0;
             g = gasleft();
             vm.prank(a);
             if (hasInventory) vault.liquidate(16, 0); else vault.unlist(single, 0);
@@ -287,13 +288,13 @@ contract ForkKeeperPayTest is ForkBase {
         setCaps(0, 0);
         (uint256 r, uint256 e) = vault.budget();
         assertEq(r + e, 0);
-        uint256[] memory planned3 = TestVaultOps.proposals(vault, 2, 3);
+        uint256[] memory planned3 = TestVaultOps.proposals(vault, 2, 6);
         vm.prank(keeper);
-        vm.expectRevert(PackVault.Payment.selector);
-        vault.list(planned3, 1);
-        uint256[] memory planned2 = TestVaultOps.proposals(vault, 2, 3);
+        vm.expectRevert(VaultLib.Payment.selector);
+        vault.build(6, planned3, 1);
+        uint256[] memory planned2 = TestVaultOps.proposals(vault, 2, 6);
         vm.prank(keeper);
-        assertEq(vault.list(planned2, 0), 0, "listed unpaid");
+        assertEq(vault.build(6, planned2, 0), 0, "built unpaid");
         uint256 shares = vault.shareBalance(alice);
         uint256 rc = Charges.redeemCharge(vault, shares);
         vm.prank(alice);
@@ -328,7 +329,7 @@ contract ForkKeeperPayTest is ForkBase {
         uint256 paid;
         for (uint256 i; i < 4; ++i) {
             vm.prank(keeper);
-            paid += TestVaultOps.restock(vault, 1, 3, 0);
+            paid += TestVaultOps.restock(vault, 1, 6, 0);
         }
         assertLe(paid, 0.002 ether);
         (r,) = vault.budget();
@@ -350,12 +351,12 @@ contract ForkKeeperPayTest is ForkBase {
         // Above the bytecode maxima: refused.
         up.routineCap = 0.3 ether + 1;
         vm.prank(owner);
-        vm.expectRevert(PackVault.OutOfBounds.selector);
+        vm.expectRevert(VaultLib.OutOfBounds.selector);
         vault.setParams(up);
         up.routineRate = 0.02 ether + 1;
         up.routineCap = 0.3 ether;
         vm.prank(owner);
-        vm.expectRevert(PackVault.OutOfBounds.selector);
+        vm.expectRevert(VaultLib.OutOfBounds.selector);
         vault.setParams(up);
         // A owner lowering clamps the level at once.
         q = vault.getParams();
@@ -384,7 +385,7 @@ contract ForkKeeperPayTest is ForkBase {
         assertEq(essential, p.essentialCap, "routine rate does not change essential capacity");
         assertEq(address(vault).balance, cash);
         p.routineRate = 0.02 ether + 1;
-        vm.expectRevert(PackVault.OutOfBounds.selector);
+        vm.expectRevert(VaultLib.OutOfBounds.selector);
         vm.prank(owner); vault.setParams(p);
         assertEq(vault.getParams().routineRate, 0.02 ether, "over-limit change is atomic");
     }
@@ -393,9 +394,7 @@ contract ForkKeeperPayTest is ForkBase {
     /// for a redemption is still paid from the essential budget.
     function test_routineCannotDrainEssential() public {
         _priced(alice, 1 ether);
-        _restock(3);
-        vm.prank(keeper);
-        TestVaultOps.list(vault, 3, 0);
+        _restock(3); // build mints and lists 3
         VaultLib.Params memory q = vault.getParams();
         setCaps(0, q.essentialCap);
         _restock(1); // routine: unpaid now
@@ -421,10 +420,7 @@ contract ForkKeeperPayTest is ForkBase {
         uint256 rc = Charges.redeemCharge(vault, shares);
         vm.prank(alice);
         vault.requestRedeem{value: rc}(shares);
-        _restock(1);
-        _check();
-        vm.prank(keeper);
-        TestVaultOps.list(vault, 1, 0);
+        _restock(1); // build mints and lists
         _check();
         toBlackout();
         checkpoint();
@@ -440,16 +436,15 @@ contract ForkKeeperPayTest is ForkBase {
     /// minPay: the exact quote is accepted, one wei more reverts the whole call.
     function test_minPayIsAllOrNothing() public {
         _priced(alice, 1 ether);
-        _restock(1);
-        uint256 quote = (VaultLib.Q_LIST + VaultLib.Q_LISTED) * PRICE + vault.getParams().workFee;
+        uint256 quote = _buildQuote(1) * PRICE + 2 * vault.getParams().workFee;
         uint256 snap = vm.snapshotState();
-        uint256[] memory planned1 = TestVaultOps.proposals(vault, 1, 3);
+        uint256[] memory planned1 = TestVaultOps.proposals(vault, 1, 6);
         vm.prank(keeper);
-        vm.expectRevert(PackVault.Payment.selector);
-        vault.list(planned1, quote + 1);
+        vm.expectRevert(VaultLib.Payment.selector);
+        vault.build(6, planned1, quote + 1);
         vm.revertToState(snap);
         vm.prank(keeper);
-        assertEq(TestVaultOps.list(vault, 1, quote), quote);
+        assertEq(TestVaultOps.restock(vault, 1, 6, quote), quote);
     }
 
     /// Requests in one interval share one checkpoint: the first tops the pool up to one
@@ -502,12 +497,11 @@ contract ForkKeeperPayTest is ForkBase {
         vm.prank(owner);
         vault.setParams(p);
         _priced(alice, 1 ether);
-        _restock(4);
         vm.fee(1 gwei);
         vm.txGasPrice(1.05 gwei);
         vm.prank(keeper);
-        uint256 listPay = TestVaultOps.list(vault, 2, 0);
-        assertEq(listPay, (VaultLib.Q_LIST + 2 * VaultLib.Q_LISTED) * 0.5 gwei + 2 * p.workFee, "routine: capped at 0.5 gwei");
+        uint256 buildPay = TestVaultOps.restock(vault, 2, 6, 0); // routine build of two listings
+        assertEq(buildPay, _buildQuote(2) * 0.5 gwei + 4 * p.workFee, "routine: capped at 0.5 gwei");
         vm.prank(owner);
         vault.startWindDown();
         uint256[] memory ids = TestVaultOps.open(vault);
@@ -522,9 +516,7 @@ contract ForkKeeperPayTest is ForkBase {
     /// withdrawer unlists and liquidates herself and the redemption completes.
     function test_selfServeExitWithoutEssentialBudget() public {
         _priced(alice, 1 ether);
-        _restock(3);
-        vm.prank(keeper);
-        TestVaultOps.list(vault, 3, 0);
+        _restock(3); // build mints and lists 3
         setCaps(vault.getParams().routineCap, 0);
         assertEq(vault.unwindCharge(), 0, "no unwind charge");
         uint256 shares = vault.shareBalance(alice);

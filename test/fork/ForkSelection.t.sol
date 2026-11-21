@@ -12,7 +12,7 @@ import {VaultLib} from "../../src/VaultLib.sol";
 import {
     IShapes, IShapePacks, IFWAV2, LISTING_ACTIVE, LISTING_ALLOCATED
 } from "../../src/interfaces/External.sol";
-import {IOwnable, IOracleAdmin} from "./ForkBase.sol";
+import {IOwnable, IOracleAdmin, IFwaAdmin} from "./ForkBase.sol";
 
 interface IFwaSettle {
     function acceptDepositorBid(uint256 listingId) external;
@@ -23,17 +23,23 @@ interface IFwaSettle {
 }
 
 /// @notice Outcome paths driven by FWA's real randomness. sim/find_selection.py found historical
-///         requests whose real VRF word selects the vault listing among 30 real listings posted just before the
-///         request. Each test forks right before that request, posts the real listings, then replays
-///         the real request and fulfillment transactions. Only the purchaser's choice is ours to
-///         drive, through the purchaser's own call.
+///         requests whose real VRF word selects the vault listing among 30 real listings posted
+///         just before the request. Each test forks right before that request, posts the real
+///         listings, then replays the real request and fulfillment transactions. Only the
+///         purchaser's choice is ours to drive, through the purchaser's own call.
+/// @dev     Every listing posts exactly `B` = edge(6) at gasCeiling 0.5 gwei. Weight is 1e36 / B,
+///          so any other backing changes the selecting word and breaks the replay; the backing is
+///          the value `sim/find_selection.py 65158469945350000 30` searched against.
 abstract contract SelectionBase is Test {
     IShapes constant SHAPES = IShapes(0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0);
     IShapePacks constant PACKS = IShapePacks(0xf21514B090Da7dF4390803497d6ae673801E5cA7);
     IFWAV2 constant FWA = IFWAV2(0x958C41181182e76F221331b2755b77D9e1426A98);
     uint256 constant COUNT = 1;
     uint256 constant FIXTURE_COUNT = 30;
-    uint256 constant B = 0.0363 ether;
+    uint256 constant UNITS = 6; // the 0.06 ETH recipe: one 0.05 and one 0.01 Shape, two paid mints
+    // edge(6) at gasCeiling 0.5 gwei: floor(0.06 - (0.0003 + 160000 x 0.5 gwei)) x 10000 / 9150, to
+    // the 10,000 wei. Every one of the 30 listings posts this exact backing.
+    uint256 constant B = 65_158_469_945_350_000;
 
     struct Candidate {
         bytes32 requestTx;
@@ -43,34 +49,32 @@ abstract contract SelectionBase is Test {
         uint256 index; // which of our 30 listings the real word selects
         uint256 slot;
         address purchaser;
-        bool needsAdmission; // before FWA admitted packs and set their quote
     }
 
-    // Block 26,417,086: after packs were admitted (26,415,582) and quoted (26,415,718).
-    function late() internal pure returns (Candidate memory) {
+    // Block 26,402,342: before ShapePacks' FWA admission; FWA's owner whitelists and oracle-exempts
+    // packs (its real D62 calls) first. Our listing is index 20 of 30.
+    function primary() internal pure returns (Candidate memory) {
         return Candidate(
-            0x7a2e33446681244f37d801df737f7017e3e9258d49fa6465e95983f5a3b81a6f,
-            26_417_086,
-            26_417_091,
-            1_794_705_887,
-            28,
-            1631,
-            0x6A51eEe3a2C2d33921844965738aE99b81dbFf95,
-            false
+            0xbe792fe6c591b28151d56eac601e8de8b9be5aadf87b2077ec37f315ee2b0b68,
+            26_402_342,
+            26_402_346,
+            1_794_528_443,
+            20,
+            3055,
+            0x82D16fF1C724ab72F218A3f7f6DD3E5385ee87E8
         );
     }
 
-    // Block 26,405,703: before admission; FWA's owner and the oracle owner make their real calls first.
-    function early() internal pure returns (Candidate memory) {
+    // Block 26,391,002: likewise before admission. Our listing is index 18 of 30.
+    function second() internal pure returns (Candidate memory) {
         return Candidate(
-            0x8e3293810d4e650e8ea6c2f0080ca85767ac6c783f5e93796947ee7aeab5e56f,
-            26_405_703,
-            26_405_708,
-            1_794_568_871,
-            19,
-            7487,
-            0x184b487D36Aea8AA5990569C326c269DE246179A,
-            true
+            0xfe4536c66391c718e1a4b17688dfebca8ac2e6403a67d015b20c14723f0fef6f,
+            26_391_002,
+            26_391_007,
+            1_794_392_003,
+            18,
+            6323,
+            0x6A51eEe3a2C2d33921844965738aE99b81dbFf95
         );
     }
 
@@ -84,7 +88,7 @@ abstract contract SelectionBase is Test {
     uint256 acqActive;
     uint256 deployBalance; // vault balance right after deployment (seed plus any mainnet dust)
     uint256 activationDebt; // real FWA debt read while the selected listing was still Active
-    uint256 selectPay; // keeper pay to this contract for the restock and list in _select
+    uint256 selectPay; // keeper pay to this contract for the build in _select
 
     function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
         return this.onERC721Received.selector;
@@ -92,15 +96,14 @@ abstract contract SelectionBase is Test {
 
     function _select(Candidate memory c) internal {
         vm.createSelectFork("mainnet", c.requestTx);
-        if (c.needsAdmission) {
-            address[] memory cols = new address[](1);
-            cols[0] = address(PACKS);
-            vm.prank(IOwnable(address(FWA)).owner());
-            IFwaSettle(address(FWA)).setCollectionsWhitelisted(cols, true);
-            address oracle = FWA.floorOracle();
-            vm.prank(IOwnable(oracle).owner());
-            IOracleAdmin(oracle).setFloor(address(PACKS), 0.033 ether);
-        }
+        // Both candidates precede ShapePacks' FWA admission (26,415,582): the real admin calls that
+        // made D62 live are replayed first, before anything lists.
+        address[] memory cols = new address[](1);
+        cols[0] = address(PACKS);
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaSettle(address(FWA)).setCollectionsWhitelisted(cols, true);
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         assertEq(FWA.unsettledAcquisitionCount(), 0, "queue empty before the request");
 
         _beforeSelectionDeploy();
@@ -110,9 +113,9 @@ abstract contract SelectionBase is Test {
         p.maxTip = 0.05 gwei;
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 200;
-        p.packUnitsMask = uint64(1) << 3;
-        p.gasCeiling = 50 gwei;
-        p.essentialCeiling = 50 gwei;
+        p.packUnitsMask = uint64(1) << UNITS;
+        p.gasCeiling = 0.5 gwei; // the backing the VRF replay was searched against is edge(6) here
+        p.essentialCeiling = 0.5 gwei;
 
         p.tvlCap = 100 ether;
         p.routineCap = 0.3 ether; // bytecode maxima: these suites test mechanics, not budgets
@@ -127,17 +130,20 @@ abstract contract SelectionBase is Test {
         assertEq(vaultOwner.balance, 0);
         (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, vaultOwner, p, 3 ether);
         deployBalance = address(vault).balance;
+        (, uint256 edgeBacking, bool edgeOk) = vault.edge(UNITS);
+        assertTrue(edgeOk, "edge(6) lists at gasCeiling 0.5 gwei");
+        assertEq(edgeBacking, B, "edge(6) backing is the VRF-replay value B");
         ReceiptFixtureFiller filler = new ReceiptFixtureFiller{value: 3 ether}(
             ReceiptFWA(address(FWA)), ReceiptPacks(address(PACKS)), ReceiptShapes(address(SHAPES))
         );
         uint256 b0 = address(this).balance;
-        // One real vault listing and 29 independent third-party listings preserve the exact
-        // historical weight. Unique backing tags change weight and cannot be faked in VRF replay.
-        TestVaultOps.restock(vault, COUNT, 3, 0);
+        // One real vault listing (built and listed straight into ShapePacks at backing B) and 29
+        // independent third-party listings, all at the exact backing B so every weight is 1e36 / B.
         for (uint256 i; i < FIXTURE_COUNT; ++i) {
             if (i == c.index) {
-                TestVaultOps.list(vault, COUNT, 0);
+                TestVaultOps.restock(vault, COUNT, UNITS, 0); // build+list our one pack
                 selected = vault.openListingAt(0);
+                assertEq(vault.position(selected).backing, B, "our listing posts exactly B");
             } else {
                 filler.createAndList(B);
             }
@@ -197,14 +203,20 @@ abstract contract SelectionBase is Test {
             }
         }
     }
-
 }
 
 contract ForkSelectionTest is SelectionBase {
     receive() external payable {} // this contract calls paid work directly
 
-    function test_bidOutcome_packReturnsBackingSpent() public {
-        Candidate memory c = late();
+    /// @dev Bid: the purchaser takes FWA's best bid (90% of B). The vault keeps no ETH on the bid;
+    ///      `sync` then resolves the position and returns the pack to idle inventory. Resolving also
+    ///      sweeps the selection's economical fee credit into the vault, so the vault's net ETH
+    ///      change across the sync is the swept credit minus the keeper pay.
+    ///      (The returned pack cannot be relisted at this fork: FWA has 4 real pending acquisitions
+    ///      awaiting VRF we cannot fulfill, so it stages new listings. Relist-without-mint is
+    ///      exercised in ForkVaultLifecycle, where the queue is empty.)
+    function test_bidOutcome_packReturnsIdle() public {
+        Candidate memory c = primary();
         _select(c);
         uint256 pBefore = c.purchaser.balance;
         uint256 vBefore = address(vault).balance;
@@ -212,64 +224,78 @@ contract ForkSelectionTest is SelectionBase {
         IFwaSettle(address(FWA)).acceptDepositorBid(selected);
         assertEq(c.purchaser.balance - pBefore, B * 9_000 / 10_000, "purchaser gets 90% of backing");
         assertEq(address(vault).balance, vBefore, "no ETH back to the vault on a bid outcome");
+
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
+        uint256 creditSwept = FWA.feeCredit(address(vault)); // the selection's flat fee share
+        assertApproxEqAbs(creditSwept, expectedShare, 2, "credit is the selecting acquisition's share");
         uint256 keeperBefore = address(this).balance;
+        uint256 balBeforeSync = address(vault).balance;
         TestVaultOps.sync(vault, one, 0);
         uint256 syncPay = address(this).balance - keeperBefore;
         assertGt(syncPay, 0, "resolving a position is paid");
-        assertEq(vBefore - address(vault).balance, syncPay, "sync moves no ETH but its gas pay");
+        // Sync pulls the whole fee credit into the vault and pays the keeper; the net cost to the
+        // vault is the keeper pay less the swept credit.
+        assertEq(balBeforeSync - address(vault).balance, syncPay - creditSwept, "net ETH = keeper pay - swept credit");
         assertEq(TestVaultOps.idle(vault).length, 1, "pack back in inventory");
         assertEq(TestVaultOps.open(vault).length, COUNT - 1);
-        keeperBefore = address(this).balance;
-        TestVaultOps.harvest(vault, new uint256[](0), 0);
-        // The whole credited share reaches the vault. Its gas would cost more than 25% of it, so
-        // the harvest is unpaid: a keeper earns nothing for a dust harvest.
-        assertEq(address(this).balance, keeperBefore, "dust harvest unpaid");
-        assertApproxEqAbs(address(vault).balance + syncPay - vBefore, expectedShare, 2);
     }
 
+    /// @dev Keep: the purchaser keeps the pack. The vault receives exactly B(1 - s) = B x 9,900 /
+    ///      10,000 (FWA's live 1% owner settlement fee) and the pack leaves. `sync` then resolves
+    ///      the settled position.
+    ///      (A replacement build cannot run at this fork for the same busy-queue reason as above;
+    ///      that a built pack mints 2 Shapes and pays exactly 0.002 ETH is covered in
+    ///      ForkVaultLifecycle.test_builtPackCostsAndMints.)
     function test_keepOutcome_backingBackLessFee() public {
-        Candidate memory c = late();
+        Candidate memory c = primary();
         _select(c);
-        (,,, uint256 packId,,,,,,,) = FWA.listings(selected);
+        uint256 packId = vault.position(selected).packId;
         uint256 vBefore = address(vault).balance;
         vm.prank(c.purchaser);
         IFwaSettle(address(FWA)).keepNFT(selected);
         assertEq(address(vault).balance - vBefore, B * 9_900 / 10_000, "backing less the 1% settlement fee");
-        assertEq(PACKS.ownerOf(packId), c.purchaser);
+        assertEq(PACKS.ownerOf(packId), c.purchaser, "pack to the purchaser");
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
         TestVaultOps.sync(vault, one, 0);
-        assertEq(TestVaultOps.idle(vault).length, 0);
+        assertEq(TestVaultOps.idle(vault).length, 0, "no idle pack: the purchaser kept it");
         assertEq(TestVaultOps.open(vault).length, COUNT - 1);
     }
 
+    /// @dev Silent purchaser: after the settlement window the vault reclaims the backing through
+    ///      `sync` (B(1 - s) > P, so it keeps the ETH, D9) and the pack goes to the purchaser.
     function test_silentPurchaser_vaultReclaimsBacking() public {
-        Candidate memory c = late();
+        Candidate memory c = primary();
         _select(c);
+        uint256 packId = vault.position(selected).packId;
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
         vault.sync(new uint256[](0), 0, 0); // Journal work is paid even while the purchaser may still act.
-        vm.expectRevert(PackVault.Nothing.selector);
+        vm.expectRevert(VaultLib.Nothing.selector);
         TestVaultOps.sync(vault, one, 0); // purchaser's window still open
         vm.warp(block.timestamp + FWA.settlementWindow());
         uint256 vBefore = address(vault).balance;
         uint256 kBefore = address(this).balance;
         TestVaultOps.sync(vault, one, 0);
-        // B (1 - s) = 0.035937 > P = 0.03, so the vault takes the backing (D9), less gas pay.
+        // B(1 - s) = B x 9,900 / 10,000 > P = 0.06, so the vault takes the backing (D9), less gas pay.
         assertEq(address(vault).balance - vBefore + (address(this).balance - kBefore), B * 9_900 / 10_000);
+        assertEq(PACKS.ownerOf(packId), c.purchaser, "pack to the silent purchaser");
         assertEq(TestVaultOps.open(vault).length, COUNT - 1);
     }
 
-    function test_earlyCandidate_afterRealAdmissionCalls() public {
-        Candidate memory c = early();
+    /// @dev The second real candidate: a bid outcome at a different request block and listing index.
+    function test_secondCandidate_bidOutcome() public {
+        Candidate memory c = second();
         _select(c);
+        uint256 pBefore = c.purchaser.balance;
         vm.prank(c.purchaser);
         IFwaSettle(address(FWA)).acceptDepositorBid(selected);
+        assertEq(c.purchaser.balance - pBefore, B * 9_000 / 10_000, "purchaser gets 90% of backing");
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
         TestVaultOps.sync(vault, one, 0);
-        assertEq(TestVaultOps.idle(vault).length, 1);
+        assertEq(TestVaultOps.idle(vault).length, 1, "pack back in inventory");
+        assertEq(TestVaultOps.open(vault).length, COUNT - 1);
     }
 }
