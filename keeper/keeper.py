@@ -471,7 +471,7 @@ def run_account(a, tm, account, pooled):
     accounts, on the signer's single nonce stream), then plan, preflight and send one call at a time,
     waiting for each receipt and re-reading that account before choosing the next. Each account has
     its own event index and plan; `pooled` is False for a personal PackManager (no checkpoints,
-    deposits or redemptions). Returns (failed, status_codes, in_flight, active_backings)."""
+    deposits or redemptions). Returns (failed, status_codes, in_flight)."""
     failed, skip, sent, declined = 0, set(), 0, []
     refreshed = {}
     codes, in_flight = [], False
@@ -593,8 +593,7 @@ def run_account(a, tm, account, pooled):
             skip.clear()  # Successful work changes funding and candidate eligibility.
             declined[:] = [entry for entry in declined if not
                            (entry[0] == "LIABILITY_WORK_SKIPPED" and entry[2].startswith(step[0] + " "))]
-    backings = active_backings(account)
-    return failed, codes + declined, in_flight, backings
+    return failed, codes + declined, in_flight
 
 
 def active_backings(account):
@@ -618,13 +617,12 @@ def run_pass(a, tm, accounts):
     if tm:
         tm.check_reorgs(head)
     failed = 0
-    account_health, all_backings = {}, []
+    account_health, all_backings, unindexed = {}, [], []
     for account, pooled in accounts:
         try:
-            f, codes, _in_flight, backings = run_account(a, tm, account, pooled)
+            f, codes, _in_flight = run_account(a, tm, account, pooled)
             failed += f
             account_health[account] = dict(pooled=pooled, status=codes)
-            all_backings += backings
         except (txm.StaleContext, IndexBehind) as e:
             account_health[account] = dict(pooled=pooled, status=[("CONTEXT_MOVED", "wait", str(e))])
             print(f"account {account} waits: {e}")
@@ -632,8 +630,16 @@ def run_pass(a, tm, accounts):
             failed += 1
             account_health[account] = dict(pooled=pooled, status=[("ACCOUNT_ERROR", "action", str(e)[:200])])
             print(f"account {account} failed this pass: {str(e)[:200]}")
+        # A failed or waiting account still counts from its saved index, so exposure never drops
+        # an account's listings for a pass; with no index at all the share is flagged incomplete.
+        try:
+            all_backings += active_backings(account)
+        except IndexBehind:
+            unindexed.append(account)
     total_weight = num(cast("call", FWA, "totalWeight()(uint256)"))
     exposure = policy.exposure_status(policy.exposure_share_bps(all_backings, total_weight))
+    if unindexed:
+        exposure.append(("EXPOSURE_INCOMPLETE", "action", f"no event index yet for {len(unindexed)} account(s); share excludes them"))
     attention = [c for h in account_health.values() for c in h["status"] if c[1] == "action"] + \
                 [c for c in exposure if c[1] == "action"]
     HEALTH.update(block=head, accounts=account_health, exposure=exposure, policy_count=len(accounts))
