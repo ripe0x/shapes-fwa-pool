@@ -40,7 +40,8 @@ VALUES = ["deploy/canary.json", "deploy/mainnet.json"]
 # The acceptance package names this manifest, so it is not listed here (no cycle).
 EVIDENCE = ["docs/receipts/formal-assessment.json", "docs/receipts/recipe-comparison.json",
             "docs/receipts/unified-production-rehearsal.json", "docs/receipts/unified-selection-rehearsal.json",
-            "docs/receipts/unified-review.md", "docs/receipts/unified-verify/SUMMARY.md", "asset-flow.json"]
+            "docs/receipts/image-rehearsal/ci-44930570759.json", "docs/receipts/unified-review.md",
+            "docs/receipts/unified-verify/SUMMARY.md", "asset-flow.json"]
 
 
 def sha(path):

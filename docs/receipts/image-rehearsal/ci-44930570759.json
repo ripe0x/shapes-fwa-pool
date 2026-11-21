@@ -1,0 +1,266 @@
+{
+ "steps": [
+  {
+   "step": "primary prices the deposit at the blackout",
+   "at_block": 26450245
+  },
+  {
+   "step": "keepers build and list",
+   "at_block": 26450249
+  },
+  {
+   "step": "replacement prices the redemption through a lost RPC response",
+   "at_block": 26450255
+  },
+  {
+   "step": "backup completes a clean pass",
+   "at_block": 26450255
+  }
+ ],
+ "fork_block": 26450200,
+ "fork_hash": "0xda7052eb890b621f2ed635feb0af056e155f801305427af666aa7930d4baabc5",
+ "image": "packvault-keeper:6c624f3fb0f693291c7fb7d9a9321684e1650345",
+ "foundry": "cast Version: 1.8.1",
+ "postflight": "postflight passed: 0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461 policy 0xF1554E2a90CDee24250f7fC00C8eF3eb5e883163 libraries {'ScanLib': '0x35ab550B981c7BD1553b6A29020B10ac25e0aD3b', 'VaultLib': '0x3a0b17F05D43Ad1E2591A52AbDEF7cBEb0C34d39', 'StrategyLib': '0x4EAd73ee37B191F6be5193deda596B13f535df88'} owner 0x7683eaAFbF5f8d94004a703bF0c85248C0B1AcCa (factory not checked)\nverification commands (Etherscan; ETHERSCAN_API_KEY from your environment):\n  forge verify-contract 0x35ab550B981c7BD1553b6A29020B10ac25e0aD3b src/ScanLib.sol:ScanLib --chain mainnet --watch\n  forge verify-contract 0x3a0b17F05D43Ad1E2591A52AbDEF7cBEb0C34d39 src/VaultLib.sol:VaultLib --chain mainnet --libraries src/ScanLib.sol:ScanLib:0x35ab550B981c7BD1553b6A29020B10ac25e0aD3b --watch\n  forge verify-contract 0x4EAd73ee37B191F6be5193deda596B13f535df88 src/StrategyLib.sol:StrategyLib --chain mainnet --libraries src/VaultLib.sol:VaultLib:0x3a0b17F05D43Ad1E2591A52AbDEF7cBEb0C34d39 --watch\n  forge verify-contract 0xF1554E2a90CDee24250f7fC00C8eF3eb5e883163 src/KeeperPolicy.sol:KeeperPolicyV1 --chain mainnet --watch\n  forge verify-contract 0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461 src/PackVault.sol:PackVault --chain mainnet --guess-constructor-args --libraries src/VaultLib.sol:VaultLib:0x3a0b17F05D43Ad1E2591A52AbDEF7cBEb0C34d39 --libraries src/StrategyLib.sol:StrategyLib:0x4EAd73ee37B191F6be5193deda596B13f535df88 --watch",
+ "vault": "0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461",
+ "factory": "0x1d274f470be25c17b0d2f9745b45ca6f3289279e",
+ "before_replacement": {
+  "stats": {
+   "sent": 2,
+   "mined": 0,
+   "reverted": 1,
+   "replaced": 0,
+   "dropped": 0,
+   "reorged": 0,
+   "skipped_expected": 0,
+   "skipped_loss": 0,
+   "spent_wei": 1825963957386,
+   "paid_wei": 0
+  },
+  "pending": {
+   "label": "build",
+   "to": "0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461",
+   "args": [
+    "build(uint256,uint256[],uint256)",
+    "6",
+    "[64896174863380000,64896174863390000,64896174863370000,64896174863400000,64896174863360000,64896174863410000,64896174863350000,64896174863420000]",
+    "714148812912000"
+   ],
+   "nonce": 1,
+   "gas": 13381769,
+   "est": 10705415,
+   "prio": 50000000,
+   "max_fee": 50647806,
+   "sent_block": 26450248,
+   "replacements": 0,
+   "hashes": [
+    "0x6d6ee48a1f0841209fe9b41315b9f59b86e2f10ba44a235551068486169ad569"
+   ],
+   "expected_pay": 892686016140000,
+   "submitted": 1795282557
+  },
+  "counted": [
+   {
+    "label": "checkpoint",
+    "block": 26450245,
+    "status": 0,
+    "gas_used": 36122,
+    "pay": 0
+   }
+  ],
+  "head": 26450248
+ },
+ "after_replacement": {
+  "stats": {
+   "sent": 2,
+   "mined": 1,
+   "reverted": 2,
+   "replaced": 0,
+   "dropped": 0,
+   "reorged": 0,
+   "skipped_expected": 0,
+   "skipped_loss": 0,
+   "spent_wei": 478228503176939,
+   "paid_wei": 892686016140000
+  },
+  "pending": null,
+  "counted": [
+   {
+    "label": "checkpoint",
+    "block": 26450245,
+    "status": 0,
+    "gas_used": 36122,
+    "pay": 0
+   },
+   {
+    "label": "build",
+    "block": 26450249,
+    "status": 1,
+    "gas_used": 9430689,
+    "pay": 892686016140000
+   },
+   {
+    "label": "checkpoint",
+    "block": 26450255,
+    "status": 0,
+    "gas_used": 36146,
+    "pay": 0
+   }
+  ],
+  "head": 26450255
+ },
+ "dropped_transaction": "0x224478762d14cd569ab23da935c192cf1bbf2c2e20274a47dc97422e3e0c631c",
+ "dropped_transaction_status": 0,
+ "backup": {
+  "stored": {
+   "stats": {
+    "sent": 3,
+    "mined": 2,
+    "reverted": 1,
+    "replaced": 0,
+    "dropped": 0,
+    "reorged": 0,
+    "skipped_expected": 0,
+    "skipped_loss": 0,
+    "spent_wei": 34386568568587,
+    "paid_wei": 76277698240000
+   },
+   "pending": null,
+   "counted": [
+    {
+     "label": "checkpoint",
+     "block": 26450245,
+     "status": 1,
+     "gas_used": 246579,
+     "pay": 38197968680000
+    },
+    {
+     "label": "build",
+     "block": 26450250,
+     "status": 0,
+     "gas_used": 132707,
+     "pay": 0
+    },
+    {
+     "label": "checkpoint",
+     "block": 26450253,
+     "status": 1,
+     "gas_used": 303516,
+     "pay": 38079729560000
+    }
+   ],
+   "head": 26450255
+  },
+  "health": {
+   "last_pass": 1795282462,
+   "block": 26450227,
+   "status": [
+    [
+     "CONTEXT_MOVED",
+     "wait",
+     "event index at block 26434239; target 26450227; next pass resumes bounded replay"
+    ],
+    [
+     "EXPOSURE_SHARE",
+     "info",
+     "keeper holds 0.00% of FWA selection weight across its accounts"
+    ]
+   ],
+   "accounts": {
+    "0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461": {
+     "pooled": true,
+     "status": [
+      [
+       "CONTEXT_MOVED",
+       "wait",
+       "event index at block 26434239; target 26450227; next pass resumes bounded replay"
+      ]
+     ]
+    }
+   },
+   "exposure": [
+    [
+     "EXPOSURE_SHARE",
+     "info",
+     "keeper holds 0.00% of FWA selection weight across its accounts"
+    ]
+   ],
+   "policy_count": 1,
+   "pending": null,
+   "stats": {
+    "sent": 3,
+    "mined": 2,
+    "reverted": 1,
+    "replaced": 0,
+    "dropped": 0,
+    "reorged": 0,
+    "skipped_expected": 0,
+    "skipped_loss": 0,
+    "spent_wei": 34386568568587,
+    "paid_wei": 76277698240000
+   },
+   "errors": [],
+   "pass_errors": 0,
+   "ok": true,
+   "fresh": true,
+   "attention": []
+  }
+ },
+ "lost_races": [
+  {
+   "lost": {
+    "label": "checkpoint",
+    "block": 26450245,
+    "status": 0,
+    "gas_used": 36122,
+    "pay": 0
+   },
+   "won": {
+    "label": "checkpoint",
+    "block": 26450245,
+    "status": 1,
+    "gas_used": 246579,
+    "pay": 38197968680000
+   }
+  },
+  {
+   "lost": {
+    "label": "checkpoint",
+    "block": 26450255,
+    "status": 0,
+    "gas_used": 36146,
+    "pay": 0
+   },
+   "won": {
+    "label": "checkpoint",
+    "block": 26450253,
+    "status": 1,
+    "gas_used": 303516,
+    "pay": 38079729560000
+   }
+  },
+  {
+   "lost": {
+    "label": "build",
+    "block": 26450250,
+    "status": 0,
+    "gas_used": 132707,
+    "pay": 0
+   },
+   "won": {
+    "label": "build",
+    "block": 26450249,
+    "status": 1,
+    "gas_used": 9430689,
+    "pay": 892686016140000
+   }
+  }
+ ],
+ "primary_nonce": 3,
+ "primary_sends_counted": 2,
+ "result": "PASS",
+ "worker_log_tails": {
+  "primary-replacement": "",
+  "backup": ""
+ }
+}
