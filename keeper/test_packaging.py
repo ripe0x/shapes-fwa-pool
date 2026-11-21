@@ -20,7 +20,8 @@ def configured_storage():
     arguments = shlex.split(entry.split("exec python3 ", 1)[1].replace("\\\n", " "))
     state = Path(arguments[arguments.index("--state") + 1])
     index = Path(arguments[arguments.index("--index") + 1])
-    assert state.parent == index.parent == Path("/data"), "both stores must use the persistent mount"
+    # The index argument is the directory holding one index file per account.
+    assert state.parent == index == Path("/data"), "both stores must use the persistent mount"
     return state, index
 
 

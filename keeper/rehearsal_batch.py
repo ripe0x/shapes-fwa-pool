@@ -28,8 +28,12 @@ FORK_BLOCK = int(os.environ.get("PACK_VAULT_FORK_BLOCK", 26_418_539))
 MAX_GAS = 16_777_216
 CODE_SIZE = 24_576
 ACTOR_ETH = 10 * 10**18
+# mgra/mgrb/mgrc own personal managers (the unified system's permissionless clones); purchaser is a
+# fresh FWA purchaser for the manager outcome paths. All are fresh label-derived addresses, verified
+# clean before funding, never Anvil dev accounts (rehearse_unified.py).
 ACTORS = {name: to_checksum_address(keccak(text=f"pack-vault-rehearsal-{name}")[-20:])
-          for name in ("deployer", "holder", "holder2", "keeper", "kicker", "owner")}
+          for name in ("deployer", "holder", "holder2", "keeper", "kicker", "owner",
+                       "mgra", "mgrb", "mgrc", "purchaser")}
 ORACLE = "0xaA4D9009a4664604b57644bF13e447E9036727DC"
 ORACLE_OWNER = "0x9306342f408185180987bBe69B5AFDCaD5e971b4"  # pinned deployed owner(), read 2026-11-18
 ENV_MANIFEST = "PACK_VAULT_LOCAL_BATCH"
@@ -209,8 +213,14 @@ def deploy(v, label):
         raise RuntimeError(f"refusing to overwrite existing values: {path}")
     path.write_text(json.dumps(v, indent=2) + "\n")
     try:
+        # Price the broadcast above the node's current base fee. The fork runs at a fixed --base-fee
+        # (plan()), but forge otherwise estimates from the forked block's lower history and underprices
+        # ("max fee per gas less than block base fee"). Read the pending base fee directly (not through
+        # inclusion_context, whose deterministic-next-block check rejects the forced --base-fee on a
+        # fresh fork before any block is mined).
+        deploy_base = quantity(rpc("eth_getBlockByNumber", "pending", False)["baseFeePerGas"])
         env = {**os.environ, "RPC_URL": RPC,
-               "FORGE_WALLET_ARGS": f"--unlocked --sender {ACTORS['deployer']}",
+               "FORGE_WALLET_ARGS": f"--unlocked --sender {ACTORS['deployer']} --with-gas-price {2 * deploy_base + 50_000_000}",
                "FOUNDRY_GAS_LIMIT": str(MAX_GAS)}
         # Forge's offchain script harness embeds creation code and exceeds EIP170. Keep its
         # default harness behavior; the actual Anvil node enforces24576 on every deployment.
@@ -240,12 +250,20 @@ def deploy(v, label):
         source, name, address = reference.rsplit(":", 2)
         code = bytes.fromhex(cast("code", address)[2:])
         artifact = json.loads((ROOT / "out" / Path(source).name / f"{name}.json").read_text())["deployedBytecode"]
-        compiled = bytearray.fromhex(artifact["object"].removeprefix("0x"))
+        # The compiled object carries __$...$__ placeholders where linked library addresses are
+        # injected at deploy time (a library that calls another library); zero those hex positions
+        # before parsing, then zero link and immutable references in both and compare the rest.
+        obj = list(artifact["object"].removeprefix("0x"))
+        offsets = [o for libs in artifact.get("linkReferences", {}).values()
+                   for refs in libs.values() for o in refs]
+        for o in offsets:
+            obj[o["start"] * 2:(o["start"] + o["length"]) * 2] = "0" * (o["length"] * 2)
+        compiled = bytearray.fromhex("".join(obj))
         actual = bytearray(code)
-        for references in artifact.get("immutableReferences", {}).values():
-            for offset in references:
-                start, length = offset["start"], offset["length"]
-                actual[start:start + length] = compiled[start:start + length] = bytes(length)
+        offsets += [o for refs in artifact.get("immutableReferences", {}).values() for o in refs]
+        for o in offsets:
+            start, length = o["start"], o["length"]
+            actual[start:start + length] = compiled[start:start + length] = bytes(length)
         if actual != compiled or len(code) > CODE_SIZE:
             raise RuntimeError("linked library runtime differs from frozen compiled artifact or exceeds EIP170")
         if not any(d["address"].lower() == address.lower() for d in deployments):
@@ -305,8 +323,11 @@ def run_approved(calibration_first=False):
         env = {**os.environ, "FOUNDRY_GAS_LIMIT": str(MAX_GAS)}
         env.pop("FOUNDRY_CODE_SIZE_LIMIT", None)
         baseline = rpc("evm_snapshot")
-        scripts = PHASES or (["measure_gas.py", "rehearse_canary.py", "rehearse_current.py"] if calibration_first else
-                             ["rehearse_canary.py", "rehearse_current.py", "measure_gas.py"])
+        # Unified system (D77): one build-and-list strategy on PackVault plus permissionless
+        # PackManager clones. rehearse_unified.py is the whole end-to-end rehearsal. The pre-A3
+        # restock/split phase and calibration scripts are retired; gas is recalibrated from the
+        # rehearsal's own keeper receipts and the ForkMaxBatchGas Forge suite.
+        scripts = PHASES or ["rehearse_unified.py"]
         for number, script in enumerate(scripts):
             if number:
                 if not rpc("evm_revert", baseline):

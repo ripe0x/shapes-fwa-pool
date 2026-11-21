@@ -132,20 +132,20 @@ class Keeper:
         self.proc = None
 
     def start(self):
-        env = dict(os.environ, VAULT=VAULT, RPC_URL=self.rpc, POLL_SECONDS=str(self.poll), KEEPER_ARGS="",
+        env = dict(os.environ, VAULT=VAULT, FACTORY=FACTORY, RPC_URL=self.rpc, POLL_SECONDS=str(self.poll), KEEPER_ARGS="",
                    HEALTH_PORT=str(self.health_port),
                    KEEPER_KEYSTORE_JSON=Path(self.keystore).read_text(), KEEPER_KEYSTORE_PASSWORD=self.password)
         if self.image:  # values travel as inherited environment, never in argv
             sh("docker", "run", "-d", "--name", self.name, "--network", "host", "--mount",
-               f"type=volume,source={self.data},target=/data", *[x for k in ("VAULT", "RPC_URL", "POLL_SECONDS", "KEEPER_ARGS", "HEALTH_PORT",
+               f"type=volume,source={self.data},target=/data", *[x for k in ("VAULT", "FACTORY", "RPC_URL", "POLL_SECONDS", "KEEPER_ARGS", "HEALTH_PORT",
                                                                      "KEEPER_KEYSTORE_JSON", "KEEPER_KEYSTORE_PASSWORD") for x in ("-e", k)],
                self.image, env=env)
         else:
             Path(self.data).mkdir(parents=True, exist_ok=True)
             self.log = open(Path(self.data) / f"{self.name}.log", "a")
-            self.proc = subprocess.Popen(["python3", "keeper/keeper.py", VAULT, "--send", "--keystore", self.keystore,
+            self.proc = subprocess.Popen(["python3", "keeper/keeper.py", VAULT, "--factory", FACTORY, "--send", "--keystore", self.keystore,
                                           "--password-file", self.password_file(), "--rpc", self.rpc,
-                                          "--state", f"{self.data}/keeper-state.json", "--index", f"{self.data}/keeper-index.sqlite",
+                                          "--state", f"{self.data}/keeper-state.json", "--index", self.data,
                                           "--loop", str(self.poll), "--confirmations", "2", "--health-port", str(self.health_port)],
                                          cwd=ROOT, stdout=self.log, stderr=subprocess.STDOUT)
 
@@ -193,7 +193,7 @@ class Keeper:
 
 
 def main():
-    global VAULT
+    global VAULT, FACTORY
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--image")
     ap.add_argument("--fork-block", type=int, default=26_450_200)
@@ -237,6 +237,8 @@ def main():
         VAULT = next(t["contractAddress"] for t in run["transactions"] if t.get("contractName") == "PackVault")
         evidence["postflight"] = sh("python3", "script/release.py", "postflight", VAULT, path, env=dict(os.environ, RPC_URL=RPC))
         evidence["vault"] = VAULT
+        FACTORY = next(t["contractAddress"] for t in run["transactions"] if t.get("contractName") == "PackManagerFactory")
+        evidence["factory"] = FACTORY
 
         holder = ACTORS["holder"]
         deposit = call("requestCharge()(uint256)") + values["tvlCapWei"] - values["seedWei"]

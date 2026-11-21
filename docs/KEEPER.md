@@ -47,7 +47,7 @@ independent listers.
 | Event index | `keeper/index-<chain>-<vault>-<deploymentBlock>.sqlite`; `--index` overrides it |
 | Initial reconstruction | starts at the earlier of deployment and the trailing-seven-day volume boundary |
 | Log ingestion | at most eight ranges of 2,000 blocks per pass; saved progress resumes on the next pass |
-| Ordinary candidates | independent returned/receipt, unseen-selection, expired and rotating OWED candidates, at most 16 per class; at most 80 hydrated positions including active witnesses |
+| Ordinary candidates | independent returned/receipt, unseen-selection, expired, inside-window booked-Allocated status checks and rotating OWED candidates, at most 16 per class; at most 80 hydrated positions including active witnesses |
 | Discovery upgrade | replay missing allocation/bid history in at most eight adaptive ranges per pass, independently of the financial head |
 | Reorg repair | verify both saved canonical prefixes, roll back affected ranges and replay retained events |
 | Financial authority | onchain acquisition cursor, pending receipt count, listing authentication and exact book |
@@ -111,6 +111,16 @@ insufficient payment atomically. The normal keeper waits for useful batches or a
 candidate. All sync, including mixed jobs during redemption/wind-down, spends routine permission.
 D64 still leaves unlisting and liquidation to callers when essential permission is zero.
 
+Terminal-work discovery never depends on a `CashReceipt` event. A booked-Allocated position is
+surfaced for a live FWA-status check every pass while it is still inside its settlement window (a
+bounded rotating class, the complement of the expiry class), so an early keep or a kick whose
+payment FWA force-sent by `SELFDESTRUCT` — the account's `receive` reverted, no `CashReceipt`,
+`pendingReceipts()` stays zero — is synced promptly instead of waiting for expiry. Because the
+keeper surfaces it, `sync` runs before any `checkpoint` (checkpoint plans only when nothing is
+`due`), so the keeper never loops a checkpoint the vault reverts with `PendingReceipts` while a
+booked-Allocated position is not Allocated at FWA. A booked-Active position FWA shows withdrawn
+(kicked) sorts first in the active set by zero debt and is caught the same way.
+
 Returned-pack discovery authenticates FWA's `NFTAllocated`, `DepositorBidAccepted` and
 `DepositorBidAcceptedAsTokens` events and this vault's depositor identity. It retains selections
 until the book catches up; an ETH or token bid independently prioritizes that return. Expiry
@@ -173,7 +183,22 @@ Owner `startWindDown()` remains one-way. Process journal/receipts, resolve alloc
 crown protection, liquidate in bounded calls, and checkpoint redemptions in blackout. Holders claim
 their own balances. Oracle or admission failures cannot block the recovery paths.
 
-Local rehearsal is prepared by `python3 keeper/rehearsal_batch.py --plan`. Its execution entry is
-reserved for an explicitly approved isolated local batch. Current command receipts and remaining
-launch gates are recorded in `docs/REPORT.md`; historical keeper profit tables do not validate the
-new quote schedule.
+Local rehearsal (unified system, D77) is one command on a fresh local mainnet fork, no public write:
+
+```sh
+python3 keeper/rehearse_unified.py --fork-block <recent> --port <free, not 8545>
+```
+
+It deploys the pooled vault and factory through `script/deploy.sh`, creates several personal
+managers for different owners, runs this keeper signing through an encrypted keystore on a durable
+`/data` volume exactly as `keeper/entrypoint.sh` does, and exercises discovery, build/list, the
+pooled deposit/checkpoint/redeem/claim cycle, manager withdrawals and owner exit, restart and
+container replacement on the same volume, the backup worker, and the lost-response/race/reorg and
+event-index paths through `keeper/test_tx.py` and `keeper/test_index.py`. It writes
+`docs/receipts/unified-production-rehearsal.json`. Real-FWA-VRF keep/bid/expiry needs the vault to
+list at the exact backing `sim/find_selection.py` searched `test/fixtures/selection.json` against;
+when a recipe or purchaser-gas change moves `edge(6)` the fixtures are stale and the rehearsal
+records that gap with the regeneration command instead of fabricating a selection (those outcomes
+are proven in the Forge `ForkSelection`/`ForkManager`/`VaultFlow` suites). It is launched through
+`keeper/rehearsal_batch.py`, which owns the Anvil node, the fresh label-derived actors and the
+manifest. Historical keeper profit tables do not validate the new quote schedule.

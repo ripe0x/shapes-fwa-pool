@@ -37,6 +37,13 @@ def main():
     assert "harvest" not in got
     assert "checkpoint" not in got  # terminal work must be reconciled, then re-read before pricing
     assert "checkpoint" in fns(plan(state(listings=act, free=E, pending_deposits=10**17)))
+    # A kept-early booked-Allocated listing (FWA SELFDESTRUCT force-sent the payment: no CashReceipt,
+    # pending_receipts==0) inside the settlement window must be synced before any checkpoint, even in
+    # the checkpoint window, so the keeper never loops a checkpoint the vault reverts on PendingReceipts.
+    kept_early = state(listings=[Listing(5, SETTLED, allocated_at=10**6 - 10)], pending_deposits=10**17,
+                       free=E, pending_receipts=0)
+    kept_plan = fns(plan(kept_early))
+    assert "sync" in kept_plan and "checkpoint" not in kept_plan, kept_plan
 
     spike = dict(gas_price=1_050_000_000, base_fee=G)
     s = state(listings=act + settled, idle_packs=2, idle_eth=E, free=E, pending_deposits=10**17,

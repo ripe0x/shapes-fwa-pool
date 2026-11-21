@@ -206,7 +206,7 @@ class EventIndex:
             self.db.execute("DELETE FROM allocations")
             self.db.execute("DELETE FROM selected")
             self.db.execute("DELETE FROM returned")
-            self.db.execute("DELETE FROM meta WHERE key IN ('cursor','token_after','owed_after')")
+            self.db.execute("DELETE FROM meta WHERE key IN ('cursor','token_after','owed_after','alloc_after')")
             for row in self.db.execute("SELECT * FROM events ORDER BY block,log_index").fetchall():
                 self._apply(row["event"], json.loads(row["args"]), row["block"], row["log_index"])
         return True
@@ -317,6 +317,25 @@ class EventIndex:
         due += [int(r[0]) for r in self.db.execute(
             "SELECT id FROM positions WHERE state=2 AND allocated_at<=? ORDER BY allocated_at,id LIMIT ?",
             (now - settlement_window if now is not None else 2**63 - 1, terminal_limit))]
+        # Booked-Allocated positions still inside the settlement window are status-checked each pass,
+        # rotating and bounded: keeper.py reads each one's live FWA status, so an early keep or kick
+        # whose payment FWA force-sent by SELFDESTRUCT (the account's receive reverted, no CashReceipt
+        # event, pendingReceipts()==0) is still synced promptly instead of waiting for expiry.
+        # Discovery never depends on CashReceipt. The complement of the expiry query above, so an
+        # unexpired allocation inside the window cannot hide a terminal outcome at FWA.
+        if now is not None:
+            inside, after = now - settlement_window, self.meta("alloc_after", "")
+            rows = self.db.execute(
+                "SELECT id FROM positions WHERE state=2 AND allocated_at>? AND id>? ORDER BY id LIMIT ?",
+                (inside, after, terminal_limit)).fetchall()
+            if len(rows) < terminal_limit:
+                rows += self.db.execute(
+                    "SELECT id FROM positions WHERE state=2 AND allocated_at>? AND id<=? ORDER BY id LIMIT ?",
+                    (inside, after, terminal_limit - len(rows))).fetchall()
+            if rows:
+                with self.db:
+                    self.set_meta("alloc_after", rows[-1][0])
+                due += [int(r[0]) for r in rows]
         after = self.meta("owed_after", "")
         owed = self.db.execute("SELECT id FROM positions WHERE state=3 AND id>? ORDER BY id LIMIT ?", (after, terminal_limit)).fetchall()
         if len(owed) < terminal_limit:

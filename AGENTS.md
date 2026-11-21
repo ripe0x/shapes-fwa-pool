@@ -39,7 +39,7 @@ Release (current instructions: `docs/release/RUNBOOK.md`; owner items: `docs/rel
 script/verify.sh                                   # every candidate check, in order
 python3 sim/formal.py                              # formal holder-return assessment (needs sim/data/fwa.sqlite)
 python3 script/release.py manifest|check|postflight|keeper-config
-python3 keeper/rehearsal_batch.py --execute-approved-local-batch --fork-block <recent> --port <free> --phases rehearse_current.py
+python3 keeper/rehearse_unified.py --fork-block <recent> --port <free>   # whole end-to-end local rehearsal (D77); writes docs/receipts/unified-production-rehearsal.json
 python3 keeper/rehearse_image.py [--image <tag>]   # CI: .github/workflows/keeper-image.yml
 ```
 
