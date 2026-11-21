@@ -37,9 +37,7 @@ contract ScanGasTest is ForkBase {
 
     function _listOwn(uint256 n) internal {
         vm.prank(keeper);
-        TestVaultOps.restock(vault, n, UNITS, 0);
-        vm.prank(keeper);
-        TestVaultOps.list(vault, n, 0);
+        TestVaultOps.restock(vault, n, UNITS, 0); // build lists all n at once
         assertEq(vault.openListingCount(), n, "own active listings in place");
     }
 
@@ -171,7 +169,7 @@ contract ScanPaidGasTest is SelectionBase {
     receive() external payable {}
 
     function test_paidScanProfitableN1() public {
-        _select(late()); // 1 own listing, really ALLOCATED; vault book still holds it Active
+        _select(primary()); // 1 own listing, really ALLOCATED; vault book still holds it Active
         // Drain the forked block's other pending request and build backlog >= 2 so the scan triggers.
         JournalRequests f = JournalRequests(address(FWA));
         vm.warp(block.timestamp + 25 hours);
