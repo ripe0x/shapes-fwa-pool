@@ -107,6 +107,20 @@ contract ForkManagerTest is ForkBase {
         assertEq(factory.implementation().owner(), address(0));
     }
 
+    /// @dev Deployment gas of the shared contracts (libraries are deployed by the test harness and
+    ///      estimated from their size in docs/UNIFIED-SYSTEM.md).
+    function test_deploymentGas() public {
+        uint256 g = gasleft();
+        KeeperPolicyV1 policy = new KeeperPolicyV1();
+        emit log_named_uint("gas KeeperPolicyV1", g - gasleft());
+        g = gasleft();
+        DeployCore.deploy(FWA, SHAPES, PACKS, owner, defaultParams(), 0.01 ether);
+        emit log_named_uint("gas PackVault + its policy + postflight", g - gasleft());
+        g = gasleft();
+        DeployCore.deployFactory(FWA, SHAPES, PACKS, policy);
+        emit log_named_uint("gas PackManagerFactory + implementation + postflight", g - gasleft());
+    }
+
     function test_initializeOnlyOnceOnlyByFactory() public {
         PackManager m = _create(alice, 0.1 ether);
         PackManager impl = factory.implementation();
