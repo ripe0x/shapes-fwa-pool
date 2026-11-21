@@ -1180,6 +1180,13 @@ and its gas-optimal and spare-capital terms (they raise B, which would break the
 **Consequence:** a keep now returns B (1 − s) for a pack worth P: +0.0045 ETH per keep after the
 replacement build at canary gas, more than the bid cycle's B (k − 1) = +0.0025 ETH. Expiry
 resolution reclaims backing (B (1 − s) ≥ P), which is also a keep.
+**Constraints the owner should know:** the purchaser's redeem gas is priced at the routine
+`gasCeiling` (a stable parameter, so proposals stay inside the 10,000 wei identifier band), so a
+0.06 pack lists only while gasCeiling is below about 11.9 gwei: raising the ceiling for keeper pay
+above that stops new listings. The 0.06 recipe also lists only while FWA keeps ShapePacks
+oracle-exempt (backing 0.065 exceeds the floor cap of about 0.036), and only while FWA's best bid
+stays below about 94.4% (FWA may set its discounts up to 95%). In each case building and listing
+stop; sync, exits and withdrawals do not.
 
 ## D81. No shared exposure registry (owner brief A3.33)
 
