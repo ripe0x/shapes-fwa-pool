@@ -36,6 +36,7 @@ proven in the Forge fork suites (ForkSelection/ForkManager/VaultFlow); the keepe
 a force-sent terminal payment with no CashReceipt is covered by keeper/test_index.py.
 """
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -50,10 +51,6 @@ import rehearsal_batch as B  # noqa: E402
 RPC = B.RPC
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 PACKS = "0xf21514B090Da7dF4390803497d6ae673801E5cA7"
-# The exact backing sim/find_selection.py searched the shipped selection.json against (the B
-# constant in ForkSelection.t.sol). If the live edge(6) backing differs the fixtures are stale.
-FIXTURE_BACKING = 65_158_469_945_350_000
-FIXTURE_BLOCK = 26_402_342  # primary() in ForkSelection.t.sol (fork at FIXTURE_BLOCK-1)
 PARAMS_T = ("(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,"
             "uint64,uint64,uint64,uint128,uint128)")
 # deploy/manager.json keys in VaultLib.Params struct order (6 u16, 9 u64, 2 u128).
@@ -364,7 +361,9 @@ def main():
 
     errors = {k: v["error"] for k, v in report["steps"].items() if isinstance(v, dict) and v.get("error")}
     report["errors"] = errors
-    (ROOT / "docs/receipts/unified-production-rehearsal.json").write_text(json.dumps(report, indent=1, default=str))
+    # Committed evidence names no local machine paths.
+    text = re.sub(r"(/private)?/var/folders/[^\"]*?/T/|/tmp/", "<tmp>/", json.dumps(report, indent=1, default=str))
+    (ROOT / "docs/receipts/unified-production-rehearsal.json").write_text(text)
     print(json.dumps({k: v for k, v in report["steps"].items()}, indent=1, default=str))
     print(f"gaps: {report['gaps']}")
     if errors:

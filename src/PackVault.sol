@@ -326,7 +326,7 @@ contract PackVault is PackAccount {
         (uint256 oldest, uint64 allocatedAt) = VaultLib.oldestAllocation(s.book);
         if (oldest != 0 && block.timestamp >= uint256(allocatedAt) + f.settlementWindow()) revert SyncFirst();
         VaultLib.harvestCredit(s.book, f);
-        uint256 nav = VaultLib.checkpointNav(s.book, f, packs, _free(), witnessId);
+        (uint256 nav, uint256 gasQ) = VaultLib.checkpointNav(s.book, f, packs, _free(), witnessId);
         if (s.book.allocatedValue * BPS > nav * s.params.allocatedBoundBps) revert AllocatedExposure();
 
         uint256 supply = totalShares;
@@ -393,10 +393,10 @@ contract PackVault is PackAccount {
             // Pay comes out of the request charges; what is left over joins the vault's ETH.
             uint256 pool = processingPool;
             processingPool = 0;
-            return StrategyLib.pay(s, OP_CHECKPOINT, VaultLib.Q_CHECKPOINT, 1, essential, minPay, pool);
+            return StrategyLib.pay(s, OP_CHECKPOINT, gasQ, 1, essential, minPay, pool);
         }
         if (distributed != 0) {
-            return StrategyLib.pay(s, OP_CHECKPOINT, VaultLib.Q_CHECKPOINT, 1, false, minPay, type(uint256).max);
+            return StrategyLib.pay(s, OP_CHECKPOINT, gasQ, 1, false, minPay, type(uint256).max);
         }
         // No flows and nothing distributed: revert, so the interval's one slot stays free (audit E3).
         revert Nothing();

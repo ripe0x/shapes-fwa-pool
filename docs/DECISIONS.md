@@ -1244,9 +1244,15 @@ as the payment: a Settled listing whose pack is neither the account's nor owed t
 whose pack came back was a bid and paid nothing; a Withdrawn listing the book holds Active was a
 kick and refunded B with the pack. Amounts are never inferred from balances. The receipt recorded in
 `receive()` stays only as the checkpoint gate it already was, and a checkpoint now also proves that
-every position the book holds Allocated is still Allocated at FWA (`ScanLib.requireAllocatedCurrent`,
-bounded by the allocation queue), so a settlement without a receipt still blocks pricing until it is
-synced. Sync is permissionless and resolves each listing exactly once (its position retires).
+every position the book holds Allocated is still Allocated at FWA (`ScanLib.requireAllocatedCurrent`),
+so a settlement without a receipt still blocks pricing until it is synced. The proof reads at most
+`MAX_ALLOCATION_SCAN` = 32 allocation queue entries from the head and otherwise refuses with
+`CatchUpFirst` at a constant 31,763 gas, so pricing never scans allocation history (review of
+958b924: the first version walked every tombstone behind an unresolved allocation). The queue from
+the head holds only allocations newer than the oldest unresolved one, and a checkpoint already
+refuses any allocation older than FWA's settlement window (`SyncFirst`), so a refusal lasts at most
+one window plus a sync. Checkpoint pay adds 6,000 gas per entry read and 30,000 per FWA listing read
+(32 entries with one read measured 186,175 gas against a 222,000 quote; `ForkAllocationProof.t.sol`). Sync is permissionless and resolves each listing exactly once (its position retires).
 **Bound with the real receiver:** too little transaction gas cannot force an unrecorded payment: when
 `receive()` runs out of gas inside the call, FWA keeps at most 1/64 of it, far below the 32,000 gas a
 `CREATE` needs, so the whole transaction reverts (`test_lowGasKeepNeverForcesAnUnrecordedPayment`).

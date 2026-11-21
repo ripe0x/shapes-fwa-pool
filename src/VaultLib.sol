@@ -109,6 +109,10 @@ library VaultLib {
     /// callers from splitting work merely to collect additional bases.
     // One checkpoint per interval cannot be split, so it is quoted at measured billed gas.
     uint256 internal constant Q_CHECKPOINT = 360_000;
+    /// Checkpoint proof that booked allocations are still Allocated at FWA (ScanLib), per queue
+    /// entry examined and per FWA listing read.
+    uint256 internal constant Q_ALLOCATION_ENTRY = 6_000;
+    uint256 internal constant Q_ALLOCATION_READ = 30_000;
     uint256 internal constant Q_BUILD = 300_000; // call base for build-and-list (one 0.06 pack billed 1,667,619 in all)
     // createPack minting straight into the pack (ForkDirectMint: 381k / 534k / 627k gas for 1 / 2 / 3 Shapes)
     uint256 internal constant Q_BUILD_PACK = 300_000;
@@ -143,6 +147,10 @@ library VaultLib {
     uint256 internal constant MAX_BATCH = 16;
     uint256 internal constant MAX_JOURNAL = 128;
     uint256 internal constant MAX_SELECTIONS = 16;
+    /// Pricing reads at most this many allocation queue entries. The queue from its head holds only
+    /// allocations newer than the oldest unresolved one, which a checkpoint already requires to be
+    /// inside FWA's settlement window, so a longer queue waits at most one window for sync.
+    uint256 internal constant MAX_ALLOCATION_SCAN = 32;
     uint256 internal constant MAX_TERMINALS = 16;
     uint256 internal constant MAX_PRUNES = 16;
     uint256 internal constant MAX_LIST_BATCH = 8;
@@ -1007,24 +1015,26 @@ library VaultLib {
     }
 
     function accountedNav(Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
-        external view returns (uint256)
+        external view returns (uint256 value)
     {
-        return _accountedNav(b, f, packs, freeEth, witnessId);
+        (value,) = _accountedNav(b, f, packs, freeEth, witnessId);
     }
 
+    /// @return value NAV; gasQ the checkpoint's quoted gas, including the allocation proof it read.
     function checkpointNav(Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
-        external returns (uint256)
+        external returns (uint256 value, uint256 gasQ)
     {
         _rebaseUnexposed(b, f);
         return _accountedNav(b, f, packs, freeEth, witnessId);
     }
 
     function _accountedNav(Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
-        private view returns (uint256)
+        private view returns (uint256, uint256 gasQ)
     {
         if (b.acquisitionCursor != f.nextSequenceToProcess()) revert CatchUpFirst();
         if (b.pendingPlusOne != 1) revert PendingReceipts();
-        ScanLib.requireAllocatedCurrent(b, f);
+        (uint256 entries, uint256 reads) = ScanLib.requireAllocatedCurrent(b, f);
+        gasQ = Q_CHECKPOINT + entries * Q_ALLOCATION_ENTRY + reads * Q_ALLOCATION_READ;
         uint256 pending;
         if (b.activeCount != 0) {
             Position memory p = b.positions[witnessId];
@@ -1033,7 +1043,7 @@ library VaultLib {
             _validate(l, packs, p.packId, p.backing);
             pending = f.pendingFees(witnessId);
         }
-        return nav(b, freeEth, f.feeCredit(address(this)), witnessId, pending);
+        return (nav(b, freeEth, f.feeCredit(address(this)), witnessId, pending), gasQ);
     }
 
     function validateBacking(Params storage p, Book storage b, IFWAV2 f, address packs,

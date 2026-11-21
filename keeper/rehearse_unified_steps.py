@@ -22,8 +22,7 @@ def _try(report, key, fn):
 
 def run(R, report):
     _try(report, "8_pooled", lambda: pooled_lifecycle(R))
-    _try(report, "6_relist", lambda: relist(R))
-    _try(report, "7_selection", lambda: selection(R))
+    _try(report, "6_7_outcomes_and_relist", selection)
     _try(report, "9_manager_exit", lambda: manager_exit(R))
     _try(report, "10_restart", lambda: restart_keeper(R))
     _try(report, "11_replace_container", lambda: replace_container(R))
@@ -111,38 +110,22 @@ def _logs_sum(R, addr, sig):
 # ---------------------------------------------------------------------------
 # 6. Relist returned packs / 7. keep-bid-expiry via real FWA VRF.
 # ---------------------------------------------------------------------------
-def selection(R):
-    """Real-VRF keep/bid/expiry needs the vault to list at the exact backing the shipped
-    selection.json was searched against and to fork at the fixture request block. Detect a stale
-    fixture (a recipe or purchaser-gas change moved edge(6)) and record the gap + the regeneration
-    command instead of fabricating a selection."""
-    _, live, _ = R.edge3(R.VAULT, 6)
-    fresh = live == R.FIXTURE_BACKING
-    if not fresh:
-        regen = (f"python3 sim/find_selection.py {live} 30   # then "
-                 f"python3 sim/selection_fixture.py <req_blocks>; update B in test/fork/ForkSelection.t.sol")
-        raise RuntimeError(
-            f"selection.json stale: live edge(6) backing {live} != fixture-era {R.FIXTURE_BACKING}. "
-            f"Real-VRF keep/bid/expiry needs regenerated fixtures (sim/test lane): {regen}. "
-            f"Outcomes are covered by Forge ForkSelection/ForkManager/VaultFlow; keeper-side terminal "
-            f"resolution with no CashReceipt by keeper/test_index.py receipt_recovery_tests.")
-    # When fixtures are fresh the driver would: fork at FIXTURE_BLOCK-1, post 30 listings at B, replay
-    # the real request, impersonate the real VRF coordinator with the real word, then drive keepNFT /
-    # acceptDepositorBid / lapse from the fresh purchaser and sync. Left as the ready path.
-    return dict(fixtures_fresh=True, note="fresh-fixture selection path ready; not reached this run")
-
-
-def relist(R):
-    """Relisting returned (idle) packs. An idle pack only arises from a bid outcome (step 7) or
-    liquidation; without a live selection there is none, so this records the dependency. The
-    keeper's relist planning is covered by ForkManager test_bid_returnedPackRelistedWithoutMint."""
-    idle = {a: R.num(R.call(a, "idlePackCount()(uint256)")) for a in [R.VAULT] + R.MANAGERS}
-    if any(idle.values()):
-        R.run_keeper(tag="relist")
-        after = {a: R.num(R.call(a, "idlePackCount()(uint256)")) for a in [R.VAULT] + R.MANAGERS}
-        return dict(idle_before=idle, idle_after=after, relisted=True)
-    raise RuntimeError("no returned (idle) packs to relist without a live selection (see 7_selection); "
-                       "relist is covered by ForkManager test_bid_returnedPackRelistedWithoutMint")
+def selection():
+    """Keep, bid (then relist of the returned pack), expiry and a forced keep need a real FWA
+    selection, which only a historical request can give: keeper/rehearse_selection.py forks just
+    before a real request, replays it and delivers its real word. Run it and carry its result."""
+    import socket
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    root = Path(__file__).resolve().parent.parent
+    done = subprocess.run([sys.executable, "keeper/rehearse_selection.py", "--port", str(port)], cwd=root)
+    receipt = json.loads((root / "docs/receipts/unified-selection-rehearsal.json").read_text())
+    if done.returncode != 0 or not receipt.get("all_outcomes_passed"):
+        raise RuntimeError(f"selection rehearsal failed: exit {done.returncode}")
+    return dict(receipt="docs/receipts/unified-selection-rehearsal.json",
+                outcomes={k: {x: v[x] for x in v if x in ("resolved", "relisted_open", "pending_receipts_at_force")}
+                          for k, v in receipt["outcomes"].items()})
 
 
 # ---------------------------------------------------------------------------

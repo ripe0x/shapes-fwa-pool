@@ -9,25 +9,23 @@ library ScanLib {
     /// @dev Every position the book holds Allocated must still be Allocated at FWA. A settlement
     ///      pays the account in its own transaction; if receive() could not record the receipt
     ///      (forced ETH), the cash would otherwise count beside the position until it is synced.
-    ///      Bounded by the allocation queue: allocations since the oldest unresolved one.
-    function requireAllocatedCurrent(VaultLib.Book storage b, IFWAV2 f) external view {
-        if (b.allocatedValue == 0) return;
-        for (uint256 i = b.allocationHead; i < b.allocationQueue.length; ++i) {
+    ///      Reads at most MAX_ALLOCATION_SCAN queue entries from the head (else CatchUpFirst: sync
+    ///      and prune first), so pricing cost never grows with allocation history.
+    function requireAllocatedCurrent(VaultLib.Book storage b, IFWAV2 f)
+        external view returns (uint256 entries, uint256 reads)
+    {
+        if (b.allocatedValue == 0) return (0, 0);
+        uint256 head = b.allocationHead;
+        entries = b.allocationQueue.length - head;
+        if (entries > VaultLib.MAX_ALLOCATION_SCAN) revert VaultLib.CatchUpFirst();
+        for (uint256 i = head; i < head + entries; ++i) {
             uint256 id = b.allocationQueue[i];
-            if (b.positions[id].state == VaultLib.ALLOCATED
-                && IFWAView(address(f)).listings(id).status != LISTING_ALLOCATED) revert VaultLib.PendingReceipts();
+            if (b.positions[id].state != VaultLib.ALLOCATED) continue;
+            ++reads;
+            if (IFWAView(address(f)).listings(id).status != LISTING_ALLOCATED) revert VaultLib.PendingReceipts();
         }
     }
 
-    /// @dev Reads the FWA listing of every open position the book holds Active and selects, in
-    ///      allocation-time order (packed `allocatedAt << 192 | id`), each one FWA allocated; then
-    ///      moves the cursor to FWA's completed prefix `end`. FWA allocates a listing only while advancing
-    ///      `nextSequenceToProcess`, so no completed entry before `end` keeps an unapplied own
-    ///      selection. Position IDs exist only for listings VaultLib.admit validated, and FWA never
-    ///      changes a listing's identity (so the journal's `_validate` is not repeated here; `_syncTerminal`
-    ///      re-validates before any backing moves). With more than MAX_SELECTIONS found, or an order the
-    ///      allocation queue cannot take, it changes nothing and returns false: the caller walks the
-    ///      journal instead. `scanned` counts the listings read by a completed scan.
     function rebase(VaultLib.Book storage b, IFWAV2 f) external returns (bool, uint256 scanned, uint256 own) {
         uint64 end = f.nextSequenceToProcess();
         uint256 backlog = end - b.acquisitionCursor;
