@@ -286,6 +286,9 @@ def main():
         evidence["before_replacement"] = before
 
         # Replacement: a new container on the same volume continues from the saved state and head.
+        # The backup pauses meanwhile so the replacement, behind the dropping proxy, is the one that
+        # must send (else the backup can price the redemption first and no response is lost).
+        backup.stop()
         primary.stop()
         DropFirstSend.dropped.clear()
         server = socketserver.ThreadingTCPServer(("127.0.0.1", PROXY_PORT), DropFirstSend)
@@ -310,6 +313,9 @@ def main():
         dropped = rpc("eth_getTransactionReceipt", DropFirstSend.dropped[0])
         evidence["dropped_transaction_status"] = dropped and int(dropped["status"], 16)
         assert after["stats"]["mined"] >= before["stats"]["mined"] and after["head"] >= before["head"], "state or index lost"
+        backup = Keeper("backup-restarted", *keys["backup"][:2], volume("backup-data"), a.image, poll=30, health=8789)
+        keepers[1] = backup
+        backup.start()  # same volume: the backup resumes its own saved state beside the replacement
         # The backup polls slowly and may find nothing to send; it must still complete clean passes.
         wait_for("backup completes a clean pass", lambda: (h := backup.health()) is not None
                  and h["block"] > 0 and h["pass_errors"] == 0, seconds=600)
