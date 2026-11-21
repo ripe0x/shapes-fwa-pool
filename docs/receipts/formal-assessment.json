@@ -5,7 +5,7 @@
   "timestamp": 1795104215
  },
  "command": [
-  "/Users/dd/.pyenv/versions/3.11.8/bin/python3",
+  "python3",
   "sim/formal.py"
  ],
  "source_sha256": {

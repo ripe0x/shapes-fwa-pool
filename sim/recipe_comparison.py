@@ -375,7 +375,7 @@ def main():
     backing = {g: backing_table(gps_gwei=g) for g in (1, 2, 3)}
     report = dict(
         generated=time.strftime("%Y-%m-%d"), pin=FM.PIN, seeds=a.seeds, grid=a.grid,
-        command=[sys.executable, *sys.argv], source_sha256=frozen,
+        command=["python3", *sys.argv], source_sha256=frozen,
         window=dict(start=w["start"], end=w["end"], successful=w["successful"],
                     refunded=w["refunded"], successful_per_day=w["successful_per_day"],
                     purchaser_responses=w["response_kinds"]),
