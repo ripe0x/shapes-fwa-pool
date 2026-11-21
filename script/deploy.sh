@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Usage: script/deploy.sh <values.json> [--broadcast]
-# Runs script/Deploy.s.sol, which deploys through DeployCore (the same code every fork and scenario
+# Runs script/Deploy.s.sol, which deploys the vault, its policy and the manager factory through DeployCore (the same code every fork and scenario
 # test deploys with) and runs its postflight. Without --broadcast it only simulates against the
 # chain at RPC_URL and prints the gas estimate and cost: nothing is sent.
 # Release gate: script/release.py check compares sources, build, values, keeper and evidence with
@@ -36,6 +36,9 @@ if [[ "$BROADCAST" == "--broadcast" ]]; then ARGS+=(--broadcast); fi
 # shellcheck disable=SC2086
 DEPLOY_VALUES="$VALUES" forge script "${ARGS[@]}" ${FORGE_WALLET_ARGS:-}
 if [[ "$BROADCAST" == "--broadcast" && "$LOCAL" == 0 ]]; then
-  VAULT="$(python3 -c "import json,sys;r=json.load(open(sys.argv[1]));print(next(t['contractAddress'] for t in r['transactions'] if t.get('contractName')=='PackVault'))" "broadcast/Deploy.s.sol/$CHAIN_ID/run-latest.json")"
-  python3 script/release.py postflight "$VAULT" "$VALUES"
+  RUN="broadcast/Deploy.s.sol/$CHAIN_ID/run-latest.json"
+  pick() { python3 -c "import json,sys;r=json.load(open(sys.argv[1]));print(next(t['contractAddress'] for t in r['transactions'] if t.get('contractName')==sys.argv[2]))" "$RUN" "$1"; }
+  VAULT="$(pick PackVault)"
+  FACTORY="$(pick PackManagerFactory)"
+  python3 script/release.py postflight "$VAULT" "$VALUES" "" "$FACTORY"
 fi

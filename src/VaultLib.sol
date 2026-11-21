@@ -519,14 +519,10 @@ library VaultLib {
     }
 
     function addInventory(Book storage b, uint256 packId, uint256 value) internal {
-        addInventory(b, packId, value, 0);
-    }
-
-    function addInventory(Book storage b, uint256 packId, uint256 value, uint256 backingQuote) internal {
         if (value == 0 || b.idleValueOf[packId] != 0 || b.packToListing[packId] != 0) revert Duplicate();
         b.trackedValue += value;
         b.idleValue += value;
-        _toIdle(b, packId, value, backingQuote);
+        _toIdle(b, packId, value, 0);
     }
 
     function _toIdle(Book storage b, uint256 packId, uint256 value, uint256 backingQuote) private {

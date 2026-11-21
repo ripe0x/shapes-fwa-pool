@@ -1101,3 +1101,115 @@ them becomes holder NAV at once and is not refundable, exactly like a plain tran
 `script/release.py postflight|keeper-config <vault> <values> [owner]` takes the current owner after a
 handover. PackVault runtime in the manifest. Tests: `ForkVaultLifecycle.test_ownerHandoverOnly`,
 `test_zeroOwnerRejectedAtDeploy`.
+
+## D77. One strategy implementation, two ownership models (owner brief A3, 2026-11-21)
+
+**Chose:** the strategy lives in three linked libraries that run by DELEGATECALL in the calling
+account: `StrategyLib` (build, list, sync, unlist, liquidate, harvest, burn, receipt
+identification, keeper pay entry), `VaultLib` (position book, live FWA economics and backing rule,
+journal, settlement, recovery, keeper pay) and `ScanLib` (own-position scan). The split is for
+EIP-170 only. `PackAccount` is the one abstract operating surface both accounts inherit: the same
+entry points, views, receive hook, NFT hook, parameter and policy setters, two-step ownership. The
+concrete account defines only what it owes: `_free`, `_idle`, and the facts only it knows
+(`_checkpointMode`, `_shortfall`, `_need`). `PackVault` adds shares, escrow, checkpoints,
+redemptions, distributions and wind-down; `PackManager` adds owner withdrawals and exit mode.
+**Why:** a library executing against the caller's storage keeps each account the FWA depositor and
+sole owner of its assets; a central strategy contract would have to custody or be trusted by every
+account. One shallow base removes the otherwise duplicated 40 entry points and views; no deeper
+hierarchy, no plugin system.
+**Isolation argument:** the libraries have no state and no withdrawal path. ETH leaves an account
+only as FWA backing for its own listing, the exact ShapePacks mint price, or keeper pay capped by
+that account's quote, budgets and `freeEth()`. NFTs leave only to FWA on listing, to ShapePacks on
+redeem, or by the owner functions in `PackManager`. Library functions that change state revert when
+called directly (Solidity's library call guard). Receipts are matched by backing inside the
+receiving account's own book; FWA pays the depositor of record, so one account cannot be credited
+with another's ETH.
+**Size:** PackVault 16,970 bytes (was 24,136 at main), PackManager 12,453, StrategyLib 12,758,
+VaultLib 23,409, ScanLib 1,935, factory 1,365, KeeperPolicyV1 216.
+
+## D78. Personal managers are ERC-1167 clones from a permissionless factory (2026-11-21)
+
+**Chose:** `PackManagerFactory` deploys one `PackManager` implementation in its constructor and
+creates each manager as a Solady 44-byte clone, initialized in the same call with the chosen owner,
+bounded parameters (same `checkBounds` as the vault) and the factory's default keeper policy, and
+funded with the call's ETH. The implementation sets its own `_initialized` in its constructor, and
+`initialize` accepts only the factory, once. The factory has no owner, no fee, keeps no ETH and has
+no function that reaches a manager after creation. Discovery: `ManagerCreated` event,
+`managerAt(i)`, `managerCount()`, `isManager(a)`.
+**Measured:** `create` 474,076 gas (clone, initialize, approval, discovery storage) against roughly
+3 million for a full 12.5 KB deployment; the clone's extra DELEGATECALL keeps FWA's pushed payments
+inside the 100,000 gas stipend: keep payment 52,363 gas, cold kick refund 35,148 gas
+(`ForkManager.t.sol`).
+**Owner controls:** withdraw any ETH, withdraw idle packs, rescue untracked NFTs, pause listing,
+exit mode (reversible: unlisting and liquidation become essential and permissionless), parameters
+and policy within bytecode bounds, two-step handover only (D76 applies). Stopping paid automation is
+setting both budgets to zero; the owner can run any operation unpaid.
+**Not built:** per-owner manager index (ownership moves; the event and `isManager` suffice), an
+upgradeable implementation, per-manager keeper or policy deployments.
+
+## D79. Direct-mint build-and-list replaces bulk mint, split and restock (owner brief A3.31)
+
+**Chose:** `build(units, proposals, minPay)` calls `ShapePacks.createPack([], mintCounts)` with the
+fewest Shapes for the pack value (0.06 ETH = one 0.05 + one 0.01: two paid primary mints, 0.002 ETH
+at today's 0.001 fee) and lists each new pack in the same transaction, validating each proposal
+after the previous admission. Returned packs are relisted with `list`, never redeemed to remint.
+Removed: 0.1 ETH mints, splits, the loose-Shape stack, the Shapes approval, `restock`, `Q_MINT`,
+`Q_PACK`, `Q_PACK_UNIT`, `Q_RESTOCK`, `Q_LIQ_SHAPE`. Kept: bounded recovery of oversized returned
+packs. New quotes from `ForkDirectMint.t.sol`: createPack 381,427 / 534,411 / 626,504 gas for one /
+two / three Shapes, so `Q_BUILD_PACK` 300,000 + `Q_BUILD_SHAPE` 130,000 per Shape; build call base
+280,000; two work units per built and listed pack.
+**Why:** the old route quoted about 1.0M gas per 0.03 ETH pack before listing and left idle packs
+and loose Shapes between transactions; minting into the pack is one call per pack and needs no
+intermediate inventory. Creator revenue per new pack rises from 0.0003 to 0.002 ETH because each
+Shape pays its own fee.
+
+## D80. Backing makes keeping the pack the purchaser's best choice (owner brief A3.32)
+
+**Chose (VaultLib.edge):** backing B = floor to 10,000 wei of (P − 0.0003 ETH − 160,000 gas ×
+gasCeiling) × 10,000 / max(ETH bid rate, token bid rate), both read live from FWA (9,000 and 9,150
+today). At P = 0.06 and the 0.5 gwei ceiling, B = 0.06515847 ETH (ratio 1.086): a purchaser keeping
+the pack holds 0.06 against at most 0.05962 from either bid, 0.0003 ETH more after redeeming at the
+ceiling price (`ShapePacks.redeem` of the pack measured at 157,023 gas). It lists only when B ≥
+P / 0.95 (a keep never loses at FWA's immutable 5% settlement-fee cap), k ≥ 1 + minEdge, a bid
+cycle B (k − 1) and a keep cycle B (k − s) − P each clear the cycle's keeper pay, and for a new
+build the keep cycle also repays the build including its mint fees. Otherwise the account stops
+building and listing; sync, exits and withdrawals are unaffected. The token bid's enable flag has no
+getter, so its rate always counts (conservative).
+**Supersedes:** D62's floor max(P / d, P / (1 − s)), which made bids the purchaser's best choice,
+and its gas-optimal and spare-capital terms (they raise B, which would break the keep incentive).
+**Consequence:** a keep now returns B (1 − s) for a pack worth P: +0.0045 ETH per keep after the
+replacement build at canary gas, more than the bid cycle's B (k − 1) = +0.0025 ETH. Expiry
+resolution reclaims backing (B (1 − s) ≥ P), which is also a keep.
+
+## D81. No shared exposure registry (owner brief A3.33)
+
+PR #1's `FWAExposureRegistry` is not adopted. FWA's own formulas make a listing's expected fees
+before selection k B whatever the number of listings (each fee splits over N listings, selection
+odds are 1/B over the sum of 1/B), so per-cycle economics, and therefore every account's admission
+gate, are independent of how many listings our accounts add. What aggregate participation dilutes
+is the rate: fees per listing per day fall with total listings, which lowers capital turnover and
+annual return for every listing, ours and others'. A registry would add shared state, a call per
+listing and coupling between accounts without changing either fact. The economic study
+(`sim/unified.py`, `docs/UNIFIED-SYSTEM.md`) measures the dilution for combined deployments.
+
+## D82. One keeper for all accounts (owner brief A3.34)
+
+The keeper treats the pooled vault and every factory manager as independent work accounts: own
+index, state, plan, budgets and failures, one signing nonce stream per keeper address. Managers are
+discovered from the factory's `managerCount()`/`managerAt(i)`, reading only new indices each pass.
+No onchain coordinator. Details: `docs/KEEPER.md`.
+
+## D83. PR #1 review: reused, replaced, rejected (2026-11-21)
+
+Reused: direct minting through `createPack` mint counts (generalised to the 0.05/0.01 recipe and
+made the only construction path); using each listing's own recorded units and backing when planning
+redemption unlists (already on main as `Listing.value`/`backing`); the lesson that FWA's staging
+must be checked by the returned listing status (main already reverts unless the listing is Active
+and the active count rose by one). Replaced: the factory of full `PackVault` copies (each would
+carry share accounting and a seed) by clones of a share-free `PackManager`; the owner-only factory
+by a permissionless one; supplied-creation-code hashing (unnecessary: the implementation is deployed
+by the factory). Rejected: `FWAExposureRegistry` (D81), the 300-position limit and spare-slot spread
+(already superseded by A2.15), staged-listing activation (FWA has no public `activateListings`;
+staged listings activate inside acquisition processing, and accounts never list while it is busy), adaptive sizing and 0.1/0.2 ETH ladders (no evidence of a
+material advantage; see the recipe comparison), `sim/mint_policy_research.py` (replaced by the event
+replay in `sim/unified.py`).
