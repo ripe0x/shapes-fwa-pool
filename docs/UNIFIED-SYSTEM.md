@@ -94,42 +94,63 @@ and a constant 31,763 gas refusal beyond it whatever the history (D84).
 
 ## 5. Economics
 
-Two models, both with tokens at zero. Numbers are model results, not forecasts.
+Model results, not forecasts. Tokens at zero; every expense included; complete holder exit. Two
+studies, both through the formal cash-path simulator (`sim/formal.py` → `sim/forward.py` → the
+PackVault mirror `sim/vault.py` and `keeper/policy.py`), at the final backing B = 0.06489617 ETH.
 
-**Formal gate (`sim/formal.py`, `docs/receipts/formal-assessment.json`).** The owner's hurdle: 10% a
-year net at trailing-30-day volume, 0.5 gwei ceiling, every expense included, complete exit. The
-actual 30 days at block 26,450,200 replayed for 360 days plus exit, 16 seeds, purchasers sampled from
-recorded responses and, conservatively, every responder bids in time:
+**Formal gate (`docs/receipts/formal-assessment.json`).** The owner's hurdle: 10% a year net at the
+actual 30 days to block 26,450,200 (356.7 successful acquisitions a day) replayed with its real timing
+for 360 days plus exit, 0.5 gwei, 16 seeds, recorded purchaser responses with every responder
+bidding:
 
 | Pool | Median | p10 | Worst | Losing runs | Creator mint fees / yr |
 |---|---:|---:|---:|---:|---:|
-| 1.96 ETH (canary values) | **+50.2%** | −51% | −61% | 6 / 16 | 0.077 ETH |
-| 6.8 ETH | **+50.7%** | +16% | −49% | 1 / 16 | 0.24 ETH |
-| 20 ETH | **+37.9%** | +17% | +6% | 0 / 16 | 0.61 ETH |
+| 1.96 ETH (canary) | **+70.6%** | −55.3% | −61.5% | 5 / 16 | 0.079 ETH |
+| 6.8 ETH | **+55.9%** | +9.3% | −26.4% | 1 / 16 | 0.24 ETH |
+| 20 ETH | **+37.7%** | +22.0% | +6.0% | 0 / 16 | 0.62 ETH |
 
-The hurdle passes at every size on the median. Diagnostics at 1.96 ETH: recorded choices (keeps
-stay keeps) median +162%, 0.66 ETH mint fees; last 10 days' volume +9.4% median (7 / 16 lose);
-zero demand −2.3%; with FWA's oracle cap restored nothing lists (−0.05%). Since D80 a value-aware
-purchaser keeps, so the formal case is a lower bound for both returns and creator revenue.
+The hurdle passes at every size on the median; the canary's tail is wide (selection luck on few
+positions), which is why the canary is a technical deployment.
 
-**Comparative study (`sim/unified.py`, `sim/out/unified.md`, 256 seeds per cell).** Event replay of
-the latest 30 days of mature FWA history with every account's listings inserted into FWA's weights,
-counts and fee split; used for comparisons, not for the gate. Recipes at 2 ETH, designed behaviour:
+**Matched recipe comparison (`docs/receipts/recipe-comparison.json`, `sim/out/recipe-comparison.md`,
+`sim/recipe_comparison.py`).** Three recipes with identical capital, demand, purchaser-response
+pool, gas (0.5 gwei) and seeds; responses are held just inside FWA's settlement window so recipes
+differ only in the keep or bid choice (absolute levels therefore differ from the gate, which replays
+real timing; use this study to rank recipes, the gate for the hurdle). 100 seeds per canary cell, 48
+at 20 ETH. Median return / loss frequency / creator mint fees per ETH a year:
 
-| Recipe | Mean | p5 | Loss probability | Creator mint fees per ETH a year |
-|---|---:|---:|---:|---:|
-| 0.03 bulk mint + split, bid backing (main) | +80% | −82% | 25% | 0.004 |
-| 0.03 bulk mint + split, keep backing | +380% | +226% | 0% | 0.58 |
-| 0.03 direct mint | −1.8% | −1.8% | 100% | 0.05 |
-| **0.06 direct mint (chosen)** | **+186%** | **+30%** | **2.3%** | **0.96** |
-| 0.07 direct mint | +146% | −12% | 7% | 1.08 |
+| Cell | 0.06 direct (chosen) | 0.03 bulk mint + split | 0.03 direct |
+|---|---|---|---|
+| 1.96 ETH, all bid | +22.8% / 45% / 0.033 | +25.1% / 39% / 0.009 | never lists |
+| 1.96 ETH, observed choices | +34.3% / 33% / 0.153 | +37.5% / 31% / 0.061 | never lists |
+| 1.96 ETH, 50% keep | +80.7% / 29% / 0.375 | +65.4% / 17% / 0.144 | never lists |
+| 1.96 ETH, all keep | +136.8% / 17% / 0.801 | +122.2% / 4% / 0.290 | never lists |
+| 20 ETH, all bid | +39.3% / 8% / 0.030 | +17.0% / 12% / 0.008 | never lists |
+| 20 ETH, observed choices | +45.9% / 4% / 0.137 | +25.4% / 2% / 0.032 | never lists |
+| 20 ETH, 50% keep | +69.4% / 2% / 0.296 | +37.3% / 2% / 0.061 | never lists |
+| 20 ETH, all keep | +88.2% / 0% / 0.546 | +48.7% / 0% / 0.100 | never lists |
+| 1.96 ETH, quieter demand (last 10 days), all bid / all keep | +0.6% / +9.8% (below the hurdle) | −3.2% / +24.1% | never lists |
+| 20 ETH, quieter demand, all bid / all keep | +4.2% / +16.7% | +5.3% / not run | never lists |
+| Zero demand, 1.96 ETH | −2.3% | −2.1% | −0.1% |
 
-- Direct 0.03 packs fail the build gate: one keep cannot repay three fresh mints, so kept packs are
-  never replaced. Direct 0.07 packs pay the creator slightly more per ETH with a worse tail.
-- The 0.03 split recipe returns more because each pack pays 0.0003 ETH in fees, but it keeps the
-  bulk-mint construction, pays the creator 40% less and takes twice the FWA weight per ETH. The 0.06
-  recipe is the best simple design for both creator and capital provider; no dynamic sizing.
-- Purchaser behaviour dominates: the 0.06 recipe falls to +83% mean (23% loss) if nobody keeps. The study has no cash path: losses are truncated at −100% (ruin) and an account's pack count is fixed, so small-account tails are approximate; the formal gate above has the cash path.
+**Decision: keep 0.06.** It earns 2.6 to 5.4 times the creator revenue of the 0.03 bulk-split recipe
+in every cell and a higher depositor return at 20 ETH under every behaviour. 0.03 direct packs never
+list: one keep (2.27 mETH net) cannot repay three fresh mints (3.80 mETH). The tradeoff, stated
+plainly: at the 1.96 ETH canary the 0.03 bulk-split recipe's median edges 0.06 under all-bid and
+observed behaviour, with a milder tail (all keep: p5 +8.8% against −50.8%), because smaller packs at
+twice the FWA weight diversify a small pool; it does so by paying the creator about a third as much,
+and it would need the removed bulk-mint and split construction back. It does not materially improve
+the combined objective. No dynamic sizing.
+
+Further results: the keep advantage is +0.30 mETH at every purchaser gas assumption (the rule solves
+for it); `PURCHASER_GAS_PRICE` at 1 / 2 / 3 gwei moves the canary all-keep median +130% / +137% /
++117%, so 2 gwei stays. All-bid is the floor for the median and the loss frequency in every cell, but
+**not** for the worst case: all-keep has the fatter left tail (canary worst −93.7% against −66.5%),
+because each keep hands the pack over and pays a fresh build. Creator revenue is set by the keep rate:
+0.03 ETH per ETH a year if every purchaser bids, 0.55 to 0.80 if every purchaser keeps. At 0.2 gwei
+the 0.03 bulk-split recipe's return leads (+369% against +184% median) while 0.06 still pays the
+creator 1.8 times more. The 6.8 and 50 ETH matched cells were not run at full precision (2-seed pilot
+only); capacity across 1.96 / 6.8 / 20 ETH comes from the formal gate above.
 
 **Pool versus personal managers.**
 
