@@ -11,8 +11,8 @@ evidence, not proof that no defect exists.
 
 | ID | Severity | Finding | Disposition |
 |---|---|---|---|
-| S1 | Low | A kick refund forced in while `receive()` fails is not caught by the checkpoint gate; with the ShapePacks oracle exemption lifted, pool NAV can count the refund and the booked position until the kicked listing is synced | Accepted and documented (D84). The full gate would read every open listing per checkpoint. Needs a gas repricing (cold kick receive is 35,148 of 100,000 gas) and FWA lifting the exemption; the keeper syncs on `ListingKicked` |
-| R1 | Process (second review, of 958b924) | `requireAllocatedCurrent` walked every tombstone behind an unresolved allocation: unbounded checkpoint and NAV gas | Fixed in 4794bf5: at most 32 entries, constant 31,763 gas refusal, pay per entry and read (`ForkAllocationProof.t.sol`) |
+| S1 | Low | A kick refund forced in while `receive()` fails is not caught by the checkpoint gate; with the ShapePacks oracle exemption lifted, pool NAV can count the refund and the booked position until the kicked listing is synced | Fixed after the review of e755307 (D84): while the exemption is lifted the proof reads every open listing, at most 32, else `CatchUpFirst`; tested with a real forced kick on the pool |
+| R1 | Process (second review, of 958b924) | `requireAllocatedCurrent` walked every tombstone behind an unresolved allocation: unbounded checkpoint and NAV gas | Fixed in 4794bf5: at most 32 entries, constant 31,763 gas refusal (34,519 after the S1 fix), pay per entry and read (`ForkAllocationProof.t.sol`) |
 | N1 | Info | A manager owner set to the factory or the manager itself would lock the funds | Fixed: `initialize` rejects both (`test_createRejectsOwnersThatCannotAct`) |
 | N2 | Info | `PendingDeposit.checkpointGwei` is `uint32` accumulated per epoch | Not exploitable: the charge is zero once `processingPool` is funded |
 | N3 | Info | A checkpoint's unspent `processingPool` joins vault NAV | By design: request charges are not refundable; a small holder gain |

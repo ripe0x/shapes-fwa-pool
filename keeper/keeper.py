@@ -466,7 +466,7 @@ def plan_key(step):
     return (step[0], tuple(step[1]), step[2]) if step[0] == "sync" else (step[0],)
 
 
-def run_account(a, tm, account, pooled, head):
+def run_account(a, tm, account, pooled):
     """One pass over ONE account: settle any in-flight transaction (there is at most one across all
     accounts, on the signer's single nonce stream), then plan, preflight and send one call at a time,
     waiting for each receipt and re-reading that account before choosing the next. Each account has
@@ -593,24 +593,19 @@ def run_account(a, tm, account, pooled, head):
             skip.clear()  # Successful work changes funding and candidate eligibility.
             declined[:] = [entry for entry in declined if not
                            (entry[0] == "LIABILITY_WORK_SKIPPED" and entry[2].startswith(step[0] + " "))]
-    backings = active_backings(account, head)
+    backings = active_backings(account)
     return failed, codes + declined, in_flight, backings
 
 
-def active_backings(account, head, cap=512):
-    """This account's own open-listing backings (bounded), for the monitoring-only selection-weight
-    share. Open listings are Active or unresolved-Allocated; counting all of them never understates
-    the keeper's selection weight, so the EXPOSURE warning is conservative."""
-    at = lambda sig, *args: call(account, sig, *args, block=head)
-    out = []
-    n = min(num(at("openListingCount()(uint256)")), cap)
-    for i in range(n):
-        # Position: (packId, value, backing, feeDebt, allocatedAt, state); backing is index 2.
-        pos = at("position(uint256)((uint256,uint256,uint256,uint256,uint64,uint8))", num(at("openListingAt(uint256)(uint256)", i)))
-        b = num(pos.strip("()").split(", ")[2])
-        if b:
-            out.append(b)
-    return out
+def active_backings(account):
+    """Backings of every open listing (Active or unresolved Allocated) this account holds, from its
+    event index, for the monitoring-only selection-weight share. The index is the durable,
+    reorg-repaired projection read_state just synced, so every position counts with no chain reads
+    and no cap; counting Allocated ones too never understates the keeper's selection weight."""
+    for index in INDEXES.values():
+        if index.vault.lower() == account.lower():
+            return index.open_backings()
+    raise IndexBehind(f"no event index for {account} this pass")
 
 
 def run_pass(a, tm, accounts):
@@ -626,7 +621,7 @@ def run_pass(a, tm, accounts):
     account_health, all_backings = {}, []
     for account, pooled in accounts:
         try:
-            f, codes, _in_flight, backings = run_account(a, tm, account, pooled, head)
+            f, codes, _in_flight, backings = run_account(a, tm, account, pooled)
             failed += f
             account_health[account] = dict(pooled=pooled, status=codes)
             all_backings += backings

@@ -37,7 +37,8 @@ needs its own ETH for gas. Token burns remain unpaid and require operator opt-in
 FWA selection weight across every account it runs: the sum over its own Active listings of each
 listing's FWA weight `1e36 / backing`, over `FWA.totalWeight()`. It surfaces as an `EXPOSURE_SHARE`
 info line, and as an `EXPOSURE_SHARE_HIGH` action once the share reaches `EXPOSURE_SHARE_HIGH_BPS`
-(10%, `policy.py`). It never changes a plan — at a high share the operator widens backings or adds
+(10%, `policy.py`). Backings come from each account's event index (every open listing, no cap,
+reorg-repaired), not from chain reads. It never changes a plan — at a high share the operator widens backings or adds
 independent listers.
 
 | State | Default or behavior |

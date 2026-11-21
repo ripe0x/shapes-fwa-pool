@@ -1249,21 +1249,27 @@ so a settlement without a receipt still blocks pricing until it is synced (a bid
 nothing and returns the pack, does not). A kept pack that comes back, perhaps with gifted Shapes, joins
 inventory at its actual value. The proof reads at most
 `MAX_ALLOCATION_SCAN` = 32 allocation queue entries from the head and otherwise refuses with
-`CatchUpFirst` at a constant 31,763 gas, so pricing never scans allocation history (review of
+`CatchUpFirst` at a constant 34,519 gas, so pricing never scans allocation history (review of
 958b924: the first version walked every tombstone behind an unresolved allocation). The queue from
 the head holds only allocations newer than the oldest unresolved one, and a checkpoint already
 refuses any allocation older than FWA's settlement window (`SyncFirst`), so a refusal lasts at most
 one window plus a sync. Checkpoint pay adds 6,000 gas per entry read and 30,000 per FWA listing read
-(32 entries with one read measured 186,175 gas against a 222,000 quote; `ForkAllocationProof.t.sol`). Sync is permissionless and resolves each listing exactly once (its position retires).
+(32 entries with one read measured 188,361 gas against a 222,000 quote; `ForkAllocationProof.t.sol`). Sync is permissionless and resolves each listing exactly once (its position retires).
 **Bound with the real receiver:** too little transaction gas cannot force an unrecorded payment: when
 `receive()` runs out of gas inside the call, FWA keeps at most 1/64 of it, far below the 32,000 gas a
 `CREATE` needs, so the whole transaction reverts (`test_lowGasKeepNeverForcesAnUnrecordedPayment`).
-**Residual:** a kick refund forced in while its receipt is missing is not caught by the checkpoint
-gate (that would need a read of every Active listing per checkpoint). It needs FWA to lift the
-ShapePacks oracle exemption and `receive()` to fail at the same time, and lasts until anyone syncs the
-kicked listing, which the keeper does on FWA's `ListingKicked` event. In that one case the pool's
-NAV correctness, not only liveness, relies on the keeper; the independent review rated it low and the
-full gate (a read of every open listing per checkpoint, up to 300) costs more than it protects.
+**Kick refunds (review of e755307):** a kick refunds B outside the account's own calls, so a
+forced refund with no receipt would let the booked Active position and the cash both count. A kick
+needs FWA's floor cap, which the ShapePacks oracle exemption switches off. The proof therefore reads
+the exemption (one read): in place, no listing can be kicked and nothing more is read; lifted, every
+open listing (at most `MAX_ALLOCATION_SCAN` = 32, else `CatchUpFirst`) must still be Active at FWA or
+pricing refuses with `PendingReceipts` until it is synced. Checkpoint pay counts those entries and
+reads like allocation entries. **Remaining exposure:** none in NAV. The cost is liveness: with the
+exemption lifted and more than 32 open listings, pool pricing (checkpoints, NAV) refuses until owner
+wind-down or an essential unlist for a redemption shortfall brings the count to 32 or fewer; the
+2 ETH canary can hold at most about 16 (each listing ties up a 0.06 ETH pack and 0.0649 ETH of
+backing). Managers have no NAV and are unaffected. Tested: `test_forcedKickRefund_blocksPoolPricingUntilSynced`,
+`test_activeCheckOnlyWhileKickableAndBounded`.
 **Tested (fork, real FWA forced-send):** `test/fork/ForkReceiptRecovery.t.sol`.
 
 ## D85. The purchaser's gas is a fixed bound, not the keeper's ceiling (owner brief A4.3)

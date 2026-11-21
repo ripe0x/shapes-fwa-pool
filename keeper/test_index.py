@@ -404,6 +404,24 @@ def rotation_tests(directory):
           "reorg replay restores the projection: pass")
 
 
+def exposure_tests(directory):
+    """Every open position counts toward selection-weight exposure, past the old 512 read cap;
+    settlement and a reorg move the count with the book, and a restart keeps it."""
+    path = directory / "exposure.sqlite"
+    book = I.EventIndex(path, 1, VAULT, 1)
+    book.append(1, 1, "e-1", [pos(i, backing=4 * 10**16, block=1, idx=i) for i in range(600)])
+    book.append(2, 2, "e-2", [pos(i, state=2, backing=4 * 10**16, block=2, idx=i) for i in range(10)] +
+                [pos(i, state=0, block=2, idx=10 + i) for i in range(10, 20)])
+    assert len(book.open_backings()) == 590  # 580 Active + 10 Allocated; 10 settled drop out
+    book.rollback(1)
+    assert len(book.open_backings()) == 600
+    book.close()
+    book = I.EventIndex(path, 1, VAULT, 1)
+    assert book.open_backings() == [4 * 10**16] * 600
+    book.close()
+    print("keeper exposure: 600 open positions counted from the index; settlement, reorg, restart: pass")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--canonical-read-check", action="store_true", help="also check discovery-hash repair against real Tenderly block hashes")
@@ -413,3 +431,4 @@ if __name__ == "__main__":
         discovery_tests(Path(d), options.canonical_read_check)
         receipt_recovery_tests(Path(d))
         rotation_tests(Path(d))
+        exposure_tests(Path(d))

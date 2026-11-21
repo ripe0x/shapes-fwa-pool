@@ -35,7 +35,7 @@ difference. `script/deploy.sh` runs it, and with `--broadcast` also verifies the
 | Asset flow, 16 regimes, outcomes O1-O11 | all pass; unsigned | [asset-flow.json](../../asset-flow.json), `docs/receipts/flow/` |
 | Local production rehearsal (fresh fork) | all 17 steps pass on the final source | [unified-production-rehearsal.json](../receipts/unified-production-rehearsal.json), [selection](../receipts/unified-selection-rehearsal.json) |
 | Production image on a fresh fork (CI) | pass | [ci-44930570759.json](../receipts/image-rehearsal/ci-44930570759.json) |
-| Independent review | no critical, high or medium; one low residual accepted (D84) | [unified-review.md](../receipts/unified-review.md) |
+| Independent review | no critical, high or medium; the low kick residual is now fixed (D84) | [unified-review.md](../receipts/unified-review.md) |
 | Holder return (formal gate) and recipe comparison | see acceptance.json `economic` | [formal-assessment.json](../receipts/formal-assessment.json), [recipe-comparison.json](../receipts/recipe-comparison.json) |
 
 ## 3. Canary: what it is for
@@ -59,8 +59,8 @@ settlement, keeper reliability and complete exit on mainnet with capped capital.
 
 Spending bounds: routine keeper pay at most 0.04 ETH in the first 24 hours, then 0.01 ETH a day.
 Checkpoint pay comes only from request charges (`processingPool`), at most one checkpoint per 12-hour
-interval: 360,000 gas plus at most 32 allocation entries (6,000 gas each) and their FWA reads (30,000
-each), at the 2 gwei essential ceiling, plus one work fee. A compromised owner key can take at most
+interval: 360,000 gas plus at most 32 allocation entries and, while the oracle exemption is lifted,
+32 open listings (6,000 gas each), and their FWA reads (30,000 each), at the 2 gwei essential ceiling, plus one work fee. A compromised owner key can take at most
 the balance it can reach through parameters plus the budget refill (B3).
 
 ## 4. Funding and deployment gas
@@ -141,7 +141,7 @@ Owner wind-down (one way): `cast send <vault> "startWindDown()" --account <owner
 | A settled listing whose `receipts(id)` is empty (a payment FWA force-sent) | expected to be resolved by the next sync; investigate why `receive` failed (gas repricing?) and pause new exposure |
 | Keeper pay above 0.04 ETH in 24 hours | owner sets routine cap and rate to 0 via `setParams`; investigate |
 | Any keeper revert that is not a lost race | stop that worker; read its state file |
-| FWA lifts the ShapePacks oracle exemption, moves its bid above about 94.4%, or changes fees or windows | new listings stop on their own (`QUOTE_UNAVAILABLE` / edge not ok); exits are unaffected; decide on wind-down. If the exemption is lifted, sync promptly on every `ListingKicked` (D84 residual) |
+| FWA lifts the ShapePacks oracle exemption, moves its bid above about 94.4%, or changes fees or windows | new listings stop on their own (`QUOTE_UNAVAILABLE` / edge not ok); exits are unaffected; decide on wind-down. With the exemption lifted, pricing also checks every open listing; above 32 it refuses until wind-down (D84) |
 | `EXPOSURE_SHARE` above 10% of FWA selection weight | owner decision on a cap (D81) |
 | Gas above the 0.5 gwei ceiling | routine work waits by design; holders may still exit at their own gas |
 

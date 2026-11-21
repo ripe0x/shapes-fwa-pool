@@ -5,6 +5,7 @@ import {SelectionBase} from "./ForkSelection.t.sol";
 import {VaultLib as L} from "../../src/VaultLib.sol";
 import {ScanLib} from "../../src/ScanLib.sol";
 import {IFWAV2, IShapePacks} from "../../src/interfaces/External.sol";
+import {IFwaAdmin, IOwnable} from "./ForkBase.sol";
 
 /// @dev The production book and allocation proof, with allocations applied directly. The proof's
 ///      FWA reads are real: the head is the listing FWA's real VRF word allocated.
@@ -17,6 +18,12 @@ contract AllocationProofHarness {
         book.addInventory(pack, 0.06 ether);
         book.list(id, pack, 0.065 ether, 0);
         book.select(id, at);
+    }
+
+    function listOnly(uint256 id) external {
+        uint256 pack = id + 1e12;
+        book.addInventory(pack, 0.06 ether);
+        book.list(id, pack, 0.065 ether + id * 1e4, 0);
     }
 
     function keep(uint256 id) external { book.keep(id); }
@@ -55,6 +62,8 @@ contract ForkAllocationProofTest is SelectionBase {
     function test_boundaryReadsTheQueue() public {
         _setUpQueue(L.MAX_ALLOCATION_SCAN - 1, 0);
         vm.cool(address(FWA));
+        vm.cool(address(PACKS));
+        vm.cool(address(ScanLib));
         vm.cool(address(h)); // a checkpoint reads the queue in its own transaction
         (uint256 entries, uint256 reads, uint256 used) = h.proof(FWA, PACKS);
         assertEq(entries, L.MAX_ALLOCATION_SCAN);
@@ -86,8 +95,34 @@ contract ForkAllocationProofTest is SelectionBase {
         h.proof(FWA, PACKS);
     }
 
+    /// @dev While FWA can kick (exemption lifted), the proof also reads every open listing, at most
+    ///      MAX_ALLOCATION_SCAN of them; above that it refuses at a cost independent of the count.
+    ///      With the exemption in place it reads none.
+    function test_activeCheckOnlyWhileKickableAndBounded() public {
+        _select(primary());
+        h = new AllocationProofHarness();
+        for (uint256 i = 1; i <= L.MAX_ALLOCATION_SCAN + 1; ++i) h.listOnly(3e15 + i);
+        (uint256 entries, uint256 reads,) = h.proof(FWA, PACKS);
+        assertEq(entries + reads, 0, "exemption in place: no kick is possible, nothing to read");
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), false);
+        (bool ok, uint256 small) = _measure();
+        assertFalse(ok, "33 open listings refuse");
+        vm.expectRevert(L.CatchUpFirst.selector);
+        h.proof(FWA, PACKS);
+        for (uint256 i = L.MAX_ALLOCATION_SCAN + 2; i <= 1_000; ++i) h.listOnly(3e15 + i);
+        (bool ok2, uint256 large) = _measure();
+        assertFalse(ok2, "1,000 open listings refuse");
+        emit log_named_uint("active-check refusal gas at 33 open", small);
+        emit log_named_uint("active-check refusal gas at 1,000 open", large);
+        assertLe(large, small, "refusal cost does not grow with the open count");
+    }
+
     function _measure() internal returns (bool ok, uint256 used) {
         vm.cool(address(h));
+        vm.cool(address(FWA));
+        vm.cool(address(PACKS));
+        vm.cool(address(ScanLib));
         uint256 g = gasleft();
         (ok,) = address(h).call(abi.encodeCall(AllocationProofHarness.proof, (FWA, PACKS)));
         used = g - gasleft();

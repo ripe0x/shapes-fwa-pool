@@ -2,7 +2,7 @@
 pragma solidity 0.8.30;
 
 import {VaultLib} from "./VaultLib.sol";
-import {IFWAV2, IFWAView, IShapePacks, LISTING_ALLOCATED, LISTING_SETTLED} from "./interfaces/External.sol";
+import {IFWAV2, IFWAView, IShapePacks, LISTING_ACTIVE, LISTING_ALLOCATED, LISTING_SETTLED} from "./interfaces/External.sol";
 
 /// @notice The read half of VaultLib's scan proof, a separate library only for EIP-170 size.
 library ScanLib {
@@ -11,14 +11,30 @@ library ScanLib {
     ///      (forced ETH), the cash would otherwise count beside the position until it is synced.
     ///      Reads at most MAX_ALLOCATION_SCAN queue entries from the head (else CatchUpFirst: sync
     ///      and prune first), so pricing cost never grows with allocation history.
+    ///      A kick refunds B the same way, so while FWA can kick (the ShapePacks oracle exemption
+    ///      lifted) every booked Active listing must also still be Active at FWA, read over at most
+    ///      MAX_ALLOCATION_SCAN open entries (else CatchUpFirst). With the exemption no listing can
+    ///      be kicked and the one exemption read is the whole proof.
     function requireAllocatedCurrent(VaultLib.Book storage b, IFWAV2 f, IShapePacks packs)
         external view returns (uint256 entries, uint256 reads)
     {
-        if (b.allocatedValue == 0) return (0, 0);
+        if (b.activeCount != 0 && !f.oracleExemptCollections(address(packs))) {
+            uint256 n = b.open.length;
+            if (n > VaultLib.MAX_ALLOCATION_SCAN) revert VaultLib.CatchUpFirst();
+            entries = n;
+            for (uint256 i; i < n; ++i) {
+                uint256 id = b.open[i];
+                if (b.positions[id].state != VaultLib.ACTIVE) continue;
+                ++reads;
+                if (IFWAView(address(f)).listings(id).status != LISTING_ACTIVE) revert VaultLib.PendingReceipts();
+            }
+        }
+        if (b.allocatedValue == 0) return (entries, reads);
         uint256 head = b.allocationHead;
-        entries = b.allocationQueue.length - head;
-        if (entries > VaultLib.MAX_ALLOCATION_SCAN) revert VaultLib.CatchUpFirst();
-        for (uint256 i = head; i < head + entries; ++i) {
+        uint256 queued = b.allocationQueue.length - head;
+        if (queued > VaultLib.MAX_ALLOCATION_SCAN) revert VaultLib.CatchUpFirst();
+        entries += queued;
+        for (uint256 i = head; i < head + queued; ++i) {
             uint256 id = b.allocationQueue[i];
             if (b.positions[id].state != VaultLib.ALLOCATED) continue;
             ++reads;

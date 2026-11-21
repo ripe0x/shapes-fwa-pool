@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {ForkBase, IFwaAdmin, IOwnable} from "./ForkBase.sol";
+import {ForkBase, IFwaAdmin, IOwnable, IOracleAdmin} from "./ForkBase.sol";
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
 import {managerParams} from "./ForkManager.t.sol";
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
@@ -10,7 +10,7 @@ import {PackManager} from "../../src/PackManager.sol";
 import {PackManagerFactory} from "../../src/PackManagerFactory.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
-import {LISTING_ALLOCATED, LISTING_SETTLED, LISTING_WITHDRAWN} from "../../src/interfaces/External.sol";
+import {LISTING_ACTIVE, LISTING_ALLOCATED, LISTING_SETTLED, LISTING_WITHDRAWN} from "../../src/interfaces/External.sol";
 
 interface IFwaFinalize {
     function finalizeUnsettled(uint256 listingId) external;
@@ -132,6 +132,90 @@ contract ForkReceiptRecoveryVaultTest is SelectionBase {
         TestVaultOps.sync(vault, _one(selected), 0);
         assertEq(vault.position(selected).state, 0);
         vault.accountedNav(0);
+    }
+
+    /// @dev A kick refunds B outside the vault's own calls; forced in with no receipt, the booked
+    ///      Active position and the refund would both count. While FWA can kick (exemption lifted)
+    ///      the checkpoint proof reads every open listing and refuses until the kick is synced, then
+    ///      prices the same NAV as before the kick. With the exemption in place the same unsynced
+    ///      state prices B too high: the gate is what stops it.
+    function test_forcedKickRefund_blocksPoolPricingUntilSynced() public {
+        _select(primary());
+        vault.sync(new uint256[](0), 0, 0); // journal current: `selected` is booked Allocated
+        address oracle = FWA.floorOracle();
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), false);
+        vm.prank(IOwnable(oracle).owner());
+        IOracleAdmin(oracle).setFloor(address(PACKS), 0.33 ether);
+        TestVaultOps.restock(vault, 2, UNITS, 0); // both list at once under the high floor
+        uint256 id = vault.openListingAt(vault.openListingCount() - 1);
+        uint256 backing = vault.position(id).backing;
+        uint256 packId = vault.position(id).packId;
+        vm.prank(IOwnable(oracle).owner());
+        IOracleAdmin(oracle).setFloor(address(PACKS), 0.03 ether); // now above the cap: kickable
+        uint256 next = block.timestamp - block.timestamp % 12 hours + 11 hours + 46 minutes;
+        if (next <= block.timestamp) next += 12 hours;
+        vm.warp(next);
+        uint256 witness;
+        uint256 actives;
+        for (uint256 i; i < vault.openListingCount(); ++i) {
+            uint256 o = vault.openListingAt(i);
+            if (vault.position(o).state != 1) continue;
+            ++actives;
+            if (o != id) witness = o;
+        }
+        assertGt(witness, 0, "another Active listing prices the vault");
+        assertEq(_status(witness), LISTING_ACTIVE);
+
+        (uint256 navBefore, uint256 gasLifted) = _nav(witness);
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
+        (, uint256 gasExempt) = _nav(witness);
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), false);
+        emit log_named_uint("open-listing reads", actives);
+        emit log_named_uint("pricing gas, exemption lifted", gasLifted);
+        emit log_named_uint("pricing gas, exemption in place", gasExempt);
+        assertLe(gasLifted - gasExempt, vault.openListingCount() * VaultLib.Q_ALLOCATION_ENTRY
+            + actives * VaultLib.Q_ALLOCATION_READ, "the active check stays within its quote");
+
+        uint256 before = address(vault).balance;
+        bytes memory code = _breakReceive(address(vault));
+        IFwaAdmin(address(FWA)).kickListing(id);
+        vm.etch(address(vault), code);
+        assertEq(address(vault).balance - before, backing, "FWA force-sent the full backing");
+        assertEq(_status(id), LISTING_WITHDRAWN);
+        assertEq(PACKS.ownerOf(packId), address(vault), "pack delivered back");
+        assertEq(vault.pendingReceipts(), 0, "no receipt was recorded");
+        assertEq(vault.position(id).state, 1, "still booked Active");
+
+        vm.expectRevert(VaultLib.PendingReceipts.selector);
+        vault.accountedNav(witness);
+
+        // Counterfactual: without the active check (exemption back in place) the unsynced kick
+        // prices the refund beside the booked position.
+        uint256 snap = vm.snapshotState();
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
+        assertEq(vault.accountedNav(witness), navBefore + backing, "the overcount the gate refuses");
+        assertTrue(vm.revertToState(snap));
+
+        uint256 keeperBefore = address(this).balance;
+        TestVaultOps.sync(vault, _one(id), 0);
+        uint256 syncPay = address(this).balance - keeperBefore;
+        assertEq(vault.position(id).state, 0);
+        assertEq(vault.idlePackCount(), 1, "kicked pack back in inventory");
+        assertEq(vault.accountedNav(witness) + syncPay, navBefore, "after sync: the NAV before the kick less the sync pay");
+        vm.expectRevert(VaultLib.Nothing.selector);
+        TestVaultOps.sync(vault, _one(id), 0);
+    }
+
+    function _nav(uint256 witness) internal returns (uint256 nav, uint256 used) {
+        vm.cool(address(FWA));
+        vm.cool(address(vault));
+        uint256 g = gasleft();
+        nav = vault.accountedNav(witness);
+        used = g - gasleft();
     }
 
     /// @dev The real receiver, no code swapped: with too little transaction gas a keep either

@@ -89,8 +89,10 @@ Billed operation gas against the fixed quotes (`ForkMaxBatchGas.t.sol`): build 1
 1,685,000; build 8 packs 9,466,009 vs 11,380,000; unlist 8 2,224,463 vs 2,620,000; liquidate 8
 (16 Shapes) 1,129,652 vs 1,275,000; relist 8 6,198,724 vs 6,880,000. Largest batch (build 8 × 30
 units) 10.40M gas, 13.0M with the keeper's 25% pad, under EIP-7825's 16,777,216. The checkpoint's
-allocation proof reads at most 32 queue entries: 186,274 gas at the bound against a 222,000 quote,
-and a constant 31,763 gas refusal beyond it whatever the history (D84).
+allocation proof reads at most 32 queue entries: 188,361 gas at the bound against a 222,000 quote,
+and a constant 34,519 gas refusal beyond it whatever the history. While FWA can kick (ShapePacks
+oracle exemption lifted) it also reads every open listing, at most 32 (else `CatchUpFirst`, at most
+39,766 gas at any count); two open listings add 41,043 gas against a 72,000 quote (D84).
 
 ## 5. Economics
 
@@ -180,7 +182,11 @@ Final source (manifest `deploy/release-manifest.json`, acceptance package unsign
   receiver, a sweep over transaction gas never forces an unrecorded payment (65 limits reverted,
   26 completed and recorded). Removing the checkpoint gate makes the forced-keep test fail.
 - **Bounded pricing** (`ForkAllocationProof.t.sol`): 32-entry boundary, 2,000 tombstones behind an
-  unresolved head refused at the same 31,763 gas as 33, many simultaneous unresolved allocations.
+  unresolved head refused at the same 34,519 gas as 33, many simultaneous unresolved allocations;
+  with the exemption lifted, 33 to 1,000 open listings refused at no more than 39,766 gas.
+- **Forced kick on the pool** (`test_forcedKickRefund_blocksPoolPricingUntilSynced`): FWA force-sends
+  B with no receipt; pricing refuses until the kick is synced, then returns the pre-kick NAV less the
+  sync pay. Without the check the same state prices B too high.
 - **Asset flow:** 16 regimes, outcomes O1–O11 pass (`asset-flow.json`, unsigned).
 - **Production rehearsal** on a fresh mainnet fork (`docs/receipts/unified-production-rehearsal.json`,
   `keeper/rehearse_unified.py`): all 17 steps pass on the final source: deploy through `script/deploy.sh`,
@@ -210,9 +216,10 @@ Final source (manifest `deploy/release-manifest.json`, acceptance package unsign
 3. **Third-party levers on new investment** (exits are unaffected): FWA keeping ShapePacks
    oracle-exempt and its best bid below about 94.4% (D80). Each stops new building and listing in every
    account at once. The keeper gas ceiling no longer affects listing (D85).
-4. **Accepted residual (D84):** a kick refund force-sent while `receive` fails is not caught by the
-   checkpoint gate; it needs FWA to lift the exemption and a gas repricing at once, and the keeper
-   syncs on `ListingKicked`.
+4. **Kick refunds (D84):** a kick refund force-sent while `receive` fails is caught by the
+   checkpoint gate while kicks are possible. Above 32 open listings with the exemption lifted, pool
+   pricing refuses until owner wind-down or essential unlisting brings the count down: a liveness
+   cost, not an overcount. The 2 ETH canary holds at most about 16 listings.
 5. **Monitored assumptions:** FWA's 100,000 gas stipend; our combined FWA weight share (keeper flags
    10%); FWA's owner-set economics (surcharge, discounts, fees) staying near today's values.
 

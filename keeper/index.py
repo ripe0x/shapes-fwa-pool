@@ -372,6 +372,9 @@ class EventIndex:
     def reserved(self, backing):
         return self.db.execute("SELECT 1 FROM positions WHERE backing=? AND state IN (1,2) LIMIT 1", (str(backing),)).fetchone() is not None
 
+    def open_backings(self):
+        return [int(r[0]) for r in self.db.execute("SELECT backing FROM positions WHERE state IN (1,2)")]
+
     def idle(self, limit):
         return [(int(r["pack_id"]), int(r["value"])) for r in self.db.execute(
             "SELECT * FROM inventory ORDER BY block DESC,log_index DESC LIMIT ?", (limit,))]

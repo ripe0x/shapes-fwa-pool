@@ -60,7 +60,7 @@ python3 keeper/rehearse_image.py [--image <tag>]   # CI: .github/workflows/keepe
   must stay well inside it (52,363 keep, 35,148 cold kick; `ForkManager.t.sol`).
 - Settlement is classified from FWA's listing record and pack ownership, never from the receipt
   (D84); the receipt only gates pricing. The checkpoint's allocation proof reads at most 32 queue
-  entries; keep any new pricing check bounded (`ForkReceiptRecovery.t.sol`, `ForkAllocationProof.t.sol`).
+  entries, and while the ShapePacks oracle exemption is lifted at most 32 open listings (kicks); keep any new pricing check bounded (`ForkReceiptRecovery.t.sol`, `ForkAllocationProof.t.sol`).
 - Purchaser redeem gas in the backing rule is the fixed `PURCHASER_GAS_PRICE` (2 gwei), never a
   keeper setting (D85).
 - Keeper pay is a fixed quote per operation (D56); never measured gas. The keeper pads the exact

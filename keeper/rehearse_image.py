@@ -7,7 +7,8 @@
 Starts its own Anvil fork (Tenderly's public gateway), deploys through script/deploy.sh with
 deploy/canary.json values (a fresh test owner), creates two disposable encrypted keystores (primary
 and backup keepers; random passwords that never leave this process tree), and then checks:
-startup through keeper/entrypoint.sh, pricing and listing by the primary, transaction state and
+startup through keeper/entrypoint.sh, pricing and listing by the primary for the pooled vault and
+for a personal manager created through the real factory (both on one signer, both in /health), transaction state and
 event index surviving container replacement on the same volume, the backup working beside it, and
 recovery when the RPC response to a real accepted transaction is lost (a proxy drops it; only the
 external service fails). Prints one JSON evidence object. Local simulated funds only.
@@ -36,7 +37,14 @@ RPC = f"http://127.0.0.1:{PORT}"
 FORK_RPC = "https://mainnet.gateway.tenderly.co"
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 MAX_GAS = 16_777_216
-ACTORS = {n: to_checksum_address(keccak(text=f"pack-vault-image-{n}")[-20:]) for n in ("deployer", "holder", "owner", "kicker")}
+PARAMS_T = ("(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,"
+            "uint64,uint64,uint64,uint128,uint128)")
+# deploy/manager.json keys in VaultLib.Params struct order (6 u16, 9 u64, 2 u128).
+PARAMS_ORDER = ["minEdgeBps", "bufferBps", "distributionBps", "payMarkupBps", "keeperShareBps",
+                "allocatedBoundBps", "packUnitsMask", "gasCeilingWei", "essentialCeilingWei", "maxTipWei",
+                "workFeeWei", "routineCapWei", "routineRatePerDayWei", "essentialCapWei",
+                "essentialRatePerDayWei", "reserveWei", "tvlCapWei"]
+ACTORS = {n: to_checksum_address(keccak(text=f"pack-vault-image-{n}")[-20:]) for n in ("deployer", "holder", "owner", "kicker", "manager")}
 evidence = dict(steps=[])
 
 
@@ -194,7 +202,7 @@ class Keeper:
 
 
 def main():
-    global VAULT, FACTORY
+    global VAULT, FACTORY, MANAGER
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--image")
     ap.add_argument("--fork-block", type=int, default=26_450_200)
@@ -236,10 +244,19 @@ def main():
         sh("script/deploy.sh", path, "--broadcast", env=env)
         run = json.loads((ROOT / "broadcast/Deploy.s.sol/1/run-latest.json").read_text())
         VAULT = next(t["contractAddress"] for t in run["transactions"] if t.get("contractName") == "PackVault")
-        evidence["postflight"] = sh("python3", "script/release.py", "postflight", VAULT, path, env=dict(os.environ, RPC_URL=RPC))
         evidence["vault"] = VAULT
         FACTORY = next(t["contractAddress"] for t in run["transactions"] if t.get("contractName") == "PackManagerFactory")
         evidence["factory"] = FACTORY
+        evidence["postflight"] = sh("python3", "script/release.py", "postflight", VAULT, path, ACTORS["owner"], FACTORY,
+                                    env=dict(os.environ, RPC_URL=RPC))
+        # A personal manager from the real permissionless factory, with the published defaults.
+        mv = json.loads((ROOT / "deploy/manager.json").read_text())
+        send(ACTORS["manager"], FACTORY, f"create(address,{PARAMS_T})", ACTORS["manager"],
+             "(" + ",".join(str(mv[k]) for k in PARAMS_ORDER) + ")", value=5 * 10**17)
+        MANAGER = cast("call", FACTORY, "managerAt(uint256)(address)", "0").split()[0]
+        assert call("managerCount()(uint256)", to=FACTORY) == 1 and \
+            cast("call", MANAGER, "owner()(address)").lower() == ACTORS["manager"].lower(), "manager postflight"
+        evidence["manager"] = MANAGER
 
         holder = ACTORS["holder"]
         deposit = call("requestCharge()(uint256)") + values["tvlCapWei"] - values["seedWei"]
@@ -260,6 +277,11 @@ def main():
         warp_to(60)
         expire_queue()
         wait_for("keepers build and list", lambda: call("openListingCount()(uint256)") > 0)
+        wait_for("primary builds and lists for the manager", lambda: call("openListingCount()(uint256)", to=MANAGER) > 0)
+        both = lambda h: h is not None and h.get("policy_count") == 2 and \
+            {VAULT.lower(), MANAGER.lower()} == {k.lower() for k in h.get("accounts", {})}  # noqa: E731
+        wait_for("primary /health serves the vault and the manager", lambda: both(primary.health()))
+        evidence["manager_open"] = call("openListingCount()(uint256)", to=MANAGER)
         before = primary.stored()
         evidence["before_replacement"] = before
 
@@ -282,6 +304,8 @@ def main():
                  lambda: DropFirstSend.dropped and call("lockedShares()(uint256)") == 0, seconds=420)
         after = replacement.stored()
         evidence["after_replacement"] = after
+        wait_for("replacement /health serves the vault and the manager", lambda: both(replacement.health()))
+        evidence["replacement_health_accounts"] = sorted(replacement.health()["accounts"])
         evidence["dropped_transaction"] = DropFirstSend.dropped[0]
         dropped = rpc("eth_getTransactionReceipt", DropFirstSend.dropped[0])
         evidence["dropped_transaction_status"] = dropped and int(dropped["status"], 16)
