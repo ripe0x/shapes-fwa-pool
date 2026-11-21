@@ -32,7 +32,7 @@ EXPOSURE_SHARE_HIGH_BPS = 1_000  # 10%
 # fixed by the operation and its completed work, never the caller's gas. build-and-list replaced
 # restock/mint/split (direct-mint recipe): each pack mints its Shapes straight into ShapePacks and
 # lists at once, so a pack of `units` costs Q_BUILD_PACK + shapeCount x Q_BUILD_SHAPE to build.
-Q = dict(checkpoint=360_000, build=280_000, build_pack=300_000, build_shape=130_000,
+Q = dict(checkpoint=360_000, build=300_000, build_pack=300_000, build_shape=130_000,
          list=280_000, listed=825_000, sync=85_000, journal_tail=120_000, distribution_proof=80_000,
          synced=120_000, journal=22_000, scan=30_000, selected=180_000,
          pruned=45_000, unlist=340_000, unlisted=285_000, liquidate=75_000, liq_pack=80_000,

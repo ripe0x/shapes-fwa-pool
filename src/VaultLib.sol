@@ -106,7 +106,7 @@ library VaultLib {
     /// callers from splitting work merely to collect additional bases.
     // One checkpoint per interval cannot be split, so it is quoted at measured billed gas.
     uint256 internal constant Q_CHECKPOINT = 360_000;
-    uint256 internal constant Q_BUILD = 280_000; // call base for build-and-list
+    uint256 internal constant Q_BUILD = 300_000; // call base for build-and-list (one 0.06 pack billed 1,667,619 in all)
     // createPack minting straight into the pack (ForkDirectMint: 381k / 534k / 627k gas for 1 / 2 / 3 Shapes)
     uint256 internal constant Q_BUILD_PACK = 300_000;
     uint256 internal constant Q_BUILD_SHAPE = 130_000;

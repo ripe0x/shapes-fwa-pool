@@ -1157,7 +1157,7 @@ Removed: 0.1 ETH mints, splits, the loose-Shape stack, the Shapes approval, `res
 `Q_PACK`, `Q_PACK_UNIT`, `Q_RESTOCK`, `Q_LIQ_SHAPE`. Kept: bounded recovery of oversized returned
 packs. New quotes from `ForkDirectMint.t.sol`: createPack 381,427 / 534,411 / 626,504 gas for one /
 two / three Shapes, so `Q_BUILD_PACK` 300,000 + `Q_BUILD_SHAPE` 130,000 per Shape; build call base
-280,000; two work units per built and listed pack.
+300,000 (raised from 280,000 after `ForkMaxBatchGas` billed a one-pack build at 1,667,619 gas, 2,619 over the old 1,665,000 quote; eight packs bill 9,466,009 against 11,380,000); two work units per built and listed pack.
 **Why:** the old route quoted about 1.0M gas per 0.03 ETH pack before listing and left idle packs
 and loose Shapes between transactions; minting into the pack is one call per pack and needs no
 intermediate inventory. Creator revenue per new pack rises from 0.0003 to 0.002 ETH because each

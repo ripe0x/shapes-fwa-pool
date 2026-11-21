@@ -61,7 +61,7 @@ Q_PURCHASER_REDEEM = 160_000
 K = (1 + SUR) * (1 - CUT) * (1 - CROWN)             # ~1.03851 (k_of)
 
 # ---- keeper gas quotes (VaultLib Q_* ; a quote is fixed, never measured gas) ----
-Q_BUILD_BASE, Q_BUILD_PACK, Q_BUILD_SHAPE = 280_000, 300_000, 130_000
+Q_BUILD_BASE, Q_BUILD_PACK, Q_BUILD_SHAPE = 300_000, 300_000, 130_000
 Q_LISTED = 825_000                                  # per pack, build-and-list and list
 Q_LIST_BASE = 280_000
 Q_SYNC, Q_SELECTED, Q_SYNCED, Q_PRUNED = 85_000, 180_000, 120_000, 45_000
