@@ -6,6 +6,7 @@ import {TestVaultOps} from "../utils/TestVaultOps.sol";
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
 import {ReconcileTrace} from "../utils/ReconcileTrace.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {VaultLib} from "../../src/VaultLib.sol";
 import {Charges} from "../utils/Charges.sol";
 import {LISTING_ACTIVE} from "../../src/interfaces/External.sol";
 
@@ -53,6 +54,14 @@ contract ForkReconcileTest is SelectionBase {
         if (vm.exists(OUT)) vm.removeFile(OUT);
         Candidate memory c = primary();
         _select(c); // deploy (3 ETH seed), restock 30, list 30, real request + fulfillment
+        _pendForeignAcquisition(); // real pending request: busy queue for the relist refusal, then a
+                                   // foreign refund the catchup drains (the historical count=5 candidate
+                                   // left these for free; the single-count candidate does not).
+        // Keep the keeper share low enough that the resolving sync does not economically sweep the
+        // selection fee credit; the explicit harvest below collects it instead, as the Python mirror
+        // (sim/vault.py) models. The default share would sweep this fixture's larger credit in-sync.
+        VaultLib.Params memory pr = vault.getParams(); pr.keeperShareBps = 500;
+        vm.prank(vault.owner()); vault.setParams(pr);
         vm.writeLine(
             OUT,
             string.concat(

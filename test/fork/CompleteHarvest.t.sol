@@ -395,8 +395,13 @@ contract CompleteCreditTest is SelectionBase {
 
     function test_terminalCashPrecedesFeeCollectionAndDustWaitsForCheckpoint() public {
         _selected(0.5 gwei);
+        // This fixture's selection credits enough fee that at the default keeper share the sync would
+        // economically sweep it; lower the share so the keeper is paid purely from the kept terminal
+        // cash and the credit genuinely waits for the checkpoint (the invariant under test).
+        VaultLib.Params memory p = vault.getParams(); p.keeperShareBps = 350;
+        vm.prank(vault.owner()); vault.setParams(p);
         uint256 credit = FWA.feeCredit(address(vault));
-        assertLt(credit * 2500 / 10_000, VaultLib.Q_CREDIT * 0.5 gwei);
+        assertLt(credit * p.keeperShareBps / 10_000, VaultLib.Q_CREDIT * 0.5 gwei);
         vm.prank(primary().purchaser); IFwaSettle(address(FWA)).keepNFT(selected);
         uint256 cash = address(vault).balance;
         uint256[] memory ids = new uint256[](1); ids[0] = selected;

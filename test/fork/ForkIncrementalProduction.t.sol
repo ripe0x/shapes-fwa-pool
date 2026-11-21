@@ -313,6 +313,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
 
     function test_realRefundedForeignTailDoesNotEarnImmediateCompensation() public {
         _select(primary());
+        _pendForeignAcquisition(); // a real foreign request that the drain below refunds unfulfilled
         _environment();
         vault.sync(new uint256[](0), 0, 0);
         _drain();
@@ -339,13 +340,20 @@ contract ForkProductionReceiptsTest is SelectionBase {
     }
 
     function test_terminalReconciliationPrunesItsHeadWithoutAnotherPaidCall() public {
-        _select(primary()); _environment();
+        _select(primary());
+        _pendForeignAcquisition(); // a foreign refund the post-drain journal sync clears for free
+        _environment();
         vm.prank(primary().purchaser); IFwaSettle(address(FWA)).acceptDepositorBid(selected);
         uint64 cursor = vault.acquisitionCursor();
+        uint256 creditBefore = FWA.feeCredit(address(vault));
         uint256 paid = vault.sync(_one(selected), 0, 0);
         uint256 processed = vault.acquisitionCursor() - cursor;
+        // At this selection the fee credit is large enough that the sync economically sweeps it into
+        // the vault (withdrawEarnings), adding Q_CREDIT to the quote (D56). Priced from the on-chain
+        // fact, not assumed: the terminal reconciliation and its bounded head cleanup are the rest.
+        uint256 swept = creditBefore != 0 && FWA.feeCredit(address(vault)) == 0 ? VaultLib.Q_CREDIT : 0;
         assertEq(paid, (VaultLib.Q_SYNC + processed * VaultLib.Q_JOURNAL + VaultLib.Q_SELECTED
-            + VaultLib.Q_SYNCED + VaultLib.Q_PRUNED) * 0.2 gwei + vault.getParams().workFee);
+            + VaultLib.Q_SYNCED + VaultLib.Q_PRUNED + swept) * 0.2 gwei + vault.getParams().workFee);
         (uint256 head, uint256 length,,,) = vault.allocationState();
         assertEq(head, length, "terminal work includes bounded head cleanup");
         _drain();
@@ -570,7 +578,7 @@ contract ForkProductionInventoryTest is ForkBase {
     /// D56: the backing proposal is calibrated by the owner's gasCeiling, not the live block
     /// basefee. A pending-block basefee change alone leaves the floor unmoved; raising the ceiling
     /// moves it past the 10,000-wei tag window, and the stale proposal is then rejected.
-    function test_gasCeilingCalibratesBackingProposalNotBlockBasefee() public {
+    function test_gasCeilingAndBasefeeDoNotMoveBackingProposal() public {
         uint256 gross = vault.requestCharge() + 2 ether;
         vm.prank(alice); vault.deposit{value: gross}();
         toBlackout(); checkpoint(); toOpen();
@@ -583,18 +591,24 @@ contract ForkProductionInventoryTest is ForkBase {
         uint256[] memory low = TestVaultOps.proposals(vault, 1, UNITS);
         vm.fee(0.35 gwei); vm.txGasPrice(0.4 gwei);
         uint256[] memory high = TestVaultOps.proposals(vault, 1, UNITS);
-        assertEq(low[0], high[0], "basefee alone does not move the gasCeiling-calibrated floor");
+        assertEq(low[0], high[0], "basefee alone does not move the backing proposal");
+        // D85: the keep-incentive backing prices the purchaser's redeem gas at the fixed
+        // PURCHASER_GAS_PRICE, so neither the basefee nor the keeper gas ceiling moves the proposal.
+        // Raising the ceiling only widens the profitability margin; the amount stays identical and
+        // inside FWA's tag window, so a proposal computed at the lower ceiling still builds here.
         uint256[] memory stale = TestVaultOps.proposals(vault, 1, UNITS);
         p.gasCeiling = 1 gwei;
         vm.prank(owner); vault.setParams(p);
         uint256[] memory fresh = TestVaultOps.proposals(vault, 1, UNITS);
-        assertGt(stale[0] > fresh[0] ? stale[0] - fresh[0] : fresh[0] - stale[0], 10_000,
-            "a higher gas ceiling moves the economic floor past the tag window");
+        assertEq(stale[0], fresh[0], "a higher gas ceiling does not move the backing proposal (D85)");
+        // The tag window still rejects a backing outside it: one window-plus past the proposal fails.
+        uint256[] memory outside = new uint256[](1);
+        outside[0] = fresh[0] + 2 * 10_000;
         vm.expectRevert(VaultLib.InvalidBacking.selector);
+        vault.build(UNITS, outside, 0);
         vault.build(UNITS, stale, 0);
-        vault.build(UNITS, fresh, 0);
         assertEq(vault.openListingCount(), 1);
-        assertEq(vault.position(vault.openListingAt(0)).backing, fresh[0]);
+        assertEq(vault.position(vault.openListingAt(0)).backing, stale[0]);
     }
 
     function test_pendingEscrowProcessingClaimsAndCancellationExcludedFromNAV() public {
@@ -762,6 +776,7 @@ contract ForkProductionStagingTest is SelectionBase {
 
     function _backlog(uint256 count) private returns (ReceiptFixtureFiller foreign, uint256[] memory staged) {
         _select(primary());
+        _pendForeignAcquisition(); // real pending request keeps FWA's queue busy so new listings stage
         assertGt(FWA.unsettledAcquisitionCount(), 0);
         foreign = new ReceiptFixtureFiller{value: 3 ether}(
             ReceiptFWA(address(FWA)), ReceiptPacks(address(PACKS)), ReceiptShapes(address(SHAPES))

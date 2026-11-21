@@ -68,6 +68,7 @@ contract AuditBSelection is SelectionBase {
     function test_noListingIntoBusyQueue() public {
         Candidate memory c = primary();
         _select(c);
+        _pendForeignAcquisition(); // real pending request keeps FWA's queue busy
         _canaryParams();
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.15 gwei);

@@ -876,12 +876,18 @@ contract VaultFlowSelectionTest is VaultFlowBase {
         (, uint64 units, uint128 backing) = TestVaultOps.position(vault, selected);
         uint256 vb = address(vault).balance;
         uint256 kb = address(this).balance;
+        uint256 creditBefore = FWA.feeCredit(address(vault));
         vm.prank(address(this));
         TestVaultOps.sync(vault, _one(selected), 0);
         uint256 pay = address(this).balance - kb;
         keeperPaidCum += pay;
-        uint256 reclaimed = (address(vault).balance - vb) + pay;
-        assertEq(reclaimed, uint256(backing) * 9_900 / 10_000, "vault reclaimed backing on silence");
+        // The sync also economically sweeps the selection fee credit into the balance; that is
+        // harvested fee income, not returned backing, so it is reported separately.
+        uint256 swept = creditBefore - FWA.feeCredit(address(vault));
+        feeHarvestedCum += swept;
+        uint256 reclaimed = (address(vault).balance - vb) + pay - swept;
+        assertEq(reclaimed, uint256(backing) * (10_000 - FWA.ownerSettlementFeeBps()) / 10_000,
+            "vault reclaimed backing on silence");
         backingReturnedCum += reclaimed;
         settlementCutCum += backing - reclaimed;
         packToPurchaserCum += uint256(units) * UNIT;
@@ -899,6 +905,7 @@ contract VaultFlowSelectionTest is VaultFlowBase {
         _select(c);
         _afterSelect();
         Snap memory a = flowBegin(0.45 gwei, 0.4 gwei, c.requestBlock);
+        _pendForeignAcquisition(); // real pending request keeps FWA's queue busy for the relist refusal
         _deposit(alice, 0.2 ether);
         (,, uint128 backing) = TestVaultOps.position(vault, selected);
         vm.prank(c.purchaser);

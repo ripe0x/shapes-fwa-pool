@@ -20,6 +20,8 @@ interface IFwaSettle {
     function setCollectionsWhitelisted(address[] calldata collections, bool allowed) external;
     function topListingId() external view returns (uint256);
     function processAcquisitions(uint256 maxCount) external returns (uint256 processed);
+    function quoteAcquisitionPrice() external view returns (uint256, uint256, uint256);
+    function acquire(address requester, uint256 count, uint256, uint256, uint256 maxFeeBps) external payable;
 }
 
 /// @notice Outcome paths driven by FWA's real randomness. sim/find_selection.py found historical
@@ -203,6 +205,23 @@ abstract contract SelectionBase is Test {
                 revert(add(ret, 32), mload(ret))
             }
         }
+    }
+
+    /// @dev Reconstructs the busy acquisition queue the historical count=5 candidates provided for
+    ///      free: a funded buyer submits a real acquisition request through FWA's public entry point
+    ///      against the 29 foreign listings. The candidates now select with a single-count request
+    ///      (fully drained by the replayed fulfillment), so nothing is left pending. The request's
+    ///      VRF is never fulfilled here, so it stays unsettled (the vault refuses to list while FWA's
+    ///      queue is busy) until a later drain past its deadline refunds it. Returns the buyer.
+    function _pendForeignAcquisition() internal returns (address buyer) {
+        buyer = makeAddr("pack-vault-test-selection-foreign-buyer");
+        assertEq(buyer.code.length, 0);
+        assertEq(buyer.balance, 0);
+        vm.deal(buyer, 2 ether);
+        (,, uint256 price) = IFwaSettle(address(FWA)).quoteAcquisitionPrice();
+        vm.prank(buyer);
+        IFwaSettle(address(FWA)).acquire{value: price}(buyer, 1, 0, 0, 10_000);
+        assertGt(FWA.unsettledAcquisitionCount(), 0, "foreign request makes FWA's queue busy");
     }
 }
 

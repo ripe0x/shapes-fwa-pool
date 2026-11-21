@@ -205,6 +205,7 @@ contract ScanPaidGasTest is SelectionBase {
         bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0)));
         uint256 intrinsic = 21_000;
         for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
+        uint256 creditBefore = FWA.feeCredit(address(vault));
         vm.cool(address(vault));
         vm.cool(address(FWA));
         vm.cool(address(vault.keeperPolicy()));
@@ -214,7 +215,10 @@ contract ScanPaidGasTest is SelectionBase {
         uint256 billed = start - gasleft() + intrinsic;
         if (!ok) assembly ("memory-safe") { revert(add(ret, 32), mload(ret)) }
         uint256 pay = abi.decode(ret, (uint256));
-        uint256 gasQ = VaultLib.Q_SYNC + 1 * VaultLib.Q_SCAN + VaultLib.Q_SELECTED;
+        // The selection fee credit is large enough that the scan economically sweeps it into the
+        // vault (withdrawEarnings), adding Q_CREDIT to the quote; priced from the on-chain fact.
+        uint256 swept = creditBefore != 0 && FWA.feeCredit(address(vault)) == 0 ? VaultLib.Q_CREDIT : 0;
+        uint256 gasQ = VaultLib.Q_SYNC + 1 * VaultLib.Q_SCAN + VaultLib.Q_SELECTED + swept;
         emit log_named_uint("paid scan billed gas", billed);
         emit log_named_uint("paid scan quoted gasQ", gasQ);
         emit log_named_uint("paid scan pay wei (0.5 gwei)", pay);

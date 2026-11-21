@@ -15,6 +15,7 @@ contract AuditActivationGas is SelectionBase {
     }
     function test_busyQueueRefusesListing() public {
         _select(primary());
+        _pendForeignAcquisition(); // real pending request keeps FWA's queue busy
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
         this.assertGasContext();
