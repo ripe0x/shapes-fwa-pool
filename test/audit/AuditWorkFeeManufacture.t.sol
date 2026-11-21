@@ -5,6 +5,7 @@ import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
 import {ForkBase} from "../fork/ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {StrategyLib} from "../../src/StrategyLib.sol";
 import {Charges} from "../utils/Charges.sol";
 
 /// @notice Release-candidate audit of the D55 workFee (uncommitted change). Attacks the two fee
@@ -80,23 +81,18 @@ contract AuditWorkFeeManufactureTest is ForkBase {
         uint256 fee = vault.getParams().workFee;
         uint256 b = keeper.balance;
         vm.prank(keeper);
-        TestVaultOps.restock(vault, 1, 3, 0); // 0 units, by design
-        uint256 restockPay = keeper.balance - b;
-
-        b = keeper.balance;
-        vm.prank(keeper);
-        TestVaultOps.list(vault, 1, 0); // 1 unit
-        uint256 listPay = keeper.balance - b;
-        assertGt(listPay, fee, "list pays the per-position work fee");
-        emit log_named_uint("restock pay (0 units expected)", restockPay);
-        emit log_named_uint("list pay (1 unit)", listPay);
+        // build mints and lists one pack at once (two work units); `list` has nothing idle to relist.
+        TestVaultOps.restock(vault, 1, UNITS, 0);
+        uint256 buildPay = keeper.balance - b;
+        assertGt(buildPay, fee, "build pays the per-pack work fees");
+        emit log_named_uint("build pay (1 pack of 6 units)", buildPay);
 
         uint256[] memory ids = TestVaultOps.open(vault);
-        assertEq(ids.length, 1, "one open listing");
+        assertEq(ids.length, 1, "build lists one pack at once");
 
         // Healthy edge, not winding down, no redemption request: unlist must revert. No fee loop.
         vm.prank(keeper);
-        vm.expectRevert(PackVault.UnlistNotAllowed.selector);
+        vm.expectRevert(StrategyLib.UnlistNotAllowed.selector);
         TestVaultOps.unlist(vault, ids, 0);
     }
 }

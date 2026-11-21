@@ -30,7 +30,8 @@ contract AuditOwnerExtraction is ForkBase {
         checkpoint();
         toOpen();
         vm.prank(keeper);
-        TestVaultOps.restock(vault, 3, 3, 0);
+        // build mints and lists three packs at once; the following list finds no idle pack (no-op).
+        TestVaultOps.restock(vault, 3, UNITS, 0);
         vm.prank(keeper);
         TestVaultOps.list(vault, 3, 0);
         uint256[] memory ids = TestVaultOps.open(vault);

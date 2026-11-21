@@ -3,7 +3,9 @@ pragma solidity 0.8.30;
 
 import {ForkBase} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {PackAccount} from "../../src/PackAccount.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
+import {StrategyLib} from "../../src/StrategyLib.sol";
 import {IFWAV2} from "../../src/interfaces/External.sol";
 
 /// @dev An empty vault persists while the fork advances through authentic external history.
@@ -25,7 +27,7 @@ contract ForkJournalGasTest is ForkBase {
     }
 
     function _measure() private returns (uint256 used, uint256 pay) {
-        bytes memory input = abi.encodeCall(PackVault.sync, (new uint256[](0), 0, 0));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), 0, 0));
         uint256 intrinsic = _intrinsic(input);
         uint256 keeperBefore = keeper.balance; // A real transaction sender is warm under EIP-2929.
         _cold();
@@ -76,7 +78,7 @@ contract ForkJournalGasTest is ForkBase {
         emit log_named_uint("actual fulfilled foreign sample", fulfilled);
         emit log_named_uint("actual refunded foreign sample", refunded);
         emit log_named_uint("unpaid rebase caller meter plus intrinsic proxy", callMeter);
-        vm.expectRevert(VaultLib.Nothing.selector);
+        vm.expectRevert(StrategyLib.Nothing.selector);
         vault.sync(new uint256[](0), 0, 0);
     }
 }

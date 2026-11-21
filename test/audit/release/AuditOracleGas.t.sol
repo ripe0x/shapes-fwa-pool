@@ -32,7 +32,7 @@ contract AuditOracleGas is ForkBase {
         checkpoint();
         toOpen();
         vm.prank(keeper);
-        TestVaultOps.restock(vault, 3, 3, 0);
+        TestVaultOps.restock(vault, 3, UNITS, 0);
         vm.prank(keeper);
         TestVaultOps.list(vault, 3, 0);
         uint256[] memory ids = TestVaultOps.open(vault);
@@ -77,7 +77,7 @@ contract AuditOracleGas is ForkBase {
         checkpoint();
         toOpen();
         vm.prank(keeper);
-        TestVaultOps.restock(vault, 1, 3, 0);
+        TestVaultOps.restock(vault, 1, UNITS, 0);
         vm.prank(keeper);
         TestVaultOps.list(vault, 1, 0);
         uint256[] memory ids = TestVaultOps.open(vault);

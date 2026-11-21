@@ -22,11 +22,11 @@ contract AuditActivationGas is SelectionBase {
         vm.deal(address(this), 20 ether);
         (bool ok,) = address(vault).call{value: 10 ether}("");
         assertTrue(ok);
-        // Repaired (audit B): the vault refuses to list into a busy queue, so 100 staged listings
-        // (whose activation exceeded EIP-7825) can no longer arise.
-        TestVaultOps.restock(vault, 10, 3, 0);
+        // Repaired (audit B): build mints and lists each pack at once and refuses a busy queue
+        // (unsettledAcquisitionCount != 0), so the 100 staged listings whose activation exceeded
+        // EIP-7825 can no longer arise. The refusal now happens on build itself.
         uint256[] memory planned25 = TestVaultOps.proposals(vault, vault.MAX_LIST_BATCH(), 3);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.list(planned25, 0);
+        vault.build(3, planned25, 0);
     }
 }

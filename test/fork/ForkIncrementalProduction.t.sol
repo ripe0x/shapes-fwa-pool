@@ -9,6 +9,7 @@ import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
 import {ForkBase, IFwaAdmin, IOwnable, IOracleAdmin} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
+import {StrategyLib} from "../../src/StrategyLib.sol";
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 interface ProductionTokenBid {
     function acceptBidAsTokens(uint256 id, uint256 minOut) external returns (uint256);
@@ -98,7 +99,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
         uint64 cursor = vault.acquisitionCursor();
         vm.expectRevert(VaultLib.CatchUpFirst.selector);
         vault.accountedNav(0);
-        vm.expectRevert(VaultLib.Payment.selector);
+        vm.expectRevert(StrategyLib.Payment.selector);
         vault.sync(_one(selected), 0, type(uint256).max);
         assertEq(vault.acquisitionCursor(), cursor);
         assertEq(vault.pendingReceipts(), 1);
@@ -331,7 +332,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
         IFWAV2.Acquisition memory a = FWA.acquisitions(request);
         assertTrue(a.status == 3 || a.status == 4, "real abandoned request was refunded through FWA");
         uint256 before = address(vault).balance;
-        vm.expectRevert(VaultLib.Payment.selector);
+        vm.expectRevert(StrategyLib.Payment.selector);
         vault.sync(new uint256[](0), 0, 1);
         assertEq(vault.acquisitionCursor(), cursor);
         _cold();
@@ -368,7 +369,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
         vm.warp(next);
         uint256 processing = vault.processingPool();
         uint256 before = address(vault).balance;
-        vm.expectRevert(VaultLib.Nothing.selector);
+        vm.expectRevert(StrategyLib.Nothing.selector);
         vault.sync(new uint256[](0), 0, 0);
         assertEq(vault.processingPool(), processing, "cleanup cannot use protected checkpoint charges");
         assertEq(address(vault).balance, before);
@@ -542,26 +543,26 @@ contract ForkProductionInventoryTest is ForkBase {
         assertEq(vault.accountedNav(TestVaultOps.witness(vault)), expected, "independent full NAV to the wei");
     }
 
-    function test_paidMintSplitLooseAssemblyListingWithdrawalAndRedemptionMatchFullReference() public {
+    /// Direct-mint recipe (build mints each 6-unit pack into ShapePacks and lists it at once, leaving
+    /// no idle/loose inventory): an independent custody-based NAV reference matches the vault's own
+    /// books across the build, wind-down unlist and liquidation custody states.
+    function test_directMintBuildListingWithdrawalAndRedemptionMatchFullReference() public {
         uint256 amount = vault.requestCharge() + 2 ether;
         vm.prank(alice); vault.deposit{value: amount}();
         toBlackout(); checkpoint(); toOpen();
         vm.recordLogs();
-        uint256 before = address(vault).balance;
-        uint256 pay = TestVaultOps.restock(vault, 2, 3, 0);
+        TestVaultOps.restock(vault, 2, UNITS, 0);
         _record();
-        assertEq(before - address(vault).balance - pay, 0.101 ether, "one paid primary mint, including owner revenue");
-        assertEq(vault.looseShapeCount(), 4);
+        assertEq(vault.openListingCount(), 2, "build lists both packs at once");
+        assertEq(vault.idlePackCount(), 0, "no idle inventory after build");
         _assertReference();
         vm.recordLogs();
-        TestVaultOps.restock(vault, 1, 3, 0);
+        TestVaultOps.restock(vault, 1, UNITS, 0);
         _record();
-        assertEq(vault.looseShapeCount(), 1, "the existing loose remainder is reused");
+        assertEq(vault.openListingCount(), 3);
         _assertReference();
-        vm.recordLogs();
-        TestVaultOps.list(vault, 2, 0);
-        _record();
-        _assertReference();
+        // Clear FWA's 12h crown-exit window so the whole batch unlists.
+        vm.warp(block.timestamp + 13 hours); vm.roll(block.number + 3_900);
         vm.prank(owner); vault.startWindDown();
         TestVaultOps.unlist(vault, TestVaultOps.open(vault), 0);
         _assertReference();
@@ -571,12 +572,10 @@ contract ForkProductionInventoryTest is ForkBase {
         assertEq(tracked, 0); assertEq(idle, 0);
     }
 
-    function assertPendingGasEnvironment() external {
-        assertEq(block.basefee, 0.4375 gwei);
-        assertEq(tx.gasprice, 0.4875 gwei);
-    }
-
-    function test_pendingBlockBasefeeNeedsFreshEconomicProposal() public {
+    /// D56: the backing proposal is calibrated by the owner's gasCeiling, not the live block
+    /// basefee. A pending-block basefee change alone leaves the floor unmoved; raising the ceiling
+    /// moves it past the 10,000-wei tag window, and the stale proposal is then rejected.
+    function test_gasCeilingCalibratesBackingProposalNotBlockBasefee() public {
         uint256 gross = vault.requestCharge() + 2 ether;
         vm.prank(alice); vault.deposit{value: gross}();
         toBlackout(); checkpoint(); toOpen();
@@ -586,24 +585,21 @@ contract ForkProductionInventoryTest is ForkBase {
         vm.prank(IOwnable(address(FWA)).owner());
         ProductionOracleExempt(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         vm.fee(0.4 gwei); vm.txGasPrice(0.45 gwei);
-        uint256[] memory head = TestVaultOps.buildProposals(vault, 1, 3);
+        uint256[] memory low = TestVaultOps.proposals(vault, 1, UNITS);
         vm.fee(0.35 gwei); vm.txGasPrice(0.4 gwei);
-        uint256[] memory pending = TestVaultOps.buildProposals(vault, 1, 3);
-        assertEq(head[0], pending[0], "the final calibrated gas-optimal floor dominates this lower-price interval");
-        p.gasCeiling = 0.6 gwei;
+        uint256[] memory high = TestVaultOps.proposals(vault, 1, UNITS);
+        assertEq(low[0], high[0], "basefee alone does not move the gasCeiling-calibrated floor");
+        uint256[] memory stale = TestVaultOps.proposals(vault, 1, UNITS);
+        p.gasCeiling = 1 gwei;
         vm.prank(owner); vault.setParams(p);
-        vm.fee(0.5 gwei); vm.txGasPrice(0.55 gwei);
-        head = TestVaultOps.buildProposals(vault, 1, 3);
-        vm.fee(0.4375 gwei); vm.txGasPrice(0.4875 gwei);
-        this.assertPendingGasEnvironment();
-        pending = TestVaultOps.buildProposals(vault, 1, 3);
-        assertGt(head[0] - pending[0], 10_000, "next-block economics moved beyond the outstanding-count tag window");
+        uint256[] memory fresh = TestVaultOps.proposals(vault, 1, UNITS);
+        assertGt(stale[0] > fresh[0] ? stale[0] - fresh[0] : fresh[0] - stale[0], 10_000,
+            "a higher gas ceiling moves the economic floor past the tag window");
         vm.expectRevert(VaultLib.InvalidBacking.selector);
-        vault.restock(3, head, 0);
-        vault.restock(3, pending, 0);
-        vault.list(pending, 0);
+        vault.build(UNITS, stale, 0);
+        vault.build(UNITS, fresh, 0);
         assertEq(vault.openListingCount(), 1);
-        assertEq(vault.position(vault.openListingAt(0)).backing, pending[0]);
+        assertEq(vault.position(vault.openListingAt(0)).backing, fresh[0]);
     }
 
     function test_pendingEscrowProcessingClaimsAndCancellationExcludedFromNAV() public {
@@ -616,7 +612,7 @@ contract ForkProductionInventoryTest is ForkBase {
         vm.prank(alice); vault.deposit{value: amount}();
         toBlackout(); checkpoint();
         uint256 shares = vault.shareBalance(alice);
-        uint256 charge = vault.requestCharge() + shares * vault.lastNav() / vault.totalShares() * vault.unwindCharge() / 0.0663 ether;
+        uint256 charge = vault.requestCharge() + shares * vault.lastNav() / vault.totalShares() * vault.unwindCharge() / 0.1248 ether;
         vm.prank(alice); vault.requestRedeem{value: charge}(shares);
         toOpen(); toBlackout(); checkpoint();
         uint256 reserved = vault.redemptionReserve();
@@ -648,13 +644,14 @@ contract ForkProductionFeeWitnessTest is ForkBase {
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
         vm.deal(address(this), 10 ether);
         (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, defaultParams(), 3 ether);
-        TestVaultOps.restock(vault, 2, 3, 0);
-        TestVaultOps.list(vault, 2, 0);
+        vm.prank(IOwnable(address(FWA)).owner());
+        ProductionOracleExempt(address(FWA)).setOracleExemptCollection(address(PACKS), true);
+        TestVaultOps.restock(vault, 2, UNITS, 0);
         first = vault.openListingAt(0); second = vault.openListingAt(1);
         ReceiptFixtureFiller filler = new ReceiptFixtureFiller{value: 3 ether}(
             ReceiptFWA(address(FWA)), ReceiptPacks(address(PACKS)), ReceiptShapes(address(SHAPES))
         );
-        for (uint256 i; i < 28; ++i) filler.createAndList(B);
+        for (uint256 i; i < 28; ++i) filler.createAndList(B());
         string memory fixture = vm.readFile("test/fixtures/selection.json");
         _replay(fixture, "req");
         vm.roll(26_417_091); vm.warp(1_794_705_887);
@@ -669,7 +666,7 @@ contract ForkProductionFeeWitnessTest is ForkBase {
     }
 
     function _independentNav(uint256 first, uint256 second) private view returns (uint256) {
-        return address(vault).balance + 0.1 ether + vault.position(first).backing + vault.position(second).backing
+        return address(vault).balance + 0.12 ether + vault.position(first).backing + vault.position(second).backing
             + FWA.pendingFees(first) + FWA.pendingFees(second) + FWA.feeCredit(address(vault));
     }
 
@@ -732,29 +729,29 @@ contract ForkProductionAdmissionTest is ForkBase {
         vm.prank(owner); vault.setParams(p);
         vm.prank(IOwnable(address(FWA)).owner());
         ProductionOracleExempt(address(FWA)).setOracleExemptCollection(address(PACKS), true);
-        (, uint256 target, bool ok) = vault.edge(3); assertTrue(ok);
+        (, uint256 target, bool ok) = vault.edge(UNITS); assertTrue(ok);
         uint256 lower = target / 10_000 * 10_000;
         uint256 upper = lower + 10_000;
-        assertGt(lower, (uint256(0.03 ether) * 10_000 + 8_999) / 9_000, "economic floor leaves both tag directions usable");
+        assertGt(lower, (uint256(0.06 ether) * 10_000 + 9_499) / 9_500, "economic floor leaves both tag directions usable");
         uint256 snapshot = vm.snapshotState();
         uint256[] memory proposed = new uint256[](1); proposed[0] = lower;
-        vault.restock(3, proposed, 0); vault.list(proposed, 0);
+        vault.build(UNITS, proposed, 0);
         assertEq(vault.position(vault.openListingAt(0)).backing, lower);
         uint256 balance = address(vault).balance;
         vm.expectRevert(VaultLib.InvalidBacking.selector);
-        vault.restock(3, proposed, 0);
+        vault.build(UNITS, proposed, 0);
         assertEq(address(vault).balance, balance, "colliding proposal fails before paid mint");
         assertTrue(vm.revertToState(snapshot));
         proposed[0] = upper;
-        vault.restock(3, proposed, 0); vault.list(proposed, 0);
+        vault.build(UNITS, proposed, 0);
         assertEq(vault.position(vault.openListingAt(0)).backing, upper);
         assertTrue(vm.revertToState(snapshot));
         proposed[0] = lower - 20_000;
         vm.expectRevert(VaultLib.InvalidBacking.selector);
-        vault.restock(3, proposed, 0);
+        vault.build(UNITS, proposed, 0);
         proposed[0] = lower + 1;
         vm.expectRevert(VaultLib.InvalidBacking.selector);
-        vault.restock(3, proposed, 0);
+        vault.build(UNITS, proposed, 0);
         assertEq(vault.reservedCount(), 0);
         assertEq(vault.idlePackCount(), 0);
     }
