@@ -162,7 +162,7 @@ def pay_v1(s, gas, units=0, essential=False):
     return min(gas * price(s, essential) + units * s.work_fee, quote(s, gas, units, essential))
 
 def edge_backing(k, cap, s_bps, units, gas_ceiling, markup_bps, work_fee, buffer_bps=0, min_edge_bps=100,
-                 discount_bps=9_000, price=None, mint_fee=10**15):
+                 discount_bps=9_150, price=None, mint_fee=10**15):
     """Mirror of VaultLib.edge / _backingTerms (D62): the backing a new listing posts, 0 when it must
     not list. Purchasers are expected to keep, so backing is the largest amount at which keeping the
     pack (the account gets B(1-s) back) still beats taking FWA's best bid (max(ETH, token) x B) by
