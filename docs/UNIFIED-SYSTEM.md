@@ -138,7 +138,7 @@ counts and fee split; used for comparisons, not for the gate. Recipes at 2 ETH, 
 
 ## 6. Verification
 
-Candidate `86edea6` (manifest `deploy/release-manifest.json`, unsigned). Every claim below names its run.
+Candidate source `749503c` (manifest `deploy/release-manifest.json`, unsigned). Every claim below names its run.
 
 - Fork tests on the real FWA, Shapes, ShapePacks, oracle and token pool; no mocks. Manager and
   factory (`ForkManager.t.sol`, 15 tests): lifecycle to the wei, initialization, owner-only controls
@@ -160,7 +160,14 @@ Candidate `86edea6` (manifest `deploy/release-manifest.json`, unsigned). Every c
 
 ### 6a. Full candidate run
 
-`script/verify.sh` with `CANDIDATE_RUN=1` at `86edea6`: RESULT_PLACEHOLDER
+`script/verify.sh` with `CANDIDATE_RUN=1` at source revision `749503c` (`docs/receipts/unified-verify/SUMMARY.md`):
+exit 0. Build with sizes; `sim/test_vault.py`, `sim/test_forward.py`, `keeper/test_policy.py`,
+`keeper/test_index.py`, `sim/replay.py`; **268 fork tests passed, 0 failed, 1 skipped** (a fixture
+exporter that runs only on request); the 301-listing and 10,000-position scale tests 3/3; the
+reconciler matches every bucket to the wei on the full cycle, the partial fill and wind-down, and the
+scan path; `release.py check deploy/canary.json` passes (no signature checked). The first run at
+`86edea6` failed one test from a test-helper timing bug (via_ir cached `block.timestamp`), fixed in
+`749503c` and covered by the rerun.
 
 ## 7. Remaining launch blockers and owner decisions
 
