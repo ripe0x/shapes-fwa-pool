@@ -27,7 +27,7 @@ def compare_snapshot(v, r, failures):
     for field, amount in (("balance", v.balance), ("totalShares", v.total_shares), ("lastNav", v.last_nav),
                           ("pendingDepositTotal", v.pending_total), ("redemptionReserve", v.redemption_reserve),
                           ("lockedShares", v.locked_shares), ("open", len(v.positions)),
-                          ("idle", len(v.idle_packs)), ("loose", v.loose_shapes),
+                          ("idle", len(v.idle_packs)),
                           ("aliceShares", v.share_balance("alice")), ("bobShares", v.share_balance("bob")),
                           ("trackedValue", v.tracked_value), ("idleValue", v.idle_value),
                           ("activeBacking", v.active_backing), ("activeCount", v.active_count),
@@ -69,9 +69,9 @@ def reconcile_cycle():
     # Admissions precede the real selection. Do not expose its future journal prefix
     # to the legitimate unexposed advance performed by the first admission.
     v.completed_prefix = s["initCursor"]
-    v.restock(s["count"], s["units"], MINT_FEE, s["backings"])
-    for live, backing in zip(sel["positions"], s["backings"], strict=True):
-        v.list(live["id"], backing, fee_debt=s["activationDebt"])
+    # build mints each pack straight into ShapePacks and lists it at once (one call, no loose Shapes).
+    v.build([live["id"] for live in sel["positions"]], s["units"], MINT_FEE, s["backings"],
+            fee_debt=s["activationDebt"])
     v.completed_prefix = sel["completedPrefix"]
     v.pay_keeper(s["selectPay"])
     check("setup", "balance", v.balance, s["balance"])
@@ -127,8 +127,7 @@ def reconcile_cycle():
     check("claim", "aliceReceived", got, by["aliceReceived"]["amount"])
 
     # The ledger: every wei in equals every wei out plus what the vault still holds.
-    held = (v.balance + sum(p.backing + p.value for p in v.positions.values())
-            + sum(v.idle_packs) + v.loose_shapes * 10**16)
+    held = (v.balance + sum(p.backing + p.value for p in v.positions.values()) + sum(v.idle_packs))
     ins = s["deployBalance"] + 15 * 10**17 + ch["ckA"] + ch["ckB"] + rc["total"] + v.fees_received
     outs = v.keeper_paid + v.mint_fees + got + v.backing_lost
     check("ledger", "held + out == in", held + outs, ins)
@@ -161,14 +160,14 @@ def reconcile_partial():
     compare("deposit")
     v.checkpoint()
     compare("checkpoint1")
-    build = by["restockInputs"]
-    v.restock(build["count"], build["units"], setup["mintFee"], build["proposals"])
-    compare("restock")
-    proposals = by["listInputs"]
-    live = {p["id"]: p for p in by["list"]["positions"]}
-    for id_, backing in zip(proposals["ids"], proposals["backings"], strict=True):
-        v.list(id_, backing, fee_debt=live[id_]["liveFeeDebt"])
-    compare("list")
+    # build-and-list: one keeper step mints and lists every pack (batched at MAX_LIST_BATCH on chain).
+    bi = by["buildInputs"]
+    live = {p["id"]: p for p in by["build"]["positions"]}
+    debt = live[bi["ids"][0]]["liveFeeDebt"] if bi["ids"] else None
+    for start in range(0, len(bi["ids"]), 8):
+        chunk = bi["ids"][start:start + 8]
+        v.build(chunk, bi["units"], setup["mintFee"], bi["backings"][start:start + len(chunk)], fee_debt=debt)
+    compare("build")
     rc = by["redeemCharge"]
     v.request_redeem("alice", v.share_balance("alice"), rc["ck"], rc["total"] - rc["ck"])
     compare("redeem")
@@ -180,7 +179,7 @@ def reconcile_partial():
     for id_ in list(v.positions):
         v.unlist(id_)
     compare("unlist")
-    while v.idle_packs or v.loose_shapes:
+    while v.idle_packs:
         v.liquidate_one()
     compare("liquidate")
     v.checkpoint()
@@ -218,9 +217,8 @@ def reconcile_scan():
     v = Vault(seed=3 * 10**18, balance=s["deployBalance"], reserve=0)
     v.acquisition_cursor = s["initCursor"]
     v.completed_prefix = s["initCursor"]
-    v.restock(s["count"], s["units"], MINT_FEE, s["backings"])
-    for live, backing in zip(sel["positions"], s["backings"], strict=True):
-        v.list(live["id"], backing, fee_debt=s["activationDebt"])
+    v.build([live["id"] for live in sel["positions"]], s["units"], MINT_FEE, s["backings"],
+            fee_debt=s["activationDebt"])
     v.completed_prefix = sel["completedPrefix"]
     v.pay_keeper(s["selectPay"])
     if v.balance != s["balance"]:
@@ -257,8 +255,7 @@ def reconcile_scan():
 
     # Every wei in equals the vault's holdings plus keeper pay out; the uncollected fee credit stays
     # on FWA (never swept here), so it is neither an inflow nor a holding yet.
-    held = (v.balance + sum(p.backing + p.value for p in v.positions.values())
-            + sum(v.idle_packs) + v.loose_shapes * 10**16)
+    held = (v.balance + sum(p.backing + p.value for p in v.positions.values()) + sum(v.idle_packs))
     ins = s["deployBalance"]
     outs = v.keeper_paid + v.mint_fees + v.backing_lost
     if held + outs != ins:

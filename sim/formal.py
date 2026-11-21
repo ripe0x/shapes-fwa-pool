@@ -160,7 +160,7 @@ def bid_outcome(price_gwei, values):
     k = int(F.k_of() * F.E)
     st = F.charge_state(int((price_gwei - values["maxTipWei"] / F.GWEI) * F.GWEI), 0)
     st.gas_ceiling, st.max_tip, st.work_fee = values["gasCeilingWei"], values["maxTipWei"], values["workFeeWei"]
-    backing = F.policy.edge_backing(k, None, int(F.S_FEE * 1e4), 3, values["gasCeilingWei"], values["payMarkupBps"],
+    backing = F.policy.edge_backing(k, None, int(F.S_FEE * 1e4), F.BUILD_UNITS, values["gasCeilingWei"], values["payMarkupBps"],
                                     values["workFeeWei"], price=min(int(price_gwei * F.GWEI), values["gasCeilingWei"]),
                                     mint_fee=F.MINT_FEE, buffer_bps=values["bufferBps"], min_edge_bps=values["minEdgeBps"])
     cycle = F.policy.quote(st, F.policy.CYCLE_GAS, 2)
