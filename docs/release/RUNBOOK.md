@@ -21,7 +21,7 @@ Two separate authorizations are needed, and neither follows from the other:
 | Manifest | [deploy/release-manifest.json](../../deploy/release-manifest.json): source hashes, toolchain, normalized runtimes of PackVault, PackManager, PackManagerFactory, KeeperPolicyV1 and the libraries ScanLib, VaultLib, StrategyLib; deploy values; keeper image inputs; evidence |
 | Compiler | solc 0.8.30, optimizer 200 runs, via IR, Cancun, no metadata hash; `lib/` pinned by git |
 | Runtime sizes (EIP-170 limit 24,576) | PackVault 16,960; VaultLib 23,482; StrategyLib and ScanLib in the manifest; PackManager 12,494 (each clone 44); PackManagerFactory 1,365; KeeperPolicyV1 216 |
-| Keeper image | `keeper/Dockerfile` (Python 3.12, Foundry 1.8.1 pinned, `keeper/requirements.txt` pinned); fork rehearsal passed in CI run 44930570759 |
+| Keeper image | `keeper/Dockerfile` (Python 3.12, Foundry 1.8.1 pinned, `keeper/requirements.txt` pinned); fork rehearsal passed in CI run 44948198556 |
 | Deploy values | [deploy/canary.json](../../deploy/canary.json); manager defaults [deploy/manager.json](../../deploy/manager.json) |
 
 `python3 script/release.py check deploy/canary.json` recomputes every hash and fails on any
@@ -33,8 +33,8 @@ difference. `script/deploy.sh` runs it, and with `--broadcast` also verifies the
 |---|---|---|
 | Full candidate run (`script/verify.sh`) | 276 fork tests passed, 1 opt-in exporter skipped; scale 3/3; reconciler to the wei on three paths | [unified-verify/SUMMARY.md](../receipts/unified-verify/SUMMARY.md) |
 | Asset flow, 16 regimes, outcomes O1-O11 | all pass; unsigned | [asset-flow.json](../../asset-flow.json), `docs/receipts/flow/` |
-| Local production rehearsal (fresh fork) | all 17 steps pass on the final source | [unified-production-rehearsal.json](../receipts/unified-production-rehearsal.json), [selection](../receipts/unified-selection-rehearsal.json) |
-| Production image on a fresh fork (CI) | pass | [ci-44930570759.json](../receipts/image-rehearsal/ci-44930570759.json) |
+| Local production rehearsal (fresh fork) | all 17 steps pass on the final source (one warm fork, upstream Alchemy while Tenderly throttled) | [unified-production-rehearsal.json](../receipts/unified-production-rehearsal.json), [selection](../receipts/unified-selection-rehearsal.json) |
+| Production image on a fresh fork (CI) | pass, vault and one factory manager served together | [ci-44948198556.json](../receipts/image-rehearsal/ci-44948198556.json) |
 | Independent review | no critical, high or medium; the low kick residual is now fixed (D84) | [unified-review.md](../receipts/unified-review.md) |
 | Holder return (formal gate) and recipe comparison | see acceptance.json `economic` | [formal-assessment.json](../receipts/formal-assessment.json), [recipe-comparison.json](../receipts/recipe-comparison.json) |
 
@@ -67,8 +67,8 @@ the balance it can reach through parameters plus the budget refill (B3).
 
 | Item | Amount |
 |---|---|
-| One-time deployment, billed on a local fork through `script/deploy.sh` | **15,968,085 gas**: ScanLib 634,563; VaultLib 5,140,640; StrategyLib 2,817,411; KeeperPolicyV1 100,155; PackVault 4,143,997; PackManagerFactory with its implementation 3,131,319 |
-| Deployment cost | 0.0080 ETH at 0.5 gwei, 0.0319 ETH at 2 gwei (send the larger plus the 0.01 ETH seed) |
+| One-time deployment, billed on a local fork through `script/deploy.sh` | **16,051,109 gas**: ScanLib 717,575; VaultLib 5,140,640; StrategyLib 2,817,411; KeeperPolicyV1 100,155; PackVault 4,144,009; PackManagerFactory with its implementation 3,131,319 |
+| Deployment cost | 0.0080 ETH at 0.5 gwei, 0.0321 ETH at 2 gwei (send the larger plus the 0.01 ETH seed) |
 | Deployer | holds the seed plus deployment gas |
 | Primary keeper wallet | 0.05 ETH |
 | Backup keeper wallet | 0.02 ETH |

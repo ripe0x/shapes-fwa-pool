@@ -10,12 +10,12 @@
  "asset_flow_outcomes_sha256": "9908f1209f319af47dd798a04acb70a4d4bdd9d59479a1f3d76a9f69f40471e0",
  "keeper_image": {
   "inputs": "manifest field keeper (Dockerfile, entrypoint, requirements, keeper.py, policy.py, tx.py, index.py, Fly configs)",
-  "ci_fork_rehearsal": "run 44930570759, PASS, docs/receipts/image-rehearsal/ci-44930570759.json"
+  "ci_fork_rehearsal": "run 44948198556 at 02c0a74, PASS: pooled vault and one factory-created manager served by one signer; docs/receipts/image-rehearsal/ci-44948198556.json"
  },
  "signing": "printf %s <sha256 of this file> | ssh-keygen -Y sign -f <owner key> -n packvault-release > deploy/release-acceptance.sig",
  "signature": null,
  "engineering": {
-  "full_suite": "script/verify.sh at 40780743 (src and test as released): 276 fork tests passed, 0 failed, 1 opt-in exporter skipped; scale 3/3; replay 0 mismatches (docs/receipts/unified-verify/SUMMARY.md)",
+  "full_suite": "script/verify.sh at b63d87a (src and test as released): 278 fork tests passed, 0 failed, 1 opt-in exporter skipped; scale 3/3; replay 0 mismatches; release check passed (docs/receipts/unified-verify/SUMMARY.md). Later commits change only keeper and rehearsal scripts (offline keeper checks rerun), receipts and docs",
   "reconciliations": "full cycle, partial fill and wind-down, scan path: every bucket to the wei",
   "asset_flow": "16 regimes, outcomes O1-O11 pass; approval absent (unsigned)",
   "sizes": {
@@ -29,12 +29,12 @@
    "libraries": "manifest"
   },
   "deployment_gas": {
-   "total": 15968085,
-   "ScanLib": 634563,
+   "total": 16051109,
+   "ScanLib": 717575,
    "VaultLib": 5140640,
    "StrategyLib": 2817411,
    "KeeperPolicyV1": 100155,
-   "PackVault": 4143997,
+   "PackVault": 4144009,
    "PackManagerFactory": 3131319
   },
   "manager_create_gas": 474175,
@@ -45,21 +45,23 @@
   },
   "allocation_proof": {
    "max_entries": 32,
-   "gas_at_bound": 186274,
+   "gas_at_bound": 188361,
    "quote_at_bound": 222000,
-   "refusal_gas_any_history": 31763
+   "refusal_gas_any_history": 34519,
+   "kick_check": "while the ShapePacks oracle exemption is lifted: every open listing, at most 32, else CatchUpFirst at no more than 39,766 gas; two open listings cost 41,043 gas against a 72,000 quote"
   },
   "largest_batch_gas_padded": 13000000,
   "tx_cap": 16777216,
-  "payment_recovery": "ForkReceiptRecovery.t.sol: forced keep, forced default and forced kick resolve once, NAV refused until synced, matching the recorded path; low-gas sweep never forces an unrecorded payment",
+  "payment_recovery": "ForkReceiptRecovery.t.sol: forced keep, forced default and forced kick (manager and pool) resolve once; pool pricing refused until synced, matching the recorded path; without the kick check the unsynced pool kick priced NAV one backing too high; low-gas sweep never forces an unrecorded payment",
   "rehearsal": {
    "receipt": "docs/receipts/unified-production-rehearsal.json",
    "fork_block": 26463991,
-   "result": "all 17 steps pass",
-   "also": "docs/receipts/unified-production-rehearsal-26464497.json (same, transaction-recovery step had no token candidate at that block)",
+   "result": "all 17 steps pass on one warm fork at 02c0a74 (upstream Alchemy via REHEARSAL_FORK_RPC while Tenderly's gateway rate-limited; URL scrubbed from records)",
+   "also": "docs/receipts/unified-production-rehearsal-26464497.json (earlier source)",
    "outcomes": "docs/receipts/unified-selection-rehearsal.json"
   },
-  "independent_review": "docs/receipts/unified-review.md: no critical, high or medium; S1 low accepted (D84)"
+  "independent_review": "docs/receipts/unified-review.md: no critical, high or medium; S1 low fixed after the review of e755307 (D84)",
+  "exposure_monitoring": "keeper counts every open listing from each account's event index (no cap, reorg-repaired), failed accounts included; EXPOSURE_INCOMPLETE when an account has no index"
  },
  "economic": {
   "formal_gate": {
@@ -139,8 +141,8 @@
   {
    "id": "U4",
    "item": "FWA payment receipts (D84)",
-   "facts": "settlement from FWA's record; pricing gated and bounded at 32 entries",
-   "residual": "a kick refund force-sent while receive fails is not caught by the checkpoint gate (needs FWA to lift the ShapePacks exemption and a gas repricing at once); the keeper syncs on ListingKicked"
+   "facts": "settlement from FWA's record; pricing gated and bounded at 32 allocation entries; while kicks are possible (exemption lifted) every open listing is checked, at most 32",
+   "liveness_cost": "with the exemption lifted and more than 32 open listings, pool pricing refuses until owner wind-down or an essential unlist brings the count to 32; the 2 ETH canary holds at most about 16"
   },
   {
    "id": "U5",
@@ -148,7 +150,7 @@
    "routine_first_24h_eth": 0.04,
    "routine_daily_eth": 0.01,
    "essential_budget_eth": 0,
-   "checkpoint": "from request charges only, at most once per 12 h: 360,000 gas + 6,000 per allocation entry + 30,000 per FWA read at 2 gwei + one work fee",
+   "checkpoint": "from request charges only, at most once per 12 h: 360,000 gas + 6,000 per allocation entry or open listing read + 30,000 per FWA read at 2 gwei + one work fee",
    "owner_key": "accepted risk B3"
   },
   {
@@ -159,7 +161,7 @@
   {
    "id": "U7",
    "item": "Coverage limits",
-   "text": "the production image's fork rehearsal runs in CI (no Docker on the build Mac); the rehearsal's real-VRF outcomes impersonate the coordinator (real request and word, proof check skipped); the Python mirror does not model the in-sync fee-credit sweep at the default keeper share, so the reconcile fork run uses a share at which the credit waits; matched 6.8 and 50 ETH recipe cells ran only as a 2-seed pilot"
+   "text": "the production image's fork rehearsal runs in CI (no Docker on the build Mac); the rehearsal's real-VRF outcomes impersonate the coordinator (real request and word, proof check skipped); the Python mirror does not model the in-sync fee-credit sweep at the default keeper share, so the reconcile fork run uses a share at which the credit waits; matched 6.8 and 50 ETH recipe cells ran only as a 2-seed pilot; the holder-run unlist in the image rehearsal was exercised in CI run 44946918814 (which then failed on liquidate timing, fixed) but the passing run 44948198556 had no shortfall to unwind; the local rehearsal fork used Alchemy, not Tenderly"
   },
   {
    "id": "U8",

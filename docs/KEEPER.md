@@ -38,7 +38,7 @@ FWA selection weight across every account it runs: the sum over its own Active l
 listing's FWA weight `1e36 / backing`, over `FWA.totalWeight()`. It surfaces as an `EXPOSURE_SHARE`
 info line, and as an `EXPOSURE_SHARE_HIGH` action once the share reaches `EXPOSURE_SHARE_HIGH_BPS`
 (10%, `policy.py`). Backings come from each account's event index (every open listing, no cap,
-reorg-repaired), not from chain reads. It never changes a plan — at a high share the operator widens backings or adds
+reorg-repaired), not from chain reads; an account whose pass fails still counts from its saved index, and one with no index yet raises `EXPOSURE_INCOMPLETE`. It never changes a plan — at a high share the operator widens backings or adds
 independent listers.
 
 | State | Default or behavior |

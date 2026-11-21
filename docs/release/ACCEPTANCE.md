@@ -13,7 +13,7 @@ personal managers.
 | U4 Payment receipts | Settlement from FWA's record; kick refunds checked while kicks are possible | Above 32 open listings with the exemption lifted, pool pricing waits for wind-down (canary holds at most about 16) |
 | U5 Spending | Canary keeper budgets and checkpoint pay | 0.04 ETH routine in 24 h, then 0.01 ETH a day; essential budget 0 |
 | U6 Asset flow | Outcomes O1–O11 replace the 2026-11-17 signature for this candidate | outcomes sha256 `9908f120…` |
-| U7 Coverage limits | What was not shown for real | Image fork rehearsal in CI only; VRF outcomes via coordinator impersonation; mirror lacks the in-sync credit sweep; 6.8 and 50 ETH matched cells as a pilot only |
+| U7 Coverage limits | What was not shown for real | Image fork rehearsal in CI only; VRF outcomes via coordinator impersonation; mirror lacks the in-sync credit sweep; 6.8 and 50 ETH matched cells as a pilot only; the passing image run had no redemption shortfall for the holder to unwind; local rehearsal fork upstream was Alchemy |
 | U8 Authority | Signing is acceptance only | Broadcast, funding, Fly and the manager product are separate decisions |
 
 Evidence: [RUNBOOK.md](RUNBOOK.md) section 2. Earlier packages: `docs/release/history/`.

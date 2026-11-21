@@ -197,9 +197,11 @@ Final source (manifest `deploy/release-manifest.json`, acceptance package unsign
   worker on the same volume, the backup keeper working alone and contending, a paused account not
   stopping the others, per-account index persistence, a lost transaction response, same-nonce
   replacement and a reorg; every account reconciles at the end. Encrypted keystores throughout.
-- **Production image** (CI run 44930570759, `docs/receipts/image-rehearsal/ci-44930570759.json`): the
-  pinned image against a fresh fork: keystore signing, primary and backup, a replacement container on
-  the same volume, a lost RPC response. Push CI only builds and smokes the image (under a minute); the
+- **Production image** (CI run 44948198556, `docs/receipts/image-rehearsal/ci-44948198556.json`): the
+  pinned image against a fresh fork: keystore signing, factory postflight, the pooled vault and a
+  personal manager created through the real factory served by one signer (both built and listed,
+  both in `/health` before and after replacement), primary and backup, a replacement container on
+  the same volume, a lost RPC response, a backup restart on its own volume. Push CI only builds and smokes the image (under a minute); the
   fork rehearsal runs on manual dispatch for a release candidate.
 - **Independent review** (`docs/receipts/unified-review.md`): no critical, high or medium finding.
   Confirmed: the factory has no access to a manager's funds after creation; no manager can move or
