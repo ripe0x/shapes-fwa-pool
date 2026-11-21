@@ -1,5 +1,10 @@
 # Owner acceptance package (unsigned)
 
+> **Superseded for the unified candidate (2026-11-21).** Items A1–A7 below describe the pre-A3
+> candidate. The unified candidate (`docs/UNIFIED-SYSTEM.md`) changes the recipe, the backing rule,
+> holder returns, keeper quotes and adds the factory; its owner items are `UNIFIED-SYSTEM.md`
+> sections 7 and 8. `acceptance.json` has not been restated, so nothing here can be signed for it.
+
 Every open owner decision for the first public deployment, in one place. The machine-readable
 copy is [acceptance.json](acceptance.json); signing its sha256 accepts every item below as written
 and is what `script/deploy.sh` checks before a public broadcast. Nothing is accepted yet.
