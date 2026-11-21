@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import {ForkBase} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {PackAccount} from "../../src/PackAccount.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
@@ -52,7 +53,7 @@ contract ReviewJournalTest is ForkBase {
     }
 
     function _measure(uint256 n) private returns (uint256 gross, uint256 pay, int64 refund) {
-        bytes memory input = abi.encodeCall(PackVault.sync, (new uint256[](0), 0, 0));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), 0, 0));
         uint256 intrinsic = _intrinsic(input);
         uint256 before = keeper.balance;
         vm.cool(address(vault)); vm.cool(address(FWA)); vm.cool(address(vault.keeperPolicy()));

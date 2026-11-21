@@ -1,3 +1,11 @@
+> **Current: [docs/UNIFIED-SYSTEM.md](UNIFIED-SYSTEM.md)** (2026-11-21). One strategy implementation for the pooled vault and personal managers (D77–D83). Everything below is history for earlier candidates.
+
+# Unified system (2026-11-21)
+
+Branch `claude/unified-shapes-fwa-system-852d17`, draft PR. PackVault now runs the shared strategy (PackAccount, StrategyLib, VaultLib, ScanLib); personal PackManager clones from a permissionless PackManagerFactory run the same code against their own storage. New packs are 0.06 ETH (0.05 + 0.01 Shapes minted straight into the pack, 0.002 ETH mint fees) built and listed in one call; backing makes keeping the pack the purchaser's best choice. Formal gate at 0.5 gwei: median +50.2% (1.96 ETH, 6/16 runs lose), +50.7% (6.8 ETH), +37.9% (20 ETH, none lose). Not deployed; no owner signature for this candidate. Blockers and next steps: `UNIFIED-SYSTEM.md` sections 7 and 8.
+
+---
+
 > **Current release instructions: [docs/release/RUNBOOK.md](release/RUNBOOK.md)** (2026-11-19). This document is history for the candidate it names; where it gives current instructions, the runbook replaces them.
 
 # Complete operating pass

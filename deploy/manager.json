@@ -1,0 +1,20 @@
+{
+ "comment": "Default PackManagerFactory.create parameters for a personal manager: the canary's keeper pay, the 0.06 ETH recipe, paid exits from the owner's own budget. distributionBps, allocatedBoundBps and tvlCapWei are pool-only and unused by managers.",
+ "minEdgeBps": 100,
+ "bufferBps": 0,
+ "distributionBps": 0,
+ "payMarkupBps": 0,
+ "keeperShareBps": 2500,
+ "allocatedBoundBps": 0,
+ "packUnitsMask": 64,
+ "gasCeilingWei": 500000000,
+ "essentialCeilingWei": 500000000,
+ "maxTipWei": 50000000,
+ "workFeeWei": 20000000000000,
+ "reserveWei": 5000000000000000,
+ "tvlCapWei": 0,
+ "routineCapWei": 30000000000000000,
+ "routineRatePerDayWei": 10000000000000000,
+ "essentialCapWei": 10000000000000000,
+ "essentialRatePerDayWei": 5000000000000000
+}

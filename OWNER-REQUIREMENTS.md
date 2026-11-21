@@ -149,3 +149,47 @@ recorded here.
 27. (2026-11-18) Complete event-based returned-pack discovery: authenticate both actual bid events,
     retain unreconciled own selections, discover expiry independently, replay missing history on
     existing-index upgrade, and verify more than16allocations with restart/reorg behavior.
+
+## A3. Unified shapes FWA system (owner, 2026-11-21)
+
+Source: the owner's "Implement the unified shapes FWA system" brief (2026-11-21, main 78ad729,
+research PR #1). It supersedes A2.20's "No factory ... shared exposure contract ... new mint/coin
+strategy" for this work, and D62's bid-favouring backing floor. Owner's words:
+
+28. "Build one unified system for automatically managing shapes and shape packs on FWA, supporting
+    two products": "A shared pool where multiple depositors contribute capital and earn
+    proportional returns" and "A personal manager factory where anyone can deploy their own isolated
+    manager". "Both products must execute the same underlying strategy implementation."
+29. "There must be exactly one authoritative implementation of these strategy mechanics." "Do not
+    add a separately funded central strategy contract or shared asset custodian." "Assets belonging
+    to one manager must never become accessible to another manager or to the factory."
+30. "The factory must not have authority to withdraw funds, replace the manager's owner, redirect
+    proceeds, or change individual manager settings." "Do not charge an additional factory or
+    management fee". "Do not introduce upgradeable manager implementations unless absolutely
+    necessary."
+31. Recipe: "A 0.06 eth pack consisting of one newly minted 0.05 eth shape and one newly minted 0.01
+    eth shape" using "the deployed shape packs contract's native ability to mint shapes directly into
+    a pack". "Do not redeem and remint returned packs merely to collect another fee." "Do not reduce
+    the live mint fee from 0.001 eth merely to force a recipe to pass."
+32. Keep incentive: "Pack value: 0.06 eth. Backing: approximately 0.0648 eth ... Minimum modeled
+    advantage for keeping versus the best alternative: 0.0003 eth after relevant gas." "These are
+    starting points, not fixed constants." "Pause fresh investment when the required economic
+    conditions are unavailable. Preserve settlement, asset recovery, and withdrawals".
+33. "Prefer live FWA admission economics and independent account safety checks unless the tests
+    demonstrate a need for centralized exposure enforcement." "Never allow a factory controlled
+    registry to become a custody authority."
+34. "The system should operate with one keeper codebase." "One manager with inadequate cash, paused
+    listings, or a stuck position must not prevent useful work on other managers." "Do not add an
+    onchain keeper coordinator unless it is necessary."
+35. "Preserve the pooled vault's recently implemented two step ownership handover and prohibition
+    on ownership renunciation." "Do not make production contracts upgradeable just to simplify code
+    sharing."
+36. "Use the formal existing 10% net annual return requirement as the pooled vault acceptance
+    hurdle. Do not value FWA token rewards as depositor income." "If an economic requirement fails,
+    do not hide the failure or lower the requirement."
+37. "Do not merge, deploy publicly, move real funds, or change the live shapes mint fee." Create a
+    branch from main, push, open a draft PR.
+
+B2 O3/O4/O6 change meaning under item 32: purchasers are now expected to keep (B (1 - s) back to the
+account and a replacement build with fresh mints) rather than bid. The restated outcomes are in
+`asset-flow.json` (unsigned) and `docs/UNIFIED-SYSTEM.md`; no new owner signature exists.

@@ -16,10 +16,16 @@ BPS = 10_000
 SCALE = 10**36
 DEAD_SHARES = 10**15
 MIN_DISTRIBUTION = 10**16
-SHAPES_PER_MINT = 10
+MAX_LIST_BATCH = 8  # VaultLib.MAX_LIST_BATCH: packs built-and-listed per call
 
 ACTIVE, ALLOCATED, WITHDRAWN, SETTLED, STAGED = 1, 2, 3, 4, 5
 OWED = 3  # cached book state; distinct from the live FWA status namespace
+
+
+def shape_count(units):
+    """VaultLib.makeup: fewest Shapes for a pack of `units` x 0.01 ETH (0.1, 0.05, 0.01 denominations).
+    Six units are one 0.05 and one 0.01 Shape: two paid primary mints."""
+    return units // 10 + units % 10 // 5 + units % 5
 
 
 def mul_div(a, b, c):
@@ -90,7 +96,6 @@ class Vault:
     idle_packs: list = field(default_factory=list)  # exact wei backing of each idle pack
     idle_quotes: list = field(default_factory=list)  # funding quote paired with the idle stack
     idle_funding: int = 0
-    loose_shapes: int = 0
     tracked_value: int = 0
     idle_value: int = 0
     active_backing: int = 0
@@ -159,23 +164,27 @@ class Vault:
         return amount
 
     # ------------------------------------------------------------ inventory and listings
-    def restock(self, count, units, mint_fee, proposals=None):
-        quotes = [0] * count if proposals is None else list(proposals)
-        if count == 0 or units < 3 or units > 30 or count * units > 30 or len(quotes) != count:
+    def build(self, ids, units, mint_fee, proposals, fee_debt=None):
+        """Mirror of VaultLib.buildAndList: mint each pack of `units` straight into ShapePacks (one
+        paid primary mint per Shape, no split, no loose Shapes) and list it at its backing proposal at
+        once. `ids` are the FWA listing ids assigned on admission; one proposal per pack; `available`
+        ETH (idle()) must cover the pending idle funding, every pack's mint cost and every backing."""
+        count = len(ids)
+        n = shape_count(units)
+        if count == 0 or count > MAX_LIST_BATCH or units < 3 or units > 30 or len(proposals) != count:
             raise RuntimeError("BadBatch")
-        need = count * units
-        mints = -(-(need - self.loose_shapes) // SHAPES_PER_MINT) if need > self.loose_shapes else 0
-        if self.idle() < mints * (UNIT * SHAPES_PER_MINT + mint_fee) + self.idle_funding + sum(quotes):
+        price = units * UNIT + n * mint_fee  # createPack cost: the pack's face value plus mint fees
+        if self.idle() < self.idle_funding + count * price + sum(proposals):
             raise RuntimeError("InsufficientBacking")
-        self.balance -= mints * (UNIT * SHAPES_PER_MINT + mint_fee)
-        self.mint_fees += mints * mint_fee
-        self.loose_shapes += mints * SHAPES_PER_MINT - need
-        self.idle_packs += [units * UNIT] * count
-        self.idle_quotes += quotes
-        self.idle_funding += sum(quotes)
-        self.tracked_value += mints * SHAPES_PER_MINT * UNIT
-        self.idle_value += mints * SHAPES_PER_MINT * UNIT
-        return mints
+        for listing_id, backing in zip(ids, proposals):
+            self.balance -= price
+            self.mint_fees += n * mint_fee
+            self.tracked_value += units * UNIT
+            self.idle_value += units * UNIT
+            self.idle_packs.append(units * UNIT)
+            self.idle_quotes.append(0)
+            # Admission lists the pack at once (each widens the identifier interval, as on chain).
+            self.list(listing_id, backing, fee_debt=fee_debt)
 
     def _debt_count(self, debt, change):
         self.count_by_debt[debt] = self.count_by_debt.get(debt, 0) + change
@@ -456,14 +465,10 @@ class Vault:
         self.idle_funding += p.backing
 
     def liquidate_one(self):
-        if self.idle_packs:
-            value = self.idle_packs.pop()
-            self.idle_funding -= self.idle_quotes.pop()
-        elif self.loose_shapes:
-            self.loose_shapes -= 1
-            value = UNIT
-        else:
+        if not self.idle_packs:
             return
+        value = self.idle_packs.pop()
+        self.idle_funding -= self.idle_quotes.pop()
         self.balance += value
         self.tracked_value -= value
         self.idle_value -= value

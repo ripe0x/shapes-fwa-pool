@@ -6,6 +6,7 @@ import {TestVaultOps} from "../../utils/TestVaultOps.sol";
 import {ForkBase} from "../../fork/ForkBase.sol";
 import {IKeeperPolicy} from "../../../src/KeeperPolicy.sol";
 import {PackVault} from "../../../src/PackVault.sol";
+import {VaultLib} from "../../../src/VaultLib.sol";
 
 contract GasPriceSwitchPolicy is IKeeperPolicy {
     function policyVersion() external pure returns (uint256) { return 1; }
@@ -45,7 +46,7 @@ contract AuditMaliciousPolicy is ForkBase {
         this.assertGasContext();
         uint256 planned23 = TestVaultOps.witness(vault);
         vm.prank(keeper);
-        vm.expectRevert(PackVault.Payment.selector);
+        vm.expectRevert(VaultLib.Payment.selector);
         vault.checkpoint(planned23, simulated * 8 / 10);
         assertEq(vault.pendingDepositTotal(), 1 ether);
         assertEq(vault.epoch(), 0);

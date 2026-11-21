@@ -10,7 +10,7 @@
  "payMarkupBps": 0,
  "keeperShareBps": 2500,
  "allocatedBoundBps": 1000,
- "packUnitsMask": 8,
+ "packUnitsMask": 64,
  "gasCeilingWei": 500000000,
  "essentialCeilingWei": 2000000000,
  "maxTipWei": 50000000,

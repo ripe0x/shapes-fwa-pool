@@ -16,7 +16,7 @@ function canary() pure returns (VaultLib.Params memory p) {
     p.minEdgeBps = 100;
     p.keeperShareBps = 2_500;
     p.allocatedBoundBps = 1_000;
-    p.packUnitsMask = 8;
+    p.packUnitsMask = uint64(1) << 6; // 6-unit direct-mint recipe (one 0.05 + one 0.01)
     p.gasCeiling = 0.5 gwei;
     p.essentialCeiling = 2 gwei;
     p.maxTip = 0.05 gwei;
@@ -48,7 +48,7 @@ contract AuditBSelection is SelectionBase {
     /// E1: repeated identifiers never count as multiple successful fee claims.
     /// The production two-active-witness case also lives in ForkProductionFeeWitnessTest.
     function test_harvestRefusesRepeatedIds() public {
-        _select(late());
+        _select(primary());
         _canaryParams();
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
         uint256 credit = FWA.feeCredit(address(vault));
@@ -66,7 +66,7 @@ contract AuditBSelection is SelectionBase {
     /// E2: a listing made into a busy FWA queue is staged: list is paid the full Q_LISTED and
     /// activate is paid again.
     function test_noListingIntoBusyQueue() public {
-        Candidate memory c = late();
+        Candidate memory c = primary();
         _select(c);
         _canaryParams();
         vm.fee(0.15 gwei);
@@ -78,7 +78,7 @@ contract AuditBSelection is SelectionBase {
         TestVaultOps.sync(vault, one, 0);
         // Repaired: the vault refuses to list into a busy FWA queue, so nothing stages.
         assertGt(FWA.unsettledAcquisitionCount(), 0, "queue busy");
-        uint256[] memory planned26 = TestVaultOps.proposals(vault, 1, 3);
+        uint256[] memory planned26 = TestVaultOps.proposals(vault, 1, UNITS);
         vm.expectRevert(PackVault.Nothing.selector);
         vault.list(planned26, 0);
         vm.warp(block.timestamp + 25 hours);
@@ -106,8 +106,7 @@ contract AuditBPinned is ForkBase {
         checkpoint();
         toOpen();
         vm.startPrank(keeper);
-        TestVaultOps.restock(vault, n, 3, 0);
-        TestVaultOps.list(vault, n, 0);
+        TestVaultOps.restock(vault, n, UNITS, 0); // build lists all n at once
         vm.stopPrank();
         ids = TestVaultOps.open(vault);
         assertEq(ids.length, n);
@@ -171,24 +170,19 @@ contract AuditBPinned is ForkBase {
         toOpen();
         vm.startPrank(keeper);
         g = gasleft();
-        pay = TestVaultOps.restock(vault, 1, 3, 0);
+        pay = TestVaultOps.restock(vault, 1, UNITS, 0);
         console2.log("restock(1, mint): gas, pay", g - gasleft(), pay);
         g = gasleft();
-        pay = TestVaultOps.restock(vault, 3, 3, 0);
+        pay = TestVaultOps.restock(vault, 3, UNITS, 0);
         console2.log("restock(3, 1 mint): gas, pay", g - gasleft(), pay);
         g = gasleft();
-        pay = TestVaultOps.restock(vault, 6, 3, 0);
+        pay = TestVaultOps.restock(vault, 6, UNITS, 0);
         console2.log("restock(6, 2 mints): gas, pay", g - gasleft(), pay);
-        g = gasleft();
-        pay = TestVaultOps.list(vault, 1, 0);
-        console2.log("list(1): gas, pay", g - gasleft(), pay);
-        (, , uint128 b1) = TestVaultOps.position(vault, TestVaultOps.open(vault)[0]);
-        console2.log("backing of first listing", b1);
-        g = gasleft();
-        pay = TestVaultOps.list(vault, 9, 0);
-        console2.log("list(9): gas, pay", g - gasleft(), pay);
+        // build lists every pack at once, so relisting has nothing idle; `list` is not measured here.
         vm.stopPrank();
         ids = TestVaultOps.open(vault);
+        (, , uint128 b1) = TestVaultOps.position(vault, ids[0]);
+        console2.log("backing of first listing", b1);
         (, , uint128 bl) = TestVaultOps.position(vault, ids[ids.length - 1]);
         console2.log("backing of last listing, idle after", bl, vault.idleEth());
         // Redemption of everything: unlist, liquidate, checkpoint.
@@ -205,7 +199,7 @@ contract AuditBPinned is ForkBase {
         g = gasleft();
         pay = vault.liquidate(40, 0);
         console2.log("liquidate: gas, pay", g - gasleft(), pay);
-        console2.log("left: open, idle packs, loose", TestVaultOps.open(vault).length, TestVaultOps.idle(vault).length, vault.looseShapeCount());
+        console2.log("left: open, idle packs", TestVaultOps.open(vault).length, TestVaultOps.idle(vault).length);
         vm.stopPrank();
         toBlackout();
         vm.startPrank(keeper);
@@ -216,7 +210,7 @@ contract AuditBPinned is ForkBase {
         uint256 a0 = alice.balance;
         vm.prank(alice);
         vault.claim();
-        console2.log("alice claim wei (deposited 1.9 + charges)", alice.balance - a0, gross + rc);
+        console2.log("alice claim wei (deposited principal + charges)", alice.balance - a0, gross + rc);
         (uint256 r, uint256 e) = vault.budget();
         console2.log("budgets left routine, essential", r, e);
         console2.log("vault balance, lastNav", address(vault).balance, vault.lastNav());
@@ -228,9 +222,12 @@ contract AuditBBudget is ForkBase {
     /// exit at 0.95 gwei basefee empties the essential budget; refill is 0.0002 ETH a day.
     function test_oneExitEmptiesEssentialBudget() public {
         VaultLib.Params memory p = canary();
+        // The 6-unit direct-mint exit (two Shapes/pack) is cheaper per pack than the old split
+        // recipe, so one holder needs more listings for the exit work to empty the essential budget.
+        p.tvlCap = 5 ether;
         vm.prank(owner);
         vault.setParams(p);
-        uint256 gross = Charges.grossFor(vault, 1.95 ether);
+        uint256 gross = Charges.grossFor(vault, 4 ether);
         vm.prank(alice);
         vault.deposit{value: gross}();
         toBlackout();
@@ -240,9 +237,9 @@ contract AuditBBudget is ForkBase {
         uint256 built;
         uint256 routinePaid;
         for (uint256 i; i < 3; ++i) {
-            try vault.restock(3, TestVaultOps.buildProposals(vault, 10, 3), 0) returns (uint256 pay) {
+            try vault.build(UNITS, TestVaultOps.proposals(vault, 8, UNITS), 0) returns (uint256 pay) {
                 routinePaid += pay;
-                built += 10;
+                built += 8;
             } catch {
                 break;
             }
@@ -251,7 +248,7 @@ contract AuditBBudget is ForkBase {
             uint256 count = vault.idlePackCount();
             if (count == 0) break;
             if (count > vault.MAX_LIST_BATCH()) count = vault.MAX_LIST_BATCH();
-            try vault.list(TestVaultOps.proposals(vault, count, 3), 0) returns (uint256 pay) {
+            try vault.list(TestVaultOps.proposals(vault, count, UNITS), 0) returns (uint256 pay) {
                 routinePaid += pay;
             } catch {
                 break;
@@ -274,15 +271,14 @@ contract AuditBBudget is ForkBase {
         vm.startPrank(keeper);
         uint256 essentialPaid = TestVaultOps.unlist(vault, open, 0);
         console2.log("unlist pay", essentialPaid);
-        uint256 lp = vault.liquidate(40, 0);
-        console2.log("liquidate #1 pay", lp);
-        essentialPaid += lp;
-        lp = vault.liquidate(16, 0);
-        console2.log("liquidate #2 pay", lp);
-        essentialPaid += lp;
+        // Redeem every idle pack (each liquidate call takes at most MAX_BATCH packs).
+        while (vault.idlePackCount() != 0) {
+            try vault.liquidate(16, 0) returns (uint256 lp) { essentialPaid += lp; }
+            catch { break; }
+        }
         (r, e) = vault.budget();
         console2.log("essential budget after unlist + liquidate", e);
-        console2.log("idle packs left, loose shapes left", TestVaultOps.idle(vault).length, vault.looseShapeCount());
+        console2.log("idle packs left", TestVaultOps.idle(vault).length);
         // A keeper asking for any pay is now refused; the work is only done unpaid.
         vm.expectRevert();
         vault.liquidate(40, 1e12);
@@ -294,7 +290,7 @@ contract AuditBBudget is ForkBase {
         assertEq(vault.lockedShares(), 0, "the exhausted-budget exit completes from requester-funded checkpoint work");
         uint256 before = alice.balance;
         vm.prank(alice); vault.claim();
-        assertGt(alice.balance - before, 1.8 ether, "absolute proceeds from the full1.95ETH principal exit");
+        assertGt(alice.balance - before, 1.8 ether, "absolute proceeds from the full principal exit");
         assertEq(vault.shareBalance(alice), 0); assertEq(vault.claimableEth(alice), 0);
         (uint128 remaining,,,) = vault.redemptions(alice);
         assertEq(remaining, 0);
@@ -312,8 +308,7 @@ contract AuditBBudget is ForkBase {
         checkpoint();
         toOpen();
         vm.startPrank(keeper);
-        TestVaultOps.restock(vault, 6, 3, 0);
-        TestVaultOps.list(vault, 6, 0);
+        TestVaultOps.restock(vault, 6, UNITS, 0); // build lists all six at once
         vm.stopPrank();
         uint256[] memory open = TestVaultOps.open(vault);
         // The attacker holds the owner key and keeps for itself.

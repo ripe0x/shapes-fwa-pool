@@ -10,19 +10,40 @@ Standalone `harvest` is unpaid. Eligible sync may sweep economical credit or cla
 economic decisions and is imported by the simulation. `tx.py` retains nonce, replacement, restart,
 lost-response and receipt-reorg handling. The vault authenticates financial facts independently.
 
+**One keeper, many accounts.** The keeper services every account from one signer: explicit
+PackVault and/or PackManager address(es), plus every personal manager a `--factory`
+(`PackManagerFactory`) has created. Discovery is bounded — each pass reads `managerCount()` and
+fetches only indices not yet in `keeper/discovered-<factory>.json`; no pass rescans the whole set.
+One signer means one nonce stream and at most one in-flight transaction across all accounts, so they
+are serviced in turn and resume the same pending transaction first. Each account keeps its own event
+index and plan, and is fully isolated: one account's revert, empty budget, paused listing or stuck
+position never stops work on the others (`/health` reports per-account status). `read_state` branches
+on account type (detected via `factory.isManager` or by probing a pool-only view): a personal
+manager has no shares, deposits, redemptions, checkpoints or distributions, so those pool-only views
+are never read and `checkpoint` is never planned for it; `windingDown` is the owner's reversible exit
+mode (`setExiting`).
+
 ```sh
 python3 keeper/keeper.py <vault> --rpc https://mainnet.gateway.tenderly.co
-python3 keeper/keeper.py <vault> --send --account <keystore> --rpc https://mainnet.gateway.tenderly.co \
-  --loop 300 --confirmations 2 --health-port 8788 --burn-tokens
-python3 keeper/keeper.py <vault> --status
+python3 keeper/keeper.py <vault> [<manager>...] --factory <factory> --send --account <keystore> \
+  --rpc https://mainnet.gateway.tenderly.co --loop 300 --confirmations 2 --health-port 8788 --burn-tokens
+python3 keeper/keeper.py <vault> --factory <factory> --status
 ```
 
 Signing uses the existing cast keystore. No raw key belongs in an argument or file. The keeper
 needs its own ETH for gas. Token burns remain unpaid and require operator opt-in.
 
+**Selection-weight exposure (monitoring only).** `/health` reports the keeper's combined share of
+FWA selection weight across every account it runs: the sum over its own Active listings of each
+listing's FWA weight `1e36 / backing`, over `FWA.totalWeight()`. It surfaces as an `EXPOSURE_SHARE`
+info line, and as an `EXPOSURE_SHARE_HIGH` action once the share reaches `EXPOSURE_SHARE_HIGH_BPS`
+(10%, `policy.py`). It never changes a plan — at a high share the operator widens backings or adds
+independent listers.
+
 | State | Default or behavior |
 | --- | --- |
-| Transaction state | `keeper/state-<vault>.json`; `--state` overrides it |
+| Transaction state | `keeper/state-<factory-or-first-account>.json` (one per signer, shared across accounts); `--state` overrides it |
+| Manager discovery | `keeper/discovered-<factory>.json`; bounded — only new `managerAt` indices are fetched per pass |
 | Event index | `keeper/index-<chain>-<vault>-<deploymentBlock>.sqlite`; `--index` overrides it |
 | Initial reconstruction | starts at the earlier of deployment and the trailing-seven-day volume boundary |
 | Log ingestion | at most eight ranges of 2,000 blocks per pass; saved progress resumes on the next pass |
@@ -49,12 +70,12 @@ a bounded candidate set. Complete portfolio getters are absent from the producti
 
 | Call | Required inputs and bounds |
 | --- | --- |
-| `restock(units, backingProposals, minPay)` | allowed pack size; at most 30 total new units; actual proposed funding plus maintained waiting-inventory funding |
-| `list(backingProposals, minPay)` | at most 8 proposals, each an unused 10,000 wei multiple inside the live target interval and every economic gate |
+| `build(units, backingProposals, minPay)` | allowed pack size (mask); each pack mints its Shapes straight into ShapePacks (6 units = one 0.05 + one 0.01 Shape, two paid mints) and is listed at once; at most 8 packs per call; capital must cover maintained waiting-inventory funding, every pack's mint cost and every backing |
+| `list(backingProposals, minPay)` | relists only idle (returned) packs; at most 8 proposals, each an unused 10,000 wei multiple inside the live target interval and every economic gate |
 | `sync(ids, witnessId, minPay)` | automatic job: at most 128 global records, 16 actual own selections, 16 supplied terminal or active funding IDs and 16 pruned heads; independent bounds |
 | `checkpoint(witnessId, minPay)` | one authenticated live fee witness when active count is nonzero; complete journal, no receipts, clean nonexpired allocation head, blackout and drained requests |
 | `unlist(ids, minPay)` / `harvest(ids, minPay)` | at most 16 IDs; harvest IDs strictly ascending; crown exit protection remains |
-| `liquidate(maxCount, minPay)` | at most 16 items and 30 ordinary backing units; oversized gifts use an isolated claim of at most 30 Shapes |
+| `liquidate(maxCount, minPay)` | at most 16 items and 60 ordinary backing units per call; oversized gifts use an isolated claim of at most 30 Shapes |
 | `burnTokens(ids)` | at most 16 candidates; unpaid; stale IDs cannot block credit withdrawal and burning |
 
 Operation identifier 4 (old staged activation) is retired. New admission atomically requires an

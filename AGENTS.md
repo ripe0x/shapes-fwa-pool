@@ -1,7 +1,10 @@
 # shapes-fwa-pool
 
-PackVault: pooled depositor vault listing Shape packs on the FWA V2 main pool. Owner
-requirements: `OWNER-REQUIREMENTS.md`. Decisions: `docs/DECISIONS.md`. Status: `docs/REPORT.md`.
+One Shape-pack strategy on the FWA V2 main pool, two ownership models: the pooled depositor vault
+(`PackVault`) and personal managers (`PackManager` clones from `PackManagerFactory`). Both inherit
+`PackAccount` and run the one strategy implementation in the linked libraries `StrategyLib`,
+`VaultLib` and `ScanLib` against their own storage (D77). Design: `docs/UNIFIED-SYSTEM.md`. Owner
+requirements: `OWNER-REQUIREMENTS.md` (A3 is current). Decisions: `docs/DECISIONS.md`. Status: `docs/REPORT.md`.
 Keeper operations: `docs/KEEPER.md`. Gas: `docs/GAS.md`. Assets: `docs/SYSTEM-MAP.md`, `asset-flow.json`.
 
 ## Commands
@@ -10,7 +13,8 @@ Keeper operations: `docs/KEEPER.md`. Gas: `docs/GAS.md`. Assets: `docs/SYSTEM-MA
 # Fork tests: mainnet fork on Tenderly's public gateway only. It throttles, so pass the retries.
 forge test --match-path test/fork/<File>.t.sol --rpc-url https://mainnet.gateway.tenderly.co \
   --fork-retries 30 --fork-retry-backoff 5000 --compute-units-per-second 100
-CANDIDATE_RUN=1 forge build --sizes  # PackVault 24,136 bytes, 440 under EIP-170; VaultLib 24,304
+CANDIDATE_RUN=1 forge build --sizes  # PackVault 16,970 B; VaultLib 23,409; StrategyLib 12,758; PackManager 12,453
+forge test --match-path test/fork/ForkManager.t.sol ...   # managers, factory, isolation, real-VRF keep/bid
 
 python3 sim/snapshot.py        # Phase 0.1 live reads at one block
 python3 sim/ingest.py          # FWA, rewards and oracle logs into sim/data/fwa.sqlite (resumable)
@@ -47,6 +51,13 @@ python3 keeper/rehearse_image.py [--image <tag>]   # CI: .github/workflows/keepe
 - Test actors use `makeAddr("pack-vault-test-...")` and setUp asserts they hold no code or ETH:
   short labels map to real mainnet addresses, some with EIP-7702 sweepers. Deploy addresses can
   hold mainnet dust; read balances, do not assume them.
+- New packs come only from `build` (mint Shapes straight into the pack and list it at once, D79);
+  returned packs are relisted with `list`, never redeemed to remint. Backing makes keeping the pack
+  the purchaser's best choice (D80); a keep needs a replacement build.
+- Strategy code changes go in the libraries or `PackAccount`, never duplicated in an account. An
+  account defines only `_free`, `_idle` and its own facts (`_checkpointMode`, `_shortfall`, `_need`).
+- FWA pushes keep payments and kick refunds with a 100,000 gas stipend; the clone's receive path
+  must stay well inside it (52,363 keep, 35,148 cold kick; `ForkManager.t.sol`).
 - Keeper pay is a fixed quote per operation (D56); never measured gas. The keeper pads the exact
   signed-call estimate 25% and enforces the transaction cap; later state can still invalidate an
   estimate. `cast send` exits 0 on a reverted transaction; check receipt status.

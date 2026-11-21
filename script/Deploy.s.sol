@@ -5,6 +5,8 @@ import {Script} from "forge-std/Script.sol";
 import {PackVault} from "../src/PackVault.sol";
 import {VaultLib} from "../src/VaultLib.sol";
 import {DeployCore} from "./DeployCore.sol";
+import {KeeperPolicyV1} from "../src/KeeperPolicy.sol";
+import {PackManagerFactory} from "../src/PackManagerFactory.sol";
 import {console2} from "forge-std/console2.sol";
 import {IShapes, IShapePacks, IFWAV2} from "../src/interfaces/External.sol";
 
@@ -42,7 +44,8 @@ contract Deploy is Script {
         address owner_ = vm.parseJsonAddress(v, ".owner");
         require(uint160(owner_) > 0xffff, "owner must be a real account, not a placeholder or precompile");
         vm.startBroadcast();
-        (vault,) = DeployCore.deploy(
+        KeeperPolicyV1 policy;
+        (vault, policy) = DeployCore.deploy(
             IFWAV2(vm.parseJsonAddress(v, ".fwa")),
             IShapes(vm.parseJsonAddress(v, ".shapes")),
             IShapePacks(vm.parseJsonAddress(v, ".packs")),
@@ -50,8 +53,12 @@ contract Deploy is Script {
             p,
             vm.parseJsonUint(v, ".seedWei")
         );
+        // Personal managers run the same strategy and share the keeper policy as their default.
+        PackManagerFactory factory = DeployCore.deployFactory(vault.fwa(), vault.shapes(), vault.packs(), policy);
         vm.stopBroadcast();
         console2.log("PackVault", address(vault));
+        console2.log("PackManagerFactory", address(factory));
+        console2.log("PackManager implementation", address(factory.implementation()));
         console2.log("KeeperPolicy", address(vault.keeperPolicy()));
         console2.log("postflight passed");
     }

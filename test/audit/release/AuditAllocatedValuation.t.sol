@@ -34,7 +34,7 @@ contract AuditAllocatedValuation is SelectionBase {
     /// unsynced, so a new deposit never prices against its lower bound; sync (anyone, paid)
     /// resolves it and the checkpoint then runs in the same blackout.
     function test_expiredAllocationMustSyncBeforePricing() public {
-        _select(late());
+        _select(primary());
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
         this.assertGasContext();

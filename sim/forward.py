@@ -40,10 +40,15 @@ DB = ROOT / "data/fwa.sqlite"
 OUT = ROOT / "out"
 E = 10**18
 GWEI = 10**9
-P = 3 * 10**16
+P = 6 * 10**16  # the REF_UNITS (6) reference recipe: 0.06 ETH, one 0.05 and one 0.01 Shape (two mints)
+BUILD_UNITS = 6
 SUR, CUT, S_FEE, BID_RATE = 0.05, 0.01, 0.01, 0.90
 ASK, PREMIUM = 0.033, 0.10
 MINT_FEE = 10**15
+# The backing rule (VaultLib.edge) sets each listing's backing so that keeping the pack beats taking
+# FWA's best bid by MIN_KEEP_ADVANTAGE after redeem gas, so a value-aware purchaser keeps and each keep
+# pays for a fresh replacement build. Scenarios override this via sc["keep"] or a response sampler.
+KEEP_DEFAULT = 1.0
 MARK_DAYS = 30  # operating marks interval (diagnostics may lower it)
 DAY = 86_400
 WORK_FEE = 2 * 10**13  # wei per unit of work, canary value (D55)
@@ -238,7 +243,7 @@ def economic_nav(v, credit):
     A blocked checkpoint never prices from this reference. It only reports what the modeled
     external assets hold when journal or receipt processing is behind.
     """
-    value = v.free() + sum(v.idle_packs) + sum(v.recovery_packs) + v.loose_shapes * policy.UNIT + credit
+    value = v.free() + sum(v.idle_packs) + sum(v.recovery_packs) + credit
     for p in v.positions.values():
         if p.status == ACTIVE:
             value += p.value + p.backing + p.pending_fees
@@ -413,7 +418,7 @@ def run(sc, n_target, seed, days=365, values=None):
     routine_unfunded = unpaid_routine_calls = zero_quote_sync_calls = 0
     sync_credit_sweeps = sync_active_fee_claims = sync_fee_receipts = sync_collection_quote = 0
     last_unfunded_offer = last_cash_shortfall = last_permission_shortfall = 0
-    op_names = ("sync", "harvest", "unlist", "liquidate", "checkpoint", "restock", "list")
+    op_names = ("sync", "harvest", "unlist", "liquidate", "checkpoint", "build", "list")
     op_paid = dict.fromkeys(op_names, 0)
     op_calls = dict.fromkeys(op_names, 0)
     holder_calls = dict.fromkeys(op_names, 0)
@@ -489,7 +494,7 @@ def run(sc, n_target, seed, days=365, values=None):
                         v.kicked(i)
         cap = int(ask * (1 + PREMIUM) * E)
         k = int(k_of(crown) * E)
-        backing = policy.edge_backing(k, None if sc.get("exempt", True) else cap, int(S_FEE * 1e4), 3,
+        backing = policy.edge_backing(k, None if sc.get("exempt", True) else cap, int(S_FEE * 1e4), BUILD_UNITS,
                                       ceiling, values["payMarkupBps"], work_fee,
                                       price=min(gas + tip, ceiling), mint_fee=mint_fee,
                                       buffer_bps=values["bufferBps"], min_edge_bps=values["minEdgeBps"])
@@ -547,7 +552,7 @@ def run(sc, n_target, seed, days=365, values=None):
                 if p and p.status == ALLOCATED:
                     late_purchaser_returns += int(absolute_now >= selected_times[payload] + clock.SETTLEMENT)
                     kept = response_keep.pop(payload, None)
-                    if kept if kept is not None else rng.random() < sc.get("keep", 0.0):
+                    if kept if kept is not None else rng.random() < sc.get("keep", KEEP_DEFAULT):
                         v.record_keep(payload, v.settlement_fee_bps)
                     else:
                         v.bid_settled(payload)
@@ -567,7 +572,7 @@ def run(sc, n_target, seed, days=365, values=None):
             for i, d0 in list(allocated_day.items()):
                 if d >= d0 + 1:
                     del allocated_day[i]
-                    if rng.random() < sc.get("keep", 0.0):
+                    if rng.random() < sc.get("keep", KEEP_DEFAULT):
                         v.record_keep(i, v.settlement_fee_bps)
                     else:
                         v.bid_settled(i)
@@ -633,10 +638,11 @@ def run(sc, n_target, seed, days=365, values=None):
                 st = policy.State(
                     now=absolute_now, gas_price=gas + tip, base_fee=gas, gas_ceiling=ceiling, max_tip=tip,
                     markup_bps=values["payMarkupBps"], share_bps=values["keeperShareBps"], k=k, backing=backing,
-                    min_edge_bps=values["minEdgeBps"], mint_fee=mint_fee, settlement_window=clock.SETTLEMENT if timed else 10**12,
+                    min_edge_bps=values["minEdgeBps"], settlement_fee_bps=int(S_FEE * 10_000), mint_fee=mint_fee,
+                    settlement_window=clock.SETTLEMENT if timed else 10**12,
                     blackout=blackout, queue_drained=(market_pending == 0 if timed else (blackout_ok or not blackout) and d >= listing_ready_day),
                     checkpoint_done_this_interval=checkpoint_done, listings=listings, idle_packs=len(v.idle_packs),
-                    recovery_packs=len(v.recovery_packs), loose_shapes=v.loose_shapes,
+                    recovery_packs=len(v.recovery_packs),
                     free=v.free(), idle_eth=v.idle(), owed_estimate=v.owed_estimate(),
                     pending_deposits=v.pending_total, locked_shares=v.locked_shares,
                     total_shares=v.total_shares, fee_credit=credit,
@@ -647,7 +653,8 @@ def run(sc, n_target, seed, days=365, values=None):
                     essential_budget=v.essential_budget, essential_cap=values["essentialCapWei"],
                     recent_volume=float(np.mean(vol_hist[max(0, d - 6):d + 1] if timed else vol_hist[-7:])), work_fee=work_fee,
                     slowdown_volume=sc.get("slowdown", 0.0), essential_ceiling=essential_ceiling,
-                    pack_units_mask=values["packUnitsMask"], reserve=values["reserveWei"],
+                    pack_units_mask=values["packUnitsMask"] | (1 << BUILD_UNITS), build_units=BUILD_UNITS,
+                    reserve=values["reserveWei"],
                     processing_pool=v.processing_pool, distribution_bps=v.distribution_bps,
                     allocation_stale=(v.allocation_head < len(v.allocation_queue) and
                                       (v.allocation_queue[v.allocation_head] not in v.positions or
@@ -658,17 +665,22 @@ def run(sc, n_target, seed, days=365, values=None):
                     up = lambda a, b: -(-a // b)
                     keep_bps = int(S_FEE * 10_000)
                     cycle = policy.quote(st, policy.CYCLE_GAS, 2)
-                    minimum = max(up(P * 10_000, 9500), up(P * 10_000, 10_000 - keep_bps),
-                                  up(P * 10_000, int(BID_RATE * 10_000)),
-                                  up(P * E, k - keep_bps * 10**14), cycle * E // (k - E) + 1)
+                    # VaultLib floors for a valid listing near the edge's desired backing: the keep
+                    # never loses at FWA's 5% settlement-fee cap (P/0.95), the bid outcome clears the
+                    # cycle (B(k-1) > cycle), and the keep outcome clears value plus cycle (B(k-s) >= P + cycle).
+                    minimum = max(up(P * 10_000, 9500), cycle * E // (k - E) + 1,
+                                  up((P + cycle) * E, k - keep_bps * 10**14))
                     maximum = 2**256 - 1 if sc.get("exempt", True) else cap * (10_000 - values["bufferBps"]) // 10_000
                     # Speed only: with no idle pack and idle ETH below one backing, the planner can
-                    # use neither list nor restock proposals, so skipping them changes no decision.
+                    # use neither list nor build proposals, so skipping them changes no decision.
                     if v.idle_packs or st.idle_eth >= minimum:
                         st.backing_proposals = backing_proposals(backing, v.positions, minimum, maximum)
-                        build_minimum = max(minimum, up((cycle + policy.build_cost(st)) * E, k - E))
+                        # A newly built pack repays its build from the keep outcome B(k-s), not the bid
+                        # outcome B(k-1): backing >= (value + cycle + build) / (k - s) (VaultLib._profitable).
+                        build_minimum = max(minimum, up((P + cycle + policy.build_cost(st, BUILD_UNITS)) * E,
+                                                        k - keep_bps * 10**14))
                         build_quote = backing_proposals(backing, v.positions, build_minimum, maximum, 1)
-                        st.restock_proposals = build_quote * policy.MAX_BATCH["restock"]
+                        st.build_proposals = build_quote * policy.MAX_BATCH["build"]
                 planned = policy.plan(st)
                 if timed and calls == 0 and d < days:
                     waiting = v.idle_packs or any(l.status in (SETTLED, WITHDRAWN) or (l.status == ALLOCATED and
@@ -898,33 +910,31 @@ def run(sc, n_target, seed, days=365, values=None):
                             v.unlist(i)
                         pay(gas_q, len(ids), essential, liability=essential)
                     elif fn == "liquidate":
-                        packs = shapes = units = 0
+                        # Redeem idle packs to ETH at exact backing; burn each pack's Shapes (no loose
+                        # Shapes exist). At most MAX_LIQUIDATE_UNITS (60) 0.01-units of packs per call.
+                        packs = units = burned = 0
                         inventory = reversed(v.idle_packs)
                         cash = 0
-                        while packs + shapes < action[1] and units < 30 and \
+                        while packs < action[1] and units < 60 and \
                                 v.owed_estimate() > v.free() + v.pending_total + cash:
                             value = next(inventory, None)
-                            if value is not None:
-                                if units + value // policy.UNIT > 30:
-                                    break
-                                packs += 1
-                                units += value // policy.UNIT
-                                cash += value
-                            elif shapes < v.loose_shapes:
-                                shapes += 1
-                                units += 1
-                                cash += policy.UNIT
-                            else:
+                            if value is None:
                                 break
-                        if not packs + shapes:
+                            u = value // policy.UNIT
+                            if units + u > 60:
+                                break
+                            packs += 1
+                            units += u
+                            burned += policy.shape_count(u)
+                            cash += value
+                        if not packs:
                             continue
-                        gas_q = (Q["liquidate"] + Q["liq_pack"] * packs
-                                 + Q["redeem_shape"] * (units - shapes) + Q["liq_shape"] * shapes)
-                        if not affordable(gas_q, packs + shapes, True, cash_delta=cash, liability=True):
+                        gas_q = Q["liquidate"] + Q["liq_pack"] * packs + Q["redeem_shape"] * burned
+                        if not affordable(gas_q, packs, True, cash_delta=cash, liability=True):
                             continue
-                        for _ in range(packs + shapes):
+                        for _ in range(packs):
                             v.liquidate_one()
-                        pay(gas_q, packs + shapes, True, liability=True)
+                        pay(gas_q, packs, True, liability=True)
                     elif fn == "checkpoint":
                         pool = v.processing_pool
                         flows = v.pending_total != 0 or v.locked_shares != 0
@@ -946,16 +956,22 @@ def run(sc, n_target, seed, days=365, values=None):
                             last_checkpoint_interval = absolute_now // clock.INTERVAL
                             timed_checkpoint_times.append(absolute_now)
                         pay(gas_q, 1, essential, funding_cap, liability=essential)
-                    elif fn == "restock":
+                    elif fn == "build":
+                        # Build-and-list: each pack mints its Shapes straight into ShapePacks (no loose
+                        # Shapes) and lists at once. Capital must cover pending idle funding, every
+                        # pack's mint cost and every backing; a keep later triggers a fresh build.
                         units, proposals = action[1], action[2]
-                        need = len(proposals) * units
-                        mints = max(0, -(-(need - v.loose_shapes) // 10))
-                        cash = mints * (10 * policy.UNIT + mint_fee)
-                        gas_q = Q["restock"] + Q["pack"] * len(proposals) + Q["mint"] * mints
-                        if v.idle() < cash + v.idle_funding + sum(proposals) or not affordable(gas_q, len(proposals), cash_delta=-cash):
+                        n = policy.shape_count(units)
+                        price = units * policy.UNIT + n * mint_fee
+                        count = len(proposals)
+                        cash = count * price
+                        gas_q = Q["build"] + count * (Q["build_pack"] + n * Q["build_shape"] + Q["listed"])
+                        if v.idle() < v.idle_funding + cash + sum(proposals) \
+                                or not affordable(gas_q, 2 * count, cash_delta=-(cash + sum(proposals))):
                             continue
-                        v.restock(len(proposals), units, mint_fee, proposals)
-                        pay(gas_q, len(proposals))
+                        v.build(list(range(next_id, next_id + count)), units, mint_fee, proposals)
+                        next_id += count
+                        pay(gas_q, 2 * count)
                     elif fn == "list":
                         if not timed:
                             if d < listing_ready_day:
@@ -1010,7 +1026,7 @@ def run(sc, n_target, seed, days=365, values=None):
             operation_end_backlog = len(journal)
             operation_end_cash, operation_end_keeper_paid, operation_end_fees = v.balance, v.keeper_paid, v.fees_received
             operation_end_routine_paid, operation_end_routine_budget = routine_paid, v.routine_budget
-            operation_end_idle, operation_end_funding, operation_end_loose = v.idle_value, v.idle_funding, v.loose_shapes * policy.UNIT
+            operation_end_idle, operation_end_funding, operation_end_loose = v.idle_value, v.idle_funding, 0
         if timed:
             redemptions = [(d, 1.0)] if event_kind == "cutoff" and exit_all else ([(d, payload)] if event_kind == "redemption" else [])
         elif exit_all:
@@ -1069,7 +1085,7 @@ def run(sc, n_target, seed, days=365, values=None):
     exit_complete = (exit_requested and not v.share_balance("h") and not remaining_locked
                      and not v.claimable.get("h", 0) and not unpriced and not journal and not v.receipts
                      and not v.locked_shares and not end_blocked)
-    physical = (v.balance + sum(v.idle_packs) + v.loose_shapes * policy.UNIT + sum(v.recovery_packs)
+    physical = (v.balance + sum(v.idle_packs) + sum(v.recovery_packs)
                 + sum(p.value for p in v.positions.values() if p.status in (ACTIVE, ALLOCATED) or p.pack_owned)
                 + sum(p.backing for p in v.positions.values() if p.status in (ACTIVE, ALLOCATED)))
     unreconciled_keep = sum(p.value for p in v.positions.values() if p.status == SETTLED and not p.pack_owned)
@@ -1330,10 +1346,11 @@ def main():
                           f"{100 * x['share']:.1f}% |")
     gross = 0.0363 * (k_of() - 1)
     fee = WORK_FEE / E
-    build_g = policy.Q["pack"] + policy.Q["mint"] * 3 // 10 + policy.Q["listed"]
+    build_g = policy.Q["build_pack"] + policy.shape_count(BUILD_UNITS) * policy.Q["build_shape"] + policy.Q["listed"]
+    mint_share = policy.shape_count(BUILD_UNITS) * MINT_FEE / E  # mints for one REF_UNITS pack
     md.append(f"\nBreak-even quoted price for a bid cycle (D56: quoted gas {policy.CYCLE_GAS:,}, including own journal, selection, terminal, cleanup, relist and harvest components, plus 2 work fees; V1 pays no markup): {(gross - 2 * fee) / policy.CYCLE_GAS * 1e9:.2f} gwei. "
-              f"New packs (build {build_g:,} quoted gas, mint fee share 0.0003 ETH and two additional work fees): "
-              f"below {(gross - 0.0003 - 4 * fee) / (policy.CYCLE_GAS + build_g) * 1e9:.2f} gwei quoted price "
+              f"New packs (build {build_g:,} quoted gas, mint fee share {mint_share} ETH and two additional work fees): "
+              f"below {(gross - mint_share - 4 * fee) / (policy.CYCLE_GAS + build_g) * 1e9:.2f} gwei quoted price "
               "(basefee + 0.05 gwei tip).\n")
 
     def g_path(base, high, start, stop=10**9):

@@ -110,6 +110,7 @@ interface IFWAV2 {
     function topListingId() external view returns (uint256);
     function topListingSince() external view returns (uint64);
     function settlementDiscountBps() external view returns (uint256);
+    function tokenSettlementDiscountBps() external view returns (uint256);
     function settlementWindow() external view returns (uint256);
     function finalizeWindow() external view returns (uint256);
     function acquisitionFee() external view returns (uint256);

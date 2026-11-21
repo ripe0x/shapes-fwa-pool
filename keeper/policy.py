@@ -15,7 +15,6 @@ ceiling is the executor's choice (keeper.py --max-loss-wei), not the vault's.
 """
 import functools
 import hashlib
-import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -24,19 +23,36 @@ SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 BPS = 10_000
 UNIT = 10**16
 ACTIVE, ALLOCATED, WITHDRAWN, SETTLED = 1, 2, 3, 4
+# Monitoring only (never changes a plan): warn when this keeper's own Active listings, across every
+# account it runs, reach this share of FWA's total selection weight. FWA selects a listing with
+# probability (its weight)/(total weight), each listing's weight being 1e36/backing.
+EXPOSURE_SHARE_HIGH_BPS = 1_000  # 10%
 
-# The vault's quoted-gas schedule, line for line (PackVault Q_* constants, D56). Pay is a quote
-# fixed by the operation and its completed work, never the caller's gas.
-Q = dict(checkpoint=360_000, restock=280_000, pack=325_000, pack_unit=100_000, mint=2_200_000,
-         list=280_000, listed=825_000, sync=85_000, journal_tail=120_000, distribution_proof=80_000, synced=120_000, journal=22_000, scan=30_000, selected=180_000,
+# The vault's quoted-gas schedule, line for line (VaultLib Q_* constants, D56). Pay is a quote
+# fixed by the operation and its completed work, never the caller's gas. build-and-list replaced
+# restock/mint/split (direct-mint recipe): each pack mints its Shapes straight into ShapePacks and
+# lists at once, so a pack of `units` costs Q_BUILD_PACK + shapeCount x Q_BUILD_SHAPE to build.
+Q = dict(checkpoint=360_000, build=300_000, build_pack=300_000, build_shape=130_000,
+         list=280_000, listed=825_000, sync=85_000, journal_tail=120_000, distribution_proof=80_000,
+         synced=120_000, journal=22_000, scan=30_000, selected=180_000,
          pruned=45_000, unlist=340_000, unlisted=285_000, liquidate=75_000, liq_pack=80_000,
-         redeem_shape=35_000, liq_shape=65_000, recovery_base=100_000, recovery_shape=35_000,
+         redeem_shape=35_000, recovery_base=100_000, recovery_shape=35_000,
          recovery_unseal=70_000, harvest=125_000, harvested=80_000,
          sync_credit=40_000, sync_funding=40_000)
-POSITION_VALUE = 663 * 10**14  # 0.0663 ETH: what request charges are scaled by
+POSITION_VALUE = 1248 * 10**14  # 0.1248 ETH: what deploy/unwind charges are scaled by
+REF_UNITS = 6  # the reference recipe: one 0.05 and one 0.01 Shape, two paid primary mints
+MIN_PACK_UNITS, MAX_PACK_UNITS = 3, 30
+MIN_KEEP_ADVANTAGE = 3 * 10**14  # 0.0003 ETH: a keep must beat the best bid by this after redeem gas
+Q_PURCHASER_REDEEM = 160_000  # ShapePacks.redeem gas priced into the keep margin
 Q_POSITION_SYNC = Q["journal"] + Q["selected"] + Q["synced"] + Q["pruned"]
 CYCLE_GAS = Q_POSITION_SYNC + Q["listed"] + Q["harvested"]  # a bid cycle's quoted gas (gates)
-MAX_BATCH = dict(sync=16, journal=128, selected=16, prune=16, harvest=16, list=8, restock=10, unlist=16, liquidate=16, tokens=16)
+MAX_BATCH = dict(sync=16, journal=128, selected=16, prune=16, harvest=16, list=8, build=8, unlist=16, liquidate=16, tokens=16)
+
+
+def shape_count(units):
+    """VaultLib.makeup: fewest Shapes for a pack of `units` x 0.01 ETH from the 0.1, 0.05 and 0.01
+    denominations. Six units are one 0.05 and one 0.01 Shape (two paid primary mints)."""
+    return units // 10 + units % 10 // 5 + units % 5
 
 
 @dataclass
@@ -62,7 +78,7 @@ class State:
     markup_bps: int
     share_bps: int
     k: int  # 1e18 scale, live
-    backing: int  # live gated backing for a 3-unit pack, 0 when the gate fails
+    backing: int  # live gated backing for a build_units pack, 0 when the gate fails
     min_edge_bps: int
     mint_fee: int
     settlement_window: int
@@ -72,7 +88,6 @@ class State:
     listings: list = field(default_factory=list)
     idle_packs: int = 0
     recovery_packs: int = 0
-    loose_shapes: int = 0
     free: int = 0  # balance less escrow and holder reserves
     idle_eth: int = 0  # vault's idleEth(): free less reserve and owed estimate
     owed_estimate: int = 0
@@ -92,8 +107,8 @@ class State:
     witness_id: int = 0
     pending_parent: str = ""
     backing_proposals: list = field(default_factory=list)
-    restock_proposals: list = field(default_factory=list)
-    winding_down: bool = False
+    build_proposals: list = field(default_factory=list)
+    winding_down: bool = False  # pool wind-down or a personal manager's exit mode
     listing_paused: bool = False
     distribution_bps: int = 0
     # FWA tokens in token wei: pending on active listings, credit from removed or repriced
@@ -114,10 +129,13 @@ class State:
     routine_budget: int = 10**30  # keeper budgets available now (PackVault.budget())
     essential_budget: int = 10**30
     distribution_due: bool = False  # a no-flow checkpoint would distribute now (simulated)
-    pack_units_mask: int = 8  # PackVault packUnitsMask; this keeper builds 3-unit packs only
+    pack_units_mask: int = 1 << REF_UNITS  # account packUnitsMask: the pack sizes it admits
+    build_units: int = REF_UNITS  # pack size the keeper builds; must be enabled in pack_units_mask
     essential_ceiling: int = None  # redemption and wind-down work; None = same as gas_ceiling
-    processing_pool: int = 0  # request charges already held for the next checkpoint
-    essential_cap: int = None  # PackVault essentialCap; 0 = exit work unpaid (withdrawers run it)
+    processing_pool: int = 0  # request charges already held for the next checkpoint (pool only)
+    essential_cap: int = None  # essentialCap; 0 = exit work unpaid (withdrawers run it)
+    pooled: bool = True  # a PackVault (shares, checkpoints); False for a personal PackManager
+    settlement_fee_bps: int = 100  # FWA ownerSettlementFeeBps: fee on a keep (B(1-s) is returned)
 
 
 def price(s, essential=False):
@@ -144,27 +162,28 @@ def pay_v1(s, gas, units=0, essential=False):
     return min(gas * price(s, essential) + units * s.work_fee, quote(s, gas, units, essential))
 
 def edge_backing(k, cap, s_bps, units, gas_ceiling, markup_bps, work_fee, buffer_bps=0, min_edge_bps=100,
-                 discount_bps=9_000, price=None, mint_fee=10**15):
-    """Mirror of VaultLib.edge (D62): backing for a new listing, 0 when it must not list. `cap` is
-    FWA's oracle cap (None when FWA exempts the collection, 0 when no quote); `price` the quoted
-    price now (default: the ceiling)."""
+                 discount_bps=9_150, price=None, mint_fee=10**15):
+    """Mirror of VaultLib.edge / _backingTerms (D62): the backing a new listing posts, 0 when it must
+    not list. Purchasers are expected to keep, so backing is the largest amount at which keeping the
+    pack (the account gets B(1-s) back) still beats taking FWA's best bid (max(ETH, token) x B) by
+    MIN_KEEP_ADVANTAGE after the gas to redeem the pack. `cap` is FWA's oracle cap (None when FWA
+    exempts the collection, 0 when no quote); `discount_bps` is max(settlementDiscountBps,
+    tokenSettlementDiscountBps); `price` the quoted price now (default: the ceiling)."""
     value = units * UNIT
-    floor = max(-(-value * BPS // (BPS - s_bps)), -(-value * BPS // discount_bps))
-    backing = floor
-    if k > 10**18:
-        a = k - 10**18
-        cyc = CYCLE_GAS
-        c = cyc * gas_ceiling * (BPS + markup_bps) // BPS + 2 * work_fee
-        backing = max(backing, (c + math.isqrt(c * c + a * c // 10**18 * value)) * 10**18 // a)
-        pr = gas_ceiling if price is None else price
-        q = lambda g, u: g * pr * (BPS + markup_bps) // BPS + u * work_fee  # noqa: E731
-        build = q(Q["pack"] + max(units - 3, 0) * Q["pack_unit"] + Q["mint"] * units // 10 + Q["listed"], 2) + mint_fee * units // 10
-        backing = max(backing, -(-(build + q(cyc, 2)) * 10**18 // a))
+    floor = value + value // 19 + (0 if value % 19 == 0 else 1)  # ceil(value / 0.95)
+    margin = MIN_KEEP_ADVANTAGE + Q_PURCHASER_REDEEM * gas_ceiling
+    desired = 0
+    if discount_bps != 0 and value > margin:
+        desired = (value - margin) * BPS // discount_bps // BPS * BPS  # quantized to 10,000 wei
     if cap is not None:
-        backing = min(backing, cap * (BPS - buffer_bps) // BPS)
-    ok = cap != 0 and k >= 10**18 + min_edge_bps * 10**14 and k > s_bps * 10**14 and backing >= floor \
-        and backing * (k - s_bps * 10**14) >= value * 10**18
-    return backing if ok else 0
+        desired = min(desired, cap * (BPS - buffer_bps) // BPS)
+    pr = gas_ceiling if price is None else price
+    cycle_cost = CYCLE_GAS * pr * (BPS + markup_bps) // BPS + 2 * work_fee  # quote(CYCLE_GAS, 2)
+    s = s_bps * 10**14  # settlement fee, 1e18 scale
+    ok = (cap != 0 and k >= 10**18 + min_edge_bps * 10**14 and desired >= floor
+          and desired * (k - 10**18) // 10**18 > cycle_cost
+          and desired * (k - s) // 10**18 >= value + cycle_cost)
+    return desired if ok else 0
 
 
 def propose_backings(target, reserved_count, count, is_reserved, minimum=0, maximum=2**256 - 1, nonce=0):
@@ -214,9 +233,24 @@ def cycle_net(s):
     return gross - c if gross > c else 0
 
 
-def build_cost(s):
-    """PackVault.restock's gate: one 3-unit pack's build share, mint fee share and first listing."""
-    return quote(s, Q["pack"] + Q["mint"] * 3 // 10 + Q["listed"], 2) + s.mint_fee * 3 // 10
+def build_net(s):
+    """Headroom a new build must fit (VaultLib._profitable, newlyBuilt): the keep outcome returns
+    B(1-s) and the vault keeps the pack's value, so over one selection the backing repays
+    B(k-s) - value - cycle. A build is worth planning only when that clears its build cost. Richer
+    than cycle_net (the bid outcome B(k-1) - cycle), because a keep also returns B(1-s) - value."""
+    if s.k <= 10**18 or s.backing == 0:
+        return 0
+    value = s.build_units * UNIT
+    gross = s.backing * (s.k - s.settlement_fee_bps * 10**14) // 10**18
+    headroom = gross - value - quote(s, CYCLE_GAS, 2)
+    return headroom if headroom > 0 else 0
+
+
+def build_cost(s, units=REF_UNITS):
+    """VaultLib.buildCost: building one pack of `units` and listing it at the envelope now, plus its
+    paid primary mint fees (one per Shape)."""
+    n = shape_count(units)
+    return quote(s, Q["build_pack"] + n * Q["build_shape"] + Q["listed"], 2) + n * s.mint_fee
 
 
 def checkpoint_cost(s):
@@ -231,17 +265,20 @@ def request_charge(s):
 
 
 def deploy_charge(s):
-    """PackVault.deployCharge, per POSITION_VALUE deposited."""
-    g = Q["pack"] + Q["mint"] * 3 // 10 + Q["listed"]
+    """VaultLib.deployCharge, per POSITION_VALUE deposited: build and list one REF_UNITS position at
+    the envelope now plus mint fees, never less than the most a builder nets over its own gas."""
+    n = shape_count(REF_UNITS)
+    g = Q["build_pack"] + n * Q["build_shape"] + Q["listed"]
     floor = g * (s.gas_ceiling * s.markup_bps + s.max_tip * (BPS + s.markup_bps)) // BPS + 2 * s.work_fee
-    return max(build_cost(s), floor)
+    return max(build_cost(s, REF_UNITS), floor)
 
 
 def unwind_charge(s):
-    """PackVault.unwindCharge, per POSITION_VALUE redeemed; 0 without an essential budget."""
+    """VaultLib.unwindCharge, per POSITION_VALUE redeemed; 0 without an essential budget."""
     if s.essential_cap == 0:
         return 0
-    return quote(s, Q["unlisted"] + Q["liq_pack"] + 3 * Q["redeem_shape"], 2, True)
+    n = shape_count(REF_UNITS)
+    return quote(s, Q["unlisted"] + Q["liq_pack"] + n * Q["redeem_shape"], 2, True)
 
 
 def sync_funding_candidates(s, terminal_ids, active, checkpoint_due):
@@ -350,7 +387,7 @@ def plan(s):
     # 3. Redemption liquidity or wind-down: idle inventory first, then unlist (needs FWA's
     #    queue drained), then liquidate what unlisting returned.
     if s.winding_down or shortfall:
-        if s.idle_packs or s.loose_shapes or s.recovery_packs:
+        if s.idle_packs or s.recovery_packs:
             out.append(("liquidate", MAX_BATCH["liquidate"]))
             shortfall = max(0, shortfall - s.idle_value)
     unwind = s.winding_down or broken
@@ -369,8 +406,10 @@ def plan(s):
             out.append(("liquidate", MAX_BATCH["liquidate"]))
 
     # 4. Checkpoint in FWA's blackout with its queue drained, only when holders have flows.
-    if (s.blackout and s.queue_drained and (not catchup or unexposed) and not s.pending_receipts and not s.allocation_stale
-            and not due and not s.checkpoint_done_this_interval
+    #    Personal managers have no shares, deposits or checkpoints (s.pooled is False), so the pool
+    #    flow fields stay zero and this never fires for them.
+    if (s.pooled and s.blackout and s.queue_drained and (not catchup or unexposed) and not s.pending_receipts
+            and not s.allocation_stale and not due and not s.checkpoint_done_this_interval
             and (s.locked_shares or (s.pending_deposits and not spike) or (s.distribution_due and not spike))):
         out.append(("checkpoint", s.witness_id))
 
@@ -403,18 +442,19 @@ def plan(s):
             return out
         if proposals:
             return out  # viable inventory keeps priority when only cash is missing
-    if s.recent_volume >= s.slowdown_volume and (s.pack_units_mask >> 3) & 1:
-        proposals = s.restock_proposals[:MAX_BATCH["restock"]]
-        build = build_cost(s)
-        n = 0  # largest batch the vault's capital check accepts: whole 0.1 mints plus backing
-        for c in range(min(len(proposals), MAX_BATCH["restock"]), 0, -1):
-            need = 3 * c
-            mints = -(-(need - s.loose_shapes) // 10) if need > s.loose_shapes else 0
-            if mints * (10 * UNIT + s.mint_fee) + s.idle_funding + sum(proposals[:c]) <= idle:
+    if s.recent_volume >= s.slowdown_volume and (s.pack_units_mask >> s.build_units) & 1:
+        units = s.build_units
+        price = units * UNIT + shape_count(units) * s.mint_fee  # mint cost of one pack (direct mint)
+        proposals = s.build_proposals[:MAX_BATCH["build"]]
+        build = build_cost(s, units)
+        n = 0  # largest batch the vault's capital check accepts: per-pack mint cost plus backing
+        for c in range(min(len(proposals), MAX_BATCH["build"]), 0, -1):
+            if s.idle_funding + c * price + sum(proposals[:c]) <= idle:
                 n = c
                 break
-        if build <= net and n:
-            out.append(("restock", 3, proposals[:n]))
+        # The build repays from the keep outcome (build_net), not the bid-only cycle_net.
+        if build <= build_net(s) and n:
+            out.append(("build", units, proposals[:n]))
     return out
 
 
@@ -439,6 +479,27 @@ def journal_backlog_floor(s):
         return quote(s, Q["journal_tail"] + s.open_positions * Q["scan"])
     full, tail = divmod(records, MAX_BATCH["journal"])
     return quote(s, full * Q["sync"] + (Q["journal_tail"] if tail else 0) + records * Q["journal"])
+
+
+def exposure_share_bps(backings, total_weight):
+    """This keeper's combined share of FWA's selection weight, in bps: the sum over its own Active
+    listings (across every account it runs) of each listing's FWA weight 1e36/backing, over FWA's
+    total weight. Pure and monitoring only: it never enters a plan, only /health."""
+    if total_weight <= 0:
+        return 0
+    own = sum(10**36 // b for b in backings if b > 0)
+    return own * BPS // total_weight
+
+
+def exposure_status(share_bps):
+    """Status rows for the combined selection-weight share: an info line always, and an action when
+    the share reaches EXPOSURE_SHARE_HIGH_BPS (the keeper's listings win too large a fraction of
+    selections; the operator should widen backings or add independent listers)."""
+    out = [("EXPOSURE_SHARE", "info", f"keeper holds {share_bps / 100:.2f}% of FWA selection weight across its accounts")]
+    if share_bps >= EXPOSURE_SHARE_HIGH_BPS:
+        out.append(("EXPOSURE_SHARE_HIGH", "action",
+                    f"combined selection-weight share {share_bps / 100:.2f}% >= {EXPOSURE_SHARE_HIGH_BPS / 100:.0f}%"))
+    return out
 
 
 def status(s, planned=None):

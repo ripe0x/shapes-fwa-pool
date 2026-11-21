@@ -5,14 +5,23 @@ import {ForkBase, IOwnable, ForceSender, IFwaAdmin} from "./ForkBase.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {Charges} from "../utils/Charges.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {PackAccount} from "../../src/PackAccount.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-interface BatchFwaProcessor { function processAcquisitions(uint256 maxCount) external returns (uint256); }
-
+/// @notice Billed-gas re-measurement against the fixed keeper quotes (D56) and the EIP-7825
+///         16,777,216-gas transaction cap, for the direct-mint recipe. `build` mints each pack
+///         straight into ShapePacks and lists it at once, so there is no idle pack to `list` after
+///         a build; `list` only relists packs FWA returned. Every operation runs the real deployed
+///         code against the real FWA/Shapes/ShapePacks; nothing is mocked.
 contract ForkMaxBatchGasTest is ForkBase {
     receive() external payable {}
+
+    // The 6-unit recipe mints two Shapes (one 0.05, one 0.01); the 30-unit cap mints three 0.1.
+    uint256 constant BUILD_GAS_6 = VaultLib.Q_BUILD_PACK + 2 * VaultLib.Q_BUILD_SHAPE;
+    uint256 constant BUILD_GAS_30 = VaultLib.Q_BUILD_PACK + 3 * VaultLib.Q_BUILD_SHAPE;
+
     function assertGasContext() external {
         assertEq(block.basefee, 0.15 gwei); assertEq(tx.gasprice, 0.2 gwei);
     }
@@ -27,156 +36,162 @@ contract ForkMaxBatchGasTest is ForkBase {
         vm.cool(address(FWA)); vm.cool(address(PACKS)); vm.cool(address(SHAPES)); vm.cool(keeper);
     }
 
-    function _measure(string memory label, bytes memory input) private returns (uint256 used) {
-        uint256 intrinsic = 21_000;
-        for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
+    /// @dev Cold keeper call, reporting the call's internal (receipt-equivalent) gas against the
+    ///      fixed quote. It does not fail on an underpay (reported instead, per the audit brief); it
+    ///      always enforces the real invariant: the operation plus the keeper's 25% estimate margin
+    ///      fits the per-transaction cap.
+    function _billed(string memory label, bytes memory input, uint256 quotedGas) private returns (uint256 billed) {
         _cold();
         vm.prank(keeper);
-        uint256 start = gasleft();
         (bool ok, bytes memory result) = address(vault).call(input);
-        used = start - gasleft() + intrinsic;
+        Vm.Gas memory frame = vm.lastCallGas();
         if (!ok) assembly ("memory-safe") { revert(add(result, 32), mload(result)) }
-        emit log_named_uint(label, used);
-        if (result.length >= 32) emit log_named_uint(string.concat(label, " pay wei"), abi.decode(result, (uint256)));
-        assertLt((used * 125 + 99) / 100, 16_777_216, "complete operation plus 25% keeper gas margin");
+        billed = uint256(frame.gasTotalUsed);
+        emit log_named_uint(string.concat(label, " billed gas"), billed);
+        emit log_named_uint(string.concat(label, " quoted gas"), quotedGas);
+        if (quotedGas >= billed) emit log_named_uint(string.concat(label, " quote margin gas"), quotedGas - billed);
+        else emit log_named_uint(string.concat(label, " QUOTE UNDERPAYS billed by gas"), billed - quotedGas);
+        if (result.length >= 32) emit log_named_uint(string.concat(label, " keeper pay wei"), abi.decode(result, (uint256)));
+        assertLt((billed * 125 + 99) / 100, 16_777_216, "operation plus 25% keeper margin fits EIP-7825");
     }
 
-    function _replay(string memory fixture, string memory leg) private {
-        string memory prefix = string.concat(".26417086.", leg);
-        address from = vm.parseJsonAddress(fixture, string.concat(prefix, "From"));
-        address to = vm.parseJsonAddress(fixture, string.concat(prefix, "To"));
-        bytes memory data = vm.parseJsonBytes(fixture, string.concat(prefix, "Input"));
-        uint256 value = keccak256(bytes(leg)) == keccak256("req") ? vm.parseJsonUint(fixture, ".26417086.reqValue") : 0;
-        vm.txGasPrice(vm.parseJsonUint(fixture, string.concat(prefix, "GasPrice")));
-        vm.deal(address(this), address(this).balance + value);
-        vm.prank(from, from);
-        (bool ok, bytes memory result) = to.call{value: value}(data);
-        if (!ok) assembly ("memory-safe") { revert(add(result, 32), mload(result)) }
-    }
-
-    function test_maximumLargePackOperationsFitTransactionCap() public {
-        vm.createSelectFork("mainnet", bytes32(0x7a2e33446681244f37d801df737f7017e3e9258d49fa6465e95983f5a3b81a6f));
+    /// @notice Build of 1..8 packs of six units: billed gas against Q_BUILD + n (buildGas + Q_LISTED),
+    ///         then unlist and liquidate of the resulting 6-unit packs. ShapePacks is oracle-exempt
+    ///         (ForkBase setUp), so a 0.06 ETH pack lists uncapped.
+    function test_sixUnitBuildUnlistLiquidateBilledGas() public {
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei); this.assertGasContext();
-        VaultLib.Params memory p = defaultParams(); p.packUnitsMask = (uint64(1) << 30) | (uint64(1) << 3); p.reserve = 0;
-        vm.deal(address(this), 50 ether);
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 20 ether);
-        uint256 smallSnapshot = vm.snapshotState();
-        uint256[] memory smallBuild = TestVaultOps.buildProposals(vault, 10, 3);
-        _measure("restock ten small packs thirty total units complete gas", abi.encodeCall(PackVault.restock, (3, smallBuild, 0)));
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, defaultParams(), 5 ether);
+        assertTrue(vm.isIsolateMode(), "receipt-equivalent frame gas requires isolated calls");
+        (,, bool ok) = vault.edge(UNITS);
+        assertTrue(ok, "6-unit edge must be live");
+
+        for (uint256 n = 1; n <= 8; ++n) {
+            uint256 snap = vm.snapshotState();
+            uint256[] memory props = TestVaultOps.proposals(vault, n, UNITS);
+            uint256 quoted = VaultLib.Q_BUILD + n * (BUILD_GAS_6 + VaultLib.Q_LISTED);
+            _billed(string.concat("build ", vm.toString(n), " x 6-unit"),
+                abi.encodeCall(PackAccount.build, (UNITS, props, 0)), quoted);
+            assertEq(vault.openListingCount(), n, "build lists every pack at once");
+            assertEq(vault.idlePackCount(), 0, "build leaves no idle pack");
+            assertTrue(vm.revertToState(snap));
+        }
+
+        // Working set of eight open listings, then exit: unlist returns them to idle, liquidate redeems.
+        uint256[] memory props8 = TestVaultOps.proposals(vault, 8, UNITS);
+        vault.build(UNITS, props8, 0);
+        assertEq(vault.openListingCount(), 8);
+        // Clear FWA's 12h crown-exit window so the whole batch can unlist in one call.
+        vm.warp(block.timestamp + 13 hours); vm.roll(block.number + 3_900);
         vm.prank(owner); vault.startWindDown();
-        _measure("liquidate ten small packs thirty total units complete gas", abi.encodeCall(PackVault.liquidate, (16, 0)));
-        assertTrue(vm.revertToState(smallSnapshot));
+        uint256[] memory open = TestVaultOps.open(vault);
+        _billed("unlist 8 x 6-unit", abi.encodeCall(PackAccount.unlist, (open, 0)),
+            VaultLib.Q_UNLIST + 8 * VaultLib.Q_UNLISTED);
+        assertEq(vault.openListingCount(), 0, "all eight unlisted");
+        assertEq(vault.idlePackCount(), 8, "returned to idle");
+        // Liquidate burns two Shapes per 6-unit pack (8 packs, 48 units <= 60-unit per-call cap).
+        _billed("liquidate 8 x 6-unit", abi.encodeCall(PackAccount.liquidate, (16, 0)),
+            VaultLib.Q_LIQUIDATE + 8 * VaultLib.Q_LIQ_PACK + 16 * VaultLib.Q_REDEEM_SHAPE);
+        assertEq(vault.idlePackCount(), 0, "all redeemed");
+    }
+
+    /// @notice Relisting idle packs (`list`). Gas is independent of pack size (no mint, no Shapes),
+    ///         so it is measured on 30-unit packs returned to idle by a real FWA kick. Non-exempt
+    ///         here (fresh fork), with a floor the kicked backings exceed.
+    function test_listRebatchBilledGas() public {
+        vm.createSelectFork("mainnet", BLOCK);
+        vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei); this.assertGasContext();
+        vm.deal(keeper, 1 ether);
+        setPackAsk(0.33 ether); // ceiling 0.363 covers 30-unit backings near 0.36
+        VaultLib.Params memory p = defaultParams();
+        p.packUnitsMask = uint64(1) << 30; p.reserve = 0;
+        vm.deal(address(this), 30 ether);
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 20 ether);
+        uint256[] memory props8 = TestVaultOps.proposals(vault, 8, 30);
+        vault.build(30, props8, 0);
+        uint256[] memory open = TestVaultOps.open(vault);
+        assertEq(open.length, 8);
+        // FWA only permits kicks during the purchase blackout; drop the floor below the live
+        // backings so every listing is kickable, returning its pack.
+        toBlackout();
+        setPackAsk(0.25 ether);
+        for (uint256 i; i < open.length; ++i) IFwaAdmin(address(FWA)).kickListing(open[i]);
+        assertEq(vault.pendingReceipts(), 8);
+        vm.prank(keeper); vault.sync(open, 0, 0);
+        assertEq(vault.idlePackCount(), 8, "kicked packs returned to idle");
+        assertEq(vault.openListingCount(), 0);
+        // Relist out of the blackout at fresh backings the restored ceiling allows.
+        toOpen();
         setPackAsk(0.33 ether);
-        uint256[] memory build = TestVaultOps.buildProposals(vault, 1, 30);
-        _measure("restock one largest 30-unit pack complete gas", abi.encodeCall(PackVault.restock, (30, build, 0)));
-        // Fixture construction is deliberately outside the measured operation.
-        for (uint256 i = 1; i < 16; ++i) vault.restock(30, build, 0);
-        uint256[] memory quotes = TestVaultOps.proposals(vault, 16, 30);
-        uint256 snapshot = vm.snapshotState();
-        uint256[] memory one = new uint256[](1); one[0] = quotes[0];
-        _measure("list single largest pack complete gas", abi.encodeCall(PackVault.list, (one, 0)));
-        assertTrue(vm.revertToState(snapshot));
-        uint256[] memory eight = new uint256[](8);
-        for (uint256 i; i < 8; ++i) eight[i] = quotes[i];
-        _measure("list maximum eight largest packs complete gas", abi.encodeCall(PackVault.list, (eight, 0)));
-        for (uint256 i; i < 8; ++i) eight[i] = quotes[i + 8];
-        vault.list(eight, 0);
+        uint256[] memory relist = TestVaultOps.proposals(vault, 8, 30);
+        _billed("list 8 relisted", abi.encodeCall(PackAccount.list, (relist, 0)),
+            VaultLib.Q_LIST + 8 * VaultLib.Q_LISTED);
+        assertEq(vault.openListingCount(), 8, "all eight relisted");
+    }
+
+    /// @notice EIP-7825 worst case: the largest allowed packs (30 units) at maximum batch for each
+    ///         operation — build 8, unlist 16, liquidate, sync 16 kicks — all inside the cap.
+    function test_thirtyUnitMaxBatchFitsTransactionCap() public {
+        vm.createSelectFork("mainnet", BLOCK);
+        vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei); this.assertGasContext();
+        vm.deal(keeper, 1 ether);
+        setPackAsk(0.33 ether);
+        VaultLib.Params memory p = defaultParams();
+        p.packUnitsMask = uint64(1) << 30; p.reserve = 0;
+        vm.deal(address(this), 40 ether);
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 30 ether);
+
+        // Max build batch: eight 30-unit packs in one call.
+        uint256 snap = vm.snapshotState();
+        uint256[] memory eight = TestVaultOps.proposals(vault, 8, 30);
+        _billed("build 8 x 30-unit (max build batch)", abi.encodeCall(PackAccount.build, (30, eight, 0)),
+            VaultLib.Q_BUILD + 8 * (BUILD_GAS_30 + VaultLib.Q_LISTED));
+        assertTrue(vm.revertToState(snap));
+
+        // Sixteen open listings for the 16-wide unlist/sync worst case (two build calls of eight).
+        uint256[] memory p8a = TestVaultOps.proposals(vault, 8, 30);
+        vault.build(30, p8a, 0);
+        uint256[] memory p8b = TestVaultOps.proposals(vault, 8, 30);
+        vault.build(30, p8b, 0);
         uint256[] memory ids = TestVaultOps.open(vault);
         assertEq(ids.length, 16);
 
-        string memory fixture = vm.readFile("test/fixtures/selection.json");
-        _replay(fixture, "req");
-        vm.roll(26_417_091); vm.warp(1_794_705_887);
-        vm.setBlockhash(26_417_086, vm.parseJsonBytes32(fixture, ".26417086.reqBlockHash"));
-        vm.fee(vm.parseJsonUint(fixture, ".26417086.fulBaseFee"));
-        _replay(fixture, "ful");
-        vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei); this.assertGasContext();
-        for (uint256 i; i < ids.length; ++i) {
-            (,,,,,,,,,, uint8 status) = FWA.listings(ids[i]);
-            assertEq(status, 1, "real foreign selection leaves each fee-earning witness Active");
-            assertGt(FWA.pendingFees(ids[i]), 0);
-        }
-        snapshot = vm.snapshotState();
-        one[0] = ids[0];
-        _measure("harvest single active debt complete gas", abi.encodeCall(PackVault.harvest, (one, 0)));
-        assertTrue(vm.revertToState(snapshot));
-        _measure("harvest maximum sixteen active debts complete gas", abi.encodeCall(PackVault.harvest, (ids, 0)));
-        // Expire the real remaining request and enter FWA's permitted withdrawal window.
-        vm.warp(block.timestamp + 25 hours);
-        vm.roll(block.number + 7_500);
-        BatchFwaProcessor(address(FWA)).processAcquisitions(50);
-        assertEq(FWA.unsettledAcquisitionCount(), 0);
+        // Max sync batch: 16 kicked receipts processed in one call (kicks need the blackout window).
+        snap = vm.snapshotState();
         toBlackout();
-        vm.prank(owner); vault.startWindDown();
-        snapshot = vm.snapshotState();
-        _measure("unlist single largest pack complete gas", abi.encodeCall(PackVault.unlist, (one, 0)));
-        assertTrue(vm.revertToState(snapshot));
-        _measure("unlist maximum sixteen largest packs complete gas", abi.encodeCall(PackVault.unlist, (ids, 0)));
-        assertEq(vault.openListingCount(), 0);
-        _measure("liquidate maximum units from largest pack complete gas", abi.encodeCall(PackVault.liquidate, (16, 0)));
-        assertEq(vault.idlePackCount(), 15);
-        assertTrue(vm.revertToState(snapshot));
-        setPackAsk(0.30 ether);
+        setPackAsk(0.25 ether);
         for (uint256 i; i < ids.length; ++i) IFwaAdmin(address(FWA)).kickListing(ids[i]);
         assertEq(vault.pendingReceipts(), 16);
-        _measure("sync maximum sixteen kicked receipts complete gas", abi.encodeCall(PackVault.sync, (ids, 0, 0)));
-        assertEq(vault.pendingReceipts(), 0);
-        assertEq(vault.reservedCount(), 0);
+        _billed("sync 16 kicked receipts", abi.encodeCall(PackAccount.sync, (ids, 0, 0)),
+            VaultLib.Q_SYNC); // base quote; per-receipt journal/scan work is added live
         assertEq(vault.idlePackCount(), 16);
+        assertTrue(vm.revertToState(snap));
+
+        // Max unlist batch: 16 active 30-unit listings withdrawn in wind-down.
+        vm.warp(block.timestamp + 13 hours); vm.roll(block.number + 3_900);
+        vm.prank(owner); vault.startWindDown();
+        snap = vm.snapshotState();
+        _billed("unlist 16 x 30-unit (max unlist batch)", abi.encodeCall(PackAccount.unlist, (ids, 0)),
+            VaultLib.Q_UNLIST + 16 * VaultLib.Q_UNLISTED);
+        assertEq(vault.openListingCount(), 0);
+        // Liquidate: two 30-unit packs is the 60-unit per-call ceiling (six Shapes burned).
+        _billed("liquidate 2 x 30-unit (60-unit per-call cap)", abi.encodeCall(PackAccount.liquidate, (2, 0)),
+            VaultLib.Q_LIQUIDATE + 2 * VaultLib.Q_LIQ_PACK + 6 * VaultLib.Q_REDEEM_SHAPE);
+        assertTrue(vm.revertToState(snap));
         assertLe(address(vault).code.length, 24_576);
         assertLe(address(VaultLib).code.length, 24_576);
     }
 
-    function test_maximumEightMixedPacksWithRealCrownTakeoversFitTransactionCap() public {
-        this.assertGasContext();
-        uint256 oldTop = FWA.topListingId();
-        (, address oldDepositor,,,,,,,,,) = FWA.listings(oldTop);
-        assertEq(oldDepositor.code.length, 0, "the real crown owner can directly withdraw its own listing");
-        assertEq(FWA.unsettledAcquisitionCount(), 0);
-        vm.prank(oldDepositor); FWA.withdrawListing(oldTop);
-        assertEq(FWA.topListingId(), 0);
-        vm.prank(IOwnable(address(FWA)).owner()); IFwaAdmin(address(FWA)).setUint(16, 0);
-        setPackAsk(1 ether);
-        VaultLib.Params memory p = defaultParams();
-        p.packUnitsMask = (uint64(1) << 30) | (uint64(1) << 3); p.reserve = 0;
-        vm.deal(address(this), 20 ether);
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 10 ether);
-        // The stack lists 3,30,3,30,..., with each later large backing slightly higher.
-        for (uint256 i; i < 4; ++i) {
-            vault.restock(30, TestVaultOps.buildProposals(vault, 1, 30), 0);
-            vault.restock(3, TestVaultOps.buildProposals(vault, 1, 3), 0);
-        }
-        uint256 small = TestVaultOps.proposals(vault, 1, 3)[0];
-        uint256 large = TestVaultOps.proposals(vault, 1, 30)[0];
-        assertGt(large, small);
-        uint256[] memory quotes = new uint256[](8);
-        for (uint256 i; i < 8; ++i) quotes[i] = (i % 2 == 0 ? small : large) + (i / 2) * 10_000;
-        vm.recordLogs();
-        _measure("list maximum eight mixed packs with crown takeovers complete gas", abi.encodeCall(PackVault.list, (quotes, 0)));
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        uint256 nonzeroCrowns;
-        for (uint256 i; i < logs.length; ++i) {
-            if (logs[i].emitter == address(FWA) && logs[i].topics[0] == keccak256("TopListingSet(uint256,address)")
-                && uint256(logs[i].topics[1]) != 0) ++nonzeroCrowns;
-        }
-        assertEq(nonzeroCrowns, 5, "first admission and every larger large-pack tag take the real crown");
-        uint256[] memory ids = TestVaultOps.open(vault);
-        assertEq(ids.length, 8); assertEq(FWA.topListingId(), ids[7]);
-        for (uint256 i; i < ids.length; ++i) {
-            (,,, uint256 pack,,,,,,, uint8 status) = FWA.listings(ids[i]);
-            assertEq(status, 1);
-            assertEq(PACKS.valueOf(pack), i % 2 == 0 ? 0.03 ether : 0.3 ether);
-        }
-    }
     function test_checkpointFullHolderMixCompleteGas() public {
         VaultLib.Params memory p = vault.getParams(); p.distributionBps = 5_000;
         vm.prank(owner); vault.setParams(p);
-        uint256 deposit = Charges.grossFor(vault, 4 ether);
+        uint256 deposit = Charges.grossFor(vault, 5 ether);
         vm.prank(alice); vault.deposit{value: deposit}();
         toBlackout(); checkpoint(); toOpen();
-        for (uint256 i; i < 4; ++i) {
-            TestVaultOps.restock(vault, 10, 3, 0);
-            TestVaultOps.list(vault, 10, 0);
+        // Lock part of the deposit in 6-unit listings (three builds of eight) so the bounded per-
+        // checkpoint unwind cannot fill a half-share redemption in one pass (first fill stays
+        // partial), while leaving idle ETH for the gain distribution to reserve into.
+        for (uint256 i; i < 3; ++i) {
+            TestVaultOps.restock(vault, 8, UNITS, 0);
         }
         uint256 half = vault.shareBalance(alice) / 2;
         uint256 charge = Charges.redeemCharge(vault, half);
@@ -265,5 +280,4 @@ contract ForkMaxBatchGasTest is ForkBase {
         protected = vault.redemptionReserve() + vault.distributionReserve() + vault.claimableTotal();
         assertGe(address(vault).balance, protected);
     }
-
 }

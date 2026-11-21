@@ -51,14 +51,14 @@ contract ForkReconcileTest is SelectionBase {
 
     function test_reconcileFullCycle() public {
         if (vm.exists(OUT)) vm.removeFile(OUT);
-        Candidate memory c = late();
+        Candidate memory c = primary();
         _select(c); // deploy (3 ETH seed), restock 30, list 30, real request + fulfillment
         vm.writeLine(
             OUT,
             string.concat(
                 '{"step":"setup","deployBalance":', vm.toString(deployBalance),
                 ',"selectPay":', vm.toString(selectPay),
-                ',"count":', vm.toString(COUNT), ',"units":3,"backing":', vm.toString(B),
+                ',"count":', vm.toString(COUNT), ',"units":6,"backing":', vm.toString(B),
                 ',"activationDebt":', vm.toString(activationDebt), ',"initCursor":', vm.toString(vault.acquisitionCursor()), ',"selectedListing":', vm.toString(selected), ',"backings":[', vm.toString(B), '],"acqFee":', vm.toString(acqFee), ',"acqCutBps":', vm.toString(acqCutBps),
                 ',"acqCrownBps":', vm.toString(acqCrownBps), ',"acqActive":', vm.toString(acqActive),
                 ',"balance":', vm.toString(address(vault).balance), "}"
@@ -106,7 +106,7 @@ contract ForkReconcileTest is SelectionBase {
         TestVaultOps.harvest(vault, TestVaultOps.open(vault), 0);
         uint256 gHarvest = g - gasleft();
         _snap("harvest");
-        uint256[] memory planned9 = TestVaultOps.proposals(vault, 1, 3);
+        uint256[] memory planned9 = TestVaultOps.proposals(vault, 1, UNITS);
 
         // FWA's queue is busy (the forked block's other request): the vault refuses to list into it.
         vm.expectRevert(PackVault.Nothing.selector);
