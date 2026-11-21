@@ -118,11 +118,11 @@ def exit_windows(events):
 def scenario(w, events=None, period=None, timing="in-window", exempt=True):
     """Timed replay with purchaser responses drawn from the window's recorded responses.
 
-    A vault pack's bid (0.9 B, with B well above the 0.03 ETH pack) beats keeping it, and the
-    vault reclaims its backing as soon as FWA's settlement window closes, which pays the vault
-    about ten times a bid. A purchaser who wants the bid must therefore answer in time. The formal
-    case ("in-window") treats every responder as bidding, at the recorded delay or just inside the
-    window if the recorded answer was later; silent purchasers stay silent. Diagnostics:
+    Since D80 backing makes keeping the pack the purchaser's best choice, and a keep (or the
+    account's reclaim after FWA's settlement window) pays the account more per cycle than a bid.
+    The formal case ("in-window") is kept unchanged as the conservative gate: every responder
+    bids, at the recorded delay or just inside the window if the recorded answer was later; silent
+    purchasers stay silent (and the account reclaims, a keep). Diagnostics:
     "recorded-timing" keeps late answers late (they then lose to the vault's reclaim) and
     "recorded-choice" also keeps recorded keeps as keeps."""
     responses = w["responses"]
@@ -262,7 +262,7 @@ def main():
         limits=[
             "Which vault listing each recorded request selects is a seeded counterfactual draw; FWA's real VRF words selected foreign listings.",
             "Recorded foreign totalWeight is used per request; the foreign pool does not react to the vault's presence.",
-            "Purchaser responses are sampled from the window's recorded responses to all allocations, not this vault's. The formal case moves recorded late answers just inside the settlement window and treats recorded keeps as bids (value-aware purchasers); recorded-timing and recorded-choice diagnostics show the upside if purchasers behave as recorded.",
+            "Purchaser responses are sampled from the window's recorded responses to all allocations, not this vault's. The formal case moves recorded late answers just inside the settlement window and treats recorded keeps as bids (the conservative lower bound since D80, when a value-aware purchaser keeps); recorded-timing and recorded-choice diagnostics show the upside if purchasers behave as recorded.",
             "Holder deposit, request, claim and checkpoint gas use historical billed receipts at the scenario price; variable unpaid exit work uses its quoted gas.",
             "Gas price is held constant per scenario. Effects are atomic at the modeled read; reverted races and inclusion latency are not charged.",
             "Tokens are valued at zero. Creator mint fees are an expense to holders and reported separately.",
