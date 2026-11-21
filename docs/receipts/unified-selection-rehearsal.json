@@ -13,7 +13,7 @@
    "purchaser": "0x88d0e89E7f502Aa49a564b683e19089c771776c3",
    "allocated": true,
    "fwa_status": 4,
-   "vault_received_wei": 64437303025843159,
+   "vault_received_wei": 64437303025351159,
    "resolved": true
   },
   "bid": {
@@ -36,7 +36,7 @@
    "purchaser": "0x88d0e89E7f502Aa49a564b683e19089c771776c3",
    "allocated": true,
    "fwa_status": 4,
-   "vault_reclaimed_wei": 64437303026827159,
+   "vault_reclaimed_wei": 64437303026335159,
    "resolved": true
   },
   "forced_keep": {
