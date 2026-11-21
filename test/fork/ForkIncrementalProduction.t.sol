@@ -281,32 +281,23 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(vault.openListingCount(), 1, "oversized gift does not occupy normal stack");
         address vaultOwner = vault.owner();
         vm.prank(vaultOwner); vault.startWindDown();
+        // The 30-Shape gift pack (one 0.05 and twenty-nine 0.01) unseals and burns in one bounded
+        // chunk (MAX_REDEEM_SHAPES = 30), recovering its whole 0.34 ETH without blocking the fresh
+        // listed pack.
+        pack; // the recovery pack id, no longer asserted per-chunk
         uint256 before = address(vault).balance;
-        uint256 paid = vault.liquidate(16, 0); // Four remaining loose Shapes.
-        assertEq(address(vault).balance + paid - before, 0.04 ether);
-        before = address(vault).balance;
-        uint256 start = gasleft();
-        paid = vault.liquidate(16, 0); // At most 30 actual underlying Shapes.
-        uint256 used = start - gasleft() + 21_000;
-        emit log_named_uint("recovery first 30 Shapes complete gas", used);
-        emit log_named_uint("recovery first 30 Shapes pay wei", paid);
-        assertLt(used * 125 / 100, 16_777_216);
-        assertEq(address(vault).balance + paid - before, 0.30 ether);
-        assertEq(paid, (75_000 + 100_000 + 30 * 35_000 + 70_000) * 0.2 gwei + vault.getParams().workFee, "quote for verified thirty burns and first unseal");
-        assertTrue(vault.recoveryUnsealed(pack));
-        assertEq(vault.recoveryPackCount(), 1);
-        before = address(vault).balance;
         _cold();
-        start = gasleft();
-        paid = vault.liquidate(16, 0);
-        used = start - gasleft() + 21_000;
-        emit log_named_uint("recovery final one Shape complete gas", used);
-        emit log_named_uint("recovery final one Shape pay wei", paid);
-        assertEq(address(vault).balance + paid - before, 0.01 ether);
-        assertEq(paid, (75_000 + 100_000 + 35_000) * 0.2 gwei + vault.getParams().workFee, "quote for verified final burn without another unseal");
+        uint256 start = gasleft();
+        uint256 paid = vault.liquidate(16, 0);
+        uint256 used = start - gasleft() + 21_000;
+        emit log_named_uint("recovery thirty Shapes complete gas", used);
+        emit log_named_uint("recovery thirty Shapes pay wei", paid);
+        assertLt(used * 125 / 100, 16_777_216);
+        assertEq(address(vault).balance + paid - before, 0.34 ether, "the whole gift pack recovers in one chunk");
+        assertEq(paid, (75_000 + 100_000 + 70_000 + 30 * 35_000) * 0.2 gwei + vault.getParams().workFee, "quote for one unseal and thirty verified burns");
         assertEq(vault.recoveryPackCount(), 0);
         (tracked, idle,,,,) = vault.totals();
-        assertEq(tracked, 0.03 ether, "only the new listed pack remains");
+        assertEq(tracked, 0.06 ether, "only the new listed six-unit pack remains");
         assertEq(idle, 0);
     }
 
@@ -326,7 +317,8 @@ contract ForkProductionReceiptsTest is SelectionBase {
         vault.sync(new uint256[](0), 0, 0);
         _drain();
         uint64 cursor = vault.acquisitionCursor();
-        assertEq(FWA.nextSequenceToProcess(), cursor + 1);
+        uint64 completed = FWA.nextSequenceToProcess();
+        assertGt(completed, cursor, "real completed foreign prefix awaits journaling");
         uint256 request = FWA.requestIdAtSequence(cursor);
         IFWAV2.Acquisition memory a = FWA.acquisitions(request);
         assertTrue(a.status == 3 || a.status == 4, "real abandoned request was refunded through FWA");
@@ -341,9 +333,9 @@ contract ForkProductionReceiptsTest is SelectionBase {
         uint256 used = start - gasleft() + 21_000;
         assertEq(before - address(vault).balance, paid);
         assertEq(paid, 0, "unrelated short tails wait for a qualified job");
-        assertEq(vault.acquisitionCursor(), cursor + 1);
-        emit log_named_uint("one refunded entry complete gas", used);
-        emit log_named_uint("one refunded entry pay wei", paid);
+        assertEq(vault.acquisitionCursor(), completed, "the unpaid journal clears the whole completed foreign prefix");
+        emit log_named_uint("refunded foreign prefix complete gas", used);
+        emit log_named_uint("refunded foreign prefix pay wei", paid);
     }
 
     function test_terminalReconciliationPrunesItsHeadWithoutAnotherPaidCall() public {
@@ -789,16 +781,19 @@ contract ForkProductionStagingTest is SelectionBase {
     function test_stagedAdmissionAfterDrainedPrecheckRevertsAtomically() public {
         (, uint256[] memory staged) = _backlog(17);
         vm.prank(IOwnable(address(FWA)).owner()); IFwaAdmin(address(FWA)).setUint(10, 1);
-        TestVaultOps.restock(vault, 1, UNITS, 0);
-        uint256 pack = vault.idlePackAt(0);
         uint256[] memory proposal = TestVaultOps.proposals(vault, 1, UNITS);
         uint256 before = address(vault).balance;
         uint256 reserved = vault.reservedCount();
+        uint256 supply = SHAPES.totalSupply();
+        uint256 openBefore = vault.openListingCount();
+        // build mints and lists atomically; a rejected foreign autoactivation rolls back the paid
+        // mint and the posted cash in the same transaction (no separate list step any more).
         vm.expectRevert(VaultLib.InvalidListing.selector);
-        vault.list(proposal, 0);
+        vault.build(UNITS, proposal, 0);
         assertEq(address(vault).balance, before, "failed admission returns posted cash atomically");
-        assertEq(PACKS.ownerOf(pack), address(vault), "failed admission returns pack custody atomically");
-        assertEq(vault.idlePackCount(), 1); assertEq(vault.reservedCount(), reserved);
+        assertEq(SHAPES.totalSupply(), supply, "failed admission mints nothing atomically");
+        assertEq(vault.idlePackCount(), 0); assertEq(vault.openListingCount(), openBefore);
+        assertEq(vault.reservedCount(), reserved);
         assertEq(vault.idForBacking(proposal[0]), 0);
         for (uint256 i; i < staged.length; ++i) {
             (,,,,,,,,,, uint8 status) = FWA.listings(staged[i]);
@@ -818,26 +813,26 @@ contract ForkProductionStagingTest is SelectionBase {
         assertEq(status, 1, "FWA's final status alone permits the costly path");
         assertEq(FWA.activeListingCount() - active, 16, "real side effect activates fifteen foreign listings");
         assertTrue(vm.revertToState(snapshot));
-        TestVaultOps.restock(vault, 8, UNITS, 0);
-        uint256[] memory packsBefore = TestVaultOps.idle(vault);
+        // build mints and lists eight packs atomically; its incidental foreign autoactivation
+        // exceeds FWA's per-admission bound, so FWA rejects it with bounded gas and the whole build
+        // (every paid mint and every posted backing) rolls back.
         uint256[] memory proposed = TestVaultOps.proposals(vault, 8, UNITS);
         uint256 balance = address(vault).balance;
         uint256 reserved = vault.reservedCount();
+        uint256 supply = SHAPES.totalSupply();
         vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(address(PACKS));
         vm.expectRevert();
         start = gasleft();
-        vault.list(proposed, 0);
+        vault.build(UNITS, proposed, 0);
         uint256 used = start - gasleft() + 21_000;
         emit log_named_uint("bounded rejected maximum-eight admission gross gas", used);
         assertLt(used * 125 / 100, 16_777_216);
         assertEq(address(vault).balance, balance);
+        assertEq(SHAPES.totalSupply(), supply, "rejected build mints nothing");
         assertEq(vault.reservedCount(), reserved);
-        assertEq(vault.idlePackCount(), 8);
+        assertEq(vault.idlePackCount(), 0);
         assertEq(FWA.activeListingCount(), active, "rejected incidental work is never committed");
-        for (uint256 i; i < packsBefore.length; ++i) {
-            assertEq(PACKS.ownerOf(packsBefore[i]), address(vault));
-            assertEq(vault.idForBacking(proposed[i]), 0);
-        }
+        for (uint256 i; i < proposed.length; ++i) assertEq(vault.idForBacking(proposed[i]), 0);
         for (uint256 i; i < staged.length; ++i) {
             (,,,,,,,,,, uint8 st) = FWA.listings(staged[i]); assertEq(st, 5);
         }
