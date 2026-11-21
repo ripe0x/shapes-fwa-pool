@@ -79,6 +79,27 @@ def send(frm, to, sig, *a, value=0):
     return r
 
 
+def holder_unwind(holder):
+    """Runbook section 7: at canary values exit work is unpaid (essential budget 0, D64), so when the
+    redemption exceeds free ETH the holder unlists and liquidates at their own gas. Returns the calls
+    that ran; none when free ETH already covers it (the vault refuses the unlist)."""
+    ran = []
+    n = min(8, call("openListingCount()(uint256)"))
+    ids = "[" + ",".join(str(call("openListingAt(uint256)(uint256)", i)) for i in range(n)) + "]"
+    try:
+        send(holder, VAULT, "unlist(uint256[],uint256)", ids, 0)
+        ran.append("unlist")
+    except (RuntimeError, AssertionError):
+        return ran
+    for _ in range(4):
+        try:
+            send(holder, VAULT, "liquidate(uint256,uint256)", 8, 0)
+            ran.append("liquidate")
+        except (RuntimeError, AssertionError):
+            break
+    return ran
+
+
 def warp_to(offset):
     now = num(cast("block", "latest", "--field", "timestamp"))
     nxt = now - now % 43_200 + offset
@@ -303,6 +324,7 @@ def main():
              value=2 * call("requestCharge()(uint256)"))
         warp_to(42_360)
         expire_queue()
+        evidence["holder_unwind"] = holder_unwind(holder)
         wait_for("replacement prices the redemption through a lost RPC response",
                  lambda: DropFirstSend.dropped and call("lockedShares()(uint256)") == 0, seconds=420)
         after = replacement.stored()
