@@ -1189,8 +1189,15 @@ odds are 1/B over the sum of 1/B), so per-cycle economics, and therefore every a
 gate, are independent of how many listings our accounts add. What aggregate participation dilutes
 is the rate: fees per listing per day fall with total listings, which lowers capital turnover and
 annual return for every listing, ours and others'. A registry would add shared state, a call per
-listing and coupling between accounts without changing either fact. The economic study
-(`sim/unified.py`, `docs/UNIFIED-SYSTEM.md`) measures the dilution for combined deployments.
+listing and coupling between accounts without changing either fact.
+**Measured (`sim/unified.py`, section B):** scaling 1 ETH managers so our combined share of FWA's
+selection weight rises 0.26% → 2.5% → 11% → 34% → 56% moves each account's mean return
++179% → +170% → +145% → +97% → +64%. Below about 2.5% (tens of managers, or a 20 ETH pool) the
+dilution is small; above about 10% it is large. A registry would not raise anyone's return; it would
+only ration admission between accounts. **Decision:** no registry at launch scale. The keeper reports
+our combined share each pass; if it nears 10%, a cap is an owner decision (it couples accounts and
+adds one call per listing). Per-account admission already stops any account whose cycle stops
+paying.
 
 ## D82. One keeper for all accounts (owner brief A3.34)
 
