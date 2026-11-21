@@ -26,6 +26,7 @@ interface IOracleAdmin {
 }
 
 interface IFwaAdmin {
+    function setOracleExemptCollection(address collection, bool exempt) external;
     function setUint(uint256 key, uint256 value) external;
     function kickListing(uint256 listingId) external;
     function setAddr(uint256 key, address value) external;
@@ -41,7 +42,9 @@ abstract contract ForkBase is Test {
     IFWAV2 constant FWA = IFWAV2(0x958C41181182e76F221331b2755b77D9e1426A98);
     uint256 constant INTERVAL = 12 hours;
     uint256 constant BLACKOUT = 11 hours + 45 minutes;
-    uint256 constant B = 0.0363 ether;
+    uint256 constant UNITS = 6; // the 0.06 ETH recipe: one 0.05 and one 0.01 Shape
+    uint256 constant P = 0.06 ether;
+    uint256 constant FEE_PER_PACK = 0.002 ether; // two paid primary mints at 0.001
 
     PackVault vault;
     uint256 preexisting;
@@ -62,6 +65,10 @@ abstract contract ForkBase is Test {
         // Real fee environment, so every ETH flow carries its real gas price.
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
+        // FWA's owner exempted ShapePacks from the floor cap after this block (live since D62):
+        // the same real admin call, made before anything lists.
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, defaultParams(), 0.01 ether);
         preexisting = address(vault).balance - 0.01 ether; // ETH already at the deploy address
         vm.deal(alice, 50 ether);
@@ -78,7 +85,7 @@ abstract contract ForkBase is Test {
         p.workFee = 0.00002 ether;
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 200;
-        p.packUnitsMask = uint64(1) << 3;
+        p.packUnitsMask = uint64(1) << UNITS;
         p.gasCeiling = 5 gwei;
         p.essentialCeiling = 5 gwei;
 
@@ -122,6 +129,11 @@ abstract contract ForkBase is Test {
         uint256 next = t - t % INTERVAL + INTERVAL + 60;
         vm.warp(next);
         vm.roll(block.number + (next - t) / 12);
+    }
+
+    /// @dev Backing a new 0.06 ETH listing posts now (VaultLib.edge), at the vault's parameters.
+    function B() internal view returns (uint256 backing) {
+        (, backing,) = vault.edge(UNITS);
     }
 
     function checkpoint() internal {

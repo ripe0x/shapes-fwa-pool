@@ -4,6 +4,8 @@ pragma solidity 0.8.30;
 import {PackVault} from "../src/PackVault.sol";
 import {VaultLib} from "../src/VaultLib.sol";
 import {KeeperPolicyV1} from "../src/KeeperPolicy.sol";
+import {PackManagerFactory} from "../src/PackManagerFactory.sol";
+import {PackManager} from "../src/PackManager.sol";
 import {IShapes, IShapePacks, IFWAV2} from "../src/interfaces/External.sol";
 
 /// @notice The one deployment path: `script/Deploy.s.sol` (mainnet, rehearsals) and every fork
@@ -23,6 +25,26 @@ library DeployCore {
         policy = new KeeperPolicyV1();
         vault = new PackVault{value: seed}(fwa, shapes, packs, owner, p, policy);
         postflight(vault, policy, fwa, owner, p, seed);
+    }
+
+    /// @notice The personal-manager factory, sharing `policy` as every new manager's default.
+    function deployFactory(IFWAV2 fwa, IShapes shapes, IShapePacks packs, KeeperPolicyV1 policy)
+        internal returns (PackManagerFactory factory)
+    {
+        factory = new PackManagerFactory(fwa, shapes, packs, address(policy));
+        postflightFactory(factory, fwa, shapes, packs, policy);
+    }
+
+    function postflightFactory(PackManagerFactory factory, IFWAV2 fwa, IShapes shapes, IShapePacks packs,
+        KeeperPolicyV1 policy) internal view
+    {
+        PackManager impl = factory.implementation();
+        require(factory.policy() == address(policy), "postflight: factory policy");
+        require(impl.factory() == address(factory), "postflight: implementation factory");
+        require(address(impl.fwa()) == address(fwa) && address(impl.shapes()) == address(shapes)
+            && address(impl.packs()) == address(packs), "postflight: implementation externals");
+        require(impl.owner() == address(0), "postflight: implementation has no owner");
+        require(factory.managerCount() == 0, "postflight: no managers yet");
     }
 
     /// @notice Reads the deployed vault back and stops on any difference from what was asked for.

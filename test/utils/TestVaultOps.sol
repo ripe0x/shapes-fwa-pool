@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import {Vm, VmSafe} from "forge-std/Vm.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {PackAccount} from "../../src/PackAccount.sol";
 import {IFloorOracle} from "../../src/interfaces/External.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 
@@ -11,22 +12,22 @@ library TestVaultOps {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
     uint256 private constant QUANTUM = 10_000;
 
-    function open(PackVault v) internal view returns (uint256[] memory ids) {
+    function open(PackAccount v) internal view returns (uint256[] memory ids) {
         ids = new uint256[](v.openListingCount());
         for (uint256 i; i < ids.length; ++i) ids[i] = v.openListingAt(i);
     }
 
-    function idle(PackVault v) internal view returns (uint256[] memory ids) {
+    function idle(PackAccount v) internal view returns (uint256[] memory ids) {
         ids = new uint256[](v.idlePackCount());
         for (uint256 i; i < ids.length; ++i) ids[i] = v.idlePackAt(i);
     }
 
-    function position(PackVault v, uint256 id) internal view returns (uint64 pack, uint64 units, uint128 backing) {
+    function position(PackAccount v, uint256 id) internal view returns (uint64 pack, uint64 units, uint128 backing) {
         VaultLib.Position memory p = v.position(id);
         return (uint64(p.packId), uint64(p.value / 0.01 ether), uint128(p.backing));
     }
 
-    function witness(PackVault v) internal view returns (uint256 id) {
+    function witness(PackAccount v) internal view returns (uint256 id) {
         uint256 debt = type(uint256).max;
         uint256[] memory ids = open(v);
         for (uint256 i; i < ids.length; ++i) {
@@ -36,14 +37,12 @@ library TestVaultOps {
     }
 
     /// @dev An offchain search. The onchain admission path independently validates each proposal.
-    function proposals(PackVault v, uint256 n, uint256 units) internal view returns (uint256[] memory quotes) {
+    function proposals(PackAccount v, uint256 n, uint256 units) internal view returns (uint256[] memory quotes) {
         quotes = new uint256[](n);
         (, uint256 target,) = v.edge(units);
         if (target == 0) return quotes;
-        uint256 discount = v.fwa().settlementDiscountBps();
-        uint256 minimum = (units * 0.01 ether * 10_000 + discount - 1) / discount;
-        uint256 conservative = (units * 0.01 ether * 10_000 + 9_499) / 9_500;
-        if (conservative > minimum) minimum = conservative;
+        // A keep never loses at FWA's 5% settlement-fee cap: at least P / 0.95.
+        uint256 minimum = (units * 0.01 ether * 10_000 + 9_499) / 9_500;
         uint256 radius = v.reservedCount() + n + 1;
         uint256 base = (target + QUANTUM - 1) / QUANTUM * QUANTUM;
         bool exempt = v.fwa().oracleExemptCollections(address(v.packs()));
@@ -69,12 +68,6 @@ library TestVaultOps {
         }
     }
 
-    function buildProposals(PackVault v, uint256 n, uint256 units) internal view returns (uint256[] memory quotes) {
-        uint256[] memory first = proposals(v, 1, units);
-        quotes = new uint256[](n);
-        for (uint256 i; i < n; ++i) quotes[i] = first[0];
-    }
-
     function _pausePrank() private returns (VmSafe.CallerMode mode, address sender, address origin) {
         (mode, sender, origin) = vm.readCallers();
         if (mode == VmSafe.CallerMode.Prank) vm.stopPrank();
@@ -84,24 +77,26 @@ library TestVaultOps {
         if (mode == VmSafe.CallerMode.Prank) vm.prank(sender, origin);
     }
 
-    function restock(PackVault v, uint256 n, uint256 units, uint256 minPay) internal returns (uint256 pay) {
+    /// @dev Build-and-list `n` new packs of `units`, in batches of MAX_LIST_BATCH.
+    function restock(PackAccount v, uint256 n, uint256 units, uint256 minPay) internal returns (uint256 pay) {
         (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
         while (n != 0) {
-            uint256 batch = n < 30 / units ? n : 30 / units;
-            uint256[] memory quotes = buildProposals(v, batch, units);
+            uint256 batch = n < v.MAX_LIST_BATCH() ? n : v.MAX_LIST_BATCH();
+            uint256[] memory quotes = proposals(v, batch, units);
             _resumePrank(mode, sender, origin);
-            pay += v.restock(units, quotes, minPay);
+            pay += v.build(units, quotes, minPay);
             n -= batch;
         }
     }
 
-    function list(PackVault v, uint256 n, uint256 minPay) internal returns (uint256 pay) {
+    function list(PackAccount v, uint256 n, uint256 minPay) internal returns (uint256 pay) {
         (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
         uint256 available = v.idlePackCount();
         if (n > available) n = available;
+        // `restock` builds and lists at once; a following list of nothing is a no-op.
         if (n == 0) {
             _resumePrank(mode, sender, origin);
-            return v.list(new uint256[](0), minPay);
+            return 0;
         }
         while (n != 0) {
             uint256 limit = v.MAX_LIST_BATCH();
@@ -115,7 +110,7 @@ library TestVaultOps {
         }
     }
 
-    function sync(PackVault v, uint256[] memory ids, uint256 minPay) internal returns (uint256 pay) {
+    function sync(PackAccount v, uint256[] memory ids, uint256 minPay) internal returns (uint256 pay) {
         (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
         if (ids.length <= 16) { _resumePrank(mode, sender, origin); return v.sync(ids, 0, minPay); }
         for (uint256 start; start < ids.length; start += 16) {
@@ -140,7 +135,7 @@ library TestVaultOps {
         }
     }
 
-    function unlist(PackVault v, uint256[] memory ids, uint256 minPay) internal returns (uint256 pay) {
+    function unlist(PackAccount v, uint256[] memory ids, uint256 minPay) internal returns (uint256 pay) {
         (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
         if (ids.length == 0) { _resumePrank(mode, sender, origin); return v.unlist(ids, minPay); }
         for (uint256 start; start < ids.length; start += 16) {
@@ -150,7 +145,7 @@ library TestVaultOps {
         }
     }
 
-    function harvest(PackVault v, uint256[] memory ids, uint256 minPay) internal returns (uint256 pay) {
+    function harvest(PackAccount v, uint256[] memory ids, uint256 minPay) internal returns (uint256 pay) {
         (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
         _sort(ids);
         if (ids.length == 0) { _resumePrank(mode, sender, origin); return v.harvest(ids, minPay); }
@@ -161,7 +156,7 @@ library TestVaultOps {
         }
     }
 
-    function burnTokens(PackVault v, uint256[] memory ids) internal {
+    function burnTokens(PackAccount v, uint256[] memory ids) internal {
         (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
         _sort(ids);
         if (ids.length == 0) { _resumePrank(mode, sender, origin); v.burnTokens(ids); return; }

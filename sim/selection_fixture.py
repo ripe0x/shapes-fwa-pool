@@ -26,7 +26,8 @@ def block(n):
 
 def main(blocks):
     cands = {c["req_block"]: c for c in json.load(open(ROOT / "out/selection_candidates.json"))}
-    out = {}
+    p = ROOT.parent / "test/fixtures/selection.json"
+    out = json.loads(p.read_text()) if p.exists() else {}  # keep fixtures other suites replay
     for b in blocks:
         c = cands[b]
         r, f = tx(c["req_tx"]), tx(c["fulfill_tx"])
@@ -38,7 +39,6 @@ def main(blocks):
             "fulFrom": f["from"], "fulTo": f["to"], "fulInput": f["input"], "fulGasPrice": int(f["gasPrice"], 16),
             "fulBaseFee": int(fb["baseFeePerGas"], 16),
         }
-    p = ROOT.parent / "test/fixtures/selection.json"
     p.write_text(json.dumps(out, indent=1))
     print(p, list(out))
 
