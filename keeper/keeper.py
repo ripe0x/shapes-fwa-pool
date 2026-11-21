@@ -179,7 +179,8 @@ def first_block_at(timestamp, head):
 def get_index(vault, block, now):
     chain = quantity(rpc("eth_chainId"))
     deployment = num(call(vault, "deploymentBlock()(uint256)", block=block))
-    path = INDEX_PATH or str(Path(__file__).parent / f"index-{chain}-{vault.lower()}-{deployment}.sqlite")
+    # One index per account, in --index (a directory) or beside this file.
+    path = str(Path(INDEX_PATH or Path(__file__).parent) / f"index-{chain}-{vault.lower()}-{deployment}.sqlite")
     key = (path, chain, vault.lower(), deployment)
     if key not in INDEXES:
         INDEXES[key] = event_index.EventIndex(path, chain, vault, deployment,
@@ -362,8 +363,10 @@ def read_state(vault, slowdown, burn=False, pooled=True):
             cap = cap * (10_000 - buf) // 10_000
         reserved = num(prospective(vault, "reservedCount()(uint256)"))
         lo, hi = proposal_limits(state, build_units * policy.UNIT, fee, discount, cap, build=True, units=build_units)
-        one = policy.propose_backings(state.backing, reserved, 1, index.reserved, lo, hi, head)
-        state.build_proposals = one * policy.MAX_BATCH["build"]
+        # build lists every pack at once: each proposal must be a distinct identifier inside the
+        # interval the contract widens by one quantum per admission (reservedCount + i + 1).
+        state.build_proposals = policy.propose_backings(state.backing, reserved, policy.MAX_BATCH["build"],
+                                                        index.reserved, lo, hi, head)
         chosen = []
         for _, value in index.idle(policy.MAX_BATCH["list"]):
             units = value // policy.UNIT
@@ -629,7 +632,8 @@ def run_pass(a, tm, accounts):
             all_backings += backings
         except (txm.StaleContext, IndexBehind) as e:
             account_health[account] = dict(pooled=pooled, status=[("CONTEXT_MOVED", "wait", str(e))])
-        except (RuntimeError, subprocess.CalledProcessError) as e:
+            print(f"account {account} waits: {e}")
+        except Exception as e:  # noqa: BLE001 - one account's failure never stops the others
             failed += 1
             account_health[account] = dict(pooled=pooled, status=[("ACCOUNT_ERROR", "action", str(e)[:200])])
             print(f"account {account} failed this pass: {str(e)[:200]}")
@@ -749,7 +753,7 @@ def main():
     ap.add_argument("--from", dest="sender", help="sender for an unlocked local node (rehearsal)")
     ap.add_argument("--rpc", default=RPC)
     ap.add_argument("--state", help="keeper state file (default keeper/state-<vault>.json)")
-    ap.add_argument("--index", help="SQLite event index path (default keyed by chain, vault and deployment block)")
+    ap.add_argument("--index", help="directory for the per-account SQLite event indexes (default: keeper/)")
     ap.add_argument("--loop", type=int, default=0, help="seconds between passes; 0 runs once")
     ap.add_argument("--slowdown-volume", type=float, default=0.0)
     ap.add_argument("--max-steps", type=int, default=40, help="calls per pass, each after a fresh read")
