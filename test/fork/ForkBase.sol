@@ -115,8 +115,10 @@ abstract contract ForkBase is Test {
     }
 
     /// @dev Warp to the next FWA purchase blackout (no new acquisitions can open).
+    /// @dev vm.getBlockTimestamp, not block.timestamp: via_ir may reuse a timestamp read before an
+    ///      earlier vm.warp in the same test.
     function toBlackout() internal {
-        uint256 t = block.timestamp;
+        uint256 t = vm.getBlockTimestamp();
         uint256 start = t - t % INTERVAL + BLACKOUT;
         if (t >= start) start += INTERVAL;
         vm.warp(start + 60);
@@ -125,7 +127,7 @@ abstract contract ForkBase is Test {
 
     /// @dev Warp out of the blackout into the next open interval.
     function toOpen() internal {
-        uint256 t = block.timestamp;
+        uint256 t = vm.getBlockTimestamp();
         uint256 next = t - t % INTERVAL + INTERVAL + 60;
         vm.warp(next);
         vm.roll(block.number + (next - t) / 12);
