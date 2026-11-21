@@ -193,3 +193,37 @@ strategy" for this work, and D62's bid-favouring backing floor. Owner's words:
 B2 O3/O4/O6 change meaning under item 32: purchasers are now expected to keep (B (1 - s) back to the
 account and a replacement build with fresh mints) rather than bid. The restated outcomes are in
 `asset-flow.json` (unsigned) and `docs/UNIFIED-SYSTEM.md`; no new owner signature exists.
+
+## A4. Complete the unified system for release (owner, 2026-11-21)
+
+Architecture accepted as built (A3); "Do not redesign the project, introduce additional contract
+layers, or reopen decisions that are already supported by evidence."
+
+1. FWA payment receipts: "A payment callback failure must not permanently prevent an account from
+   resolving a legitimate FWA position or recovering its funds." Recovery must authenticate the FWA
+   listing, depositor, pack, status and outcome; prevent fabricated, duplicate and misattributed
+   receipts; preserve protected liabilities and correct NAV; work for pools and managers and "even if
+   the original callback exhausted its gas allowance". "Do not assume that matching an eth balance
+   increase alone proves a particular settlement outcome." (D84)
+2. Recipe: a matched comparison of 0.03 and 0.06 packs through the formal simulator with identical
+   inputs, enough seeds for the downside, keep rates 0-100% and stressed demand and gas. "Retain 0.06
+   as the preferred recipe unless the stronger comparison demonstrates that another simple recipe
+   materially improves the combined objectives." 10% a year net stays the minimum gate. "Do not reduce
+   the current 0.001 eth shapes mint fee." The all-bids case is a stress case, not assumed to be a
+   lower bound.
+3. "Decouple purchaser gas assumptions from keeper compensation." "Prefer an explicit, bounded
+   purchaser gas assumption." No new oracle, role or configuration subsystem. (D85)
+4. Production keeper rehearsal on a fresh fork with the production image, encrypted keys, durable
+   state, multiple managers, outcomes, restarts, container replacement, backup keeper, lost responses,
+   nonce races, per-account failure isolation, index persistence and reorgs. Retire scripts that
+   target the old `restock` API. "Do not simulate successful recovery by manually changing protected
+   accounting state."
+5. Independent review of the final source; all tests, reconciliations and regimes to the wei.
+6. A fresh unsigned acceptance package bound to the final bytecode, values, libraries and keeper
+   image. "Do not generate or reuse an owner signature."
+7. Canary: the existing 2 eth pooled canary as a limited technical deployment. "Do not increase the
+   initial capital exposure merely to produce better modeled investment results." "Distinguish
+   authorization to deploy a contract from authorization to offer the personal manager product
+   publicly."
+8. Final simplification pass without weakening security, accounting or performance.
+"Do not merge, deploy, sign acceptance documents, or spend real funds."

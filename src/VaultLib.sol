@@ -99,6 +99,9 @@ library VaultLib {
     /// best bid FWA offers (ETH or token bid), after the gas to redeem it, by at least this much.
     uint256 internal constant MIN_KEEP_ADVANTAGE = 0.0003 ether;
     uint256 internal constant Q_PURCHASER_REDEEM = 160_000; // ShapePacks.redeem of a 2-Shape pack: 157,023
+    /// The purchaser's redeem gas is priced at this fixed bound, independent of the keeper's gas
+    /// ceiling: keeping stays the better choice for any purchaser paying up to 2 gwei.
+    uint256 internal constant PURCHASER_GAS_PRICE = 2 gwei;
 
     /// Fixed gas quotes from billed receipts (keeper/measure_gas.py, docs/GAS.md). The journal
     /// always consumes its full bounded job; only a required checkpoint can pay for a foreign
@@ -221,7 +224,6 @@ library VaultLib {
     error OutOfOrder();
     error InvalidListing();
     error InvalidJournal();
-    error MissingReceipt();
     error CatchUpFirst();
     error PendingReceipts();
     error InvalidBacking();
@@ -436,7 +438,7 @@ library VaultLib {
         t.build = build;
         t.floor = t.value + t.value / 19 + (t.value % 19 == 0 ? 0 : 1);
         uint256 bid = M.max(f.settlementDiscountBps(), f.tokenSettlementDiscountBps());
-        uint256 margin = MIN_KEEP_ADVANTAGE + Q_PURCHASER_REDEEM * p.gasCeiling;
+        uint256 margin = MIN_KEEP_ADVANTAGE + Q_PURCHASER_REDEEM * PURCHASER_GAS_PRICE;
         if (bid != 0 && t.value > margin) t.desired = (t.value - margin) * BPS / bid / BPS * BPS;
         if (t.cap != type(uint256).max) t.desired = M.min(t.desired, t.cap * (BPS - p.bufferBps) / BPS);
         t.cycleCost = quote(p, CYCLE_GAS, 2, false);
@@ -933,22 +935,27 @@ library VaultLib {
             l = listing(f, id);
         }
         if (l.status == LISTING_ACTIVE) return false;
-        uint8 kind = b.receipts[id].kind;
+        // FWA changes a listing's status and pays its depositor in the same transaction
+        // (forceSafeTransferETH, which force-sends when receive() fails), so FWA's record alone
+        // proves the outcome and its cash. The receipt only gates checkpoints until this sync;
+        // a payment whose receipt was never recorded resolves here the same way.
+        bool owned = owns(packs, p.packId);
+        bool returned = owned || f.stuckNFTRecipient(id) == address(this);
         if (l.status == LISTING_SETTLED) {
             if (p.state == ACTIVE) return false;
             if (p.state != ALLOCATED) revert InvalidListing();
-            if (kind == 1) {
+            // Keep, relist, expiry or default: B (1 - s) paid, the pack went to the purchaser.
+            // A bid returns the pack to the depositor (or owes it) and pays nothing. A pack that
+            // is the account's either way is booked as returned; the cash is in the balance.
+            if (!returned) {
                 release(b, id, p.backing);
                 keep(b, id);
-                if (owns(packs, p.packId)) addInventory(b, p.packId, packs.valueOf(p.packId));
                 return true;
             }
-            if (kind != 0) revert MissingReceipt();
         } else if (l.status == LISTING_WITHDRAWN) {
-            if (p.state != ACTIVE || kind != 2) revert MissingReceipt();
+            // Only a kick withdraws a listing outside this account's own calls: B refunded, pack returned.
+            if (p.state != ACTIVE || !returned) revert InvalidListing();
         } else return false;
-        bool owned = owns(packs, p.packId);
-        if (!owned && f.stuckNFTRecipient(id) != address(this)) revert MissingReceipt();
         release(b, id, p.backing);
         returnPack(b, id, owned);
         return true;
@@ -1017,6 +1024,7 @@ library VaultLib {
     {
         if (b.acquisitionCursor != f.nextSequenceToProcess()) revert CatchUpFirst();
         if (b.pendingPlusOne != 1) revert PendingReceipts();
+        ScanLib.requireAllocatedCurrent(b, f);
         uint256 pending;
         if (b.activeCount != 0) {
             Position memory p = b.positions[witnessId];

@@ -44,6 +44,8 @@ contract PackManager is PackAccount {
         if (msg.sender != factory) revert Unauthorized();
         if (_initialized) revert AlreadyInitialized();
         _initialized = true;
+        // Neither the factory nor the manager itself can act as an owner: funds would lock.
+        if (owner_ == msg.sender || owner_ == address(this)) revert Unauthorized();
         _initStrategy(owner_, p, policy);
     }
 

@@ -27,9 +27,9 @@ interface IFwaSettle {
 ///         just before the request. Each test forks right before that request, posts the real
 ///         listings, then replays the real request and fulfillment transactions. Only the
 ///         purchaser's choice is ours to drive, through the purchaser's own call.
-/// @dev     Every listing posts exactly `B` = edge(6) at gasCeiling 0.5 gwei. Weight is 1e36 / B,
-///          so any other backing changes the selecting word and breaks the replay; the backing is
-///          the value `sim/find_selection.py 65158469945350000 30` searched against.
+/// @dev     Every listing posts exactly `B` = edge(6). Weight is 1e36 / B, so any other backing
+///          changes the selecting word and breaks the replay; the backing is the value
+///          `sim/find_selection.py 64896174863380000 30` searched against.
 abstract contract SelectionBase is Test {
     IShapes constant SHAPES = IShapes(0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0);
     IShapePacks constant PACKS = IShapePacks(0xf21514B090Da7dF4390803497d6ae673801E5cA7);
@@ -37,9 +37,10 @@ abstract contract SelectionBase is Test {
     uint256 constant COUNT = 1;
     uint256 constant FIXTURE_COUNT = 30;
     uint256 constant UNITS = 6; // the 0.06 ETH recipe: one 0.05 and one 0.01 Shape, two paid mints
-    // edge(6) at gasCeiling 0.5 gwei: floor(0.06 - (0.0003 + 160000 x 0.5 gwei)) x 10000 / 9150, to
-    // the 10,000 wei. Every one of the 30 listings posts this exact backing.
-    uint256 constant B = 65_158_469_945_350_000;
+    // edge(6): floor(0.06 - (0.0003 + 160000 x 2 gwei)) x 10000 / 9150, to the 10,000 wei. The
+    // purchaser's redeem gas is priced at the fixed PURCHASER_GAS_PRICE = 2 gwei bound, not the
+    // keeper's gas ceiling. Every one of the 30 listings posts this exact backing.
+    uint256 constant B = 64_896_174_863_380_000;
 
     struct Candidate {
         bytes32 requestTx;
@@ -51,30 +52,30 @@ abstract contract SelectionBase is Test {
         address purchaser;
     }
 
-    // Block 26,402,342: before ShapePacks' FWA admission; FWA's owner whitelists and oracle-exempts
-    // packs (its real D62 calls) first. Our listing is index 20 of 30.
+    // Block 26,310,897: before ShapePacks' FWA admission; FWA's owner whitelists and oracle-exempts
+    // packs (its real D62 calls) first. Our listing is index 22 of 30.
     function primary() internal pure returns (Candidate memory) {
         return Candidate(
-            0xbe792fe6c591b28151d56eac601e8de8b9be5aadf87b2077ec37f315ee2b0b68,
-            26_402_342,
-            26_402_346,
-            1_794_528_443,
-            20,
-            3055,
-            0x82D16fF1C724ab72F218A3f7f6DD3E5385ee87E8
+            0x3c030ce52b8ef58a5c499b9c6e6d02e4233ae670bcb25c7667fe20404e493f36,
+            26_310_897,
+            26_310_902,
+            1_793_427_491,
+            22,
+            3724,
+            0x88d0e89E7f502Aa49a564b683e19089c771776c3
         );
     }
 
-    // Block 26,391,002: likewise before admission. Our listing is index 18 of 30.
+    // Block 26,335,398: likewise before admission. Our listing is index 10 of 30.
     function second() internal pure returns (Candidate memory) {
         return Candidate(
-            0xfe4536c66391c718e1a4b17688dfebca8ac2e6403a67d015b20c14723f0fef6f,
-            26_391_002,
-            26_391_007,
-            1_794_392_003,
-            18,
-            6323,
-            0x6A51eEe3a2C2d33921844965738aE99b81dbFf95
+            0x22e3edc95dcb85fe749565f45203d6a8c623db50813e46f1d2601e1313605a81,
+            26_335_398,
+            26_335_403,
+            1_793_722_463,
+            10,
+            8205,
+            0xD37DAbe2CccA72166F41c236b91Ca36494FE5919
         );
     }
 
@@ -234,9 +235,10 @@ contract ForkSelectionTest is SelectionBase {
         TestVaultOps.sync(vault, one, 0);
         uint256 syncPay = address(this).balance - keeperBefore;
         assertGt(syncPay, 0, "resolving a position is paid");
-        // Sync pulls the whole fee credit into the vault and pays the keeper; the net cost to the
-        // vault is the keeper pay less the swept credit.
-        assertEq(balBeforeSync - address(vault).balance, syncPay - creditSwept, "net ETH = keeper pay - swept credit");
+        // Sync pulls the whole fee credit into the vault and pays the keeper. Conservation, sign-safe
+        // because here the swept fee share exceeds the keeper pay (the vault nets a small gain):
+        // starting balance + swept credit == ending balance + keeper pay.
+        assertEq(balBeforeSync + creditSwept, address(vault).balance + syncPay, "sync ETH conserved: +swept credit, -keeper pay");
         assertEq(TestVaultOps.idle(vault).length, 1, "pack back in inventory");
         assertEq(TestVaultOps.open(vault).length, COUNT - 1);
     }

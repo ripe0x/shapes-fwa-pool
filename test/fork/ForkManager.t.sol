@@ -77,6 +77,17 @@ contract ForkManagerTest is ForkBase {
 
     // ------------------------------------------------------------------ factory
 
+    /// @dev An owner that could never act (the factory, or the manager itself) would lock the funds.
+    function test_createRejectsOwnersThatCannotAct() public {
+        address predicted = vm.computeCreateAddress(address(factory), vm.getNonce(address(factory)));
+        vm.prank(alice);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        factory.create{value: 1 ether}(address(factory), managerParams());
+        vm.prank(alice);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        factory.create{value: 1 ether}(predicted, managerParams());
+    }
+
     function test_createInitializesAtomically() public {
         address predicted = vm.computeCreateAddress(address(factory), vm.getNonce(address(factory)));
         uint256 dust = predicted.balance; // a fresh address can still hold mainnet dust
@@ -223,9 +234,9 @@ contract ForkManagerTest is ForkBase {
             packIds[i] = packId;
         }
         // Keep incentive: the pack (0.06) beats FWA's best bid (91.5% of backing) by >= 0.0003 ETH
-        // after the purchaser's redeem gas at the ceiling.
+        // after the purchaser's redeem gas at the fixed 2 gwei bound (PURCHASER_GAS_PRICE).
         (, uint256 b,) = m.edge(UNITS);
-        assertGe(P, b * 9_150 / 10_000 + 0.0003 ether + 160_000 * 0.5 gwei);
+        assertGe(P, b * 9_150 / 10_000 + 0.0003 ether + 160_000 * 2 gwei);
 
         // The owner withdraws spare cash at any time.
         uint256 spare = address(m).balance;
@@ -420,19 +431,19 @@ contract ForkManagerTest is ForkBase {
 }
 
 /// @notice Keep and bid outcomes on a personal manager, driven by FWA's real randomness. Forks
-///         right before a historical acquisition request whose real VRF word selects listing #20
-///         of 30 posted at exactly 65,158,469,945,350,000 wei backing (sim/find_selection.py), then
+///         right before a historical acquisition request whose real VRF word selects listing #22
+///         of 30 posted at exactly 64,896,174,863,380,000 wei backing (sim/find_selection.py), then
 ///         replays the real request and fulfillment calls. Only the purchaser's choice is ours.
 contract ForkManagerSelectionTest is Test {
     IShapes constant SHAPES = IShapes(0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0);
     IShapePacks constant PACKS = IShapePacks(0xf21514B090Da7dF4390803497d6ae673801E5cA7);
     IFWAV2 constant FWA = IFWAV2(0x958C41181182e76F221331b2755b77D9e1426A98);
-    bytes32 constant REQUEST_TX = 0xbe792fe6c591b28151d56eac601e8de8b9be5aadf87b2077ec37f315ee2b0b68;
-    uint256 constant REQUEST_BLOCK = 26_402_342;
-    uint256 constant INDEX = 20;
-    uint256 constant SLOT = 3055;
-    address constant PURCHASER = 0x82D16fF1C724ab72F218A3f7f6DD3E5385ee87E8;
-    uint256 constant BACKING = 65_158_469_945_350_000;
+    bytes32 constant REQUEST_TX = 0x3c030ce52b8ef58a5c499b9c6e6d02e4233ae670bcb25c7667fe20404e493f36;
+    uint256 constant REQUEST_BLOCK = 26_310_897;
+    uint256 constant INDEX = 22;
+    uint256 constant SLOT = 3724;
+    address constant PURCHASER = 0x88d0e89E7f502Aa49a564b683e19089c771776c3;
+    uint256 constant BACKING = 64_896_174_863_380_000;
     uint256 constant P = 0.06 ether;
 
     PackManagerFactory factory;

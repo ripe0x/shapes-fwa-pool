@@ -6,6 +6,19 @@ import {IFWAV2, IFWAView, LISTING_ALLOCATED, LISTING_SETTLED} from "./interfaces
 
 /// @notice The read half of VaultLib's scan proof, a separate library only for EIP-170 size.
 library ScanLib {
+    /// @dev Every position the book holds Allocated must still be Allocated at FWA. A settlement
+    ///      pays the account in its own transaction; if receive() could not record the receipt
+    ///      (forced ETH), the cash would otherwise count beside the position until it is synced.
+    ///      Bounded by the allocation queue: allocations since the oldest unresolved one.
+    function requireAllocatedCurrent(VaultLib.Book storage b, IFWAV2 f) external view {
+        if (b.allocatedValue == 0) return;
+        for (uint256 i = b.allocationHead; i < b.allocationQueue.length; ++i) {
+            uint256 id = b.allocationQueue[i];
+            if (b.positions[id].state == VaultLib.ALLOCATED
+                && IFWAView(address(f)).listings(id).status != LISTING_ALLOCATED) revert VaultLib.PendingReceipts();
+        }
+    }
+
     /// @dev Reads the FWA listing of every open position the book holds Active and selects, in
     ///      allocation-time order (packed `allocatedAt << 192 | id`), each one FWA allocated; then
     ///      moves the cursor to FWA's completed prefix `end`. FWA allocates a listing only while advancing

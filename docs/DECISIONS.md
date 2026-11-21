@@ -1227,3 +1227,45 @@ by the factory). Rejected: `FWAExposureRegistry` (D81), the 300-position limit a
 staged listings activate inside acquisition processing, and accounts never list while it is busy), adaptive sizing and 0.1/0.2 ETH ladders (no evidence of a
 material advantage; see the recipe comparison), `sim/mint_policy_research.py` (replaced by the event
 replay in `sim/unified.py`).
+
+## D84. FWA's record, not the receipt, resolves a settlement (owner brief A4.1)
+
+**Found:** FWA pays depositors with Solady's `forceSafeTransferETH`: a call with a 100,000 gas
+stipend, and if that call fails, a `CREATE` of a contract that `SELFDESTRUCT`s the ETH to the
+depositor, so the FWA transaction still succeeds (verified source, `FWAV2.sol` lines 1285 kick,
+2069 keep/relist/expiry/default). If an account's `receive()` ever failed (for example after a gas
+repricing pushed it past the stipend), the keep payment or kick refund would arrive with no receipt.
+`_syncTerminal` then reverted `MissingReceipt` for ever: the position could never resolve, a pooled
+vault's wind-down could never finish, and its NAV would count both the cash and the booked position
+at any checkpoint.
+**Chose:** settlement is classified from FWA's own record, which FWA writes in the same transaction
+as the payment: a Settled listing whose pack is neither the account's nor owed to it
+(`stuckNFTRecipient`) was a keep, relist, expiry or default and paid B (1 - s); a Settled listing
+whose pack came back was a bid and paid nothing; a Withdrawn listing the book holds Active was a
+kick and refunded B with the pack. Amounts are never inferred from balances. The receipt recorded in
+`receive()` stays only as the checkpoint gate it already was, and a checkpoint now also proves that
+every position the book holds Allocated is still Allocated at FWA (`ScanLib.requireAllocatedCurrent`,
+bounded by the allocation queue), so a settlement without a receipt still blocks pricing until it is
+synced. Sync is permissionless and resolves each listing exactly once (its position retires).
+**Bound with the real receiver:** too little transaction gas cannot force an unrecorded payment: when
+`receive()` runs out of gas inside the call, FWA keeps at most 1/64 of it, far below the 32,000 gas a
+`CREATE` needs, so the whole transaction reverts (`test_lowGasKeepNeverForcesAnUnrecordedPayment`).
+**Residual:** a kick refund forced in while its receipt is missing is not caught by the checkpoint
+gate (that would need a read of every Active listing per checkpoint). It needs FWA to lift the
+ShapePacks oracle exemption and `receive()` to fail at the same time, and lasts until anyone syncs the
+kicked listing, which the keeper does on FWA's `ListingKicked` event. In that one case the pool's
+NAV correctness, not only liveness, relies on the keeper; the independent review rated it low and the
+full gate (a read of every open listing per checkpoint, up to 300) costs more than it protects.
+**Tested (fork, real FWA forced-send):** `test/fork/ForkReceiptRecovery.t.sol`.
+
+## D85. The purchaser's gas is a fixed bound, not the keeper's ceiling (owner brief A4.3)
+
+**Found:** the keep incentive priced the purchaser's 160,000 gas redeem at the account's routine
+keeper gas ceiling, so raising keeper pay lowered backing and stopped fresh listing above about
+11.9 gwei even when purchasers' costs had not changed.
+**Chose:** `PURCHASER_GAS_PRICE = 2 gwei`, a bytecode constant: B = floor_1e4((P - (0.0003 ETH +
+160,000 x 2 gwei)) x 1e4 / max(ETH bid, token bid)). For 0.06 ETH, B = 0.06489617486338 ETH. Keeping
+beats FWA's best bid for any purchaser paying up to 2 gwei; above that a purchaser may prefer the bid,
+which the bid-outcome gate already requires to be profitable. Backing no longer moves with keeper
+settings, so a proposal stays valid across parameter changes. No oracle, role or setting is added.
+Keeper pay keeps its own ceilings.

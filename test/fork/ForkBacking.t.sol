@@ -12,10 +12,12 @@ interface IFwaExempt {
 
 /// @notice Live backing economics for the direct-mint recipe. Backing is a linear target
 ///         `floor_10000((P - margin) x 10,000 / bid)` where `margin = 0.0003 ETH +
-///         160,000 x gasCeiling` and `bid = max(settlementDiscountBps, tokenSettlementDiscountBps)`,
-///         capped by the oracle only when ShapePacks is not oracle-exempt. The old sqrt gas-optimum
-///         and the 0.03/0.9 cash-bid floor are gone (VaultLib._backingTerms, direct-mint rewrite),
-///         so those assertions are replaced by the linear-target checks below.
+///         160,000 x PURCHASER_GAS_PRICE` (the purchaser's redeem gas priced at a fixed 2 gwei
+///         bound, not the keeper's gas ceiling) and `bid = max(settlementDiscountBps,
+///         tokenSettlementDiscountBps)`, capped by the oracle only when ShapePacks is not
+///         oracle-exempt. The old sqrt gas-optimum and the 0.03/0.9 cash-bid floor are gone
+///         (VaultLib._backingTerms, direct-mint rewrite), so those assertions are replaced by the
+///         linear-target checks below.
 contract ForkBackingTest is ForkBase {
     // ceil(P x 10,000 / 9,500): a keep never loses at FWA's immutable 5% settlement-fee cap.
     uint256 constant FLOOR = 63_157_894_736_842_106;
@@ -52,7 +54,9 @@ contract ForkBackingTest is ForkBase {
     /// @dev The exact economic target `edge` posts for an exempt collection (no oracle ceiling).
     function _target(uint256 units) internal view returns (uint256) {
         uint256 value = units * 0.01 ether;
-        uint256 margin = 0.0003 ether + 160_000 * uint256(vault.getParams().gasCeiling);
+        // Redeem gas is priced at the fixed 2 gwei bound (VaultLib.PURCHASER_GAS_PRICE), not the
+        // keeper's gas ceiling, so the target no longer moves with the ceiling.
+        uint256 margin = VaultLib.MIN_KEEP_ADVANTAGE + VaultLib.Q_PURCHASER_REDEEM * VaultLib.PURCHASER_GAS_PRICE;
         if (value <= margin || _bid() == 0) return 0;
         return (value - margin) * 10_000 / _bid() / 10_000 * 10_000; // floored to 10,000 wei
     }
@@ -88,9 +92,10 @@ contract ForkBackingTest is ForkBase {
         assertEq(before, afterTarget, "target depends on economics, not spare capital slots");
     }
 
-    /// A higher gas ceiling widens the purchaser-redeem margin, so the linear target drops: the
-    /// opposite of the retired sqrt optimum, which rose with the ceiling.
-    function test_higherCeilingLowersBacking() public {
+    /// The purchaser-redeem margin is priced at a fixed 2 gwei bound (PURCHASER_GAS_PRICE), so the
+    /// linear target no longer moves with the keeper's gas ceiling: unlike the retired sqrt optimum
+    /// (which rose with the ceiling) and the earlier gasCeiling-priced margin (which lowered it).
+    function test_ceilingDoesNotMoveBacking() public {
         _exempt(true);
         _setCeiling(0.5 gwei);
         _priced(1 ether);
@@ -102,8 +107,6 @@ contract ForkBackingTest is ForkBase {
         (, uint256 highCeil, bool ok1) = vault.edge(UNITS);
         assertTrue(ok1);
         assertEq(highCeil, _target(UNITS), "linear target at 5 gwei");
-        // margin = 0.0003 + 160,000 x gasCeiling, so the 4.5 gwei rise cuts (P - margin) and the
-        // target with it.
-        assertLt(highCeil, lowCeil, "a higher ceiling lowers the target");
+        assertEq(highCeil, lowCeil, "backing is independent of the keeper gas ceiling");
     }
 }
