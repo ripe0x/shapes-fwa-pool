@@ -32,9 +32,7 @@ contract AuditOracleGas is ForkBase {
         checkpoint();
         toOpen();
         vm.prank(keeper);
-        TestVaultOps.restock(vault, 3, UNITS, 0);
-        vm.prank(keeper);
-        TestVaultOps.list(vault, 3, 0);
+        TestVaultOps.restock(vault, 3, UNITS, 0); // build lists all three at once
         uint256[] memory ids = TestVaultOps.open(vault);
         assertEq(ids.length, 3);
         address originalOracle = FWA.floorOracle();
@@ -77,9 +75,7 @@ contract AuditOracleGas is ForkBase {
         checkpoint();
         toOpen();
         vm.prank(keeper);
-        TestVaultOps.restock(vault, 1, UNITS, 0);
-        vm.prank(keeper);
-        TestVaultOps.list(vault, 1, 0);
+        TestVaultOps.restock(vault, 1, UNITS, 0); // build lists it at once
         uint256[] memory ids = TestVaultOps.open(vault);
         assertEq(ids.length, 1);
         uint256 shares = vault.shareBalance(alice);

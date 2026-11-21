@@ -48,7 +48,7 @@ contract AuditBSelection is SelectionBase {
     /// E1: repeated identifiers never count as multiple successful fee claims.
     /// The production two-active-witness case also lives in ForkProductionFeeWitnessTest.
     function test_harvestRefusesRepeatedIds() public {
-        _select(late());
+        _select(primary());
         _canaryParams();
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
         uint256 credit = FWA.feeCredit(address(vault));
@@ -66,7 +66,7 @@ contract AuditBSelection is SelectionBase {
     /// E2: a listing made into a busy FWA queue is staged: list is paid the full Q_LISTED and
     /// activate is paid again.
     function test_noListingIntoBusyQueue() public {
-        Candidate memory c = late();
+        Candidate memory c = primary();
         _select(c);
         _canaryParams();
         vm.fee(0.15 gwei);
@@ -78,7 +78,7 @@ contract AuditBSelection is SelectionBase {
         TestVaultOps.sync(vault, one, 0);
         // Repaired: the vault refuses to list into a busy FWA queue, so nothing stages.
         assertGt(FWA.unsettledAcquisitionCount(), 0, "queue busy");
-        uint256[] memory planned26 = TestVaultOps.proposals(vault, 1, 3);
+        uint256[] memory planned26 = TestVaultOps.proposals(vault, 1, UNITS);
         vm.expectRevert(PackVault.Nothing.selector);
         vault.list(planned26, 0);
         vm.warp(block.timestamp + 25 hours);
@@ -106,8 +106,7 @@ contract AuditBPinned is ForkBase {
         checkpoint();
         toOpen();
         vm.startPrank(keeper);
-        TestVaultOps.restock(vault, n, UNITS, 0);
-        TestVaultOps.list(vault, n, 0);
+        TestVaultOps.restock(vault, n, UNITS, 0); // build lists all n at once
         vm.stopPrank();
         ids = TestVaultOps.open(vault);
         assertEq(ids.length, n);
@@ -179,16 +178,11 @@ contract AuditBPinned is ForkBase {
         g = gasleft();
         pay = TestVaultOps.restock(vault, 6, UNITS, 0);
         console2.log("restock(6, 2 mints): gas, pay", g - gasleft(), pay);
-        g = gasleft();
-        pay = TestVaultOps.list(vault, 1, 0);
-        console2.log("list(1): gas, pay", g - gasleft(), pay);
-        (, , uint128 b1) = TestVaultOps.position(vault, TestVaultOps.open(vault)[0]);
-        console2.log("backing of first listing", b1);
-        g = gasleft();
-        pay = TestVaultOps.list(vault, 9, 0);
-        console2.log("list(9): gas, pay", g - gasleft(), pay);
+        // build lists every pack at once, so relisting has nothing idle; `list` is not measured here.
         vm.stopPrank();
         ids = TestVaultOps.open(vault);
+        (, , uint128 b1) = TestVaultOps.position(vault, ids[0]);
+        console2.log("backing of first listing", b1);
         (, , uint128 bl) = TestVaultOps.position(vault, ids[ids.length - 1]);
         console2.log("backing of last listing, idle after", bl, vault.idleEth());
         // Redemption of everything: unlist, liquidate, checkpoint.
@@ -314,8 +308,7 @@ contract AuditBBudget is ForkBase {
         checkpoint();
         toOpen();
         vm.startPrank(keeper);
-        TestVaultOps.restock(vault, 6, UNITS, 0);
-        TestVaultOps.list(vault, 6, 0);
+        TestVaultOps.restock(vault, 6, UNITS, 0); // build lists all six at once
         vm.stopPrank();
         uint256[] memory open = TestVaultOps.open(vault);
         // The attacker holds the owner key and keeps for itself.

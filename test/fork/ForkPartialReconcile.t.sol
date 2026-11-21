@@ -2,7 +2,7 @@
 pragma solidity 0.8.30;
 
 import {Vm} from "forge-std/Vm.sol";
-import {ForkBase} from "./ForkBase.sol";
+import {ForkBase, IOwnable, IFwaAdmin} from "./ForkBase.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {Charges} from "../utils/Charges.sol";
@@ -21,6 +21,10 @@ contract ForkPartialReconcileTest is ForkBase {
             assertEq(actors[i].code.length, 0); assertEq(actors[i].balance, 0);
         }
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
+        // D62: ShapePacks is oracle-exempt (the real admin call ForkBase makes), so a 0.06 ETH pack
+        // lists at its edge backing instead of being clamped to the stale historical floor cap.
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         VaultLib.Params memory p = defaultParams();
         p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei; p.payMarkupBps = 0;
         p.reserve = 0.005 ether; p.tvlCap = 2 ether;

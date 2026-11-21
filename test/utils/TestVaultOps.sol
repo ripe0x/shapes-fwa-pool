@@ -68,34 +68,37 @@ library TestVaultOps {
         }
     }
 
-    function _pausePrank() private returns (VmSafe.CallerMode mode, address sender, address origin) {
-        (mode, sender, origin) = vm.readCallers();
-        if (mode == VmSafe.CallerMode.Prank) vm.stopPrank();
+    // Packed into one memory pointer so inlined ops spend one stack slot here, not three (via_ir depth).
+    struct Prank { VmSafe.CallerMode mode; address sender; address origin; }
+
+    function _pausePrank() private returns (Prank memory p) {
+        (p.mode, p.sender, p.origin) = vm.readCallers();
+        if (p.mode == VmSafe.CallerMode.Prank) vm.stopPrank();
     }
 
-    function _resumePrank(VmSafe.CallerMode mode, address sender, address origin) private {
-        if (mode == VmSafe.CallerMode.Prank) vm.prank(sender, origin);
+    function _resumePrank(Prank memory p) private {
+        if (p.mode == VmSafe.CallerMode.Prank) vm.prank(p.sender, p.origin);
     }
 
     /// @dev Build-and-list `n` new packs of `units`, in batches of MAX_LIST_BATCH.
     function restock(PackAccount v, uint256 n, uint256 units, uint256 minPay) internal returns (uint256 pay) {
-        (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
+        Prank memory _pk = _pausePrank();
         while (n != 0) {
             uint256 batch = n < v.MAX_LIST_BATCH() ? n : v.MAX_LIST_BATCH();
             uint256[] memory quotes = proposals(v, batch, units);
-            _resumePrank(mode, sender, origin);
+            _resumePrank(_pk);
             pay += v.build(units, quotes, minPay);
             n -= batch;
         }
     }
 
     function list(PackAccount v, uint256 n, uint256 minPay) internal returns (uint256 pay) {
-        (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
+        Prank memory _pk = _pausePrank();
         uint256 available = v.idlePackCount();
         if (n > available) n = available;
         // `restock` builds and lists at once; a following list of nothing is a no-op.
         if (n == 0) {
-            _resumePrank(mode, sender, origin);
+            _resumePrank(_pk);
             return 0;
         }
         while (n != 0) {
@@ -104,20 +107,20 @@ library TestVaultOps {
             uint256 pack = v.idlePackAt(v.idlePackCount() - 1);
             uint256 units = v.packs().valueOf(pack) / 0.01 ether;
             uint256[] memory quotes = proposals(v, batch, units);
-            _resumePrank(mode, sender, origin);
+            _resumePrank(_pk);
             pay += v.list(quotes, minPay);
             n -= batch;
         }
     }
 
     function sync(PackAccount v, uint256[] memory ids, uint256 minPay) internal returns (uint256 pay) {
-        (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
-        if (ids.length <= 16) { _resumePrank(mode, sender, origin); return v.sync(ids, 0, minPay); }
+        Prank memory _pk = _pausePrank();
+        if (ids.length <= 16) { _resumePrank(_pk); return v.sync(ids, 0, minPay); }
         for (uint256 start; start < ids.length; start += 16) {
             uint256 count = ids.length - start < 16 ? ids.length - start : 16;
             uint256[] memory batch = new uint256[](count);
             for (uint256 i; i < count; ++i) batch[i] = ids[start + i];
-            _resumePrank(mode, sender, origin);
+            _resumePrank(_pk);
             pay += v.sync(batch, 0, minPay);
         }
     }
@@ -136,41 +139,41 @@ library TestVaultOps {
     }
 
     function unlist(PackAccount v, uint256[] memory ids, uint256 minPay) internal returns (uint256 pay) {
-        (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
-        if (ids.length == 0) { _resumePrank(mode, sender, origin); return v.unlist(ids, minPay); }
+        Prank memory _pk = _pausePrank();
+        if (ids.length == 0) { _resumePrank(_pk); return v.unlist(ids, minPay); }
         for (uint256 start; start < ids.length; start += 16) {
             uint256 n = ids.length - start < 16 ? ids.length - start : 16;
-            _resumePrank(mode, sender, origin);
+            _resumePrank(_pk);
             pay += v.unlist(_slice(ids, start, n), minPay);
         }
     }
 
     function harvest(PackAccount v, uint256[] memory ids, uint256 minPay) internal returns (uint256 pay) {
-        (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
+        Prank memory _pk = _pausePrank();
         _sort(ids);
-        if (ids.length == 0) { _resumePrank(mode, sender, origin); return v.harvest(ids, minPay); }
+        if (ids.length == 0) { _resumePrank(_pk); return v.harvest(ids, minPay); }
         for (uint256 start; start < ids.length; start += 16) {
             uint256 n = ids.length - start < 16 ? ids.length - start : 16;
-            _resumePrank(mode, sender, origin);
+            _resumePrank(_pk);
             pay += v.harvest(_slice(ids, start, n), minPay);
         }
     }
 
     function burnTokens(PackAccount v, uint256[] memory ids) internal {
-        (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
+        Prank memory _pk = _pausePrank();
         _sort(ids);
-        if (ids.length == 0) { _resumePrank(mode, sender, origin); v.burnTokens(ids); return; }
+        if (ids.length == 0) { _resumePrank(_pk); v.burnTokens(ids); return; }
         for (uint256 start; start < ids.length; start += 16) {
             uint256 n = ids.length - start < 16 ? ids.length - start : 16;
-            _resumePrank(mode, sender, origin);
+            _resumePrank(_pk);
             v.burnTokens(_slice(ids, start, n));
         }
     }
 
     function checkpoint(PackVault v, uint256 minPay) internal returns (uint256) {
-        (VmSafe.CallerMode mode, address sender, address origin) = _pausePrank();
+        Prank memory _pk = _pausePrank();
         uint256 id = witness(v);
-        _resumePrank(mode, sender, origin);
+        _resumePrank(_pk);
         return v.checkpoint(id, minPay);
     }
 }

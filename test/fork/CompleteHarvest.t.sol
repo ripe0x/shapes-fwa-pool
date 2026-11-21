@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {ForkBase} from "./ForkBase.sol";
+import {ForkBase, IOwnable, IFwaAdmin} from "./ForkBase.sol";
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
 import {JournalRequests} from "./EfficientJournal.t.sol";
 import {ReceiptFixtureFiller, ReceiptFWA, ReceiptPacks, ReceiptShapes} from "../research/ReceiptIdentity.t.sol";
@@ -19,6 +19,11 @@ contract CompleteHarvestTest is ForkBase {
 
     receive() external payable {}
 
+    function seedTwoListings() external {
+        // build mints and lists both 6-unit packs at once; no idle pack remains to relist.
+        TestVaultOps.restock(vault, 2, UNITS, 0);
+    }
+
     function setUp() public override {
         vm.createSelectFork("mainnet", bytes32(0x7a2e33446681244f37d801df737f7017e3e9258d49fa6465e95983f5a3b81a6f));
         address[4] memory actors = [owner, keeper, alice, bob];
@@ -29,11 +34,14 @@ contract CompleteHarvestTest is ForkBase {
         }
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
         vm.deal(address(this), 10 ether);
+        // D62: ShapePacks oracle-exempt (the real admin call) so a 0.06 ETH pack lists uncapped.
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         VaultLib.Params memory p = defaultParams();
         p.payMarkupBps = 0; p.workFee = 0; p.reserve = 0; p.gasCeiling = 0.5 gwei;
         (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether);
-        TestVaultOps.restock(vault, 2, UNITS, 0);
-        TestVaultOps.list(vault, 2, 0);
+        // External self-call: keeps restock/list out of setUp's stack frame (via_ir stack depth).
+        this.seedTwoListings();
         first = vault.openListingAt(0); second = vault.openListingAt(1);
         ReceiptFixtureFiller filler = new ReceiptFixtureFiller{value: 3 ether}(
             ReceiptFWA(address(FWA)), ReceiptPacks(address(PACKS)), ReceiptShapes(address(SHAPES))
@@ -344,7 +352,7 @@ contract CompleteCreditTest is SelectionBase {
     receive() external payable {}
 
     function _selected(uint256 price) private {
-        _select(late());
+        _select(primary());
         VaultLib.Params memory p = vault.getParams();
         p.payMarkupBps = 0; p.workFee = 0; p.maxTip = 0;
         vm.prank(vault.owner()); vault.setParams(p);
@@ -389,7 +397,7 @@ contract CompleteCreditTest is SelectionBase {
         _selected(0.5 gwei);
         uint256 credit = FWA.feeCredit(address(vault));
         assertLt(credit * 2500 / 10_000, VaultLib.Q_CREDIT * 0.5 gwei);
-        vm.prank(late().purchaser); IFwaSettle(address(FWA)).keepNFT(selected);
+        vm.prank(primary().purchaser); IFwaSettle(address(FWA)).keepNFT(selected);
         uint256 cash = address(vault).balance;
         uint256[] memory ids = new uint256[](1); ids[0] = selected;
         uint256 paid = vault.sync(ids, 0, 1);

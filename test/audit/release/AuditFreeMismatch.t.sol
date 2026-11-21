@@ -29,10 +29,8 @@ contract AuditFreeMismatch is ForkBase {
         checkpoint();
         toOpen();
         vm.prank(keeper);
-        // build mints and lists one pack at once; the following list finds no idle pack (no-op).
+        // build mints and lists one pack at once.
         TestVaultOps.restock(vault, 1, UNITS, 0);
-        vm.prank(keeper);
-        TestVaultOps.list(vault, 1, 0);
         assertEq(TestVaultOps.open(vault).length, 1);
         // Repaired (E4 root): a cancel refunds its checkpoint charge, so cycles retain nothing
         // and no reserved ETH builds up for the keeper to misread. The keeper also subtracts the

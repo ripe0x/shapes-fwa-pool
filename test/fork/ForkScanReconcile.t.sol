@@ -66,7 +66,7 @@ contract ForkScanReconcileTest is SelectionBase {
 
     function test_reconcileScanPath() public {
         if (vm.exists(OUT)) vm.removeFile(OUT);
-        Candidate memory c = late();
+        Candidate memory c = primary();
         _select(c); // deploy (3 ETH seed), restock 1, list 1 own, real request + fulfillment -> ALLOCATED
 
         // Zero keeperShareBps: the scan pays from routine only, never sweeping the fee credit.
@@ -83,7 +83,7 @@ contract ForkScanReconcileTest is SelectionBase {
             string.concat(
                 '{"step":"setup","deployBalance":', vm.toString(deployBalance),
                 ',"selectPay":', vm.toString(selectPay),
-                ',"count":', vm.toString(COUNT), ',"units":3,"backing":', vm.toString(B),
+                ',"count":', vm.toString(COUNT), ',"units":6,"backing":', vm.toString(B),
                 ',"activationDebt":', vm.toString(activationDebt), ',"initCursor":', vm.toString(vault.acquisitionCursor()),
                 ',"selectedListing":', vm.toString(selected), ',"backings":[', vm.toString(B), '],"acqFee":', vm.toString(acqFee),
                 ',"acqCutBps":', vm.toString(acqCutBps), ',"acqCrownBps":', vm.toString(acqCrownBps),

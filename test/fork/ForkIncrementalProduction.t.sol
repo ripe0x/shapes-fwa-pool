@@ -77,12 +77,12 @@ contract ForkProductionReceiptsTest is SelectionBase {
 
     function _keep(uint256 atFee) private {
         fee = atFee;
-        _select(late());
+        _select(primary());
         _environment();
         uint256 before = address(vault).balance;
         uint256 expected = B * (10_000 - atFee) / 10_000;
         _cold();
-        vm.prank(late().purchaser);
+        vm.prank(primary().purchaser);
         IFwaSettle(address(FWA)).keepNFT(selected);
         _assertReceipt(selected, expected, atFee, 1);
         assertEq(vault.pendingReceipts(), 1);
@@ -109,11 +109,11 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(vault.pendingReceipts(), 0);
         assertEq(vault.idForBacking(B), 0);
         (uint256 tracked, uint256 idle,,, , uint256 allocated) = vault.totals();
-        assertEq(tracked, 0.07 ether, "only the paid mint's seven loose Shapes remain");
-        assertEq(idle, 0.07 ether);
+        assertEq(tracked, 0, "the kept pack leaves no inventory (direct-mint has no loose remainder)");
+        assertEq(idle, 0);
         assertEq(allocated, 0);
         uint256 nav = vault.accountedNav(0);
-        assertEq(nav, address(vault).balance + 0.07 ether + FWA.feeCredit(address(vault)));
+        assertEq(nav, address(vault).balance + FWA.feeCredit(address(vault)));
         vm.expectRevert(PackVault.Nothing.selector);
         vault.sync(_one(selected), 0, 0);
         assertEq(vault.accountedNav(0), nav);
@@ -159,9 +159,9 @@ contract ForkProductionReceiptsTest is SelectionBase {
     }
 
     function test_bidReturnPreservesFloorBeforeInventorySyncAndReusesIdentifierAfterRetirement() public {
-        _select(late()); _environment();
+        _select(primary()); _environment();
         vault.sync(new uint256[](0), 0, 0);
-        address buyer = late().purchaser;
+        address buyer = primary().purchaser;
         uint256 before = buyer.balance;
         vm.prank(buyer); IFwaSettle(address(FWA)).acceptDepositorBid(selected);
         assertEq(buyer.balance - before, B * 9_000 / 10_000);
@@ -169,13 +169,13 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(vault.idlePackCount(), 0, "custody alone does not retire the old position");
         assertEq(vault.idForBacking(B), selected);
         (uint256 tracked, uint256 idle,,,, uint256 allocated) = vault.totals();
-        assertEq(tracked, 0.1 ether); assertEq(idle, 0.07 ether); assertEq(allocated, 0.03 ether);
-        assertEq(vault.accountedNav(0), address(vault).balance + 0.1 ether + FWA.feeCredit(address(vault)), "unsynced bid return cannot raise NAV");
+        assertEq(tracked, 0.06 ether); assertEq(idle, 0); assertEq(allocated, 0.06 ether);
+        assertEq(vault.accountedNav(0), address(vault).balance + 0.06 ether + FWA.feeCredit(address(vault)), "unsynced bid return cannot raise NAV");
         vault.sync(_one(selected), 0, 0);
         assertEq(vault.idForBacking(B), 0);
         assertEq(vault.idlePackCount(), 1);
         (tracked, idle,,,, allocated) = vault.totals();
-        assertEq(tracked, 0.1 ether); assertEq(idle, 0.1 ether); assertEq(allocated, 0);
+        assertEq(tracked, 0.06 ether); assertEq(idle, 0.06 ether); assertEq(allocated, 0);
         _drain();
         uint256[] memory proposed = new uint256[](1); proposed[0] = B;
         vault.list(proposed, 0);
@@ -187,9 +187,9 @@ contract ForkProductionReceiptsTest is SelectionBase {
     }
 
     function test_realTokenBidReturnsPackPreservesPrincipalAndCreatesNoEthReceipt() public {
-        _select(late()); _environment();
+        _select(primary()); _environment();
         vault.sync(new uint256[](0), 0, 0);
-        address buyer = late().purchaser;
+        address buyer = primary().purchaser;
         IFWAToken rewardToken = IFWAToken(FWA.token());
         uint256 buyerBefore = rewardToken.balanceOf(buyer);
         uint256 vaultEth = address(vault).balance;
@@ -218,28 +218,28 @@ contract ForkProductionReceiptsTest is SelectionBase {
             identified = true;
         }
         assertTrue(identified, "authenticated actual token-bid outcome");
-        assertEq(vault.accountedNav(0), vaultEth + 0.1 ether + FWA.feeCredit(address(vault)), "token route preserves the same conservative principal");
+        assertEq(vault.accountedNav(0), vaultEth + 0.06 ether + FWA.feeCredit(address(vault)), "token route preserves the same conservative principal");
         vault.sync(_one(selected), 0, 0);
         (uint256 tracked, uint256 idle,,,, uint256 allocated) = vault.totals();
-        assertEq(tracked, 0.1 ether); assertEq(idle, tracked); assertEq(allocated, 0);
+        assertEq(tracked, 0.06 ether); assertEq(idle, tracked); assertEq(allocated, 0);
         assertEq(vault.idForBacking(B), 0);
-        assertEq(vault.accountedNav(0), address(vault).balance + 0.1 ether + FWA.feeCredit(address(vault)));
+        assertEq(vault.accountedNav(0), address(vault).balance + 0.06 ether + FWA.feeCredit(address(vault)));
     }
 
     function test_burnedKeptPackCanStillConsumeReceipt() public {
         _keep(100);
         (,,, uint256 pack,,,,,,,) = FWA.listings(selected);
-        vm.prank(late().purchaser);
+        vm.prank(primary().purchaser);
         PACKS.redeem(pack);
         _catchUp(_one(selected));
         assertEq(vault.pendingReceipts(), 0);
         (uint256 tracked,,,,,) = vault.totals();
-        assertEq(tracked, 0.07 ether);
+        assertEq(tracked, 0, "no loose remainder after a kept pack is redeemed by its purchaser");
     }
 
     function test_extendedKeptGiftAdoptsActualBackingOnce() public {
         _keep(100);
-        address buyer = late().purchaser;
+        address buyer = primary().purchaser;
         (,,, uint256 pack,,,,,,,) = FWA.listings(selected);
         uint32[] memory counts = new uint32[](9); counts[0] = 1;
         uint256 cost = 0.01 ether + SHAPES.mintFee();
@@ -248,10 +248,10 @@ contract ForkProductionReceiptsTest is SelectionBase {
         ProductionGiftPacks(address(PACKS)).addToPack{value: cost}(pack, new uint256[](0), counts);
         PACKS.transferFrom(buyer, address(vault), pack);
         vm.stopPrank();
-        assertEq(PACKS.valueOf(pack), 0.04 ether);
+        assertEq(PACKS.valueOf(pack), 0.07 ether);
         _catchUp(_one(selected));
         (uint256 tracked, uint256 idle,,,,) = vault.totals();
-        assertEq(tracked, 0.11 ether, "seven loose units plus actual four-unit gift");
+        assertEq(tracked, 0.07 ether, "the kept six-unit pack extended by one gift unit");
         assertEq(idle, tracked);
         assertEq(vault.idForBacking(B), 0);
         uint256 before = vault.accountedNav(0);
@@ -262,7 +262,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
 
     function test_oversizedKeptGiftRecoversInBoundedChunksWithoutBlockingNormalInventory() public {
         _keep(100);
-        address buyer = late().purchaser;
+        address buyer = primary().purchaser;
         (,,, uint256 pack,,,,,,,) = FWA.listings(selected);
         uint32[] memory counts = new uint32[](9); counts[0] = 28;
         uint256 cost = 28 * (0.01 ether + SHAPES.mintFee());
@@ -275,10 +275,9 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(vault.recoveryPackCount(), 1);
         assertEq(vault.idlePackCount(), 0);
         (uint256 tracked, uint256 idle,,,,) = vault.totals();
-        assertEq(tracked, 0.38 ether); assertEq(idle, tracked);
+        assertEq(tracked, 0.34 ether); assertEq(idle, tracked);
         _drain();
-        TestVaultOps.restock(vault, 1, 3, 0);
-        TestVaultOps.list(vault, 1, 0);
+        TestVaultOps.restock(vault, 1, UNITS, 0); // build lists it at once
         assertEq(vault.openListingCount(), 1, "oversized gift does not occupy normal stack");
         address vaultOwner = vault.owner();
         vm.prank(vaultOwner); vault.startWindDown();
@@ -322,7 +321,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
     }
 
     function test_realRefundedForeignTailDoesNotEarnImmediateCompensation() public {
-        _select(late());
+        _select(primary());
         _environment();
         vault.sync(new uint256[](0), 0, 0);
         _drain();
@@ -348,8 +347,8 @@ contract ForkProductionReceiptsTest is SelectionBase {
     }
 
     function test_terminalReconciliationPrunesItsHeadWithoutAnotherPaidCall() public {
-        _select(late()); _environment();
-        vm.prank(late().purchaser); IFwaSettle(address(FWA)).acceptDepositorBid(selected);
+        _select(primary()); _environment();
+        vm.prank(primary().purchaser); IFwaSettle(address(FWA)).acceptDepositorBid(selected);
         uint64 cursor = vault.acquisitionCursor();
         uint256 paid = vault.sync(_one(selected), 0, 0);
         uint256 processed = vault.acquisitionCursor() - cursor;
@@ -378,20 +377,24 @@ contract ForkProductionReceiptsTest is SelectionBase {
     }
 
     function _kickFixture() private returns (uint256 id, uint256 backing) {
-        _select(late());
+        _select(primary());
         _environment();
-        vm.prank(late().purchaser);
+        vm.prank(primary().purchaser);
         IFwaSettle(address(FWA)).acceptDepositorBid(selected);
         _drain();
         _catchUp(new uint256[](0)); // old bid lookup remains live until its terminal transition
-        backing = B * 9_900 / 10_000;
+        // A kick needs FWA's floor cap to apply, so drop the D62 exemption _select set, then list a
+        // fresh pack under a high floor (it takes the next free backing above the reserved B).
         address oracle = FWA.floorOracle();
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), false);
         vm.prank(IOwnable(oracle).owner());
-        IOracleAdmin(oracle).setFloor(address(PACKS), backing * 10_000 / 11_000);
-        TestVaultOps.restock(vault, 1, 3, 0);
-        TestVaultOps.list(vault, 1, 0);
+        IOracleAdmin(oracle).setFloor(address(PACKS), 0.33 ether); // cap 0.363 lets a 6-unit pack list at edge
+        TestVaultOps.restock(vault, 1, UNITS, 0); // build lists it at once
         id = vault.openListingAt(vault.openListingCount() - 1);
-        assertEq(vault.position(id).backing, backing);
+        backing = vault.position(id).backing; // actual edge backing; B itself is reserved by `selected`
+        assertGt(backing, 0.06 ether);
+        // Drop the floor so this listing sits above the cap and becomes kickable.
         vm.prank(IOwnable(oracle).owner());
         IOracleAdmin(oracle).setFloor(address(PACKS), 0.03 ether);
         uint256 next = block.timestamp - block.timestamp % 12 hours + 11 hours + 46 minutes;
@@ -416,7 +419,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
     }
 
     function test_productionLowGasKeepRecordsOrFailsAtomically() public {
-        _select(late());
+        _select(primary());
         _environment();
         uint256 snapshot = vm.snapshotState();
         uint256 before = address(vault).balance;
@@ -425,7 +428,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
         for (uint256 limit = 20_000; limit <= 800_000; limit += 20_000) {
             assertTrue(vm.revertToState(snapshot));
             _cold();
-            vm.prank(late().purchaser);
+            vm.prank(primary().purchaser);
             (bool ok,) = address(FWA).call{gas: limit}(abi.encodeCall(IFwaSettle.keepNFT, (selected)));
             if (ok) {
                 ++successes;
@@ -766,7 +769,7 @@ contract ForkProductionStagingTest is SelectionBase {
     }
 
     function _backlog(uint256 count) private returns (ReceiptFixtureFiller foreign, uint256[] memory staged) {
-        _select(late());
+        _select(primary());
         assertGt(FWA.unsettledAcquisitionCount(), 0);
         foreign = new ReceiptFixtureFiller{value: 3 ether}(
             ReceiptFWA(address(FWA)), ReceiptPacks(address(PACKS)), ReceiptShapes(address(SHAPES))
@@ -786,9 +789,9 @@ contract ForkProductionStagingTest is SelectionBase {
     function test_stagedAdmissionAfterDrainedPrecheckRevertsAtomically() public {
         (, uint256[] memory staged) = _backlog(17);
         vm.prank(IOwnable(address(FWA)).owner()); IFwaAdmin(address(FWA)).setUint(10, 1);
-        TestVaultOps.restock(vault, 1, 3, 0);
+        TestVaultOps.restock(vault, 1, UNITS, 0);
         uint256 pack = vault.idlePackAt(0);
-        uint256[] memory proposal = TestVaultOps.proposals(vault, 1, 3);
+        uint256[] memory proposal = TestVaultOps.proposals(vault, 1, UNITS);
         uint256 before = address(vault).balance;
         uint256 reserved = vault.reservedCount();
         vm.expectRevert(VaultLib.InvalidListing.selector);
@@ -815,9 +818,9 @@ contract ForkProductionStagingTest is SelectionBase {
         assertEq(status, 1, "FWA's final status alone permits the costly path");
         assertEq(FWA.activeListingCount() - active, 16, "real side effect activates fifteen foreign listings");
         assertTrue(vm.revertToState(snapshot));
-        TestVaultOps.restock(vault, 8, 3, 0);
+        TestVaultOps.restock(vault, 8, UNITS, 0);
         uint256[] memory packsBefore = TestVaultOps.idle(vault);
-        uint256[] memory proposed = TestVaultOps.proposals(vault, 8, 3);
+        uint256[] memory proposed = TestVaultOps.proposals(vault, 8, UNITS);
         uint256 balance = address(vault).balance;
         uint256 reserved = vault.reservedCount();
         vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(address(PACKS));
