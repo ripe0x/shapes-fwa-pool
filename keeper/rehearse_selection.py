@@ -21,6 +21,7 @@ the keeper must still discover and sync it.
 """
 import argparse
 import json
+import re
 import os
 import secrets
 import socket
@@ -32,7 +33,15 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-FORK_RPC = "https://mainnet.gateway.tenderly.co"
+# Tenderly's public gateway by default. REHEARSAL_FORK_RPC (environment only) can name another
+# upstream for the fork; its URL can carry an API key, so scrub() removes it from every record.
+FORK_RPC = os.environ.get("REHEARSAL_FORK_RPC") or "https://mainnet.gateway.tenderly.co"
+
+
+def scrub(text):
+    text = text.replace(FORK_RPC, "<fork-rpc>") if "tenderly" not in FORK_RPC else text
+    return re.sub(r"(https?://[^\s\"']*/v[0-9]+/)[A-Za-z0-9_-]{8,}", r"\1<key>", text)
+
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 PACKS = "0xf21514B090Da7dF4390803497d6ae673801E5cA7"
 SHAPES = "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0"
@@ -374,8 +383,8 @@ def main():
     failures = {k: v.get("error") for k, v in report["outcomes"].items() if v.get("error") or not v.get("resolved")}
     report["all_outcomes_passed"] = not failures
     out = ROOT / "docs/receipts/unified-selection-rehearsal.json"
-    out.write_text(json.dumps(report, indent=1, default=str))
-    print(json.dumps(report, indent=1, default=str))
+    out.write_text(scrub(json.dumps(report, indent=1, default=str)))
+    print(scrub(json.dumps(report, indent=1, default=str)))
     if failures:
         sys.exit(f"selection rehearsal: {len(failures)} outcome(s) failed: {failures}")
 

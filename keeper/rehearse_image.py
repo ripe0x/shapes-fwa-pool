@@ -16,6 +16,7 @@ external service fails). Prints one JSON evidence object. Local simulated funds 
 import argparse
 import http.server
 import json
+import re
 import os
 import secrets
 import shutil
@@ -34,7 +35,14 @@ from eth_utils import keccak, to_checksum_address
 ROOT = Path(__file__).resolve().parent.parent
 PORT, PROXY_PORT = 8581, 8582
 RPC = f"http://127.0.0.1:{PORT}"
-FORK_RPC = "https://mainnet.gateway.tenderly.co"
+# Tenderly's public gateway by default. REHEARSAL_FORK_RPC (environment only) can name another
+# upstream for the fork; its URL can carry an API key, so scrub() removes it from every record.
+FORK_RPC = os.environ.get("REHEARSAL_FORK_RPC") or "https://mainnet.gateway.tenderly.co"
+
+
+def scrub(text):
+    text = text.replace(FORK_RPC, "<fork-rpc>") if "tenderly" not in FORK_RPC else text
+    return re.sub(r"(https?://[^\s\"']*/v[0-9]+/)[A-Za-z0-9_-]{8,}", r"\1<key>", text)
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 MAX_GAS = 16_777_216
 PARAMS_T = ("(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,"
@@ -79,25 +87,20 @@ def send(frm, to, sig, *a, value=0):
     return r
 
 
-def holder_unwind(holder):
+def holder_unwind(holder, log):
     """Runbook section 7: at canary values exit work is unpaid (essential budget 0, D64), so when the
-    redemption exceeds free ETH the holder unlists and liquidates at their own gas. Returns the calls
-    that ran; none when free ETH already covers it (the vault refuses the unlist)."""
-    ran = []
+    redemption exceeds free ETH the holder unlists and liquidates at their own gas, rerunning until
+    nothing is owed. Each call the vault refuses (nothing to do yet or any more) is logged, not sent."""
     n = min(8, call("openListingCount()(uint256)"))
     ids = "[" + ",".join(str(call("openListingAt(uint256)(uint256)", i)) for i in range(n)) + "]"
-    try:
-        send(holder, VAULT, "unlist(uint256[],uint256)", ids, 0)
-        ran.append("unlist")
-    except (RuntimeError, AssertionError):
-        return ran
-    for _ in range(4):
+    for sig, args in (("unlist(uint256[],uint256)", (ids, 0)), ("liquidate(uint256,uint256)", (8, 0))):
         try:
-            send(holder, VAULT, "liquidate(uint256,uint256)", 8, 0)
-            ran.append("liquidate")
-        except (RuntimeError, AssertionError):
-            break
-    return ran
+            send(holder, VAULT, sig, *args)
+            log.append(dict(call=sig.split("(")[0], block=num(cast("block-number"))))
+        except (RuntimeError, AssertionError) as e:
+            reason = str(e)[-160:]
+            if not log or log[-1].get("refused") != (sig.split("(")[0], reason):
+                log.append(dict(refused=(sig.split("(")[0], reason)))
 
 
 def warp_to(offset):
@@ -324,9 +327,10 @@ def main():
              value=2 * call("requestCharge()(uint256)"))
         warp_to(42_360)
         expire_queue()
-        evidence["holder_unwind"] = holder_unwind(holder)
+        unwind = evidence["holder_unwind"] = []
         wait_for("replacement prices the redemption through a lost RPC response",
-                 lambda: DropFirstSend.dropped and call("lockedShares()(uint256)") == 0, seconds=420)
+                 lambda: holder_unwind(holder, unwind) or (DropFirstSend.dropped and call("lockedShares()(uint256)") == 0),
+                 seconds=420)
         after = replacement.stored()
         evidence["after_replacement"] = after
         wait_for("replacement /health serves the vault and the manager", lambda: both(replacement.health()))
@@ -369,7 +373,7 @@ def main():
         node.terminate()
         for f in cleanup:
             f.unlink(missing_ok=True)
-        print(json.dumps(evidence, indent=1, default=str))
+        print(scrub(json.dumps(evidence, indent=1, default=str)))
         shutil.rmtree(work, ignore_errors=True)
 
 

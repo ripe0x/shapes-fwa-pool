@@ -10,6 +10,7 @@ historical default 26,418,539 is the 2026-11-18 campaign.
 import argparse
 import hashlib
 import json
+import re
 import os
 import socket
 import subprocess
@@ -23,7 +24,15 @@ from eth_utils import keccak, to_checksum_address
 ROOT = Path(__file__).resolve().parent.parent
 PORT = int(os.environ.get("PACK_VAULT_LOCAL_PORT", 8557))
 RPC = f"http://127.0.0.1:{PORT}"
-FORK_RPC = "https://mainnet.gateway.tenderly.co"
+# Tenderly's public gateway by default. REHEARSAL_FORK_RPC (environment only) can name another
+# upstream for the fork; its URL can carry an API key, so scrub() removes it from every record.
+FORK_RPC = os.environ.get("REHEARSAL_FORK_RPC") or "https://mainnet.gateway.tenderly.co"
+
+
+def scrub(text):
+    text = text.replace(FORK_RPC, "<fork-rpc>") if "tenderly" not in FORK_RPC else text
+    return re.sub(r"(https?://[^\s\"']*/v[0-9]+/)[A-Za-z0-9_-]{8,}", r"\1<key>", text)
+
 FORK_BLOCK = int(os.environ.get("PACK_VAULT_FORK_BLOCK", 26_418_539))
 MAX_GAS = 16_777_216
 CODE_SIZE = 24_576
@@ -119,7 +128,7 @@ def load_manifest():
     fork = info.get("forkConfig") or {}
     if (str(fork.get("forkUrl")).rstrip("/") != FORK_RPC.rstrip("/")
             or quantity(fork.get("forkBlockNumber", -1)) != FORK_BLOCK):
-        raise RuntimeError(f"unexpected Anvil fork metadata: {fork}")
+        raise RuntimeError(scrub(f"unexpected Anvil fork metadata: {fork}"))
     if rpc("eth_getBlockByNumber", hex(FORK_BLOCK), False)["hash"] != m["fork_hash"]:
         raise RuntimeError("fork base block hash changed")
     return m
@@ -136,7 +145,7 @@ def append_action(record):
     if CURRENT_DEPLOYMENT is not None:
         record["vault_context"] = CURRENT_DEPLOYMENT
     with open(m["actions"], "a") as f:
-        f.write(json.dumps(record) + "\n")
+        f.write(scrub(json.dumps(record)) + "\n")
 
 
 def prepare_actor(address):
@@ -338,9 +347,9 @@ def run_approved(calibration_first=False):
                 attempt += 1
                 path = work / f"{number}-{script}-attempt{attempt}.log"
                 print(f"START phase={script} log={path} manifest={manifest}", flush=True)
-                with open(path, "w") as output:
-                    result = subprocess.run([sys.executable, str(ROOT / "keeper" / script)], cwd=ROOT, env=env,
-                                            stdout=output, stderr=subprocess.STDOUT)
+                result = subprocess.run([sys.executable, str(ROOT / "keeper" / script)], cwd=ROOT, env=env,
+                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                path.write_text(scrub(result.stdout))
                 if not result.returncode:
                     break
                 print(f"PAUSED phase={script} exit={result.returncode} log={path}; node and ledger preserved. "
@@ -385,6 +394,6 @@ if __name__ == "__main__":
                  ("--fork-block", str(args.fork_block), "--port", str(args.port))]])
     PHASES = args.phases
     if args.plan:
-        print(json.dumps(plan(), indent=2))
+        print(scrub(json.dumps(plan(), indent=2)))
     else:
         run_approved(args.calibration_first)

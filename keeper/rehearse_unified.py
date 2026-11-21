@@ -365,7 +365,7 @@ def main():
     errors = {k: v["error"] for k, v in report["steps"].items() if isinstance(v, dict) and v.get("error")}
     report["errors"] = errors
     # Committed evidence names no local machine paths.
-    text = re.sub(r"(/private)?/var/folders/[^\"]*?/T/|/tmp/", "<tmp>/", json.dumps(report, indent=1, default=str))
+    text = B.scrub(re.sub(r"(/private)?/var/folders/[^\"]*?/T/|/tmp/", "<tmp>/", json.dumps(report, indent=1, default=str)))
     (ROOT / "docs/receipts/unified-production-rehearsal.json").write_text(text)
     print(json.dumps({k: v for k, v in report["steps"].items()}, indent=1, default=str))
     print(f"gaps: {report['gaps']}")
