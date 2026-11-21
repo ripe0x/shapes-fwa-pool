@@ -2,7 +2,8 @@
 """Assert-based self checks for sim/unified.py. Run: python3 sim/test_unified.py
 
 Covers the four checks the study owner required:
-  1. the VaultLib.edge backing self-check (0.06 pack at 0.5 gwei -> 65,158,469,945,350,000 wei);
+  1. the VaultLib.edge backing self-check (0.06 pack -> 64,896,174,863,380,000 wei; redeem gas at the
+     fixed 2 gwei purchaser bound, so the gas-ceiling arg no longer moves it);
   2. conservation of every wei across a full cycle (deposit -> operate -> full exit), integer ledger;
   3. our fee-share totals equal FWA's split (matches sim/forward.py.backtest exactly);
   4. a zero-activity run loses exactly the build/list costs (plus one-time deploy/exit gas).
@@ -19,7 +20,7 @@ E = U.E
 
 
 def check_backing():
-    assert U.edge_backing(6 * 10**16, 0.5) == 65_158_469_945_350_000, U.edge_backing(6 * 10**16, 0.5)
+    assert U.edge_backing(6 * 10**16, 0.5) == 64_896_174_863_380_000, U.edge_backing(6 * 10**16, 0.5)
     # gate: 0.06 keep recipe lists and restocks; 0.03 direct mint lists but cannot restock
     r4 = U.RECIPES["r4_direct06"]
     cyc = r4.cycle_cost(0.5)
