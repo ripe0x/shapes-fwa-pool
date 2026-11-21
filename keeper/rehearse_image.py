@@ -272,8 +272,10 @@ def main():
                              rpc=f"http://127.0.0.1:{PROXY_PORT}")
         keepers[0] = replacement
         replacement.start()
+        # The charge is quoted at the basefee when the call runs; a build in between can raise it.
+        # Pay double, as a holder should: the excess comes straight back.
         send(holder, VAULT, "requestRedeem(uint256)", call("shareBalance(address)(uint256)", holder) // 4,
-             value=call("requestCharge()(uint256)"))
+             value=2 * call("requestCharge()(uint256)"))
         warp_to(42_360)
         expire_queue()
         wait_for("replacement prices the redemption through a lost RPC response",
