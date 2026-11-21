@@ -1,8 +1,8 @@
 {
  "name": "Unified shapes FWA system: pooled canary and personal manager factory (unsigned)",
- "commit": "3573ea635e56e2c008033ff9e821e161fe858b13",
+ "commit": "dc29b7c99b9428a76f0ffba7a4bd7d006286d733",
  "manifest": "deploy/release-manifest.json",
- "manifest_sha256": "e7dd6d38205be15b52762989678fb9a573461729f8f2ac97ffecbe0272ce9c49",
+ "manifest_sha256": "4517350609846893eb03ee163f405d0a8a3b1d885d287658dd662ac55382c5f9",
  "deployment_values": "deploy/canary.json",
  "deployment_values_sha256": "4f6daca9a77e96f2e52295de3072f0256095aa360a9caf8f8d15da108f02fe79",
  "manager_default_values": "deploy/manager.json",

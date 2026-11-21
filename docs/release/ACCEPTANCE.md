@@ -1,6 +1,6 @@
 # Owner acceptance: unified candidate (unsigned)
 
-[acceptance.json](acceptance.json) binds commit `3573ea6`, the release manifest (`e7dd6d38…`), the
+[acceptance.json](acceptance.json) binds commit `dc29b7c`, the release manifest (`45173506…`), the
 canary values (`deploy/canary.json`) and the asset-flow outcomes O1–O11. Signing its sha256 accepts the
 items below. It authorizes nothing else: no broadcast, funding, Fly deployment or public offer of
 personal managers.
