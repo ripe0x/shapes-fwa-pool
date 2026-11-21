@@ -953,11 +953,12 @@ library VaultLib {
             if (p.state == ACTIVE) return false;
             if (p.state != ALLOCATED) revert InvalidListing();
             // Keep, relist, expiry or default: B (1 - s) paid, the pack went to the purchaser.
-            // A bid returns the pack to the depositor (or owes it) and pays nothing. A pack that
-            // is the account's either way is booked as returned; the cash is in the balance.
-            if (!returned) {
+            // A bid returns the pack to the depositor (or owes it) and pays nothing. A kept pack
+            // that came back (a gift, perhaps with extra Shapes) joins inventory at its actual value.
+            if (b.receipts[id].kind == 1 || !returned) {
                 release(b, id, p.backing);
                 keep(b, id);
+                if (owned) addInventory(b, p.packId, packs.valueOf(p.packId));
                 return true;
             }
         } else if (l.status == LISTING_WITHDRAWN) {
@@ -1033,7 +1034,7 @@ library VaultLib {
     {
         if (b.acquisitionCursor != f.nextSequenceToProcess()) revert CatchUpFirst();
         if (b.pendingPlusOne != 1) revert PendingReceipts();
-        (uint256 entries, uint256 reads) = ScanLib.requireAllocatedCurrent(b, f);
+        (uint256 entries, uint256 reads) = ScanLib.requireAllocatedCurrent(b, f, packs);
         gasQ = Q_CHECKPOINT + entries * Q_ALLOCATION_ENTRY + reads * Q_ALLOCATION_READ;
         uint256 pending;
         if (b.activeCount != 0) {

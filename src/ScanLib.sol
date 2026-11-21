@@ -2,7 +2,7 @@
 pragma solidity 0.8.30;
 
 import {VaultLib} from "./VaultLib.sol";
-import {IFWAV2, IFWAView, LISTING_ALLOCATED, LISTING_SETTLED} from "./interfaces/External.sol";
+import {IFWAV2, IFWAView, IShapePacks, LISTING_ALLOCATED, LISTING_SETTLED} from "./interfaces/External.sol";
 
 /// @notice The read half of VaultLib's scan proof, a separate library only for EIP-170 size.
 library ScanLib {
@@ -11,7 +11,7 @@ library ScanLib {
     ///      (forced ETH), the cash would otherwise count beside the position until it is synced.
     ///      Reads at most MAX_ALLOCATION_SCAN queue entries from the head (else CatchUpFirst: sync
     ///      and prune first), so pricing cost never grows with allocation history.
-    function requireAllocatedCurrent(VaultLib.Book storage b, IFWAV2 f)
+    function requireAllocatedCurrent(VaultLib.Book storage b, IFWAV2 f, IShapePacks packs)
         external view returns (uint256 entries, uint256 reads)
     {
         if (b.allocatedValue == 0) return (0, 0);
@@ -22,7 +22,11 @@ library ScanLib {
             uint256 id = b.allocationQueue[i];
             if (b.positions[id].state != VaultLib.ALLOCATED) continue;
             ++reads;
-            if (IFWAView(address(f)).listings(id).status != LISTING_ALLOCATED) revert VaultLib.PendingReceipts();
+            uint8 status = IFWAView(address(f)).listings(id).status;
+            // A bid pays nothing and returns the pack: the booked position already counts it.
+            if (status == LISTING_ALLOCATED || (status == LISTING_SETTLED
+                && (VaultLib.owns(packs, b.positions[id].packId) || f.stuckNFTRecipient(id) == address(this)))) continue;
+            revert VaultLib.PendingReceipts();
         }
     }
 

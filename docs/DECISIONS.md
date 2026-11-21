@@ -1245,7 +1245,9 @@ whose pack came back was a bid and paid nothing; a Withdrawn listing the book ho
 kick and refunded B with the pack. Amounts are never inferred from balances. The receipt recorded in
 `receive()` stays only as the checkpoint gate it already was, and a checkpoint now also proves that
 every position the book holds Allocated is still Allocated at FWA (`ScanLib.requireAllocatedCurrent`),
-so a settlement without a receipt still blocks pricing until it is synced. The proof reads at most
+so a settlement without a receipt still blocks pricing until it is synced (a bid, which pays
+nothing and returns the pack, does not). A kept pack that comes back, perhaps with gifted Shapes, joins
+inventory at its actual value. The proof reads at most
 `MAX_ALLOCATION_SCAN` = 32 allocation queue entries from the head and otherwise refuses with
 `CatchUpFirst` at a constant 31,763 gas, so pricing never scans allocation history (review of
 958b924: the first version walked every tombstone behind an unresolved allocation). The queue from
