@@ -16,7 +16,7 @@
   "src/StrategyLib.sol": "af84cbab21da0215b63c2b4cd306b6ab7c89b48951d34c0742f8fa911cd8cb40",
   "src/VaultLib.sol": "e74c475d430137a38ceef00d920ca6b415e2442fbd8b1996e70c0d6f81147636",
   "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879",
-  "script/release.py": "7d194250c4debcc44426bb04f441fb3a73549075fa0f05a82a89efadeb1d2c74"
+  "script/release.py": "417dd46d5908086c546783eaa0b95d256f0c7432036c3e5a9a26142c9aa6e69f"
  },
  "toolchain": {
   "solc": "0.8.30",
@@ -84,11 +84,13 @@
   "fly.keeper-backup.toml": "5ad276a78fc08c2fc8badf7b70b4794cb19e0043e3b080081323d9041a57a79b"
  },
  "evidence": {
-  "docs/receipts/formal-assessment.json": "0d1b1774c5f428dbc005bb1599ad08fc3d42fbf3cba8e8ca52bd0dccf32d8a33",
-  "docs/receipts/unified-production-rehearsal.json": "09e9942ff56928a344b55d7fd8f504f74cc12f2140f7fe505f5e80fae8dd38d8",
-  "docs/receipts/unified-selection-rehearsal.json": "23cdd72cc7ce78166d22fd31f61d284dcdc294e78e4bfe86319afa21d0f65bea",
+  "docs/receipts/formal-assessment.json": "5654fe55725846c5b4a292b9b1298d3e3dee74d0f64a23d05e91bb93c0c97133",
+  "docs/receipts/recipe-comparison.json": "619174dbc9034424070fc62c1eb94175480bbf0c8549f3c92f2c0a2066d48cc0",
+  "docs/receipts/unified-production-rehearsal.json": "d52a4c644bf2fb5aaec19adf7e0adfce574839ec8c5088de239b3fdd16c9e33f",
+  "docs/receipts/unified-selection-rehearsal.json": "8662f2f36b14f0c6cc1133cc44951f2dd0d72c5d571038e07ba20ae75ae883c4",
+  "docs/receipts/image-rehearsal/ci-44930570759.json": "4543d98a490f01b2696510f9b22164828d5807107b7d42b8c88ce8c66a57bfd1",
   "docs/receipts/unified-review.md": "d9d3eb7f8bfcb76d26deef11c89b9da71e0acd4c406bcff311de6a69995b74e5",
-  "docs/receipts/unified-verify/SUMMARY.md": "95e4918bb116c883a140d3551c57fd71b3f4dc7e950862598b13647de73b2153",
-  "asset-flow.json": "226c8e341787202636d706aa374942fcc2fb016d6bea6815966fd094132cc2d1"
+  "docs/receipts/unified-verify/SUMMARY.md": "3995883483bb1e818b1cd0c85d7093e4ac209c4e3acd7aa21be87f6f17275071",
+  "asset-flow.json": "a78995f0503d22f0652e78bd7594f582fa28e4489f14829cd414ccdae3e84414"
  }
 }
