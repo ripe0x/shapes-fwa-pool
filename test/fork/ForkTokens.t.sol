@@ -6,11 +6,13 @@ import {TestVaultOps} from "../utils/TestVaultOps.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {Test} from "forge-std/Test.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {PackAccount} from "../../src/PackAccount.sol";
 import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {
     IShapes, IShapePacks, IFWAV2, IFWARewards, IFWAToken
 } from "../../src/interfaces/External.sol";
+import {IOwnable, IFwaAdmin} from "./ForkBase.sol";
 
 /// @notice FWA token rewards end to end: our listings are live when a real buyback transaction
 ///         (replayed as its original call) routes tokens to depositors; the vault claims them and
@@ -40,6 +42,10 @@ contract ForkTokensTest is Test {
         vm.fee(0.1 gwei);
         vm.txGasPrice(0.15 gwei);
         token = IFWAToken(FWA.token());
+        // The 6-unit backing (~0.065 ETH) exceeds the oracle floor cap, so list it the way D62 does:
+        // FWA's owner oracle-exempts ShapePacks (its real live call, also made in ForkBase).
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
 
         VaultLib.Params memory p;
         p.minEdgeBps = 100;
@@ -47,7 +53,7 @@ contract ForkTokensTest is Test {
         p.maxTip = 0.05 gwei;
         p.keeperShareBps = 2_500;
         p.allocatedBoundBps = 200;
-        p.packUnitsMask = uint64(1) << 3;
+        p.packUnitsMask = uint64(1) << 6; // the 6-unit direct-mint recipe
         p.gasCeiling = 0.5 gwei;
         p.essentialCeiling = 0.5 gwei;
 
@@ -56,10 +62,10 @@ contract ForkTokensTest is Test {
         p.routineRate = 0.01 ether;
         p.essentialCap = 0.1 ether;
         p.essentialRate = 0.005 ether;
-        vm.deal(address(this), 5 ether);
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 2 ether);
-        TestVaultOps.restock(vault, 16, 3, 0);
-        TestVaultOps.list(vault, 16, 0);
+        vm.deal(address(this), 6 ether);
+        // Seed covers 16 six-unit packs: each costs P + 0.002 mint fee + backing (~0.13 ETH).
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether);
+        TestVaultOps.restock(vault, 16, 6, 0); // build mints and lists all 16 at once
 
         // The real buyback, replayed as its original self-call (EIP-7702 delegated sender).
         address from = vm.parseJsonAddress(fx, ".from");
@@ -93,7 +99,7 @@ contract ForkTokensTest is Test {
         assertEq(caller.code.length, 0); assertEq(caller.balance, 0);
         vm.deal(caller, 0.01 ether);
         this.assertTokenGasContext();
-        bytes memory input = abi.encodeCall(PackVault.burnTokens, (ids));
+        bytes memory input = abi.encodeCall(PackAccount.burnTokens, (ids));
         uint256 intrinsic = 21_000;
         for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
         address rewardModule = FWA.rewards();

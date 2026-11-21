@@ -6,6 +6,7 @@ import {TestVaultOps} from "../utils/TestVaultOps.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {ForkBase} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {PackAccount} from "../../src/PackAccount.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {IKeeperPolicy, KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
@@ -82,17 +83,20 @@ contract PolicyNoVersion {}
 ///         envelope, free ETH and budget, and never lets a policy block maintenance. No mocks.
 contract ForkKeeperPolicyTest is ForkBase {
     uint256 constant PRICE = 0.2 gwei; // min(basefee 0.15 + maxTip 0.05, ceiling 5)
-    uint256 constant LIST3_GAS = VaultLib.Q_LIST + 3 * VaultLib.Q_LISTED; // Q_LIST + 3 x Q_LISTED
+    // Build-and-list 3 six-unit packs: Q_BUILD call base + per pack (buildGas(2) + Q_LISTED).
+    uint256 constant BUILD3_GAS = VaultLib.Q_BUILD + 3 * (VaultLib.Q_BUILD_PACK + 2 * VaultLib.Q_BUILD_SHAPE
+        + VaultLib.Q_LISTED);
+    uint256 constant BUILD3_UNITS = 6; // 2 work units per built pack
 
     function _priced() internal {
-        uint256 gross = Charges.grossFor(vault, 1 ether);
+        uint256 gross = Charges.grossFor(vault, 2 ether);
         vm.prank(alice);
         vault.deposit{value: gross}();
         toBlackout();
         checkpoint();
         toOpen();
         vm.prank(keeper);
-        TestVaultOps.restock(vault, 6, 3, 0);
+        TestVaultOps.restock(vault, 6, 6, 0);
     }
 
     function _swap(address policy) internal {
@@ -101,10 +105,13 @@ contract ForkKeeperPolicyTest is ForkBase {
         assertEq(address(vault.keeperPolicy()), policy);
     }
 
-    function _list3(uint256 minPay) internal returns (uint256 pay) {
+    /// @dev `build` is now the primary paid strategy op (it mints and lists at once); `list` only
+    ///      relists returned packs, of which routine flow produces none, so keeper pay is exercised
+    ///      through `build` here.
+    function _build3(uint256 minPay) internal returns (uint256 pay) {
         uint256 b = keeper.balance;
         vm.prank(keeper);
-        pay = TestVaultOps.list(vault, 3, minPay);
+        pay = TestVaultOps.restock(vault, 3, 6, minPay);
         assertEq(keeper.balance - b, pay, "returned pay is the ETH received");
     }
 
@@ -113,7 +120,7 @@ contract ForkKeeperPolicyTest is ForkBase {
     function test_swapToDifferentFormulaPreservesAccounting() public {
         _priced();
         uint256 fee = vault.getParams().workFee;
-        assertEq(_list3(0), LIST3_GAS * PRICE + 3 * fee, "V1: quoted gas at basefee + tip, plus work fee");
+        assertEq(_build3(0), BUILD3_GAS * PRICE + BUILD3_UNITS * fee, "V1: quoted gas at basefee + tip, plus work fee");
 
         KeeperPolicyFlat v2 = new KeeperPolicyFlat();
         address v1 = address(vault.keeperPolicy());
@@ -132,7 +139,7 @@ contract ForkKeeperPolicyTest is ForkBase {
         vm.expectRevert(Ownable.Unauthorized.selector);
         vault.setPolicy(address(v2));
         vm.expectEmit(true, true, false, false, address(vault));
-        emit PackVault.PolicyChanged(v1, address(v2));
+        emit PackAccount.PolicyChanged(v1, address(v2));
         vm.prank(owner);
         vault.setPolicy(address(v2));
         assertEq(address(vault.keeperPolicy()), address(v2));
@@ -152,9 +159,9 @@ contract ForkKeeperPolicyTest is ForkBase {
             assertTrue(packId != 0, "position record kept");
         }
 
-        uint256 expected = v2.quote(2, 3, LIST3_GAS, false, 5 gwei, 0.05 gwei, fee);
-        assertEq(expected, 9 * fee);
-        assertEq(_list3(expected), expected, "V2 pays its own quote, to the wei");
+        uint256 expected = v2.quote(1, BUILD3_UNITS, BUILD3_GAS, false, 5 gwei, 0.05 gwei, fee);
+        assertEq(expected, 3 * BUILD3_UNITS * fee);
+        assertEq(_build3(expected), expected, "V2 pays its own quote, to the wei");
         assertEq(TestVaultOps.open(vault).length, open.length + 3);
     }
 
@@ -166,18 +173,18 @@ contract ForkKeeperPolicyTest is ForkBase {
         address v0 = address(new PolicyVersionZero());
         address nv = address(new PolicyNoVersion());
         vm.startPrank(owner);
-        vm.expectRevert(PackVault.OutOfBounds.selector);
+        vm.expectRevert(VaultLib.OutOfBounds.selector);
         vault.setPolicy(eoa);
-        vm.expectRevert(PackVault.OutOfBounds.selector);
+        vm.expectRevert(VaultLib.OutOfBounds.selector);
         vault.setPolicy(v0);
-        vm.expectRevert(PackVault.OutOfBounds.selector);
+        vm.expectRevert(VaultLib.OutOfBounds.selector);
         vault.setPolicy(nv);
         vm.stopPrank();
         address ok = address(new KeeperPolicyFlat());
         vm.prank(keeper);
         vm.expectRevert(Ownable.Unauthorized.selector);
         vault.setPolicy(ok);
-        vm.expectRevert(PackVault.OutOfBounds.selector);
+        vm.expectRevert(VaultLib.OutOfBounds.selector);
         new PackVault(FWA, SHAPES, PACKS, owner, defaultParams(), KeeperPolicyV1(eoa));
     }
 
@@ -186,8 +193,8 @@ contract ForkKeeperPolicyTest is ForkBase {
     function test_greedyPolicyCappedAtEnvelope() public {
         _priced();
         _swap(address(new PolicyGreedy()));
-        uint256 envelope = LIST3_GAS * PRICE * 11_000 / 10_000 + 3 * vault.getParams().workFee;
-        assertEq(_list3(0), envelope, "capped at the vault's envelope");
+        uint256 envelope = BUILD3_GAS * PRICE * 11_000 / 10_000 + BUILD3_UNITS * vault.getParams().workFee;
+        assertEq(_build3(0), envelope, "capped at the vault's envelope");
     }
 
     /// A reverting, gas-burning or short-return policy pays nothing; maintenance still runs unpaid,
@@ -198,20 +205,20 @@ contract ForkKeeperPolicyTest is ForkBase {
             [address(new PolicyReverting()), address(new PolicyGasBurner()), address(new PolicyShortReturn())];
         uint256 g = gasleft();
         vm.prank(keeper);
-        TestVaultOps.list(vault, 1, 0);
+        TestVaultOps.restock(vault, 1, 6, 0);
         uint256 gasV1 = g - gasleft();
         uint256 snap = vm.snapshotState();
         for (uint256 i; i < 3; ++i) {
             vm.revertToState(snap);
             _swap(bad[i]);
             uint256 open = TestVaultOps.open(vault).length;
-            uint256[] memory planned7 = TestVaultOps.proposals(vault, 1, 3);
+            uint256[] memory planned7 = TestVaultOps.proposals(vault, 1, 6);
             vm.prank(keeper);
-            vm.expectRevert(PackVault.Payment.selector);
-            vault.list(planned7, 1);
+            vm.expectRevert(VaultLib.Payment.selector);
+            vault.build(6, planned7, 1);
             g = gasleft();
             vm.prank(keeper);
-            uint256 pay = TestVaultOps.list(vault, 1, 0);
+            uint256 pay = TestVaultOps.restock(vault, 1, 6, 0);
             uint256 used = g - gasleft();
             assertEq(pay, 0, "failing policy pays nothing");
             assertEq(TestVaultOps.open(vault).length, open + 1, "work still done");
@@ -238,12 +245,12 @@ contract ForkKeeperPolicyTest is ForkBase {
         (uint256 r, uint256 e) = vault.budget();
         assertEq(r + e, 0, "budgets emptied");
         uint256 open = TestVaultOps.open(vault).length;
-        assertEq(_list3(0), 0, "no pay");
+        assertEq(_build3(0), 0, "no pay");
         assertEq(TestVaultOps.open(vault).length, open + 3, "work runs unpaid");
-        uint256[] memory planned6 = TestVaultOps.proposals(vault, 1, 3);
+        uint256[] memory planned6 = TestVaultOps.proposals(vault, 1, 6);
         vm.prank(keeper);
-        vm.expectRevert(PackVault.Payment.selector);
-        vault.list(planned6, 1);
+        vm.expectRevert(VaultLib.Payment.selector);
+        vault.build(6, planned6, 1);
     }
 
     /// Review H1: a deployment charge above 2^64 wei (18.4 ETH) is stored whole, so shares mint on
@@ -257,7 +264,9 @@ contract ForkKeeperPolicyTest is ForkBase {
         vm.fee(50 gwei);
         vm.txGasPrice(50 gwei);
         (PackVault v,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether);
-        uint256 gross = Charges.grossFor(v, 40 ether);
+        // The direct-mint deploy charge is a smaller fraction of each escrowed unit than the old
+        // 0.1-ETH recipe, so a larger deposit is needed to drive the stored charge above 2^64 wei.
+        uint256 gross = Charges.grossFor(v, 60 ether);
         vm.deal(alice, gross);
         vm.prank(alice);
         v.deposit{value: gross}();
