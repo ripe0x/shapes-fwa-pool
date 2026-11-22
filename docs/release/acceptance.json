@@ -142,6 +142,7 @@
    "id": "U4",
    "item": "FWA payment receipts (D84)",
    "facts": "settlement from FWA's record; pricing gated and bounded at 32 allocation entries; while kicks are possible (exemption lifted) every open listing is checked, at most 32",
+   "residual": "if FWA lifts the exemption, a kick refund is force-sent with no receipt, and FWA restores the exemption before sync, pricing counts the refund beside the position: NAV high by 0.0649 ETH per such kick until the permissionless sync",
    "liveness_cost": "with the exemption lifted and more than 32 open listings, pool pricing refuses until owner wind-down or an essential unlist brings the count to 32; the 2 ETH canary holds at most about 16"
   },
   {

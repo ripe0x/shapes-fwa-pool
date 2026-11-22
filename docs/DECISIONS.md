@@ -1264,7 +1264,7 @@ needs FWA's floor cap, which the ShapePacks oracle exemption switches off. The p
 the exemption (one read): in place, no listing can be kicked and nothing more is read; lifted, every
 open listing (at most `MAX_ALLOCATION_SCAN` = 32, else `CatchUpFirst`) must still be Active at FWA or
 pricing refuses with `PendingReceipts` until it is synced. Checkpoint pay counts those entries and
-reads like allocation entries. **Remaining exposure:** none in NAV. The cost is liveness: with the
+reads like allocation entries. **Remaining exposure** (review of b63d87a): one narrow overcount. If FWA's owner lifts the exemption, a kick refund is force-sent (`receive` failed, so no receipt), and the owner restores the exemption before anyone syncs, the one exemption read skips the check and pricing counts that refund beside its booked position: NAV high by one backing (0.0649 ETH) per such kick until the permissionless `sync`. The keeper syncs withdrawn listings before it checkpoints, but `checkpoint` is permissionless. Accepted: it needs two FWA owner actions around a failed `receive` (35,148 of the 100,000 gas stipend), and closing it means scanning every open listing at every checkpoint. The other cost is liveness: with the
 exemption lifted and more than 32 open listings, pool pricing (checkpoints, NAV) refuses until owner
 wind-down or an essential unlist for a redemption shortfall brings the count to 32 or fewer; the
 2 ETH canary can hold at most about 16 (each listing ties up a 0.06 ETH pack and 0.0649 ETH of

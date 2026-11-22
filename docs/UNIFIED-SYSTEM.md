@@ -221,7 +221,8 @@ Final source (manifest `deploy/release-manifest.json`, acceptance package unsign
 4. **Kick refunds (D84):** a kick refund force-sent while `receive` fails is caught by the
    checkpoint gate while kicks are possible. Above 32 open listings with the exemption lifted, pool
    pricing refuses until owner wind-down or essential unlisting brings the count down: a liveness
-   cost, not an overcount. The 2 ETH canary holds at most about 16 listings.
+   cost, not an overcount. The 2 ETH canary holds at most about 16 listings. Residual: a forced
+   kick refund left unsynced while FWA restores the exemption is priced one backing high until sync.
 5. **Monitored assumptions:** FWA's 100,000 gas stipend; our combined FWA weight share (keeper flags
    10%); FWA's owner-set economics (surcharge, discounts, fees) staying near today's values.
 

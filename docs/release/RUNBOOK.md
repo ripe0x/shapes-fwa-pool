@@ -36,6 +36,7 @@ difference. `script/deploy.sh` runs it, and with `--broadcast` also verifies the
 | Local production rehearsal (fresh fork) | all 17 steps pass on the final source (one warm fork, upstream Alchemy while Tenderly throttled) | [unified-production-rehearsal.json](../receipts/unified-production-rehearsal.json), [selection](../receipts/unified-selection-rehearsal.json) |
 | Production image on a fresh fork (CI) | pass, vault and one factory manager served together | [ci-44948198556.json](../receipts/image-rehearsal/ci-44948198556.json) |
 | Independent review | no critical, high or medium; the low kick residual is now fixed (D84) | [unified-review.md](../receipts/unified-review.md) |
+| Independent review of the kick fix (b63d87a) | no critical, high or medium; one low residual across an exemption restore, accepted (D84, U4) | [kick-fix-review.md](../receipts/kick-fix-review.md) |
 | Holder return (formal gate) and recipe comparison | see acceptance.json `economic` | [formal-assessment.json](../receipts/formal-assessment.json), [recipe-comparison.json](../receipts/recipe-comparison.json) |
 
 ## 3. Canary: what it is for
