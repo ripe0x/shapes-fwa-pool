@@ -83,6 +83,11 @@ after** at canary budgets (routine 0.03 ETH; no essential budget, D64) (measured
 `test/audit/release/AuditOwnerExtraction.t.sol`). Raising `tvlCap` exposes more holders to bad
 settings but does not raise that rate. Mitigation: the owner key is a multisig or hardware wallet.
 
+Update (owner, 2026-11-22, launch audits A and B): the numbers above understate the current
+bytecode maxima (routine 0.3 ETH cap at 0.02 a day, essential 0.1 at 0.005 a day, 50 gwei ceiling;
+audit B measured 0.3726 ETH over 30 days on the canary). The owner accepts owner-key compromise as
+a risk without a numeric bound and does not want it raised again.
+
 
 ## A2. Position accounting integration (owner, 2026-11-18)
 
