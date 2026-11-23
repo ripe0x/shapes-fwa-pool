@@ -26,9 +26,8 @@ Candidates (owner brief):
          contract could build if packUnitsMask allowed units=3.
 
 Recipe parameters are injected into the forward/policy modules per worker (spawn resets module
-globals), leaving src/, keeper/ and the mirror untouched. The only keeper/policy.py constant that is
-recipe-specific and currently hardcoded is Q_PURCHASER_REDEEM (160,000, a 2-Shape pack): for the
-0.03 recipes the pack holds three 0.01 Shapes, so the purchaser redeem gas is higher; see REDEEM_3.
+globals), leaving src/, keeper/ and the mirror untouched. Purchaser redeem gas follows each
+recipe's Shape count through keeper/policy.py (REDEEM_2, REDEEM_3).
 
 Usage: sim/recipe_comparison.py [--seeds 160] [--workers 14] [--quick] [--grid core|full]
 """
@@ -57,13 +56,9 @@ RECEIPT = ROOT / "docs/receipts"
 HURDLE_BPS = 1_000  # owner's 10%/yr net gate
 
 # ShapePacks.redeem of a 2-Shape 0.06 pack is 157,023 gas (ForkDirectMint.t.sol), quoted 160,000.
-# A 0.03 pack holds three 0.01 Shapes. There is no fork measurement of a 3-Shape redeem, so the
-# third Shape is priced at the strategy's own per-Shape redeem quote (policy.Q["redeem_shape"]
-# 35,000). 160,000 + 35,000 = 195,000. The keep-margin term is redeem_gas x 2 gwei, so this moves a
-# 0.03 pack's backing by ~7e-5 ETH versus using 160,000 (immaterial to the decision; stated as
-# derived, not measured).
-REDEEM_2 = 160_000
-REDEEM_3 = 160_000 + policy.Q["redeem_shape"]
+# Purchaser redeem gas comes from keeper.policy (VaultLib): a pack plus 30,000 per Shape.
+REDEEM_2 = policy.Q_PURCHASER_REDEEM_PACK + 2 * policy.Q_PURCHASER_REDEEM_SHAPE
+REDEEM_3 = policy.Q_PURCHASER_REDEEM_PACK + 3 * policy.Q_PURCHASER_REDEEM_SHAPE
 
 RECIPES = {
     "r1_06":  dict(name="0.06 direct (current)",   units=6, mint_fee=10**15, redeem=REDEEM_2, legacy=False),
@@ -84,7 +79,6 @@ def set_recipe(r):
     F.P = r["units"] * 10**16
     F.BUILD_UNITS = r["units"]
     F.MINT_FEE = r["mint_fee"]
-    policy.Q_PURCHASER_REDEEM = r["redeem"]
     policy.PURCHASER_GAS_PRICE = int(r.get("gps_gwei", 2) * 10**9)
     policy.Q["build_pack"] = LEGACY_BUILD_PACK if r["legacy"] else DIRECT_BUILD_PACK
     policy.Q["build_shape"] = LEGACY_BUILD_SHAPE if r["legacy"] else DIRECT_BUILD_SHAPE
@@ -267,7 +261,6 @@ def backing_table(gps_gwei=2, price_gwei=0.5):
     k = int(F.k_of() * F.E)
     rows = {}
     for rk, r in RECIPES.items():
-        policy.Q_PURCHASER_REDEEM = r["redeem"]
         policy.PURCHASER_GAS_PRICE = int(gps_gwei * 10**9)
         P = r["units"] * 10**16
         B = policy.edge_backing(k, None, int(F.S_FEE * 1e4), r["units"], vals["gasCeilingWei"],

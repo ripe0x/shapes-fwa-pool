@@ -44,7 +44,7 @@ def test_set_recipe_isolation():
     assert policy.Q["build_shape"] == 0 and policy.Q["build_pack"] == 545_000
     RC.set_recipe(dict(RC.RECIPES["r1_06"]))
     assert F.BUILD_UNITS == 6 and policy.Q["build_shape"] == 130_000
-    assert policy.Q_PURCHASER_REDEEM == RC.REDEEM_2
+    assert RC.REDEEM_2 == 160_000 and RC.REDEEM_3 == 190_000
 
 
 def test_sampler_behaviour():

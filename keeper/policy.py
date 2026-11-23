@@ -43,7 +43,7 @@ POSITION_VALUE = 1248 * 10**14  # 0.1248 ETH: what deploy/unwind charges are sca
 REF_UNITS = 6  # the reference recipe: one 0.05 and one 0.01 Shape, two paid primary mints
 MIN_PACK_UNITS, MAX_PACK_UNITS = 3, 30
 MIN_KEEP_ADVANTAGE = 3 * 10**14  # 0.0003 ETH: a keep must beat the best bid by this after redeem gas
-Q_PURCHASER_REDEEM = 160_000  # ShapePacks.redeem gas priced into the keep margin
+Q_PURCHASER_REDEEM_PACK, Q_PURCHASER_REDEEM_SHAPE = 100_000, 30_000  # ShapePacks.redeem gas: pack + per Shape
 PURCHASER_GAS_PRICE = 2 * 10**9  # the purchaser's redeem gas price bound, independent of the keeper ceiling
 Q_POSITION_SYNC = Q["journal"] + Q["selected"] + Q["synced"] + Q["pruned"]
 CYCLE_GAS = Q_POSITION_SYNC + Q["listed"] + Q["harvested"]  # a bid cycle's quoted gas (gates)
@@ -172,7 +172,8 @@ def edge_backing(k, cap, s_bps, units, gas_ceiling, markup_bps, work_fee, buffer
     tokenSettlementDiscountBps); `price` the quoted price now (default: the ceiling)."""
     value = units * UNIT
     floor = value + value // 19 + (0 if value % 19 == 0 else 1)  # ceil(value / 0.95)
-    margin = MIN_KEEP_ADVANTAGE + Q_PURCHASER_REDEEM * PURCHASER_GAS_PRICE
+    redeem_gas = Q_PURCHASER_REDEEM_PACK + shape_count(units) * Q_PURCHASER_REDEEM_SHAPE
+    margin = MIN_KEEP_ADVANTAGE + redeem_gas * PURCHASER_GAS_PRICE
     desired = 0
     if discount_bps != 0 and value > margin:
         desired = (value - margin) * BPS // discount_bps // BPS * BPS  # quantized to 10,000 wei

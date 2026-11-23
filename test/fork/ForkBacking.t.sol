@@ -56,7 +56,9 @@ contract ForkBackingTest is ForkBase {
         uint256 value = units * 0.01 ether;
         // Redeem gas is priced at the fixed 2 gwei bound (VaultLib.PURCHASER_GAS_PRICE), not the
         // keeper's gas ceiling, so the target no longer moves with the ceiling.
-        uint256 margin = VaultLib.MIN_KEEP_ADVANTAGE + VaultLib.Q_PURCHASER_REDEEM * VaultLib.PURCHASER_GAS_PRICE;
+        (, uint256 shapes) = VaultLib.makeup(units);
+        uint256 margin = VaultLib.MIN_KEEP_ADVANTAGE
+            + (VaultLib.Q_PURCHASER_REDEEM_PACK + shapes * VaultLib.Q_PURCHASER_REDEEM_SHAPE) * VaultLib.PURCHASER_GAS_PRICE;
         if (value <= margin || _bid() == 0) return 0;
         return (value - margin) * 10_000 / _bid() / 10_000 * 10_000; // floored to 10,000 wei
     }

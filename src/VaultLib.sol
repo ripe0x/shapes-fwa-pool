@@ -98,7 +98,10 @@ library VaultLib {
     /// Purchaser keep incentive. A selected purchaser keeps the pack when it is worth more than the
     /// best bid FWA offers (ETH or token bid), after the gas to redeem it, by at least this much.
     uint256 internal constant MIN_KEEP_ADVANTAGE = 0.0003 ether;
-    uint256 internal constant Q_PURCHASER_REDEEM = 160_000; // ShapePacks.redeem of a 2-Shape pack: 157,023
+    /// ShapePacks.redeem gas: a pack plus each Shape it holds. Measured on a fork (execution gas):
+    /// 2 Shapes 157,023, 5 Shapes 245,212, 7 Shapes (the most any allowed size holds) 304,115.
+    uint256 internal constant Q_PURCHASER_REDEEM_PACK = 100_000;
+    uint256 internal constant Q_PURCHASER_REDEEM_SHAPE = 30_000;
     /// The purchaser's redeem gas is priced at this fixed bound, independent of the keeper's gas
     /// ceiling: keeping stays the better choice for any purchaser paying up to 2 gwei.
     uint256 internal constant PURCHASER_GAS_PRICE = 2 gwei;
@@ -446,7 +449,9 @@ library VaultLib {
         t.build = build;
         t.floor = t.value + t.value / 19 + (t.value % 19 == 0 ? 0 : 1);
         uint256 bid = M.max(f.settlementDiscountBps(), f.tokenSettlementDiscountBps());
-        uint256 margin = MIN_KEEP_ADVANTAGE + Q_PURCHASER_REDEEM * PURCHASER_GAS_PRICE;
+        (, uint256 shapes) = makeup(units);
+        uint256 margin =
+            MIN_KEEP_ADVANTAGE + (Q_PURCHASER_REDEEM_PACK + shapes * Q_PURCHASER_REDEEM_SHAPE) * PURCHASER_GAS_PRICE;
         if (bid != 0 && t.value > margin) t.desired = (t.value - margin) * BPS / bid / BPS * BPS;
         if (t.cap != type(uint256).max) t.desired = M.min(t.desired, t.cap * (BPS - p.bufferBps) / BPS);
         t.cycleCost = quote(p, CYCLE_GAS, 2, false);

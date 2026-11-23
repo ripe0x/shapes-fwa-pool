@@ -38,7 +38,7 @@ contract ForkDirectMintTest is Test {
         uint32[] memory counts = new uint32[](9);
         (counts[0], counts[1], counts[2]) = (c001, c005, c01);
         uint256 shapesN = uint256(c001) + c005 + c01;
-        uint256 value = c001 * 0.01 ether + c005 * 0.05 ether + c01 * 0.1 ether;
+        uint256 value = uint256(c001) * 0.01 ether + uint256(c005) * 0.05 ether + uint256(c01) * 0.1 ether;
         uint256 fee = SHAPES.mintFee();
         vm.deal(address(this), 10 ether);
         uint256 balBefore = address(this).balance;
@@ -66,5 +66,26 @@ contract ForkDirectMintTest is Test {
         PACKS.redeem(p6);
         emit log_named_uint("gas redeem 0.06 pack (2 Shapes)", g - gasleft());
         assertEq(address(this).balance - before, 0.06 ether, "redeem returns exact backing, no fee");
+    }
+
+    /// The purchaser redeem gas VaultLib prices into the keep margin (100,000 + 30,000 per Shape)
+    /// covers a cold redeem of 2, 5 and 7 Shapes (7 is the most any allowed pack size holds).
+    function test_purchaserRedeemGasWithinQuote() public {
+        uint32[3][3] memory makeups = [[uint32(1), 1, 0], [uint32(4), 1, 0], [uint32(4), 1, 2]]; // 0.06, 0.09, 0.29
+        for (uint256 i; i < 3; ++i) {
+            (uint32 a, uint32 b, uint32 c) = (makeups[i][0], makeups[i][1], makeups[i][2]);
+            (uint256 id,) = _make(a, b, c);
+            uint256 n = uint256(a) + b + c;
+            uint256 value = PACKS.valueOf(id);
+            vm.cool(address(PACKS));
+            vm.cool(address(SHAPES));
+            uint256 before = address(this).balance;
+            uint256 g = gasleft();
+            PACKS.redeem(id);
+            uint256 used = g - gasleft();
+            emit log_named_uint(string.concat("gas redeem, Shapes: ", vm.toString(n)), used);
+            assertEq(address(this).balance - before, value, "redeem returns the pack value");
+            assertLe(used, 100_000 + n * 30_000, "redeem within the keep-margin quote");
+        }
     }
 }

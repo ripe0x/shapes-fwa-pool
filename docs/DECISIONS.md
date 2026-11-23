@@ -1283,3 +1283,9 @@ beats FWA's best bid for any purchaser paying up to 2 gwei; above that a purchas
 which the bid-outcome gate already requires to be profitable. Backing no longer moves with keeper
 settings, so a proposal stays valid across parameter changes. No oracle, role or setting is added.
 Keeper pay keeps its own ceilings.
+**Redeem gas by pack size (launch audit A, E1):** 160,000 gas fit only a 2-Shape pack; a 7-Shape
+pack redeems at 304,165 gas, which left a 0.29 ETH pack's keep advantage at 0.0000118 ETH. The quote
+is now 100,000 + 30,000 per Shape (`Q_PURCHASER_REDEEM_PACK`, `_SHAPE`; `makeup(units)`), mirrored
+in `keeper/policy.py`. Cold redeems on a fork: 2 Shapes 157,014, 5 Shapes 245,262, 7 Shapes 304,165
+(`ForkDirectMint.t.sol`); 7 is the most any allowed size holds. A 0.06 ETH pack is still 160,000, so
+its backing is unchanged.
