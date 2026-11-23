@@ -326,7 +326,8 @@ def plan(s):
                if l.status in (SETTLED, WITHDRAWN)
                or (l.status == ALLOCATED and s.now >= l.allocated_at + s.settlement_window)))
     active = [l for l in s.listings if l.status == ACTIVE]
-    shortfall = max(0, s.owed_estimate - s.free - s.pending_deposits)
+    # Escrow is cancellable until pricing, so it cannot replace redemption liquidity.
+    shortfall = max(0, s.owed_estimate - s.free)
     catchup = s.journal_cursor < s.completed_prefix
     unexposed = not s.open_positions and not s.active_count and not s.pending_receipts and not s.listings
     checkpoint_due = (s.blackout and s.queue_drained and not s.checkpoint_done_this_interval
@@ -510,7 +511,7 @@ def status(s, planned=None):
     planned = plan(s) if planned is None else planned
     out = []
     spike = s.gas_price > s.gas_ceiling
-    shortfall = max(0, s.owed_estimate - s.free - s.pending_deposits)
+    shortfall = max(0, s.owed_estimate - s.free)
     if s.winding_down:
         out.append(("WINDING_DOWN", "info", f"{s.open_positions} positions, {s.idle_packs} idle packs left to unwind"))
     if spike:

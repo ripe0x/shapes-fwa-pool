@@ -53,7 +53,8 @@ library ReconcileTrace {
         line = string.concat(line, ',"open":', vm.toString(open.length), ',"idle":', vm.toString(v.idlePackCount()));
         line = string.concat(line, ',"aliceShares":', vm.toString(v.shareBalance(alice)), ',"bobShares":', vm.toString(v.shareBalance(bob)), ',"aliceLocked":', vm.toString(uint256(aLocked)));
         line = string.concat(line, ',"aliceClaimable":', vm.toString(v.claimableEth(alice)), ',"pendingFeesSum":', vm.toString(fees), ',"feeCredit":', vm.toString(v.fwa().feeCredit(address(v))));
-        line = string.concat(line, book(v), ',"processingPool":', vm.toString(v.processingPool()));
+        line = string.concat(line, book(v), ',"processingPool":', vm.toString(v.processingPool()),
+            ',"chargeRefundReserve":', vm.toString(v.chargeRefundReserve()));
         line = string.concat(line, ',"distributionReserve":', vm.toString(v.distributionReserve()), ',"claimableTotal":', vm.toString(v.claimableTotal()));
         line = string.concat(line, ',"windingDown":', v.windingDown() ? "true" : "false", '}');
         vm.writeLine(output, line);

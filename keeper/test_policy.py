@@ -206,6 +206,13 @@ def main():
               free=873_337_920_659_858_602, owed_estimate=873_961_920_659_858_594,
               locked_shares=86_597_063_493_129_589, work_fee=20_000_000_000_000)
     assert fns(plan(s)).index("liquidate") < fns(plan(s)).index("checkpoint")
+    # A pending deposit covers the numerical gap but can cancel before checkpoint. The keeper
+    # must follow the vault's need calculation and free an idle pack for the existing redeemer.
+    cancellable = state(idle_packs=1, idle_value=P.UNIT, free=0, pending_deposits=E,
+                        locked_shares=E // 2, owed_estimate=P.UNIT)
+    cancellable_plan = fns(plan(cancellable))
+    assert cancellable_plan.index("liquidate") < cancellable_plan.index("checkpoint"), cancellable_plan
+    assert any(code == "REDEMPTION_LIQUIDITY_SHORT" for code, _, _ in status(cancellable)), status(cancellable)
 
     # Identifiers can go on either side, obey the actual interval, and become reusable.
     target = 10**16 + 1234

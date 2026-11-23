@@ -137,7 +137,7 @@ contract ForkVaultInvariantTest is ForkBase {
     /// INV01: the vault always holds every amount it owes outside the strategy.
     function invariant_reservesCovered() public view {
         uint256 owed = vault.pendingDepositTotal() + vault.redemptionReserve() + vault.distributionReserve()
-            + vault.claimableTotal();
+            + vault.claimableTotal() + vault.chargeRefundReserve();
         assertGe(address(vault).balance, owed);
     }
 
@@ -150,7 +150,7 @@ contract ForkVaultInvariantTest is ForkBase {
         }
         // Settled entitlements are tracked as one liability and are all part of the vault balance.
         assertEq(claimable, vault.claimableTotal(), "claimable total tracks every holder");
-        assertGe(address(vault).balance, claimable + vault.redemptionReserve() + vault.distributionReserve());
+        assertGe(address(vault).balance, claimable + vault.redemptionReserve() + vault.distributionReserve() + vault.chargeRefundReserve());
     }
 
     /// INV03: shares are conserved: supply = dead + holders' live shares + locked shares, up to

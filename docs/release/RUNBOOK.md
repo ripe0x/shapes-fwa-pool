@@ -1,8 +1,18 @@
 # Unified candidate: release runbook
 
-**Status: not approved for mainnet.** The unified candidate (PR ripe0x/shapes-fwa-pool#5) is built,
-verified and packaged unsigned. Nothing in this document has been broadcast. This file replaces the
-earlier runbook (PR #2 candidate), which is kept in git history.
+**2026-11-23 candidate update:** D86 changes `PackVault` redemption liquidity and checkpoint-charge
+refund accounting. The current branch is `codex/adversarial-checkpoint-nav`; see
+[the timing review](../receipts/checkpoint-timing-adversarial.md). Previous owner signatures and
+production rehearsal receipts apply to earlier bytecode and do not authorize this candidate.
+
+If several pending deposits shared a checkpoint charge and all cancel, the payer can read the
+`CheckpointRefundReady(era, amount)` event, confirm `chargeContribution(era, payer)`, and call
+`claimCheckpointRefund(era)`. The reserve remains excluded from NAV until claimed. Refund-claim gas
+belongs to the payer; at high gas it may be cheaper to wait.
+
+**Status: not approved for mainnet.** This candidate has no owner acceptance signature or fresh
+production rehearsal. Nothing in this document has been broadcast. The earlier release package is
+preserved in git history.
 
 Two separate authorizations are needed, and neither follows from the other:
 
@@ -16,11 +26,11 @@ Two separate authorizations are needed, and neither follows from the other:
 
 | Item | Identity |
 |---|---|
-| Branch | `claude/unified-shapes-fwa-system-852d17` (PR ripe0x/shapes-fwa-pool#5, draft) |
+| Branch | `codex/adversarial-checkpoint-nav` (draft PR) |
 | Release commit and manifest | named in [acceptance.json](acceptance.json): `commit`, `manifest_sha256` |
 | Manifest | [deploy/release-manifest.json](../../deploy/release-manifest.json): source hashes, toolchain, normalized runtimes of PackVault, PackManager, PackManagerFactory, KeeperPolicyV1 and the libraries ScanLib, VaultLib, StrategyLib; deploy values; keeper image inputs; evidence |
 | Compiler | solc 0.8.30, optimizer 200 runs, via IR, Cancun, no metadata hash; `lib/` pinned by git |
-| Runtime sizes (EIP-170 limit 24,576) | PackVault 16,960; VaultLib 23,482; StrategyLib and ScanLib in the manifest; PackManager 12,494 (each clone 44); PackManagerFactory 1,365; KeeperPolicyV1 216 |
+| Runtime sizes (EIP-170 limit 24,576) | PackVault 17,729; VaultLib 23,561; StrategyLib and ScanLib in the manifest; PackManager 12,494 (each clone 44); PackManagerFactory 1,365; KeeperPolicyV1 216 |
 | Keeper image | `keeper/Dockerfile` (Python 3.12, Foundry 1.8.1 pinned, `keeper/requirements.txt` pinned); fork rehearsal passed in CI run 44948198556 |
 | Deploy values | [deploy/mainnet.json](../../deploy/mainnet.json); manager defaults [deploy/manager.json](../../deploy/manager.json) |
 
@@ -31,12 +41,13 @@ difference. `script/deploy.sh` runs it, and with `--broadcast` also verifies the
 
 | Gate | Result | Receipt |
 |---|---|---|
-| Full candidate run (`script/verify.sh`) | at 3b4d9b3: 279 fork tests passed, 1 opt-in exporter skipped; scale 3/3; reconciler to the wei on three paths | [unified-verify/SUMMARY.md](../receipts/unified-verify/SUMMARY.md) |
-| Asset flow, 16 regimes, outcomes O1-O11 | all pass; unsigned | [asset-flow.json](../../asset-flow.json), `docs/receipts/flow/` |
-| Local production rehearsal (fresh fork) | all 17 steps pass on the final source (one warm fork, upstream Alchemy while Tenderly throttled) | [unified-production-rehearsal.json](../receipts/unified-production-rehearsal.json), [selection](../receipts/unified-selection-rehearsal.json) |
-| Production image on a fresh fork (CI) | pass, vault and one factory manager served together | [ci-44948198556.json](../receipts/image-rehearsal/ci-44948198556.json) |
-| Independent review | no critical, high or medium; the low kick residual is now fixed (D84) | [unified-review.md](../receipts/unified-review.md) |
-| Independent review of the kick fix (b63d87a) | no critical, high or medium; one low residual across an exemption restore, accepted (D84, U4) | [kick-fix-review.md](../receipts/kick-fix-review.md) |
+| Current adversarial candidate | 284 fork tests passed, 0 failed, 1 optional exporter skipped after forced compilation; 16 asset-flow regimes reconciled; release gate remains open | [checkpoint-timing-adversarial.md](../receipts/checkpoint-timing-adversarial.md) |
+| Prior full candidate run (`script/verify.sh`) | historical at 3b4d9b3: 279 fork tests passed, 1 opt-in exporter skipped; stale for this bytecode | [unified-verify/SUMMARY.md](../receipts/unified-verify/SUMMARY.md) |
+| Asset flow, 16 regimes, outcomes O1-O11 | current fork scenarios checked; owner approval withdrawn for this bytecode | [asset-flow.json](../../asset-flow.json), `docs/receipts/flow/` |
+| Local production rehearsal (fresh fork) | historical 17-step pass; stale for this bytecode | [unified-production-rehearsal.json](../receipts/unified-production-rehearsal.json), [selection](../receipts/unified-selection-rehearsal.json) |
+| Production image on a fresh fork (CI) | historical pass; stale for the changed vault and keeper | [ci-44948198556.json](../receipts/image-rehearsal/ci-44948198556.json) |
+| Prior independent review | historical, before D86 | [unified-review.md](../receipts/unified-review.md) |
+| Independent review of the kick fix (b63d87a) | historical, before D86; one low residual across an exemption restore (D84, U4) | [kick-fix-review.md](../receipts/kick-fix-review.md) |
 | Launch audit A (informed, b0e9c12) | R1 release-check binding repaired and re-attacked; E1, E2, S1 and the D84 test gap open | [launch-audit-A-repairs.md](../receipts/launch-audit-A-repairs.md) |
 | Launch audits A and B compared (step C) | owner-key bound, O9 at maximum load and purchaser gas need owner decisions; stranded request charge and unsolicited pack need repairs | [launch-audit-comparison.md](../receipts/launch-audit-comparison.md) |
 | Holder return (formal gate) and recipe comparison | see acceptance.json `economic` | [formal-assessment.json](../receipts/formal-assessment.json), [recipe-comparison.json](../receipts/recipe-comparison.json) |
@@ -133,7 +144,7 @@ Owner wind-down (one way): `cast send <vault> "startWindDown()" --account <owner
 
 | Condition | Action |
 |---|---|
-| Balance below `pendingDepositTotal + redemptionReserve + distributionReserve + claimableTotal + processingPool` | owner `startWindDown()`; investigate |
+| Balance below `pendingDepositTotal + redemptionReserve + distributionReserve + claimableTotal + processingPool + chargeRefundReserve` | owner `startWindDown()`; investigate |
 | `pendingReceipts()` nonzero for more than one keeper pass, or the checkpoint refusing with `PendingReceipts`/`CatchUpFirst` for more than one settlement window | read the keeper log; the next `sync` resolves it (D84) |
 | A settled listing whose `receipts(id)` is empty (a payment FWA force-sent) | expected to be resolved by the next sync; investigate why `receive` failed (gas repricing?) and pause new exposure |
 | Keeper pay above 0.12 ETH in 24 hours | owner sets routine cap and rate to 0 via `setParams`; investigate |

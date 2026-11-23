@@ -486,7 +486,12 @@ contract ForkKeeperPayTest is ForkBase {
         vm.prank(bob);
         vault.cancelDeposit();
         assertEq(bob.balance - b0, 1 ether, "bob paid no charge, gets none");
-        assertEq(vault.processingPool(), ckA, "alice's charge stays: she cancelled while bob waited");
+        assertEq(vault.processingPool(), 0, "the final cancellation closes this charge era");
+        assertEq(vault.chargeRefundReserve(), ckA, "alice's funded charge remains claimable");
+        uint256 era = vault.chargeEra();
+        vm.prank(alice);
+        vault.claimCheckpointRefund(era);
+        assertEq(vault.chargeRefundReserve(), 0);
     }
 
     /// Redemption and wind-down work is paid up to the essential ceiling; routine work stops at

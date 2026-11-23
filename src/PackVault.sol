@@ -95,6 +95,10 @@ contract PackVault is PackAccount {
 
     // Request charges held for the next checkpoint.
     uint256 public processingPool; // excluded from NAV until the checkpoint it funds
+    uint256 public chargeEra;
+    mapping(uint256 => mapping(address => uint256)) public chargeContribution;
+    mapping(uint256 => bool) public chargeRefundable;
+    uint256 public chargeRefundReserve; // canceled sponsors' ETH, excluded from NAV
 
     // ------------------------------------------------------------------ events and errors
 
@@ -103,6 +107,8 @@ contract PackVault is PackAccount {
     event RedeemRequested(address indexed holder, uint256 shares);
     event Checkpoint(uint256 indexed epoch, uint256 nav, uint256 supply, uint256 filledShares, uint256 paid, uint256 distributed);
     event Claimed(address indexed holder, uint256 amount);
+    event CheckpointRefundReady(uint256 indexed era, uint256 amount);
+    event CheckpointRefundClaimed(address indexed holder, uint256 indexed era, uint256 amount);
     event WindDownStarted();
 
     error Paused();
@@ -147,11 +153,12 @@ contract PackVault is PackAccount {
         return owed > inventory ? owed - inventory : 0;
     }
 
-    /// @dev ETH locked redemptions need beyond free ETH and new deposits.
+    /// @dev Cancellable deposits cannot count as redemption liquidity: a depositor can cancel
+    ///      immediately before a checkpoint, leaving no time to liquidate idle packs.
     function _need() internal view override returns (uint256) {
         uint256 owed = _owedEstimate();
-        uint256 liquid = _free() + pendingDepositTotal;
-        return owed > liquid ? owed - liquid : 0;
+        uint256 free = _free();
+        return owed > free ? owed - free : 0;
     }
 
     /// @dev The vault's own ETH: balance less escrowed deposits and every amount owed to holders,
@@ -159,7 +166,8 @@ contract PackVault is PackAccount {
     ///      Request charges held for the next checkpoint are excluded too. Forced ETH lands here,
     ///      so it is attributed by balance, never by callback.
     function _free() internal view override returns (uint256) {
-        uint256 owed = pendingDepositTotal + redemptionReserve + distributionReserve + claimableTotal + processingPool;
+        uint256 owed = pendingDepositTotal + redemptionReserve + distributionReserve + claimableTotal + processingPool
+            + chargeRefundReserve;
         uint256 bal = address(this).balance;
         return bal > owed ? bal - owed : 0;
     }
@@ -195,7 +203,11 @@ contract PackVault is PackAccount {
         uint256 charge = amount * deploy / (VaultLib.POSITION_VALUE + deploy);
         if (lastNav + pendingDepositTotal + amount > s.params.tvlCap) revert Amount();
         _settleHolder(msg.sender);
+        // Open a new charge era on its first funded request. Keeping this write out of
+        // checkpoint preserves the fixed gas quote for the full holder-flow path.
+        if (processingPool == 0 && ck != 0) ++chargeEra;
         processingPool += ck;
+        chargeContribution[chargeEra][msg.sender] += ck;
         PendingDeposit storage d = pendingDeposits[msg.sender];
         d.amount += uint96(amount);
         d.charge += uint96(charge);
@@ -218,8 +230,28 @@ contract PackVault is PackAccount {
         uint256 keep = pendingDepositTotal != 0 || lockedShares != 0 ? VaultLib.requestCharge(s.params) : 0;
         uint256 back = M.min(uint256(d.checkpointGwei) * 1 gwei, processingPool > keep ? processingPool - keep : 0);
         processingPool -= back;
+        chargeContribution[chargeEra][msg.sender] -= back;
+        if (keep == 0 && processingPool != 0) {
+            // Earlier canceled sponsors retain their charge until the last request cancels.
+            // Move it to a pull refund instead of subsidizing a future, unrelated checkpoint.
+            chargeRefundable[chargeEra] = true;
+            chargeRefundReserve += processingPool;
+            emit CheckpointRefundReady(chargeEra, processingPool);
+            processingPool = 0;
+        }
         msg.sender.forceSafeTransferETH(amount + back);
         emit DepositCancelled(msg.sender, amount + back);
+    }
+
+    /// @notice Recover a checkpoint charge that funded no checkpoint after every request canceled.
+    function claimCheckpointRefund(uint256 era) external nonReentrant {
+        if (!chargeRefundable[era]) revert Nothing();
+        uint256 amount = chargeContribution[era][msg.sender];
+        if (amount == 0) revert Nothing();
+        chargeContribution[era][msg.sender] = 0;
+        chargeRefundReserve -= amount;
+        msg.sender.forceSafeTransferETH(amount);
+        emit CheckpointRefundClaimed(msg.sender, era, amount);
     }
 
     /// @notice Lock shares for redemption. Filled pro rata at checkpoints as ETH frees up; the
@@ -233,7 +265,9 @@ contract PackVault is PackAccount {
         uint256 ck = requestCharge();
         uint256 charge = ck + M.mulDiv(M.mulDiv(amount, lastNav, totalShares), unwindCharge(), VaultLib.POSITION_VALUE);
         if (msg.value < charge) revert Amount();
+        if (processingPool == 0 && ck != 0) ++chargeEra;
         processingPool += ck;
+        chargeContribution[chargeEra][msg.sender] += ck;
         if (msg.value > charge) msg.sender.forceSafeTransferETH(msg.value - charge);
         _settleDist(msg.sender);
         sharesOf[msg.sender] -= amount;

@@ -300,7 +300,8 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         pending = num(at(vault, "pendingDepositTotal()(uint256)"))
         processing_pool = num(at(vault, "processingPool()(uint256)"))
         reserves = pending + num(at(vault, "redemptionReserve()(uint256)")) + \
-            num(at(vault, "distributionReserve()(uint256)")) + num(at(vault, "claimableTotal()(uint256)")) + processing_pool
+            num(at(vault, "distributionReserve()(uint256)")) + num(at(vault, "claimableTotal()(uint256)")) + \
+            num(at(vault, "chargeRefundReserve()(uint256)")) + processing_pool
         locked = num(at(vault, "lockedShares()(uint256)"))
         supply = num(at(vault, "totalShares()(uint256)"))
         if locked:

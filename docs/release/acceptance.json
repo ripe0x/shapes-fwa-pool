@@ -1,8 +1,8 @@
 {
- "name": "Unified shapes FWA system: pooled vault and personal manager factory",
- "commit": "7ad76a0d8d3eea3c99fa1a1e871f6c435683fb72",
+ "name": "Checkpoint timing candidate: pooled vault and personal manager factory",
+ "commit": "b0a0eebd0833837ba06c45aae7fe17913aaa9876",
  "manifest": "deploy/release-manifest.json",
- "manifest_sha256": "86ef59847800ff203ab66f1413a8cbb844377005ff1c1208f902ea9d2ef636bb",
+ "manifest_sha256": "0da80ea6f1198bc064da2d86f10dd7ae4a0eefe3746f2db8db4fc1e50576cebd",
  "deployment_values": "deploy/mainnet.json",
  "deployment_values_sha256": "4f6daca9a77e96f2e52295de3072f0256095aa360a9caf8f8d15da108f02fe79",
  "manager_default_values": "deploy/manager.json",
@@ -10,45 +10,41 @@
  "asset_flow_outcomes_sha256": "dbe267c39a299f3bf62424e35e52f9eae5d76090ba1e95f4c338c366e1b094f9",
  "keeper_image": {
   "inputs": "manifest field keeper (Dockerfile, entrypoint, requirements, keeper.py, policy.py, tx.py, index.py, Fly configs)",
-  "ci_fork_rehearsal": "run 44948198556 at 02c0a74, PASS: pooled vault and one factory-created manager served by one signer; docs/receipts/image-rehearsal/ci-44948198556.json"
+  "ci_fork_rehearsal": "Historical pass on prior bytecode and keeper; new image rehearsal outstanding."
  },
  "signing": "printf %s <sha256 of this file> | ssh-keygen -Y sign -f <owner key> -n packvault-release > deploy/release-acceptance.sig",
  "signature": null,
  "engineering": {
-  "full_suite": "script/verify.sh at 3b4d9b3: 279 fork tests passed, 0 failed, 1 opt-in exporter skipped; scale 3/3; replay 0 mismatches; reconciler to the wei on three paths; release check ok",
+  "full_suite": "b0a0eeb clean worktree: forced compile, 284 fork tests passed, 0 failed, 1 optional exporter skipped; 3 scale tests passed; model and keeper policy tests passed; full/partial/scan reconciliation to the wei.",
   "reconciliations": "full cycle, partial fill and wind-down, scan path: every bucket to the wei",
-  "asset_flow": "16 regimes, outcomes O1-O11 pass; owner-signed 2026-11-22; gate PASS",
+  "asset_flow": "16 regimes run at source hash 6492f5c7a791c3b0f5571ccde9c46d649e53574bf2ab02af1fc804d2ba259700, 0 bucket mismatches; gate INCOMPLETE because current owner approval is absent.",
   "sizes": {
-   "PackVault": 16960,
-   "VaultLib": 23482,
+   "PackVault": 17729,
    "PackManager": 12494,
-   "PackManager_clone": 44,
    "PackManagerFactory": 1365,
+   "StrategyLib": 12758,
+   "VaultLib": 23561,
+   "ScanLib": 3077,
    "KeeperPolicyV1": 216,
-   "limit": 24576,
-   "libraries": "manifest"
+   "limit": 24576
   },
   "deployment_gas": {
-   "total": 16070106,
-   "ScanLib": 719323,
-   "VaultLib": 5157757,
-   "StrategyLib": 2817411,
-   "KeeperPolicyV1": 100155,
-   "PackVault": 4144141,
-   "PackManagerFactory": 3131319
+   "status": "historical measurement invalidated; fresh production rehearsal outstanding"
   },
   "manager_create_gas": 474175,
   "fwa_push_receive_gas": {
    "keep_payment": 52363,
    "cold_kick_refund": 35148,
-   "stipend": 100000
+   "stipend": 100000,
+   "status": "historical measurement on prior bytecode; fresh production rehearsal outstanding"
   },
   "allocation_proof": {
    "max_entries": 32,
    "gas_at_bound": 188361,
    "quote_at_bound": 222000,
    "refusal_gas_any_history": 34519,
-   "kick_check": "while the ShapePacks oracle exemption is lifted: every open listing, at most 32, else CatchUpFirst at no more than 39,766 gas; two open listings cost 41,043 gas against a 72,000 quote"
+   "kick_check": "while the ShapePacks oracle exemption is lifted: every open listing, at most 32, else CatchUpFirst at no more than 39,766 gas; two open listings cost 41,043 gas against a 72,000 quote",
+   "status": "historical gas numbers; current behavior exercised in forced fork suite"
   },
   "largest_batch_gas_padded": 13000000,
   "tx_cap": 16777216,
@@ -56,11 +52,11 @@
   "rehearsal": {
    "receipt": "docs/receipts/unified-production-rehearsal.json",
    "fork_block": 26463991,
-   "result": "all 17 steps pass on one warm fork at 02c0a74 (upstream Alchemy via REHEARSAL_FORK_RPC while Tenderly's gateway rate-limited; URL scrubbed from records)",
+   "result": "historical 17-step pass on prior bytecode; fresh production rehearsal outstanding",
    "also": "docs/receipts/unified-production-rehearsal-26464497.json (earlier source)",
    "outcomes": "docs/receipts/unified-selection-rehearsal.json"
   },
-  "independent_review": "docs/receipts/unified-review.md: no critical, high or medium; S1 low fixed after the review of e755307 (D84)",
+  "independent_review": "Independent source discovery found cancellable-escrow exit delay; final informed review of refund eras, keeper liability and keeper exit planning found no blocking issue. See docs/receipts/checkpoint-timing-adversarial.md.",
   "exposure_monitoring": "keeper counts every open listing from each account's event index (no cap, reorg-repaired), failed accounts included; EXPOSURE_INCOMPLETE when an account has no index"
  },
  "economic": {
@@ -119,6 +115,13 @@
    },
    "zero_demand_1_96_eth_pct": -2.3,
    "0_03_direct": "never lists"
+  },
+  "status": "Prior formal demand and recipe assessments are historical; current timing and cancellation results are in docs/receipts/checkpoint-timing-adversarial.md.",
+  "timing": {
+   "marked_new_depositor_gain_wei": "1057625183394753",
+   "realized_round_trip_profit": "not demonstrated",
+   "gross_keep_revaluation_cap_at_1pct_fee_pct": "0.707869",
+   "gross_keep_revaluation_cap_at_zero_fee_pct": "0.816029"
   }
  },
  "decisions": [
@@ -156,18 +159,25 @@
   },
   {
    "id": "U6",
-   "item": "Asset-flow outcomes O1-O11, signed 2026-11-22, replace the 2026-11-17 signature for this candidate",
-   "outcomes_sha256": "dbe267c39a299f3bf62424e35e52f9eae5d76090ba1e95f4c338c366e1b094f9"
+   "item": "Asset-flow outcomes O1-O11 for the changed bytecode, currently unsigned",
+   "outcomes_sha256": "dbe267c39a299f3bf62424e35e52f9eae5d76090ba1e95f4c338c366e1b094f9",
+   "status": "No owner signature applies to this candidate."
   },
   {
    "id": "U7",
    "item": "Coverage limits",
-   "text": "the production image's fork rehearsal runs in CI (no Docker on the build Mac); the rehearsal's real-VRF outcomes impersonate the coordinator (real request and word, proof check skipped); the Python mirror does not model the in-sync fee-credit sweep at the default keeper share, so the reconcile fork run uses a share at which the credit waits; matched 6.8 and 50 ETH recipe cells ran only as a 2-seed pilot; the holder-run unlist in the image rehearsal was exercised in CI run 44946918814 (which then failed on liquidate timing, fixed) but the passing run 44948198556 had no shortfall to unwind; the local rehearsal fork used Alchemy, not Tenderly"
+   "text": "Historical image and production rehearsals do not cover changed bytecode/keeper. Signed checkpoint receipts, a live incumbent settlement ordering, realized colluding exit, multiple controlled allocations, and direct forced-kick receiver failure remain open."
   },
   {
    "id": "U8",
    "item": "Authority",
    "text": "signing authorizes no broadcast, funding, Fly deployment or public offer of personal managers; each is a separate owner decision"
+  },
+  {
+   "id": "U9",
+   "item": "Checkpoint timing and cancellation repair",
+   "facts": "Real keep ordering shifts 1057625183394753 wei of marked value to a new 1 ETH deposit; no positive round-trip profit established. Refunded charge carryover and cancellable-escrow exit delay are repaired.",
+   "status": "Unsigned; see docs/receipts/checkpoint-timing-adversarial.md."
   }
  ],
  "human_readable": "docs/release/ACCEPTANCE.md",

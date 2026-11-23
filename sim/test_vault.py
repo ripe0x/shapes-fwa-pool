@@ -14,6 +14,20 @@ def build_and_list(v, ids, units, mint_fee, backings, fee_debt=None):
 
 
 class VaultAccountingTest(unittest.TestCase):
+    def test_canceled_shared_charge_stays_refundable_and_out_of_nav(self):
+        v = self.vault()
+        charge = 92_000_000_000_000
+        v.deposit('alice', 10**17, charge)
+        v.deposit('bob', 10**17)
+        v.cancel('alice', keep=charge)
+        v.cancel('bob', keep=charge)
+        self.assertEqual(v.processing_pool, 0)
+        self.assertEqual(v.charge_refund_reserve, charge)
+        self.assertEqual(v.free(), E)
+        self.assertEqual(v.claim_checkpoint_refund('alice', v.charge_era), charge)
+        self.assertEqual(v.charge_refund_reserve, 0)
+        self.assertEqual(v.free(), E)
+
     def fee_funding_vault(self, cash=0, budget=10**18):
         v = self.vault()
         v.build([1, 2, 3], 3, 10**15, [363 * 10**14 + i * 10_000 for i in (1, 2, 3)])

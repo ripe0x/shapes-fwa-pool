@@ -144,10 +144,10 @@
   }
  ],
  "explained": [],
- "approval_history": "docs/release/history/asset-flow-signed-2026-11-17.json (older candidate). This unified candidate is unsigned; see docs/release/ACCEPTANCE.md.",
+ "approval_history": "Earlier owner signatures apply only to their earlier candidates; this changed bytecode and refund outcome require new acceptance.",
  "approval": {
   "outcomes_sha256": "dbe267c39a299f3bf62424e35e52f9eae5d76090ba1e95f4c338c366e1b094f9",
-  "date": "2026-11-22",
-  "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgT10UwBigHu/hL3vKFUPPNoDIN6\n6Wsrnx17avHqp4qC8AAAAKYXNzZXQtZmxvdwAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gt\nZWQyNTUxOQAAAEC92ggGey722MlQM3622QKlJUbV2bOa1jqj9/5h6QLd9JQ7SdqzwdzJvr\nDz37nhp/joJhMKvuqaL8W1BGyfaksD\n-----END SSH SIGNATURE-----"
+  "date": null,
+  "signature": null
  }
 }
