@@ -499,7 +499,7 @@ class Vault:
         d[3] += ck // 10**9
         self.pending_total += amount
         self.pending_charge_total += charge
-        if self.processing_pool == 0:
+        if self.processing_pool == 0 and ck:
             self.charge_era += 1
         self.processing_pool += ck
         key = (self.charge_era, h)
@@ -539,7 +539,7 @@ class Vault:
 
     def request_redeem(self, h, amount, ck=0, unwind=0):
         """Charges paid in ETH: `ck` to the processing pool, `unwind` to the vault."""
-        if self.processing_pool == 0:
+        if self.processing_pool == 0 and ck:
             self.charge_era += 1
         self.processing_pool += ck
         key = (self.charge_era, h)

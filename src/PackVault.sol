@@ -205,7 +205,7 @@ contract PackVault is PackAccount {
         _settleHolder(msg.sender);
         // Open a new charge era on its first funded request. Keeping this write out of
         // checkpoint preserves the fixed gas quote for the full holder-flow path.
-        if (processingPool == 0) ++chargeEra;
+        if (processingPool == 0 && ck != 0) ++chargeEra;
         processingPool += ck;
         chargeContribution[chargeEra][msg.sender] += ck;
         PendingDeposit storage d = pendingDeposits[msg.sender];
@@ -265,7 +265,7 @@ contract PackVault is PackAccount {
         uint256 ck = requestCharge();
         uint256 charge = ck + M.mulDiv(M.mulDiv(amount, lastNav, totalShares), unwindCharge(), VaultLib.POSITION_VALUE);
         if (msg.value < charge) revert Amount();
-        if (processingPool == 0) ++chargeEra;
+        if (processingPool == 0 && ck != 0) ++chargeEra;
         processingPool += ck;
         chargeContribution[chargeEra][msg.sender] += ck;
         if (msg.value > charge) msg.sender.forceSafeTransferETH(msg.value - charge);
