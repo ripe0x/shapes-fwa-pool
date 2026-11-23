@@ -10,6 +10,7 @@ import {VaultLib} from "../../src/VaultLib.sol";
 contract ForkCheckpointTimingTest is SelectionBase {
     address bob = makeAddr("pack-vault-test-timing-bob");
     address alice = makeAddr("pack-vault-test-timing-alice");
+    address carol = makeAddr("pack-vault-test-timing-carol");
 
     receive() external payable {}
 
@@ -131,6 +132,66 @@ contract ForkCheckpointTimingTest is SelectionBase {
         emit log_named_uint("post-checkpoint Alice gross deposit (wei)", g1);
         emit log_named_uint("post-checkpoint Alice final claim (wei)", a1);
         emit log_named_uint("post-checkpoint incumbent Bob final claim (wei)", b1);
+    }
+
+    function _redeemAroundKeep(bool settleBefore, address purchaser)
+        internal returns (uint256 charge, uint256 received, uint256 aliceValue, uint256 nav)
+    {
+        if (settleBefore) _settle(true, purchaser);
+        uint256 shares = vault.shareBalance(carol);
+        charge = Charges.redeemCharge(vault, shares);
+        vm.prank(carol);
+        vault.requestRedeem{value: charge}(shares);
+        if (!settleBefore) _settle(true, purchaser);
+        _blackout();
+        TestVaultOps.checkpoint(vault, 0);
+        uint256 cashBefore = carol.balance;
+        vm.prank(carol);
+        vault.claim();
+        received = carol.balance - cashBefore;
+        nav = vault.accountedNav(0);
+        aliceValue = nav * vault.shareBalance(alice) / vault.totalShares();
+    }
+
+    function test_postCheckpointRedemptionDoesNotLockPreKeepNav() public {
+        Candidate memory c = Candidate(
+            0x2eebb87b882804d37898b4074ab7e27e5f41eb59ed0712bf3ed6cddc943283a6,
+            26_229_795, 26_229_800, 1_792_451_207, 23, 3647,
+            0xE86C40ab0F182Ce4A7F2EC299080bcb741154720
+        );
+        _select(c);
+        VaultLib.Params memory params = vault.getParams();
+        params.allocatedBoundBps = 1000;
+        vm.prank(vault.owner());
+        vault.setParams(params);
+        vm.fee(0.15 gwei);
+        vm.txGasPrice(0.2 gwei);
+        vault.sync(new uint256[](0), 0, 0);
+        vm.deal(alice, 2 ether);
+        vm.deal(carol, 2 ether);
+        uint256 gross = Charges.grossFor(vault, 1 ether);
+        vm.prank(alice);
+        vault.deposit{value: gross}();
+        vm.prank(carol);
+        vault.deposit{value: 1 ether}(); // Alice funded the shared checkpoint charge
+        _blackout();
+        TestVaultOps.checkpoint(vault, 0);
+        assertGt(vault.shareBalance(alice), 0);
+        assertGt(vault.shareBalance(carol), 0);
+        assertLt(block.timestamp, uint256(FWA.settlementWindow()) + c.fulfillTimestamp);
+
+        uint256 snap = vm.snapshotState();
+        (uint256 c0, uint256 r0, uint256 a0, uint256 n0) = _redeemAroundKeep(true, c.purchaser);
+        assertTrue(vm.revertToState(snap));
+        (uint256 c1, uint256 r1, uint256 a1, uint256 n1) = _redeemAroundKeep(false, c.purchaser);
+        assertEq(c0, c1, "the stale lastNav gives the same request charge");
+        assertEq(r0, r1, "Carol's actual claimed ETH is priced at the same settled NAV");
+        assertEq(a0, a1, "the remaining live holder retains the same value");
+        assertEq(n0, n1, "both orderings end with identical vault NAV");
+        assertGt(r1, 0, "Carol receives a real ETH exit payment");
+        emit log_named_uint("post-checkpoint Carol redeem charge (wei)", c1);
+        emit log_named_uint("post-checkpoint Carol received ETH (wei)", r1);
+        emit log_named_uint("post-checkpoint remaining Alice claim (wei)", a1);
     }
 
     function test_colludingDepositorCapturesDeferredKeepGain() public {
