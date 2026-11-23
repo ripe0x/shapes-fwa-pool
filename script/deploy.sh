@@ -22,13 +22,13 @@ if [[ "$RPC_URL" =~ ^http://(127\.0\.0\.1|localhost)(:[0-9]+)?/?$ ]] \
   && cast rpc web3_clientVersion --rpc-url "$RPC_URL" | grep -qi anvil; then
   LOCAL=1
 fi
-# FORGE_WALLET_ARGS reaches forge script; only signer flags, so it cannot change compiler settings.
+# FORGE_WALLET_ARGS reaches forge script; only signer and gas-price flags, so it cannot change compiler settings.
 read -r -a WALLET <<< "${FORGE_WALLET_ARGS:-}"
 for ((i = 0; i < ${#WALLET[@]}; i++)); do
   case "${WALLET[i]}" in
-    --ledger|--trezor) ;;
-    --account|--sender|--keystore|--password-file|--hd-paths) ((++i)) ;;
-    *) echo "FORGE_WALLET_ARGS: ${WALLET[i]} is not a signer flag" >&2; exit 1 ;;
+    --ledger|--trezor|--unlocked) ;;
+    --account|--sender|--keystore|--password-file|--hd-paths|--with-gas-price|--priority-gas-price) ((++i)) ;;
+    *) echo "FORGE_WALLET_ARGS: ${WALLET[i]} is not a signer or gas-price flag" >&2; exit 1 ;;
   esac
 done
 # Compile in this environment before the check, so the check covers the artifacts forge script
