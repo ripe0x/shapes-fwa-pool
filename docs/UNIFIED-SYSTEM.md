@@ -218,11 +218,10 @@ Final source (manifest `deploy/release-manifest.json`, acceptance package unsign
    oracle-exempt and its best bid below about 94.4% (D80). Each stops new building and listing in every
    account at once. The keeper gas ceiling no longer affects listing (D85).
 4. **Kick refunds (D84):** a kick refund force-sent while `receive` fails is caught by the
-   checkpoint gate while kicks are possible. Above 32 open listings with the exemption lifted, pool
-   pricing refuses until owner wind-down or essential unlisting brings the count down: a liveness
-   cost, not an overcount. With no deposit cap this is reachable from about 4 ETH of listings
-   (33 positions). Residual: a forced
-   kick refund left unsynced while FWA restores the exemption is priced one backing high until sync.
+   checkpoint gate while kicks are possible and the pool holds at most 32 open listings; above 32
+   the check is skipped so pricing never stalls. Residual: a kick refund with no receipt (it needs
+   `receive` above FWA's 100,000 gas stipend) above 32 listings, or left unsynced while FWA restores
+   the exemption, is priced one backing high until sync.
 5. **Monitored assumptions:** FWA's 100,000 gas stipend; our combined FWA weight share (keeper flags
    10%); FWA's owner-set economics (surcharge, discounts, fees) staying near today's values.
 

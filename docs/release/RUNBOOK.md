@@ -138,7 +138,7 @@ Owner wind-down (one way): `cast send <vault> "startWindDown()" --account <owner
 | A settled listing whose `receipts(id)` is empty (a payment FWA force-sent) | expected to be resolved by the next sync; investigate why `receive` failed (gas repricing?) and pause new exposure |
 | Keeper pay above 0.12 ETH in 24 hours | owner sets routine cap and rate to 0 via `setParams`; investigate |
 | Any keeper revert that is not a lost race | stop that worker; read its state file |
-| FWA lifts the ShapePacks oracle exemption, moves its bid above about 94.4%, or changes fees or windows | new listings stop on their own (`QUOTE_UNAVAILABLE` / edge not ok); exits are unaffected; decide on wind-down. With the exemption lifted, pricing also checks every open listing; above 32 it refuses until wind-down (D84) |
+| FWA lifts the ShapePacks oracle exemption, moves its bid above about 94.4%, or changes fees or windows | new listings stop on their own (`QUOTE_UNAVAILABLE` / edge not ok); exits are unaffected; decide on wind-down. With the exemption lifted, pricing also checks every open listing up to 32 (D84) |
 | `EXPOSURE_SHARE` above 10% of FWA selection weight | owner decision on a cap (D81) |
 | Gas above the 0.5 gwei ceiling | routine work waits by design; holders may still exit at their own gas |
 

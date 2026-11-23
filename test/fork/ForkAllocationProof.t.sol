@@ -101,21 +101,25 @@ contract ForkAllocationProofTest is SelectionBase {
     function test_activeCheckOnlyWhileKickableAndBounded() public {
         _select(primary());
         h = new AllocationProofHarness();
-        for (uint256 i = 1; i <= L.MAX_ALLOCATION_SCAN + 1; ++i) h.listOnly(3e15 + i);
+        for (uint256 i = 1; i <= L.MAX_ALLOCATION_SCAN; ++i) h.listOnly(3e15 + i);
         (uint256 entries, uint256 reads,) = h.proof(FWA, PACKS);
         assertEq(entries + reads, 0, "exemption in place: no kick is possible, nothing to read");
         vm.prank(IOwnable(address(FWA)).owner());
         IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), false);
-        (bool ok, uint256 small) = _measure();
-        assertFalse(ok, "33 open listings refuse");
-        vm.expectRevert(L.CatchUpFirst.selector);
+        // listOnly books ids FWA never issued, so the check reads them as not Active and refuses.
+        vm.expectRevert(L.PendingReceipts.selector);
         h.proof(FWA, PACKS);
+        h.listOnly(3e15 + L.MAX_ALLOCATION_SCAN + 1);
+        (bool ok, uint256 small) = _measure();
+        assertTrue(ok, "33 open listings still price");
+        (entries, reads,) = h.proof(FWA, PACKS);
+        assertEq(entries + reads, 0, "above the bound the check is skipped, never refused");
         for (uint256 i = L.MAX_ALLOCATION_SCAN + 2; i <= 1_000; ++i) h.listOnly(3e15 + i);
         (bool ok2, uint256 large) = _measure();
-        assertFalse(ok2, "1,000 open listings refuse");
-        emit log_named_uint("active-check refusal gas at 33 open", small);
-        emit log_named_uint("active-check refusal gas at 1,000 open", large);
-        assertLe(large, small, "refusal cost does not grow with the open count");
+        assertTrue(ok2, "1,000 open listings still price");
+        emit log_named_uint("proof gas at 33 open, exemption lifted", small);
+        emit log_named_uint("proof gas at 1,000 open, exemption lifted", large);
+        assertLe(large, small, "cost does not grow with the open count");
     }
 
     function _measure() internal returns (bool ok, uint256 used) {

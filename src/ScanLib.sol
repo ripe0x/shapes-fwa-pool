@@ -12,15 +12,16 @@ library ScanLib {
     ///      Reads at most MAX_ALLOCATION_SCAN queue entries from the head (else CatchUpFirst: sync
     ///      and prune first), so pricing cost never grows with allocation history.
     ///      A kick refunds B the same way, so while FWA can kick (the ShapePacks oracle exemption
-    ///      lifted) every booked Active listing must also still be Active at FWA, read over at most
-    ///      MAX_ALLOCATION_SCAN open entries (else CatchUpFirst). With the exemption no listing can
-    ///      be kicked and the one exemption read is the whole proof.
+    ///      lifted) and the account holds at most MAX_ALLOCATION_SCAN open entries, every booked
+    ///      Active listing must also still be Active at FWA. Above that the check is skipped, not
+    ///      refused, so pricing never stalls on FWA's exemption: an unrecorded kick refund needs
+    ///      receive() to exceed FWA's 100,000 gas stipend (it uses 35,148), and with the exemption in
+    ///      place no listing can be kicked.
     function requireAllocatedCurrent(VaultLib.Book storage b, IFWAV2 f, IShapePacks packs)
         external view returns (uint256 entries, uint256 reads)
     {
-        if (b.activeCount != 0 && !f.oracleExemptCollections(address(packs))) {
-            uint256 n = b.open.length;
-            if (n > VaultLib.MAX_ALLOCATION_SCAN) revert VaultLib.CatchUpFirst();
+        uint256 n = b.open.length;
+        if (b.activeCount != 0 && n <= VaultLib.MAX_ALLOCATION_SCAN && !f.oracleExemptCollections(address(packs))) {
             entries = n;
             for (uint256 i; i < n; ++i) {
                 uint256 id = b.open[i];
