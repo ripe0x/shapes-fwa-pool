@@ -1,6 +1,6 @@
 # Owner acceptance: unified candidate (unsigned)
 
-[acceptance.json](acceptance.json) binds commit `3b4d9b3`, the release manifest (`75441e25…`), the
+[acceptance.json](acceptance.json) binds commit `f6050d1`, the release manifest (`cde32abd…`), the
 mainnet values (`deploy/mainnet.json`, no deposit cap) and the asset-flow outcomes O1–O11. Signing its sha256 accepts the
 items below. It authorizes nothing else: no broadcast, funding, Fly deployment or public offer of
 personal managers.
@@ -12,7 +12,7 @@ personal managers.
 | U3 Purchaser gas | Fixed 2 gwei bound in the keep incentive | Backing 0.06489617 ETH; keep beats the best bid by 0.0003 ETH after 160,000 gas |
 | U4 Payment receipts | Settlement from FWA's record; kick refunds checked while kicks are possible, up to 32 open listings | Above 32 the check is skipped, never refused; a forced kick refund left unsynced across an exemption restore prices NAV 0.0649 ETH high per kick until sync |
 | U5 Spending | Keeper budgets and checkpoint pay | 0.12 ETH routine in 24 h, then 0.02 ETH a day; essential budget 0 |
-| U6 Asset flow | Outcomes O1–O11 replace the 2026-11-17 signature for this candidate | outcomes sha256 `c45a37c5…` |
+| U6 Asset flow | Outcomes O1–O11 replace the 2026-11-17 signature for this candidate | outcomes sha256 `dbe267c3…` |
 | U7 Coverage limits | What was not shown for real | Image fork rehearsal in CI only; VRF outcomes via coordinator impersonation; mirror lacks the in-sync credit sweep; 6.8 and 50 ETH matched cells as a pilot only; the passing image run had no redemption shortfall for the holder to unwind; local rehearsal fork upstream was Alchemy |
 | U8 Authority | Signing is acceptance only | Broadcast, funding, Fly and the manager product are separate decisions |
 

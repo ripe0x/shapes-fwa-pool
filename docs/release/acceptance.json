@@ -1,13 +1,13 @@
 {
  "name": "Unified shapes FWA system: pooled vault and personal manager factory (unsigned)",
- "commit": "3b4d9b30fa05e414eb42e4d8062336d410f95b96",
+ "commit": "f6050d19c492a6ef98240b174b4a2bfb0f9c23d9",
  "manifest": "deploy/release-manifest.json",
- "manifest_sha256": "75441e251f68b6f9a5960e4715f224385f96fa45fde0e0672ccc59dbfa8df086",
+ "manifest_sha256": "cde32abd57901c88d7d64d4bd968d3fb738aef507300868e7e16b4d5a4d39c91",
  "deployment_values": "deploy/mainnet.json",
  "deployment_values_sha256": "4f6daca9a77e96f2e52295de3072f0256095aa360a9caf8f8d15da108f02fe79",
  "manager_default_values": "deploy/manager.json",
  "asset_flow": "asset-flow.json",
- "asset_flow_outcomes_sha256": "c45a37c53b53b52e1cec078df1c3b816141a927654be538fe1bee5908f87c783",
+ "asset_flow_outcomes_sha256": "dbe267c39a299f3bf62424e35e52f9eae5d76090ba1e95f4c338c366e1b094f9",
  "keeper_image": {
   "inputs": "manifest field keeper (Dockerfile, entrypoint, requirements, keeper.py, policy.py, tx.py, index.py, Fly configs)",
   "ci_fork_rehearsal": "run 44948198556 at 02c0a74, PASS: pooled vault and one factory-created manager served by one signer; docs/receipts/image-rehearsal/ci-44948198556.json"
@@ -15,7 +15,7 @@
  "signing": "printf %s <sha256 of this file> | ssh-keygen -Y sign -f <owner key> -n packvault-release > deploy/release-acceptance.sig",
  "signature": null,
  "engineering": {
-  "full_suite": "script/verify.sh at b63d87a (src and test as released): 278 fork tests passed, 0 failed, 1 opt-in exporter skipped; scale 3/3; replay 0 mismatches; release check passed (docs/receipts/unified-verify/SUMMARY.md). Later commits change only keeper and rehearsal scripts (offline keeper checks rerun), receipts and docs",
+  "full_suite": "script/verify.sh at 3b4d9b3: 279 fork tests passed, 0 failed, 1 opt-in exporter skipped; scale 3/3; replay 0 mismatches; reconciler to the wei on three paths; release check ok",
   "reconciliations": "full cycle, partial fill and wind-down, scan path: every bucket to the wei",
   "asset_flow": "16 regimes, outcomes O1-O11 pass; approval absent (unsigned)",
   "sizes": {
@@ -157,7 +157,7 @@
   {
    "id": "U6",
    "item": "Asset-flow outcomes O1-O11 (unsigned) replace the 2026-11-17 signature for this candidate",
-   "outcomes_sha256": "c45a37c53b53b52e1cec078df1c3b816141a927654be538fe1bee5908f87c783"
+   "outcomes_sha256": "dbe267c39a299f3bf62424e35e52f9eae5d76090ba1e95f4c338c366e1b094f9"
   },
   {
    "id": "U7",
