@@ -1,8 +1,8 @@
 {
  "name": "Unified shapes FWA system: pooled vault and personal manager factory (unsigned)",
- "commit": "64c728680d60ad8cd3a73a77e0e5c77b3f2f1179",
+ "commit": "3b4d9b30fa05e414eb42e4d8062336d410f95b96",
  "manifest": "deploy/release-manifest.json",
- "manifest_sha256": "a131ef72be5d27a8ef8b89aa7e3e04c8a24f82702d277a98d3077e0bb6d76191",
+ "manifest_sha256": "75441e251f68b6f9a5960e4715f224385f96fa45fde0e0672ccc59dbfa8df086",
  "deployment_values": "deploy/mainnet.json",
  "deployment_values_sha256": "4f6daca9a77e96f2e52295de3072f0256095aa360a9caf8f8d15da108f02fe79",
  "manager_default_values": "deploy/manager.json",
@@ -29,8 +29,8 @@
    "libraries": "manifest"
   },
   "deployment_gas": {
-   "total": 16068358,
-   "ScanLib": 717575,
+   "total": 16070106,
+   "ScanLib": 719323,
    "VaultLib": 5157757,
    "StrategyLib": 2817411,
    "KeeperPolicyV1": 100155,
@@ -143,7 +143,7 @@
    "item": "FWA payment receipts (D84)",
    "facts": "settlement from FWA's record; pricing gated and bounded at 32 allocation entries; while kicks are possible (exemption lifted) every open listing is checked, at most 32",
    "residual": "if FWA lifts the exemption, a kick refund is force-sent with no receipt, and FWA restores the exemption before sync, pricing counts the refund beside the position: NAV high by 0.0649 ETH per such kick until the permissionless sync",
-   "liveness_cost": "with the exemption lifted and more than 32 open listings, pool pricing refuses until owner wind-down or an essential unlist brings the count to 32; with no deposit cap this is reachable from about 4 ETH of listings"
+   "above_32_listings": "the kick check is skipped above 32 open listings, so pricing never waits on FWA's exemption; an unrecorded kick refund there (receive above FWA's 100,000 gas stipend) would price one backing high until sync"
   },
   {
    "id": "U5",

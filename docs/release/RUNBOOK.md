@@ -65,7 +65,7 @@ interval: 360,000 gas plus at most 32 allocation entries and, while the oracle e
 
 | Item | Amount |
 |---|---|
-| One-time deployment, billed on a local fork through `script/deploy.sh` | **16,068,358 gas**: ScanLib 717,575 (unchanged since b63d87a, measured then); VaultLib 5,157,757; StrategyLib 2,817,411; KeeperPolicyV1 100,155; PackVault 4,144,141; PackManagerFactory with its implementation 3,131,319 |
+| One-time deployment, billed on a local fork through `script/deploy.sh` | **16,070,106 gas**: ScanLib 719,323; VaultLib 5,157,757; StrategyLib 2,817,411; KeeperPolicyV1 100,155; PackVault 4,144,141; PackManagerFactory with its implementation 3,131,319 |
 | Deployment cost | 0.0080 ETH at 0.5 gwei, 0.0321 ETH at 2 gwei (send the larger plus the 0.01 ETH seed) |
 | Deployer | holds the seed plus deployment gas |
 | Primary keeper wallet | 0.05 ETH |
