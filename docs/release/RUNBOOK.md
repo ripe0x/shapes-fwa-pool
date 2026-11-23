@@ -38,6 +38,7 @@ difference. `script/deploy.sh` runs it, and with `--broadcast` also verifies the
 | Independent review | no critical, high or medium; the low kick residual is now fixed (D84) | [unified-review.md](../receipts/unified-review.md) |
 | Independent review of the kick fix (b63d87a) | no critical, high or medium; one low residual across an exemption restore, accepted (D84, U4) | [kick-fix-review.md](../receipts/kick-fix-review.md) |
 | Launch audit A (informed, b0e9c12) | R1 release-check binding repaired and re-attacked; E1, E2, S1 and the D84 test gap open | [launch-audit-A-repairs.md](../receipts/launch-audit-A-repairs.md) |
+| Launch audits A and B compared (step C) | owner-key bound, O9 at maximum load and purchaser gas need owner decisions; stranded request charge and unsolicited pack need repairs | [launch-audit-comparison.md](../receipts/launch-audit-comparison.md) |
 | Holder return (formal gate) and recipe comparison | see acceptance.json `economic` | [formal-assessment.json](../receipts/formal-assessment.json), [recipe-comparison.json](../receipts/recipe-comparison.json) |
 
 ## 3. Canary: what it is for
