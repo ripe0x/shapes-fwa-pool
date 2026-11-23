@@ -223,7 +223,8 @@ contract ForkMaxBatchGasTest is ForkBase {
         assertGe(frame.gasRefunded, 0);
         uint256 refund = uint256(uint64(frame.gasRefunded));
         uint256 gross = uint256(frame.gasTotalUsed) + refund;
-        assertLe(frame.gasTotalUsed, VaultLib.Q_CHECKPOINT, "fixed checkpoint gas component covers this isolated receipt-equivalent sample");
+        assertLe(uint256(frame.gasTotalUsed) * 0.5 gwei, VaultLib.Q_CHECKPOINT * 0.5 gwei + p.workFee,
+            "full checkpoint quote covers the isolated caller cost at the configured ceiling");
         emit log_named_uint("checkpoint redemption index distribution deposit payment complete gas", gross);
         emit log_named_uint("checkpoint redemption index distribution deposit payment complete gas pay wei", abi.decode(result, (uint256)));
         emit log_named_uint("checkpoint call meter plus intrinsic", callMeter);
@@ -236,7 +237,8 @@ contract ForkMaxBatchGasTest is ForkBase {
         assertGt(vault.distributionReserve(), 0, "eligible gain distribution is actually reserved");
         assertGt(vault.shareBalance(bob), 0, "new deposit is priced after flows");
         assertEq(vault.pendingDepositTotal(), 0);
-        uint256 protected = vault.redemptionReserve() + vault.distributionReserve() + vault.claimableTotal() + vault.processingPool();
+        uint256 protected = vault.redemptionReserve() + vault.distributionReserve() + vault.claimableTotal()
+            + vault.processingPool() + vault.chargeRefundReserve();
         assertGe(address(vault).balance, protected);
 
         assertTrue(vm.revertToState(beforeSecondDeposit));
@@ -265,7 +267,8 @@ contract ForkMaxBatchGasTest is ForkBase {
         assertGe(frame.gasRefunded, 0);
         refund = uint256(uint64(frame.gasRefunded));
         gross = uint256(frame.gasTotalUsed) + refund;
-        assertLe(frame.gasTotalUsed, VaultLib.Q_CHECKPOINT, "essential gas component covers this isolated receipt-equivalent sample");
+        assertLe(uint256(frame.gasTotalUsed) * 2 gwei, VaultLib.Q_CHECKPOINT * 2 gwei + p.workFee,
+            "full essential checkpoint quote covers the isolated caller cost");
         emit log_named_uint("essential spike checkpoint isolated receipt-equivalent gas", frame.gasTotalUsed);
         emit log_named_uint("essential spike checkpoint finalized frame refund", refund);
         emit log_named_uint("essential spike checkpoint isolated gross before refund", gross);

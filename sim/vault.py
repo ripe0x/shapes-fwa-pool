@@ -499,6 +499,8 @@ class Vault:
         d[3] += ck // 10**9
         self.pending_total += amount
         self.pending_charge_total += charge
+        if self.processing_pool == 0:
+            self.charge_era += 1
         self.processing_pool += ck
         key = (self.charge_era, h)
         self.charge_contribution[key] = self.charge_contribution.get(key, 0) + ck
@@ -520,7 +522,6 @@ class Vault:
             self.charge_refundable.add(self.charge_era)
             self.charge_refund_reserve += self.processing_pool
             self.processing_pool = 0
-            self.charge_era += 1
         self.balance -= amount + back
         return amount + back
 
@@ -538,6 +539,8 @@ class Vault:
 
     def request_redeem(self, h, amount, ck=0, unwind=0):
         """Charges paid in ETH: `ck` to the processing pool, `unwind` to the vault."""
+        if self.processing_pool == 0:
+            self.charge_era += 1
         self.processing_pool += ck
         key = (self.charge_era, h)
         self.charge_contribution[key] = self.charge_contribution.get(key, 0) + ck
@@ -689,7 +692,6 @@ class Vault:
         self.epoch += 1
         if work:
             self.processing_pool = 0  # keeper pay comes out of it (pay_keeper); the rest is free ETH
-            self.charge_era += 1
         elif distributed == 0:
             raise RuntimeError("Nothing")
         return work or distributed != 0

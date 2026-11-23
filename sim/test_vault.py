@@ -24,7 +24,7 @@ class VaultAccountingTest(unittest.TestCase):
         self.assertEqual(v.processing_pool, 0)
         self.assertEqual(v.charge_refund_reserve, charge)
         self.assertEqual(v.free(), E)
-        self.assertEqual(v.claim_checkpoint_refund('alice', 0), charge)
+        self.assertEqual(v.claim_checkpoint_refund('alice', v.charge_era), charge)
         self.assertEqual(v.charge_refund_reserve, 0)
         self.assertEqual(v.free(), E)
 

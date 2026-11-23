@@ -203,6 +203,9 @@ contract PackVault is PackAccount {
         uint256 charge = amount * deploy / (VaultLib.POSITION_VALUE + deploy);
         if (lastNav + pendingDepositTotal + amount > s.params.tvlCap) revert Amount();
         _settleHolder(msg.sender);
+        // Open a new charge era on its first funded request. Keeping this write out of
+        // checkpoint preserves the fixed gas quote for the full holder-flow path.
+        if (processingPool == 0) ++chargeEra;
         processingPool += ck;
         chargeContribution[chargeEra][msg.sender] += ck;
         PendingDeposit storage d = pendingDeposits[msg.sender];
@@ -235,7 +238,6 @@ contract PackVault is PackAccount {
             chargeRefundReserve += processingPool;
             emit CheckpointRefundReady(chargeEra, processingPool);
             processingPool = 0;
-            ++chargeEra;
         }
         msg.sender.forceSafeTransferETH(amount + back);
         emit DepositCancelled(msg.sender, amount + back);
@@ -263,6 +265,7 @@ contract PackVault is PackAccount {
         uint256 ck = requestCharge();
         uint256 charge = ck + M.mulDiv(M.mulDiv(amount, lastNav, totalShares), unwindCharge(), VaultLib.POSITION_VALUE);
         if (msg.value < charge) revert Amount();
+        if (processingPool == 0) ++chargeEra;
         processingPool += ck;
         chargeContribution[chargeEra][msg.sender] += ck;
         if (msg.value > charge) msg.sender.forceSafeTransferETH(msg.value - charge);
@@ -424,7 +427,6 @@ contract PackVault is PackAccount {
             // Pay comes out of the request charges; what is left over joins the vault's ETH.
             uint256 pool = processingPool;
             processingPool = 0;
-            ++chargeEra;
             return StrategyLib.pay(s, OP_CHECKPOINT, gasQ, 1, essential, minPay, pool);
         }
         if (distributed != 0) {

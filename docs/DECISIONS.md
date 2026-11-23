@@ -1311,6 +1311,13 @@ existing rule that a sponsor pays when another user's request actually reaches c
 refund reserve is excluded from NAV and from every spend path. The finite 10% allocation bound,
 strategy architecture, keeper pay quote and FWA settlement rules are unchanged.
 
+The first funded request opens the charge era, keeping its storage write out of checkpoint. The
+full holder-flow sample uses 361,202 gas after this change. At the configured 0.5 gwei ceiling its
+gas cost is 180,601,000,000,000 wei; the unchanged fixed quote plus work fee pays
+200,000,000,000,000 wei. Thus the total fixed quote still covers this sample and the approved O6
+payment stays at 0.0002 ETH. The gas component alone no longer covers the sample; actual signed
+receipt evidence remains an open release gate.
+
 **Measured:** the real-fork regression failed with `Nothing` before the liquidity repair and passed
 after it; 0.06 ETH of real pack value became cash before keeper pay. The first payer recovered its
 92,000,000,000,000 wei after two cancellations; a second payer's quote top-up also refunded to its
