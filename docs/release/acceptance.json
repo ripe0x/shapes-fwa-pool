@@ -1,13 +1,13 @@
 {
- "name": "Unified shapes FWA system: pooled canary and personal manager factory (unsigned)",
- "commit": "d47c1218e925050d3fbf4a591746e29d8d0565de",
+ "name": "Unified shapes FWA system: pooled vault and personal manager factory (unsigned)",
+ "commit": "64c728680d60ad8cd3a73a77e0e5c77b3f2f1179",
  "manifest": "deploy/release-manifest.json",
- "manifest_sha256": "3a3e6cf995df69b10be80440a58cd7d51c52abba87623b865b34475bd3fd6db5",
- "deployment_values": "deploy/canary.json",
+ "manifest_sha256": "a131ef72be5d27a8ef8b89aa7e3e04c8a24f82702d277a98d3077e0bb6d76191",
+ "deployment_values": "deploy/mainnet.json",
  "deployment_values_sha256": "4f6daca9a77e96f2e52295de3072f0256095aa360a9caf8f8d15da108f02fe79",
  "manager_default_values": "deploy/manager.json",
  "asset_flow": "asset-flow.json",
- "asset_flow_outcomes_sha256": "9908f1209f319af47dd798a04acb70a4d4bdd9d59479a1f3d76a9f69f40471e0",
+ "asset_flow_outcomes_sha256": "c45a37c53b53b52e1cec078df1c3b816141a927654be538fe1bee5908f87c783",
  "keeper_image": {
   "inputs": "manifest field keeper (Dockerfile, entrypoint, requirements, keeper.py, policy.py, tx.py, index.py, Fly configs)",
   "ci_fork_rehearsal": "run 44948198556 at 02c0a74, PASS: pooled vault and one factory-created manager served by one signer; docs/receipts/image-rehearsal/ci-44948198556.json"
@@ -29,12 +29,12 @@
    "libraries": "manifest"
   },
   "deployment_gas": {
-   "total": 16051109,
+   "total": 16068358,
    "ScanLib": 717575,
-   "VaultLib": 5140640,
+   "VaultLib": 5157757,
    "StrategyLib": 2817411,
    "KeeperPolicyV1": 100155,
-   "PackVault": 4144009,
+   "PackVault": 4144141,
    "PackManagerFactory": 3131319
   },
   "manager_create_gas": 474175,
@@ -68,7 +68,7 @@
    "receipt": "docs/receipts/formal-assessment.json",
    "hurdle": "10% a year net",
    "window_successful_per_day": 356.7,
-   "canary_1_96_eth": {
+   "holder_1_96_eth": {
     "median_pct": 70.6,
     "p10_pct": -55.3,
     "worst_pct": -61.5,
@@ -95,13 +95,13 @@
    "receipt": "docs/receipts/recipe-comparison.json",
    "decision": "0.06 direct mint",
    "creator_fees_ratio_vs_0_03_bulk_split": "2.6x to 5.4x in every cell",
-   "canary_0_06_median_pct": {
+   "holder_1_96_eth_0_06_median_pct": {
     "all_bid": 22.8,
     "observed": 34.3,
     "keep_50": 80.7,
     "all_keep": 136.8
    },
-   "canary_0_03_bulk_split_median_pct": {
+   "holder_1_96_eth_0_03_bulk_split_median_pct": {
     "all_bid": 25.1,
     "observed": 37.5,
     "keep_50": 65.4,
@@ -113,25 +113,25 @@
     "keep_50": 69.4,
     "all_keep": 88.2
    },
-   "quieter_demand_canary_0_06_median_pct": {
+   "quieter_demand_1_96_eth_0_06_median_pct": {
     "all_bid": 0.6,
     "all_keep": 9.8
    },
-   "zero_demand_canary_pct": -2.3,
+   "zero_demand_1_96_eth_pct": -2.3,
    "0_03_direct": "never lists"
   }
  },
  "decisions": [
   {
    "id": "U1",
-   "item": "Holder return at the canary",
-   "facts": "formal gate median +70.6% but 5 of 16 years lose (p10 -55.3%); with the last 10 days' quieter demand the canary median is +0.6% (all bid) to +9.8% (all keep), below the hurdle",
-   "recommendation": "deploy the 2 ETH canary as a technical deployment, not an investment product; assess after 14 days or 5 selections (RUNBOOK section 9)"
+   "item": "Holder return (mainnet values, no deposit cap)",
+   "facts": "formal gate median +70.6% but 5 of 16 years lose (p10 -55.3%); with the last 10 days' quieter demand the 1.96 ETH median is +0.6% (all bid) to +9.8% (all keep), below the hurdle",
+   "recommendation": "small pools carry a wide loss tail (5 of 16 modeled years lose at 1.96 ETH); none lose at 20 ETH"
   },
   {
    "id": "U2",
    "item": "Recipe: 0.06 direct mint",
-   "facts": "2.6-5.4x the creator revenue of 0.03 bulk-split; higher return at 20 ETH; at the canary 0.03 bulk-split's median is slightly higher under all-bid and observed behaviour with a milder tail"
+   "facts": "2.6-5.4x the creator revenue of 0.03 bulk-split; higher return at 20 ETH; at 1.96 ETH 0.03 bulk-split's median is slightly higher under all-bid and observed behaviour with a milder tail"
   },
   {
    "id": "U3",
@@ -143,21 +143,21 @@
    "item": "FWA payment receipts (D84)",
    "facts": "settlement from FWA's record; pricing gated and bounded at 32 allocation entries; while kicks are possible (exemption lifted) every open listing is checked, at most 32",
    "residual": "if FWA lifts the exemption, a kick refund is force-sent with no receipt, and FWA restores the exemption before sync, pricing counts the refund beside the position: NAV high by 0.0649 ETH per such kick until the permissionless sync",
-   "liveness_cost": "with the exemption lifted and more than 32 open listings, pool pricing refuses until owner wind-down or an essential unlist brings the count to 32; the 2 ETH canary holds at most about 16"
+   "liveness_cost": "with the exemption lifted and more than 32 open listings, pool pricing refuses until owner wind-down or an essential unlist brings the count to 32; with no deposit cap this is reachable from about 4 ETH of listings"
   },
   {
    "id": "U5",
-   "item": "Spending and owner-key bounds (canary)",
-   "routine_first_24h_eth": 0.04,
-   "routine_daily_eth": 0.01,
+   "item": "Spending (mainnet values)",
+   "routine_first_24h_eth": 0.12,
+   "routine_daily_eth": 0.02,
    "essential_budget_eth": 0,
    "checkpoint": "from request charges only, at most once per 12 h: 360,000 gas + 6,000 per allocation entry or open listing read + 30,000 per FWA read at 2 gwei + one work fee",
-   "owner_key": "accepted risk B3"
+   "owner_key": "accepted risk B3, no numeric bound (owner, 2026-11-22)"
   },
   {
    "id": "U6",
    "item": "Asset-flow outcomes O1-O11 (unsigned) replace the 2026-11-17 signature for this candidate",
-   "outcomes_sha256": "9908f1209f319af47dd798a04acb70a4d4bdd9d59479a1f3d76a9f69f40471e0"
+   "outcomes_sha256": "c45a37c53b53b52e1cec078df1c3b816141a927654be538fe1bee5908f87c783"
   },
   {
    "id": "U7",
