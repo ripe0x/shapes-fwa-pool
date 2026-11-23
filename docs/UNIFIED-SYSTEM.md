@@ -107,18 +107,18 @@ bidding:
 
 | Pool | Median | p10 | Worst | Losing runs | Creator mint fees / yr |
 |---|---:|---:|---:|---:|---:|
-| 1.96 ETH (canary) | **+70.6%** | −55.3% | −61.5% | 5 / 16 | 0.079 ETH |
+| 1.96 ETH | **+70.6%** | −55.3% | −61.5% | 5 / 16 | 0.079 ETH |
 | 6.8 ETH | **+55.9%** | +9.3% | −26.4% | 1 / 16 | 0.24 ETH |
 | 20 ETH | **+37.7%** | +22.0% | +6.0% | 0 / 16 | 0.62 ETH |
 
-The hurdle passes at every size on the median; the canary's tail is wide (selection luck on few
-positions), which is why the canary is a technical deployment.
+The hurdle passes at every size on the median; the 1.96 ETH tail is wide (selection luck on few
+positions).
 
 **Matched recipe comparison (`docs/receipts/recipe-comparison.json`, `sim/out/recipe-comparison.md`,
 `sim/recipe_comparison.py`).** Three recipes with identical capital, demand, purchaser-response
 pool, gas (0.5 gwei) and seeds; responses are held just inside FWA's settlement window so recipes
 differ only in the keep or bid choice (absolute levels therefore differ from the gate, which replays
-real timing; use this study to rank recipes, the gate for the hurdle). 100 seeds per canary cell, 48
+real timing; use this study to rank recipes, the gate for the hurdle). 100 seeds per 1.96 ETH cell, 48
 at 20 ETH. Median return / loss frequency / creator mint fees per ETH a year:
 
 | Cell | 0.06 direct (chosen) | 0.03 bulk mint + split | 0.03 direct |
@@ -138,16 +138,16 @@ at 20 ETH. Median return / loss frequency / creator mint fees per ETH a year:
 **Decision: keep 0.06.** It earns 2.6 to 5.4 times the creator revenue of the 0.03 bulk-split recipe
 in every cell and a higher depositor return at 20 ETH under every behaviour. 0.03 direct packs never
 list: one keep (2.27 mETH net) cannot repay three fresh mints (3.80 mETH). The tradeoff, stated
-plainly: at the 1.96 ETH canary the 0.03 bulk-split recipe's median edges 0.06 under all-bid and
+plainly: at 1.96 ETH the 0.03 bulk-split recipe's median edges 0.06 under all-bid and
 observed behaviour, with a milder tail (all keep: p5 +8.8% against −50.8%), because smaller packs at
 twice the FWA weight diversify a small pool; it does so by paying the creator about a third as much,
 and it would need the removed bulk-mint and split construction back. It does not materially improve
 the combined objective. No dynamic sizing.
 
 Further results: the keep advantage is +0.30 mETH at every purchaser gas assumption (the rule solves
-for it); `PURCHASER_GAS_PRICE` at 1 / 2 / 3 gwei moves the canary all-keep median +130% / +137% /
+for it); `PURCHASER_GAS_PRICE` at 1 / 2 / 3 gwei moves the 1.96 ETH all-keep median +130% / +137% /
 +117%, so 2 gwei stays. All-bid is the floor for the median and the loss frequency in every cell, but
-**not** for the worst case: all-keep has the fatter left tail (canary worst −93.7% against −66.5%),
+**not** for the worst case: all-keep has the fatter left tail (1.96 ETH worst −93.7% against −66.5%),
 because each keep hands the pack over and pays a fresh build. Creator revenue is set by the keep rate:
 0.03 ETH per ETH a year if every purchaser bids, 0.55 to 0.80 if every purchaser keeps. At 0.2 gwei
 the 0.03 bulk-split recipe's return leads (+369% against +184% median) while 0.06 still pays the
@@ -212,16 +212,16 @@ Final source (manifest `deploy/release-manifest.json`, acceptance package unsign
 
 1. **Owner signature.** The restated `asset-flow.json` outcomes and `docs/release/acceptance.json`
    are unsigned. No broadcast until the owner signs (D73).
-2. **Canary is a technical deployment.** At 2 ETH the formal gate's loss tail is wide (see section 5);
-   the canary verifies operation and exit, not returns. Capital is not raised to improve modeled
-   returns (A4.7).
+2. **No deposit cap and no canary** (owner, 2026-11-22): deployment uses `deploy/mainnet.json`.
+   At small sizes the formal gate's loss tail is wide (see section 5).
 3. **Third-party levers on new investment** (exits are unaffected): FWA keeping ShapePacks
    oracle-exempt and its best bid below about 94.4% (D80). Each stops new building and listing in every
    account at once. The keeper gas ceiling no longer affects listing (D85).
 4. **Kick refunds (D84):** a kick refund force-sent while `receive` fails is caught by the
    checkpoint gate while kicks are possible. Above 32 open listings with the exemption lifted, pool
    pricing refuses until owner wind-down or essential unlisting brings the count down: a liveness
-   cost, not an overcount. The 2 ETH canary holds at most about 16 listings. Residual: a forced
+   cost, not an overcount. With no deposit cap this is reachable from about 4 ETH of listings
+   (33 positions). Residual: a forced
    kick refund left unsynced while FWA restores the exemption is priced one backing high until sync.
 5. **Monitored assumptions:** FWA's 100,000 gas stipend; our combined FWA weight share (keeper flags
    10%); FWA's owner-set economics (surcharge, discounts, fees) staying near today's values.
@@ -230,8 +230,8 @@ Final source (manifest `deploy/release-manifest.json`, acceptance package unsign
 
 1. Review this document, D77–D85, OWNER-REQUIREMENTS A3 and A4, and `docs/release/ACCEPTANCE.md`.
 2. Sign `docs/release/acceptance.json` (which binds the manifest, values and outcomes) if accepted.
-3. Authorize the public canary broadcast (`script/deploy.sh deploy/canary.json --broadcast` from the
+3. Authorize the broadcast (`script/deploy.sh deploy/mainnet.json --broadcast` from the
    owner's keystore), keeper funding (primary 0.05, backup 0.02 ETH) and the Fly deployment with
    `VAULT` set and `FACTORY` unset (`docs/release/RUNBOOK.md`).
-4. Separately, after the canary assessment, decide whether to offer personal managers publicly
+4. Separately, decide whether to offer personal managers publicly
    (set `FACTORY` for the keepers, publish the factory and `deploy/manager.json`).

@@ -77,7 +77,7 @@ def quantity(v):
 
 
 def values(calibration=False):
-    v = json.loads((ROOT / "deploy/canary.example.json").read_text())
+    v = json.loads((ROOT / "deploy/mainnet.json").read_text())
     v["owner"] = ACTORS["owner"]
     if calibration:
         v["tvlCapWei"] = 12 * 10**18
@@ -96,11 +96,11 @@ def plan():
         external_test_signer=dict(address=ORACLE_OWNER, target=ORACLE, action="setFloor(packs,ask)",
                                   added_funding_wei=0, preconditions="pinned owner/code/nonce/balance readback; existing balance funds gas"),
         per_transaction_gas_limit=MAX_GAS, runtime_code_limit=CODE_SIZE, production_broadcasts=0,
-        canary_values=values(), calibration_values=values(True),
+        launch_values=values(), calibration_values=values(True),
         phase_isolation="evm_snapshot/revert reuses the single funded baseline between phases; no second balance credit",
         phases=[
-            "Fresh production script/deploy.sh deployment and postflight; 2ETH canary lifecycle using normal keeper/index, restart, tokens/burn, oracle kick, policy swap, gas spike, redemption, wind-down",
-            "Fresh production deployment for the holder workflow and a separate owner wind-down (rehearse_current.py), selected canary values and budgets; restart normal keeper; holder-run exits with loss limits",
+            "Fresh production script/deploy.sh deployment and postflight; mainnet-values lifecycle using normal keeper/index, restart, tokens/burn, oracle kick, policy swap, gas spike, redemption, wind-down",
+            "Fresh production deployment for the holder workflow and a separate owner wind-down (rehearse_current.py), mainnet values and budgets; restart normal keeper; holder-run exits with loss limits",
             "Fresh12ETH test-only calibration vault, same budgets; <=6ETH deposits by each of two holders; masks3+30; max16 listing/unlisting/harvest/token/sync items, total30Shapes restock/liquidation, exact fee witness checkpoints",
             "Genuine external FWA acquire requests in bounded batches, expire through real processor, measure1/16 refunded global journal entries and higher gas; withdraw actual refund; no fabricated VRF success",
         ],

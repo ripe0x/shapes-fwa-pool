@@ -69,7 +69,7 @@ def test_short_runs():
     RC._init(w)
     out = {}
     for rk in RC.RECIPES:
-        task = (rk, None, "1.96ETH", RC.CANARY, 0.5, "value", 1.0, "base", 1, 30, 30)
+        task = (rk, None, "1.96ETH", RC.SMALL, 0.5, "value", 1.0, "base", 1, 30, 30)
         out[rk] = RC._one(task)
     # 0.06 builds and lists within 30 days.
     assert out["r1_06"]["build_calls"] > 0 and out["r1_06"]["pos_max"] > 0, out["r1_06"]

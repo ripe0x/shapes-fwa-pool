@@ -36,7 +36,7 @@ CONTRACTS = {"PackVault": "src/PackVault.sol", "PackManager": "src/PackManager.s
 LIBRARIES = ["ScanLib", "VaultLib", "StrategyLib"]
 KEEPER = ["keeper/Dockerfile", "keeper/entrypoint.sh", "keeper/requirements.txt", "keeper/keeper.py",
           "keeper/policy.py", "keeper/tx.py", "keeper/index.py", "fly.keeper-primary.toml", "fly.keeper-backup.toml"]
-VALUES = ["deploy/canary.json", "deploy/mainnet.json"]
+VALUES = ["deploy/mainnet.json"]
 # The acceptance package names this manifest, so it is not listed here (no cycle).
 EVIDENCE = ["docs/receipts/formal-assessment.json", "docs/receipts/recipe-comparison.json",
             "docs/receipts/unified-production-rehearsal.json", "docs/receipts/unified-selection-rehearsal.json",
@@ -120,8 +120,8 @@ def toolchain():
 
 
 def manifest():
-    m = dict(name="PackVault and PackManagerFactory mainnet canary", sources=sources(), toolchain=toolchain(), build=build(),
-             deployment_values="deploy/canary.json", values={v: sha(v) for v in VALUES},
+    m = dict(name="PackVault and PackManagerFactory mainnet", sources=sources(), toolchain=toolchain(), build=build(),
+             deployment_values="deploy/mainnet.json", values={v: sha(v) for v in VALUES},
              keeper={k: sha(k) for k in KEEPER},
              evidence={e: sha(e) for e in EVIDENCE if (ROOT / e).exists()})
     for name, b in m["build"].items():

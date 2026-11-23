@@ -71,7 +71,7 @@ RECIPES = {
 LEGACY_BUILD_PACK, LEGACY_BUILD_SHAPE = 545_000, 0
 DIRECT_BUILD_PACK, DIRECT_BUILD_SHAPE = 300_000, 130_000
 
-CANARY = 1_960_100_000_000_000_000  # formal's 1.96 ETH deployable canary deposit
+SMALL = 1_960_100_000_000_000_000  # formal's 1.96 ETH holder cell
 
 
 def set_recipe(r):
@@ -85,7 +85,7 @@ def set_recipe(r):
 
 
 def config_for(principal):
-    return "canary" if principal <= 2 * 10**18 else "mainnet"
+    return "mainnet"
 
 
 # ----------------------------------------------------------------- scenarios
@@ -215,20 +215,20 @@ def build_jobs(seeds, quick, grid):
         # base and stressed (last-10-days) demand. Plus purchaser-gas sensitivity and zero demand.
         BEH = [("allbid", 0.0), ("fixed", 0.5), ("value", 1.0), ("observed", 1.0)]
         for beh, kp in BEH:
-            add("1.96ETH", CANARY, 0.5, beh, kp, "base")   # canary, every behaviour, base demand
+            add("1.96ETH", SMALL, 0.5, beh, kp, "base")   # canary, every behaviour, base demand
             add("20ETH", 20 * F.E, 0.5, beh, kp, "base")   # larger level, every behaviour
         # Stressed (last-10-days) demand at the extremes of keep, both capitals.
         for beh, kp in (("allbid", 0.0), ("value", 1.0)):
-            add("1.96ETH", CANARY, 0.5, beh, kp, "recent10")
+            add("1.96ETH", SMALL, 0.5, beh, kp, "recent10")
             add("20ETH", 20 * F.E, 0.5, beh, kp, "recent10")
-        add("1.96ETH", CANARY, 0.5, "value", 1.0, "zero")
-        add("1.96ETH", CANARY, 0.2, "value", 1.0, "base")  # low gas
+        add("1.96ETH", SMALL, 0.5, "value", 1.0, "zero")
+        add("1.96ETH", SMALL, 0.2, "value", 1.0, "base")  # low gas
         for gps in (1, 3):                                   # purchaser-gas sensitivity
-            add("1.96ETH", CANARY, 0.5, "value", 1.0, "base", gps=gps)
+            add("1.96ETH", SMALL, 0.5, "value", 1.0, "base", gps=gps)
         return jobs
 
     # Headline: recipe x capital x behaviour, at the 0.5 gwei gate price.
-    caps_all = [("1.96ETH", CANARY), ("20ETH", 20 * F.E)]
+    caps_all = [("1.96ETH", SMALL), ("20ETH", 20 * F.E)]
     caps_edge = [("6.8ETH", 68 * 10**17), ("50ETH", 50 * F.E)]
     for label, cap in caps_all:
         for beh, kp in (("allbid", 0.0), ("value", 1.0), ("observed", 1.0)):
@@ -240,16 +240,16 @@ def build_jobs(seeds, quick, grid):
     if grid == "full":
         # Fixed keep-rate sweep at the canary (0 and 1 already covered by allbid/value).
         for kp in (0.25, 0.5, 0.75):
-            add("1.96ETH", CANARY, 0.5, "fixed", kp, "base")
+            add("1.96ETH", SMALL, 0.5, "fixed", kp, "base")
         # Stress: quieter/concentrated (last 10 days) and zero demand, value-aware.
-        add("1.96ETH", CANARY, 0.5, "value", 1.0, "recent10")
-        add("1.96ETH", CANARY, 0.5, "value", 1.0, "zero")
+        add("1.96ETH", SMALL, 0.5, "value", 1.0, "recent10")
+        add("1.96ETH", SMALL, 0.5, "value", 1.0, "zero")
         # Higher gas: 0.2 gwei (low) already excluded; run the ceiling already is 0.5. Add a
         # low-gas 0.2 reference at the canary, value-aware.
-        add("1.96ETH", CANARY, 0.2, "value", 1.0, "base")
+        add("1.96ETH", SMALL, 0.2, "value", 1.0, "base")
         # Purchaser-gas-price sensitivity (changes backing): 1 and 3 gwei (2 is the base above).
         for gps in (1, 3):
-            add("1.96ETH", CANARY, 0.5, "value", 1.0, "base", gps=gps)
+            add("1.96ETH", SMALL, 0.5, "value", 1.0, "base", gps=gps)
     return jobs
 
 
@@ -257,7 +257,7 @@ def build_jobs(seeds, quick, grid):
 
 def backing_table(gps_gwei=2, price_gwei=0.5):
     """Analytic backing and keep advantage per recipe at the gate, no simulation."""
-    vals = json.loads((ROOT / "deploy/canary.json").read_text())
+    vals = json.loads((ROOT / "deploy/mainnet.json").read_text())
     k = int(F.k_of() * F.E)
     rows = {}
     for rk, r in RECIPES.items():
@@ -329,7 +329,7 @@ def summarize(rows):
 # ----------------------------------------------------------------- main
 
 SOURCES = ["sim/recipe_comparison.py", "sim/forward.py", "sim/vault.py", "keeper/policy.py",
-           "sim/formal.py", "deploy/canary.json", "deploy/mainnet.json"]
+           "sim/formal.py", "deploy/mainnet.json"]
 
 
 def main():

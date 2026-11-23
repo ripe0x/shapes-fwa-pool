@@ -41,7 +41,7 @@ WINDOW = 30 * F.DAY
 INTERVAL, BLACKOUT = F.OperatingClock.INTERVAL, F.OperatingClock.BLACKOUT_START
 HURDLE_BPS = 1_000
 SOURCES = ["sim/formal.py", "sim/forward.py", "sim/vault.py", "sim/replay.py", "sim/ingest.py",
-           "keeper/policy.py", "deploy/canary.json", "deploy/mainnet.json"]
+           "keeper/policy.py", "deploy/mainnet.json"]
 
 
 def window(db_path, end):
@@ -212,22 +212,22 @@ def main():
     windows = exit_windows(w["events"])
     days, exit_days = (30, 30) if a.quick else (360, 30)
     seeds = range(1, 2 if a.quick else a.seeds + 1)
-    canary = 1_960_100_000_000_000_000
+    small = 1_960_100_000_000_000_000  # the 1.96 ETH holder cell
     jobs = []
     for price in (0.5, 0.2):
-        for label, config, principal in [("formal", "canary", canary), ("formal", "mainnet", 68 * 10**17),
+        for label, config, principal in [("formal", "mainnet", small), ("formal", "mainnet", 68 * 10**17),
                                          ("formal", "mainnet", 20 * F.E)]:
             jobs += [(w, label, config, principal, price, s, days, exit_days, None, None, {}) for s in seeds]
     # Diagnostics, never the gate: the window's last ten days tiled, and zero demand.
     recent_start = WINDOW - 10 * F.DAY
     recent = flatten([(max(0, r - recent_start), c - recent_start, x) for r, c, x in w["pairs"] if c >= recent_start])
-    jobs += [(w, "recent-10-days", "canary", canary, 0.5, s, days, exit_days, recent, 10 * F.DAY, {}) for s in seeds]
-    jobs += [(w, "zero-demand", "canary", canary, 0.5, 1, days, exit_days, [], WINDOW, {})]
+    jobs += [(w, "recent-10-days", "mainnet", small, 0.5, s, days, exit_days, recent, 10 * F.DAY, {}) for s in seeds]
+    jobs += [(w, "zero-demand", "mainnet", small, 0.5, 1, days, exit_days, [], WINDOW, {})]
     for timing in ("recorded-timing", "recorded-choice"):
-        jobs += [(w, timing, "canary", canary, 0.5, s, days, exit_days, None, None, dict(timing=timing))
+        jobs += [(w, timing, "mainnet", small, 0.5, s, days, exit_days, None, None, dict(timing=timing))
                  for s in seeds]
     # FWA's owner set the pack oracle exemption inside the window and can remove it again.
-    jobs += [(w, "oracle-capped", "canary", canary, 0.5, s, days, exit_days, None, None,
+    jobs += [(w, "oracle-capped", "mainnet", small, 0.5, s, days, exit_days, None, None,
               dict(exempt=False)) for s in seeds]
     print(f"{len(jobs)} runs, {a.workers} workers", flush=True)
     rows = []
@@ -238,14 +238,14 @@ def main():
                   f"claim={r['exit_complete']} net={r['holder_net_realized_wei'] / F.E:+.6f}", flush=True)
     assert frozen == {p: sha(p) for p in SOURCES}, "source changed during the run"
     summary = summarize(rows)
-    values = {c: json.loads((ROOT / f"deploy/{c}.json").read_text()) for c in ("canary", "mainnet")}
-    bids = [bid_outcome(p, values["canary"]) for p in (0.2, 0.5)]
+    values = {c: json.loads((ROOT / f"deploy/{c}.json").read_text()) for c in ("mainnet",)}
+    bids = [bid_outcome(p, values["mainnet"]) for p in (0.2, 0.5)]
     gate = {k: s for k, s in summary.items() if s["label"] == "formal" and s["total_price_gwei"] == 0.5}
     formal = dict(
         hurdle_bps=HURDLE_BPS,
         holder_return=all(s["completed_claims"] == s["runs"] and s["median_return_bps"] is not None
                           and s["median_return_bps"] >= HURDLE_BPS for s in gate.values()),
-        holder_return_at_canary=summary.get(f"formal|canary|{canary}|0.5"),
+        holder_return_at_1_96_eth=summary.get(f"formal|mainnet|{small}|0.5"),
         bid_outcome_positive_at_ceiling=bids[1]["positive"],
         usable_exit_window_every_day=windows["minimum_per_day_met"])
     report = dict(

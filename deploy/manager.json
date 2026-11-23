@@ -1,5 +1,5 @@
 {
- "comment": "Default PackManagerFactory.create parameters for a personal manager: the canary's keeper pay, the 0.06 ETH recipe, paid exits from the owner's own budget. distributionBps, allocatedBoundBps and tvlCapWei are pool-only and unused by managers.",
+ "comment": "Default PackManagerFactory.create parameters for a personal manager: the pooled vault's keeper pay, the 0.06 ETH recipe, paid exits from the owner's own budget. distributionBps, allocatedBoundBps and tvlCapWei are pool-only and unused by managers.",
  "minEdgeBps": 100,
  "bufferBps": 0,
  "distributionBps": 0,

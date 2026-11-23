@@ -39,9 +39,9 @@ def run(R, report):
 def pooled_lifecycle(R):
     vault, holder = R.VAULT, R.HOLDER
     values = json.loads((Path(R.ROOT) / "deploy/rehearse-unified.json").read_text()) \
-        if (Path(R.ROOT) / "deploy/rehearse-unified.json").exists() else json.loads((Path(R.ROOT) / "deploy/canary.json").read_text())
+        if (Path(R.ROOT) / "deploy/rehearse-unified.json").exists() else json.loads((Path(R.ROOT) / "deploy/mainnet.json").read_text())
     ck = R.num(R.call(vault, "requestCharge()(uint256)"))
-    deposit = ck + values["tvlCapWei"] - values["seedWei"]
+    deposit = ck + 2 * 10**18  # a 2 ETH holder deposit
     start = R.num(R.cast("balance", holder))
     R.send(holder, vault, "deposit()", value=deposit)
     # Price the deposit at FWA's blackout with the queue drained, then let the keeper build+list.

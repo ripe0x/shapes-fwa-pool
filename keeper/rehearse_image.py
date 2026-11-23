@@ -5,7 +5,7 @@
   python3 keeper/rehearse_image.py                                  # host processes, for debugging
 
 Starts its own Anvil fork (Tenderly's public gateway), deploys through script/deploy.sh with
-deploy/canary.json values (a fresh test owner), creates two disposable encrypted keystores (primary
+deploy/mainnet.json values (a fresh test owner), creates two disposable encrypted keystores (primary
 and backup keepers; random passwords that never leave this process tree), and then checks:
 startup through keeper/entrypoint.sh, pricing and listing by the primary for the pooled vault and
 for a personal manager created through the real factory (both on one signer, both in /health), transaction state and
@@ -88,7 +88,7 @@ def send(frm, to, sig, *a, value=0):
 
 
 def holder_unwind(holder, log):
-    """Runbook section 7: at canary values exit work is unpaid (essential budget 0, D64), so when the
+    """Runbook section 7: at mainnet values exit work is unpaid (essential budget 0, D64), so when the
     redemption exceeds free ETH the holder unlists and liquidates at their own gas, rerunning until
     nothing is owed. Each call the vault refuses (nothing to do yet or any more) is logged, not sent."""
     n = min(8, call("openListingCount()(uint256)"))
@@ -259,7 +259,7 @@ def main():
             rpc("anvil_setBalance", address, hex(10 * 10**18))
         for address in ACTORS.values():
             rpc("anvil_impersonateAccount", address)
-        values = json.loads((ROOT / "deploy/canary.json").read_text())
+        values = json.loads((ROOT / "deploy/mainnet.json").read_text())
         values["owner"] = ACTORS["owner"]
         path = ROOT / "deploy/rehearse-image.json"  # Forge reads values only under deploy/
         path.write_text(json.dumps(values))
@@ -283,7 +283,7 @@ def main():
         evidence["manager"] = MANAGER
 
         holder = ACTORS["holder"]
-        deposit = call("requestCharge()(uint256)") + values["tvlCapWei"] - values["seedWei"]
+        deposit = call("requestCharge()(uint256)") + 2 * 10**18  # a 2 ETH holder deposit
         send(holder, VAULT, "deposit()", value=deposit)
         expire_queue()
         volume = lambda n: n if a.image else str(work / n)  # noqa: E731

@@ -159,7 +159,7 @@ def admit_packs():
 
 
 def deploy_vault(deployer, seed_wei):
-    values = json.loads((ROOT / "deploy/canary.json").read_text())
+    values = json.loads((ROOT / "deploy/mainnet.json").read_text())
     values["owner"] = actor("owner")
     values["seedWei"] = seed_wei
     values["tvlCapWei"] = 100 * E

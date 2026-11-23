@@ -231,4 +231,7 @@ layers, or reopen decisions that are already supported by evidence."
    authorization to deploy a contract from authorization to offer the personal manager product
    publicly."
 8. Final simplification pass without weakening security, accounting or performance.
+
+Update (owner, 2026-11-22): no canary, ever. Item 7 is withdrawn; deployment uses
+`deploy/mainnet.json`, which has no deposit cap (set 2026-11-17, cba0cf5).
 "Do not merge, deploy, sign acceptance documents, or spend real funds."

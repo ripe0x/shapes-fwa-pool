@@ -38,7 +38,7 @@ import {
 ///         units, never as ETH buckets: tokens are claimed and burned, worth zero to holders (D43),
 ///         so they never enter the ETH conservation sum.
 ///
-///         Parameters are the selected canary deployment values (deploy/canary.json): gas ceiling
+///         Parameters are the mainnet deployment values (deploy/mainnet.json): gas ceiling
 ///         0.5 gwei, reserve 0.005 ETH, TVL cap 2 ETH, routine budget 0.03 ETH refilling 0.01 ETH a day,
 ///         no essential budget, no markup, 25% keeper share.
 ///         Stated variations are named in each regime that needs one (distributions on; the real
@@ -110,10 +110,10 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         _setPackAsk(ask);
     }
 
-    /// @dev The selected canary deployment values, read from deploy/canary.json (the file
+    /// @dev The mainnet deployment values, read from deploy/mainnet.json (the file
     ///      script/deploy.sh broadcasts), so every regime runs the configuration that ships.
-    function _canary() internal view returns (VaultLib.Params memory p) {
-        string memory v = vm.readFile("deploy/canary.json");
+    function _values() internal view returns (VaultLib.Params memory p) {
+        string memory v = vm.readFile("deploy/mainnet.json");
         p.minEdgeBps = uint16(vm.parseJsonUint(v, ".minEdgeBps"));
         p.bufferBps = uint16(vm.parseJsonUint(v, ".bufferBps"));
         p.distributionBps = uint16(vm.parseJsonUint(v, ".distributionBps"));
@@ -448,11 +448,11 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
 contract VaultFlowPinnedTest is VaultFlowBase {
     // ------------------------------------------------------------------ pinned-block regimes
 
-    /// @dev Initial capitalization: deploy at the canary seed, then the first deposit priced into
+    /// @dev Initial capitalization: deploy at the mainnet seed, then the first deposit priced into
     ///      shares. Shows the seed and the first holder's capital resting as free vault ETH.
     function test_flow_init() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _toBlackout();
@@ -469,7 +469,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      standing load instead (see report).
     function test_flow_max_load() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1.98 ether);
         _toBlackout();
@@ -514,7 +514,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
 
     function _inactive(string memory regime, uint256 intervals) internal {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _toBlackout();
@@ -537,7 +537,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      price, never the spiked basefee (D56). The spike never reaches holder ETH (O6 limit).
     function test_flow_gas_spike() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         // Setup at low gas, before the measured window.
         vm.fee(BASE_FEE);
         vm.txGasPrice(GAS_PRICE);
@@ -576,7 +576,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     function test_flow_oracle_change() public {
         _forkPinned();
         _useOracle(0.1 ether); // real oracle active (cap 0.11 > the 6-unit backing): needed to kick
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _toBlackout();
@@ -625,7 +625,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      and recoverable; the backing counter still matches real FWA holdings (held == implied).
     function test_flow_keeper_delay() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _toBlackout();
@@ -650,7 +650,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      pro rata from free ETH, the backing is unwound, the next checkpoint fills the rest.
     function test_flow_withdrawals() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _deposit(bob, 1 ether);
@@ -694,7 +694,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      only deploy bob's capital and the seed.
     function test_flow_settled_unclaimed() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _deposit(bob, 1 ether);
@@ -732,11 +732,11 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         flowReport("settled_unclaimed", a, f);
     }
 
-    /// @dev Distributions on (stated variation: distributionBps 2000; the canary ships 0). A 1 ETH
+    /// @dev Distributions on (stated variation: distributionBps 2000; mainnet ships 0). A 1 ETH
     ///      forced gain above the high-water mark is distributed to live shares and claimed.
     function test_flow_distributions() public {
         _forkPinned();
-        VaultLib.Params memory p = _canary();
+        VaultLib.Params memory p = _values();
         p.distributionBps = 2_000;
         _deploy(0.01 ether, p);
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
@@ -760,7 +760,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      holders redeem in full. Only the dead-share seed slice remains in the vault.
     function test_flow_wind_down() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _deposit(bob, 0.5 ether);
@@ -818,7 +818,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
 contract VaultFlowSelectionTest is VaultFlowBase {
     // ------------------------------------------------------------------ selection-fork regimes
     // The real VRF fixtures (SelectionBase) carry their own deploy: 3 ETH seed, gasCeiling 50 gwei,
-    // One vault listing among 30 real listings. Resolution and harvest run at a canary-realistic 0.45/0.4 gwei.
+    // One vault listing among 30 real listings. Resolution and harvest run at a realistic 0.45/0.4 gwei.
 
     /// @dev Bid outcome: the purchaser takes the bid; the vault keeps the pack and loses the
     ///      backing. The pack returns to inventory on sync, the fee share is harvested.
@@ -950,7 +950,7 @@ contract VaultFlowSelectionTest is VaultFlowBase {
         IFWAToken token = IFWAToken(FWA.token());
         IFWARewards rewards = IFWARewards(FWA.rewards());
 
-        VaultLib.Params memory p = _canary();
+        VaultLib.Params memory p = _values();
         vm.deal(address(this), 6 ether);
         // Seed covers 20 six-unit packs (~0.13 ETH each to list).
         (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether);

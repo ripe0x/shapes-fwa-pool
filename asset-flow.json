@@ -53,7 +53,7 @@
   },
   {
    "id": "O2",
-   "text": "UNSIGNED, unified candidate. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling; 2 gwei for redemption and wind-down work) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint (quoted at measured gas, D61), 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; routine budgets cap pay at 0.03 ETH plus 0.01 ETH a day at canary values (0.02 ETH a day at most in bytecode); the owner can stop pay at once. Measured worst: 1,425,000 quoted gas per position built and listed (max_load).",
+   "text": "UNSIGNED, unified candidate. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling; 2 gwei for redemption and wind-down work) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint (quoted at measured gas, D61), 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; routine budgets cap pay at 0.1 ETH plus 0.02 ETH a day at mainnet values (the bytecode maximum rate); the owner can stop pay at once. Measured worst: 1,425,000 quoted gas per position built and listed (max_load).",
    "metric": "facts.keeper_gas_per_position",
    "max": 1750000,
    "regimes": [
@@ -89,7 +89,7 @@
   },
   {
    "id": "O6",
-   "text": "UNSIGNED, unified candidate. Can it stall and what restarts it (gas): no call is refused for gas price. Routine work is paid up to the 0.5 gwei ceiling; above it the keeper waits. Exit work (unlisting and liquidating for redemptions or wind-down) is unpaid at canary values (D64): withdrawers, or the owner in a wind-down, run it at their own gas, and redeemers pay no unwind charge. Checkpoints are paid from the request charges. A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid.",
+   "text": "UNSIGNED, unified candidate. Can it stall and what restarts it (gas): no call is refused for gas price. Routine work is paid up to the 0.5 gwei ceiling; above it the keeper waits. Exit work (unlisting and liquidating for redemptions or wind-down) is unpaid at mainnet values (D64): withdrawers, or the owner in a wind-down, run it at their own gas, and redeemers pay no unwind charge. Checkpoints are paid from the request charges. A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid.",
    "metric": "facts.checkpoint_pay_wei",
    "max": 200000000000000,
    "regimes": [

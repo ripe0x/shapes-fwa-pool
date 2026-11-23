@@ -12,7 +12,7 @@
 # keystore account) or "--ledger --sender 0x...". Never a raw key. The simulation also needs
 # --sender: the deploying address must hold the seed (seedWei) plus gas.
 set -euo pipefail
-VALUES="${1:?values file, e.g. deploy/canary.json}"
+VALUES="${1:?values file, e.g. deploy/mainnet.json}"
 BROADCAST="${2:-}"
 RPC_URL="${RPC_URL:-https://mainnet.gateway.tenderly.co}"
 export RPC_URL

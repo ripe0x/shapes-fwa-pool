@@ -327,7 +327,7 @@ def main():
         impersonate(actor)
 
     # 1. Deploy the pooled vault and the factory through the production path.
-    values = json.loads((ROOT / "deploy/canary.json").read_text())
+    values = json.loads((ROOT / "deploy/mainnet.json").read_text())
     values["owner"] = B.ACTORS["owner"]
     VAULT = B.deploy(values, "unified")
     FACTORY = next(t["contractAddress"] for t in
