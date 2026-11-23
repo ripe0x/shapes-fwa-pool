@@ -9,6 +9,7 @@ import {VaultLib} from "../../src/VaultLib.sol";
 /// @notice Matched-ordering attack against a real FWA allocation and its authenticated VRF replay.
 contract ForkCheckpointTimingTest is SelectionBase {
     address bob = makeAddr("pack-vault-test-timing-bob");
+    address alice = makeAddr("pack-vault-test-timing-alice");
 
     receive() external payable {}
 
@@ -75,6 +76,61 @@ contract ForkCheckpointTimingTest is SelectionBase {
         o.purchaserPack = PACKS.ownerOf(packId) == purchaser ? PACKS.valueOf(packId) : 0;
         o.bobPaid = gross;
         o.checkpointPay = address(this).balance - keeperStart;
+    }
+
+    function _secondDeposit(bool settleBefore, address purchaser)
+        internal returns (uint256 gross, uint256 shares, uint256 aliceValue, uint256 bobValue, uint256 nav)
+    {
+        if (settleBefore) _settle(true, purchaser);
+        gross = Charges.grossFor(vault, 1 ether);
+        vm.prank(alice);
+        vault.deposit{value: gross}();
+        if (!settleBefore) _settle(true, purchaser);
+        _blackout(); // the next interval prices Alice; her request never locks lastNav
+        TestVaultOps.checkpoint(vault, 0);
+        shares = vault.shareBalance(alice);
+        nav = vault.accountedNav(0);
+        aliceValue = nav * shares / vault.totalShares();
+        bobValue = nav * vault.shareBalance(bob) / vault.totalShares();
+    }
+
+    function test_postCheckpointDepositDoesNotLockPreKeepNav() public {
+        Candidate memory c = Candidate(
+            0x2eebb87b882804d37898b4074ab7e27e5f41eb59ed0712bf3ed6cddc943283a6,
+            26_229_795, 26_229_800, 1_792_451_207, 23, 3647,
+            0xE86C40ab0F182Ce4A7F2EC299080bcb741154720
+        );
+        _select(c);
+        VaultLib.Params memory params = vault.getParams();
+        params.allocatedBoundBps = 1000;
+        vm.prank(vault.owner());
+        vault.setParams(params);
+        vm.fee(0.15 gwei);
+        vm.txGasPrice(0.2 gwei);
+        vault.sync(new uint256[](0), 0, 0);
+        vm.deal(bob, 2 ether);
+        vm.deal(alice, 2 ether);
+        uint256 gross = Charges.grossFor(vault, 1 ether);
+        vm.prank(bob);
+        vault.deposit{value: gross}();
+        _blackout();
+        TestVaultOps.checkpoint(vault, 0);
+        assertGt(vault.shareBalance(bob), 0, "Bob is a live incumbent before Alice requests entry");
+        assertEq(vault.shareBalance(alice), 0);
+        assertLt(block.timestamp, uint256(FWA.settlementWindow()) + c.fulfillTimestamp);
+
+        uint256 snap = vm.snapshotState();
+        (uint256 g0, uint256 s0, uint256 a0, uint256 b0, uint256 n0) = _secondDeposit(true, c.purchaser);
+        assertTrue(vm.revertToState(snap));
+        (uint256 g1, uint256 s1, uint256 a1, uint256 b1, uint256 n1) = _secondDeposit(false, c.purchaser);
+        assertEq(g0, g1, "entry payment is independent of keep ordering");
+        assertEq(s0, s1, "Alice receives the same shares when the keep settles before pricing");
+        assertEq(a0, a1, "new depositor receives no pre-pricing settlement gain");
+        assertEq(b0, b1, "live incumbent retains the same claim");
+        assertEq(n0, n1, "both orderings end with identical vault NAV");
+        emit log_named_uint("post-checkpoint Alice gross deposit (wei)", g1);
+        emit log_named_uint("post-checkpoint Alice final claim (wei)", a1);
+        emit log_named_uint("post-checkpoint incumbent Bob final claim (wei)", b1);
     }
 
     function test_colludingDepositorCapturesDeferredKeepGain() public {
