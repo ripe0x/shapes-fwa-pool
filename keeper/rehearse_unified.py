@@ -53,12 +53,14 @@ RPC = B.RPC
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 PACKS = "0xf21514B090Da7dF4390803497d6ae673801E5cA7"
 PARAMS_T = ("(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,"
-            "uint64,uint64,uint64,uint128,uint128)")
-# deploy/manager.json keys in VaultLib.Params struct order (6 u16, 9 u64, 2 u128).
+            "uint64,uint64,uint64,uint128,uint128,uint64,uint64,uint64,uint64,uint64,uint64)")
+# deploy/manager.json keys in VaultLib.Params struct order (6 u16, 9 u64, 2 u128, 6 u64).
 PARAMS_ORDER = ["minEdgeBps", "bufferBps", "distributionBps", "payMarkupBps", "keeperShareBps",
                 "allocatedBoundBps", "packUnitsMask", "gasCeilingWei", "essentialCeilingWei", "maxTipWei",
                 "workFeeWei", "routineCapWei", "routineRatePerDayWei", "essentialCapWei",
-                "essentialRatePerDayWei", "reserveWei", "tvlCapWei"]
+                "essentialRatePerDayWei", "reserveWei", "tvlCapWei",
+                "keepAdvantageWei", "purchaserGasPriceWei", "purchaserRedeemPackGas",
+                "purchaserRedeemShapeGas", "minDepositWei", "minDistributionWei"]
 E = 10**18
 MGR_OWNERS = ["mgra", "mgrb", "mgrc"]
 # Named unlocked actors the real-vault harnesses (keeper/test_tx.py, keeper/test_index.py) drive.

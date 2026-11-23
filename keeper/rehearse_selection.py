@@ -56,11 +56,13 @@ LISTING_ALLOCATED, LISTING_ACTIVE, LISTING_SETTLED, LISTING_WITHDRAWN = 2, 1, 4,
 E = 10**18
 MAX_GAS = 16_777_216
 PARAMS_T = ("(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,"
-            "uint64,uint64,uint64,uint128,uint128)")
+            "uint64,uint64,uint64,uint128,uint128,uint64,uint64,uint64,uint64,uint64,uint64)")
 PARAMS_ORDER = ["minEdgeBps", "bufferBps", "distributionBps", "payMarkupBps", "keeperShareBps",
                 "allocatedBoundBps", "packUnitsMask", "gasCeilingWei", "essentialCeilingWei", "maxTipWei",
                 "workFeeWei", "routineCapWei", "routineRatePerDayWei", "essentialCapWei",
-                "essentialRatePerDayWei", "reserveWei", "tvlCapWei"]
+                "essentialRatePerDayWei", "reserveWei", "tvlCapWei",
+                "keepAdvantageWei", "purchaserGasPriceWei", "purchaserRedeemPackGas",
+                "purchaserRedeemShapeGas", "minDepositWei", "minDistributionWei"]
 
 RPC = None
 

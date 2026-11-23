@@ -46,12 +46,14 @@ def scrub(text):
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 MAX_GAS = 16_777_216
 PARAMS_T = ("(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,"
-            "uint64,uint64,uint64,uint128,uint128)")
-# deploy/manager.json keys in VaultLib.Params struct order (6 u16, 9 u64, 2 u128).
+            "uint64,uint64,uint64,uint128,uint128,uint64,uint64,uint64,uint64,uint64,uint64)")
+# deploy/manager.json keys in VaultLib.Params struct order (6 u16, 9 u64, 2 u128, 6 u64).
 PARAMS_ORDER = ["minEdgeBps", "bufferBps", "distributionBps", "payMarkupBps", "keeperShareBps",
                 "allocatedBoundBps", "packUnitsMask", "gasCeilingWei", "essentialCeilingWei", "maxTipWei",
                 "workFeeWei", "routineCapWei", "routineRatePerDayWei", "essentialCapWei",
-                "essentialRatePerDayWei", "reserveWei", "tvlCapWei"]
+                "essentialRatePerDayWei", "reserveWei", "tvlCapWei",
+                "keepAdvantageWei", "purchaserGasPriceWei", "purchaserRedeemPackGas",
+                "purchaserRedeemShapeGas", "minDepositWei", "minDistributionWei"]
 ACTORS = {n: to_checksum_address(keccak(text=f"pack-vault-image-{n}")[-20:]) for n in ("deployer", "holder", "owner", "kicker", "manager")}
 evidence = dict(steps=[])
 
