@@ -59,8 +59,9 @@ def shape_count(units):
 
 
 def ref_units(mask):
-    """VaultLib.refUnits: the smallest enabled pack size in packUnitsMask (LibBit.ffs)."""
-    return (mask & -mask).bit_length() - 1
+    """VaultLib.refUnits: the smallest enabled pack size in packUnitsMask, falling back to the
+    6-unit recipe when the mask enables none (mask 0 = build/list nothing)."""
+    return (mask & -mask).bit_length() - 1 if mask else REF_UNITS
 
 
 def position_value(s):

@@ -106,6 +106,10 @@ library VaultLib {
     uint256 internal constant MAX_ESSENTIAL_RATE = 0.005 ether;
     uint256 internal constant MAX_PACK_UNITS = 30; // at most 30 x 0.01 ETH: bounded redemption work
     uint256 internal constant MIN_PACK_UNITS = 3; // ShapePacks' minimum pack value, 0.03 ETH
+    /// The charge reference falls back to this 6-unit recipe (0.06 ETH, one 0.05 + one 0.01 Shape)
+    /// when packUnitsMask enables no size (mask 0 means build/list nothing), so the deposit, unwind
+    /// and redemption charges stay sized rather than reading a 256-unit `ffs(0)` reference.
+    uint256 internal constant REF_UNITS = 6;
 
     /// Ceilings on the behaviour-shaping Params (defaults in the deploy values equal the former
     /// constants, named in each comment). A compromised owner setting any of these to its ceiling
@@ -422,11 +426,15 @@ library VaultLib {
     }
 
     /// @notice The reference pack size the request/deploy/unwind charges are scaled by: the smallest
-    ///         enabled pack size in `packUnitsMask`. The keeper builds this size (or the 6-unit
-    ///         recipe when enabled), so charges track the cheapest pack the account actually lists.
-    ///         checkBounds keeps at least one bit set in [MIN_PACK_UNITS, MAX_PACK_UNITS].
-    function refUnits(Params storage p) internal view returns (uint256) {
-        return LibBit.ffs(p.packUnitsMask);
+    ///         enabled pack size in `packUnitsMask` (`LibBit.ffs`). checkBounds allows a bit only in
+    ///         [MIN_PACK_UNITS, MAX_PACK_UNITS], or none at all; mask 0 means "build/list nothing"
+    ///         and makes `ffs` return 256, so this falls back to the 6-unit recipe to keep charges
+    ///         sized. When several sizes are enabled this is the smallest, not the size the keeper
+    ///         actually builds (`keeper/policy.py` build_units, 6 by default): the smaller pack holds
+    ///         more Shapes per ETH, so the charge is sized at or above the real per-ETH deploy cost.
+    function refUnits(Params storage p) internal view returns (uint256 u) {
+        u = LibBit.ffs(p.packUnitsMask);
+        if (u > MAX_PACK_UNITS) u = REF_UNITS;
     }
 
     /// @notice Per-position capital (value + keep-incentive backing) a deposit or redemption's

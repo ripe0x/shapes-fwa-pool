@@ -227,6 +227,51 @@ contract ForkSettingsTest is ForkBase {
         assertGt(deploy3, deploy6, "the 3-unit reference (3 Shapes) costs more to deploy than the 6-unit (2)");
     }
 
+    /// packUnitsMask 0 means "build/list no new packs" and must not break redemptions or deposits:
+    /// the reference falls back to the 6-unit recipe (not a 256-unit `ffs(0)` reference), so the
+    /// charges stay sized and a priced holder can still redeem and claim.
+    function test_packUnitsMaskZeroStillPricesChargesAndRedeems() public {
+        // A priced holder.
+        uint256 gross = Charges.grossFor(vault, 2 ether);
+        vm.prank(alice);
+        vault.deposit{value: gross}();
+        toBlackout();
+        checkpoint();
+        toOpen();
+        uint256 shares = vault.shareBalance(alice);
+        assertGt(shares, 0, "alice priced in");
+
+        // Owner disables every pack size.
+        VaultLib.Params memory p = vault.getParams();
+        p.packUnitsMask = 0;
+        _set(p);
+
+        // The reference is the 6-unit fallback, not a 256-unit monster (~5.3 ETH would be the bug).
+        assertApproxEqAbs(vault.positionValue(), 0.1249 ether, 0.0005 ether, "6-unit fallback reference");
+        assertLt(vault.positionValue(), 0.2 ether, "not sized as a 256-unit position");
+
+        // Redemption still works at the expected (fallback-sized) charge, filled from free ETH.
+        uint256 rc = Charges.redeemCharge(vault, shares);
+        vm.prank(alice);
+        vault.requestRedeem{value: rc}(shares);
+        assertEq(vault.lockedShares(), shares, "redeem request accepted");
+
+        // A fresh deposit is still accepted and priced with the fallback-sized charge.
+        uint256 g2 = Charges.grossFor(vault, 1 ether);
+        vm.prank(bob);
+        vault.deposit{value: g2}();
+
+        // The checkpoint fills alice's redemption (no listings, so free ETH covers it) and she claims.
+        toBlackout();
+        checkpoint();
+        toOpen();
+        assertEq(vault.lockedShares(), 0, "redemption fully filled from free ETH");
+        uint256 before = alice.balance;
+        vm.prank(alice);
+        vault.claim();
+        assertGt(alice.balance, before, "alice receives her redeemed ETH");
+    }
+
     /// @dev The default params list 6-unit packs at a low ceiling (mirrors ForkBacking).
     function _lowCeiling() internal {
         VaultLib.Params memory p = vault.getParams();
