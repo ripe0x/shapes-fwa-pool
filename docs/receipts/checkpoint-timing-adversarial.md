@@ -6,6 +6,8 @@ Date: 2026-11-23. Base: `e94fd99c072448bbbbb090c60d4f1e9b51df56ed` (`main`). Can
 
 **A purchaser-controlled keep can shift value to a newly priced depositor.** In the matched historical FWA replay below, a 1 ETH pending deposit priced before the keep receives **1,057,625,183,394,753 wei** more claim on final NAV than the same deposit priced after the keep. The incumbent dead-share seed loses exactly that amount. This is a real timing transfer in the share formula, but this depositor's claim remains below its entry payment before exit costs and gas. The fixture does not include a live incumbent holder, so a direct holder-to-holder realized profit is not established. At the production 10% allocation cap and the observed 0.06 ETH pack/1% FWA settlement fee, the *maximum gross keep revaluation* is 0.707869% of pre-flow NAV, before the depositor's share fraction. No contract change was made for this bounded timing exposure.
 
+If FWA's owner reduces the settlement fee from 1% to zero, the corresponding cap rises to **0.816029% of pre-flow NAV** at the same pack backing and 10% exposure limit. The cap bounds aggregate revaluation, not an individual newcomer's fraction of it. It is independent of pool size, so hundreds of listings do not remove this economic timing gap.
+
 **A cancellable deposit could block liquidation and delay an honest exit.** This was reproduced on the real fork before repair. The deposit was counted by `_need()` despite remaining refundable, so `liquidate()` returned `Nothing`. The attacker could cancel and checkpoint in one transaction, leaving the real idle pack unredeemed and consuming the 12-hour checkpoint slot. The repair excludes pending escrow from `_need()`. The new regression failed with `Nothing` before the repair and passes afterwards. This is a denial of service, not a demonstrated ETH theft.
 
 **A canceled-charge carryover could subsidize an attacker's later deposit.** Two deposits shared a checkpoint charge; both canceled, leaving the first payer's 92,000,000,000,000 wei in `processingPool`. The next request quoted zero. The attacker's extra deposit and cancel consumed 198,513 measured call gas; at 0.2 gwei this is 39,702,600,000,000 wei before transaction overhead, below the charge saved on a planned later deposit. A payer now retains a protected pull-refund right if all requests cancel; the next request funds its own checkpoint. A gas-parameter increase with two charge contributors is covered by a second regression.
@@ -47,6 +49,20 @@ Expected invariants: (1) protected liabilities are never deployable; (2) `cash +
 | 301 real listings; above 32; receipt recovery | Existing adversarial, allocation-proof and receipt-recovery fork tests | Bounded gas/scan and recorded payment paths exercised. The documented forced-kick residual requires an FWA-owner exemption change plus an unrecorded forced payment; original vault receiver failure was not reproduced here. |
 | Distributions and high-water mark | Existing distribution and full-exit tests | One payout and no payout on the next no-gain checkpoint exercised. Entry immediately around a real keep with distributions on was not executed. |
 | Multiple controlled allocations, mixed keep/bid, repeated partial fills, long history | Existing selection, partial reconciliation and allocation tests cover components | No matched multi-allocation collusion run in this review. This remains an open economic test, not a negative conclusion. |
+
+### Requested ordering coverage
+
+| Request family | Directly executed here or in cited existing fork tests | Open portion |
+|---|---|---|
+| Deposit immediately before pricing | Quiet deposit, live allocation followed by keep, live allocation followed by bid, two canceled deposits | New holder alongside an actual incumbent holder; distribution-on settlement ordering; multiple pending deposits with fees accruing but uncollected |
+| Deposit immediately after pricing | Normal subsequent deposit lifecycle in `ForkVaultLifecycle` | Matched FWA settlement just after the preceding checkpoint |
+| Redeem immediately before/after pricing | Full and partial fills in `ForkVaultLifecycle` and `ForkPartialReconcile` | Purchaser-controlled settlement timed against an actual redeeming Carol |
+| Deposit → checkpoint → redeem | `ForkVaultLifecycle.test_depositListRedeem_roundTrip`, `ForkReconcile` | A fully priced, gas-billed colluding purchaser/depositor exit from the historical allocation fixture |
+| Attacker calls checkpoint | Atomic cancel+checkpoint in new fork test; blackout/window rules and 301-listing gas in `ForkVaultAdversarial` | Mempool ordering against independent callers; same-block keep after an actual incumbent redemption |
+| Multiple allocations and exposure bound | Single live allocation at the production 10% bound; bounded allocation proof and 301 listings in existing tests | Two attacker-controlled live allocations with mixed outcomes and a matched 10%-boundary economic ledger |
+| Missed receipts / forced payments | Existing recorded/forced-send tests and bounded checkpoint proof reviewed | A failed callback on the original vault at 100,000 gas, especially a forced kick above 32 listings and an exemption restore |
+
+These open portions are **not closed by the executed matrix**. In particular, the single-allocation result is evidence of the share-pricing mechanism and its size at one fork state; it is not a measured realized profit from Alice or Carol.
 
 ## Exact matched values and economic classification
 

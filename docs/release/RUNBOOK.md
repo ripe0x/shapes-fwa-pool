@@ -143,7 +143,7 @@ Owner wind-down (one way): `cast send <vault> "startWindDown()" --account <owner
 
 | Condition | Action |
 |---|---|
-| Balance below `pendingDepositTotal + redemptionReserve + distributionReserve + claimableTotal + processingPool` | owner `startWindDown()`; investigate |
+| Balance below `pendingDepositTotal + redemptionReserve + distributionReserve + claimableTotal + processingPool + chargeRefundReserve` | owner `startWindDown()`; investigate |
 | `pendingReceipts()` nonzero for more than one keeper pass, or the checkpoint refusing with `PendingReceipts`/`CatchUpFirst` for more than one settlement window | read the keeper log; the next `sync` resolves it (D84) |
 | A settled listing whose `receipts(id)` is empty (a payment FWA force-sent) | expected to be resolved by the next sync; investigate why `receive` failed (gas repricing?) and pause new exposure |
 | Keeper pay above 0.12 ETH in 24 hours | owner sets routine cap and rate to 0 via `setParams`; investigate |

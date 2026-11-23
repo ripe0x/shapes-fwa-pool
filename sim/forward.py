@@ -432,7 +432,7 @@ def run(sc, n_target, seed, days=365, values=None):
     def trace_state(action, day):
         if trace is not None:
             trace.append(dict(day=day, action=action, **(dict(timestamp=absolute_now, event=event_kind) if timed else {}), cash=v.balance, free=v.free(), routine_budget=v.routine_budget,
-                              protected=v.redemption_reserve + v.distribution_reserve + v.claimable_total + v.processing_pool,
+                              protected=v.redemption_reserve + v.distribution_reserve + v.claimable_total + v.processing_pool + v.charge_refund_reserve,
                               locked=locked_holder(), global_locked=v.locked_shares, positions=len(v.positions),
                               returned_value=sum(p.value for p in v.positions.values() if p.status == SETTLED and p.pack_owned),
                               journal=len(journal), claimed=holder_claimed))
@@ -1152,7 +1152,7 @@ def run(sc, n_target, seed, days=365, values=None):
                 end_unreconciled_returned_value_wei=sum(p.value for p in v.positions.values() if p.status == SETTLED and p.pack_owned),
                 end_allocated_book_value_wei=v.allocated_value,
                 creator_mint_fees_wei=v.mint_fees, settlement_fees_wei=v.settlement_fees,
-                physical_assets_wei=physical, vault_cash_wei=v.balance, holder_liability_wei=v.redemption_reserve + v.distribution_reserve + v.claimable_total,
+                physical_assets_wei=physical, vault_cash_wei=v.balance, holder_liability_wei=v.redemption_reserve + v.distribution_reserve + v.claimable_total + v.charge_refund_reserve,
                 ledger_gap_wei=ledger_gap, routine_initial_cap_wei=values["routineCapWei"],
                 routine_refill_per_day_wei=values["routineRatePerDayWei"],
                 routine_period_permission_upper_wei=values["routineCapWei"] + now * values["routineRatePerDayWei"] // DAY,
