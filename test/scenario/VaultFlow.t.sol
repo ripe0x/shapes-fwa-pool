@@ -285,7 +285,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
     ///      owed estimate for unpriced redemptions + the reserve fit inside the balance.
     function _guard() internal {
         uint256 liab = vault.pendingDepositTotal() + vault.redemptionReserve() + vault.distributionReserve()
-            + vault.claimableTotal();
+            + vault.claimableTotal() + vault.chargeRefundReserve();
         uint256 bal = address(vault).balance;
         assertGe(bal, liab, "balance below liabilities");
         // While redeemers are short of ETH (owed + reserve > free) nothing is spendable at all.
@@ -380,14 +380,15 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
     }
 
     function flowBuckets() internal view override returns (Bucket[] memory k) {
-        k = new Bucket[](10);
+        k = new Bucket[](11);
         uint256 pending = vault.pendingDepositTotal();
         uint256 redeem = vault.redemptionReserve();
         uint256 dist = vault.distributionReserve();
         uint256 claimable = vault.claimableTotal();
         uint256 bal = address(vault).balance;
         uint256 pool = vault.processingPool();
-        uint256 liabilities = pending + redeem + dist + claimable + pool;
+        uint256 refund = vault.chargeRefundReserve();
+        uint256 liabilities = pending + redeem + dist + claimable + pool + refund;
         uint256 free = bal > liabilities ? bal - liabilities : 0;
         VaultLib.Params memory p = vault.getParams();
         uint256 reserveNeed = uint256(p.reserve) + _owed();
@@ -411,6 +412,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         k[8] = Bucket("FWA fees uncollected (pending + credit)", _feesHeld(), false, 0, false, 0);
         // Request charges held to pay the next checkpoint's keeper (D56); the remainder joins free ETH.
         k[9] = Bucket("request charges held for the next checkpoint", pool, false, 0, true, pool);
+        k[10] = Bucket("canceled checkpoint charge refunds", refund, false, 0, true, refund);
     }
 
     /// @dev Reads FWA's own listing records, not just vault counters. held/packHeld count only
@@ -713,7 +715,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _toOpen();
         _deposit(alice, 0.01 ether); // touch: her entitlement settles to claimableEth
         uint256 liabilities = vault.pendingDepositTotal() + vault.redemptionReserve()
-            + vault.distributionReserve() + vault.claimableTotal();
+            + vault.distributionReserve() + vault.claimableTotal() + vault.chargeRefundReserve();
         // Only bob's ~1 ETH is deployable (alice's filled redemption is a liability); five six-unit
         // packs (~0.65 ETH) fit, more would exceed it.
         _kRestock(keeper, 5, 6);

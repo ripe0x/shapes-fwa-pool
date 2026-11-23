@@ -1291,3 +1291,28 @@ is now 100,000 + 30,000 per Shape (`Q_PURCHASER_REDEEM_PACK`, `_SHAPE`; `makeup(
 in `keeper/policy.py`. Cold redeems on a fork: 2 Shapes 157,014, 5 Shapes 245,262, 7 Shapes 304,165
 (`ForkDirectMint.t.sol`); 7 is the most any allowed size holds. A 0.06 ETH pack is still 160,000, so
 its backing is unchanged.
+
+## D86. Cancellable escrow and checkpoint-charge refunds (adversarial review, 2026-11-23)
+
+**Found:** `_need()` treated refundable pending deposits as certain redemption liquidity. A depositor
+could suppress liquidation of a real idle pack, then atomically cancel and checkpoint, leaving the
+pack idle and consuming the interval's only pricing slot. A separate multi-address sequence left
+the first requester's checkpoint charge in `processingPool` after every request canceled, so an
+unrelated later request paid none. At 0.2 gwei, the carried charge was 0.000092 ETH and the extra
+attacker entry/cancel cost 198,513 measured call gas before transaction overhead.
+
+**Chose:** liquidation need uses protected-liability-excluded free ETH, never cancellable escrow.
+This may redeem a real idle pack that a later deposit would have funded; with current production
+values, essential liquidation pay is zero and the withdrawer supplies gas. Checkpoint charge
+contributions now have an era. A completed checkpoint consumes them. If all requests cancel,
+remaining contributions move to a protected refund reserve; each payer can call
+`claimCheckpointRefund(era)`. Events announce refund availability and claims. This preserves the
+existing rule that a sponsor pays when another user's request actually reaches checkpoint. The
+refund reserve is excluded from NAV and from every spend path. The finite 10% allocation bound,
+strategy architecture, keeper pay quote and FWA settlement rules are unchanged.
+
+**Measured:** the real-fork regression failed with `Nothing` before the liquidity repair and passed
+after it; 0.06 ETH of real pack value became cash before keeper pay. The first payer recovered its
+92,000,000,000,000 wei after two cancellations; a second payer's quote top-up also refunded to its
+own payer. See `docs/receipts/checkpoint-timing-adversarial.md`. New bytecode and release acceptance
+need fresh identities and owner authorization; earlier signatures do not cover D86.

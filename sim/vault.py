@@ -76,6 +76,10 @@ class Vault:
     pending_total: int = 0
     pending_charge_total: int = 0
     processing_pool: int = 0  # request charges held for the next checkpoint (D56)
+    charge_era: int = 0
+    charge_contribution: dict = field(default_factory=dict)  # (era, holder) -> paid charge
+    charge_refundable: set = field(default_factory=set)
+    charge_refund_reserve: int = 0
     epoch_nav: dict = field(default_factory=dict)
     epoch_supply: dict = field(default_factory=dict)
     epoch_dist: dict = field(default_factory=dict)
@@ -132,7 +136,7 @@ class Vault:
     # ------------------------------------------------------------ cash buckets
     def free(self):
         owed = (self.pending_total + self.redemption_reserve + self.distribution_reserve + self.claimable_total
-                + self.processing_pool)
+                + self.processing_pool + self.charge_refund_reserve)
         return self.balance - owed if self.balance > owed else 0
 
     def owed_estimate(self):
@@ -496,6 +500,8 @@ class Vault:
         self.pending_total += amount
         self.pending_charge_total += charge
         self.processing_pool += ck
+        key = (self.charge_era, h)
+        self.charge_contribution[key] = self.charge_contribution.get(key, 0) + ck
         self.balance += amount + ck
 
     def cancel(self, h, keep=0):
@@ -508,12 +514,33 @@ class Vault:
         keep = keep if self.pending_total or self.locked_shares else 0
         back = min(d[3] * 10**9, self.processing_pool - keep if self.processing_pool > keep else 0)
         self.processing_pool -= back
+        key = (self.charge_era, h)
+        self.charge_contribution[key] = self.charge_contribution.get(key, 0) - back
+        if keep == 0 and self.processing_pool:
+            self.charge_refundable.add(self.charge_era)
+            self.charge_refund_reserve += self.processing_pool
+            self.processing_pool = 0
+            self.charge_era += 1
         self.balance -= amount + back
         return amount + back
+
+    def claim_checkpoint_refund(self, h, era):
+        if era not in self.charge_refundable:
+            raise RuntimeError("Nothing")
+        key = (era, h)
+        amount = self.charge_contribution.get(key, 0)
+        if not amount:
+            raise RuntimeError("Nothing")
+        self.charge_contribution[key] = 0
+        self.charge_refund_reserve -= amount
+        self.balance -= amount
+        return amount
 
     def request_redeem(self, h, amount, ck=0, unwind=0):
         """Charges paid in ETH: `ck` to the processing pool, `unwind` to the vault."""
         self.processing_pool += ck
+        key = (self.charge_era, h)
+        self.charge_contribution[key] = self.charge_contribution.get(key, 0) + ck
         self.balance += ck + unwind
         self._settle_holder(h)
         self._settle_dist(h)
@@ -662,6 +689,7 @@ class Vault:
         self.epoch += 1
         if work:
             self.processing_pool = 0  # keeper pay comes out of it (pay_keeper); the rest is free ETH
+            self.charge_era += 1
         elif distributed == 0:
             raise RuntimeError("Nothing")
         return work or distributed != 0

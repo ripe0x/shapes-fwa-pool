@@ -36,6 +36,7 @@ def compare_snapshot(v, r, failures):
                           ("pendingReceipts", len(v.receipts)), ("cursor", v.acquisition_cursor),
                           ("reservedCount", sum(p.state != OWED for p in v.positions.values())),
                           ("feeCredit", v.fee_credit), ("processingPool", v.processing_pool),
+                          ("chargeRefundReserve", v.charge_refund_reserve),
                           ("distributionReserve", v.distribution_reserve), ("claimableTotal", v.claimable_total)):
         check(field, amount, r[field])
     check("aliceClaimable", v.claimable.get("alice", 0), r["aliceClaimable"])

@@ -1,5 +1,15 @@
 # Unified candidate: release runbook
 
+**2026-11-23 candidate update:** D86 changes `PackVault` redemption liquidity and checkpoint-charge
+refund accounting. The identities, gas measurements and acceptance package below describe the prior
+candidate until regenerated for `codex/adversarial-checkpoint-nav`. Its previous owner signatures
+must not authorize this bytecode. See [the timing review](../receipts/checkpoint-timing-adversarial.md).
+
+If several pending deposits shared a checkpoint charge and all cancel, the payer can read the
+`CheckpointRefundReady(era, amount)` event, confirm `chargeContribution(era, payer)`, and call
+`claimCheckpointRefund(era)`. The reserve remains excluded from NAV until claimed. Refund-claim gas
+belongs to the payer; at high gas it may be cheaper to wait.
+
 **Status: not approved for mainnet.** The unified candidate (PR ripe0x/shapes-fwa-pool#5) is built,
 verified and packaged unsigned. Nothing in this document has been broadcast. This file replaces the
 earlier runbook (PR #2 candidate), which is kept in git history.
