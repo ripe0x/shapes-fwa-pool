@@ -38,7 +38,7 @@ import {
 ///         units, never as ETH buckets: tokens are claimed and burned, worth zero to holders (D43),
 ///         so they never enter the ETH conservation sum.
 ///
-///         Parameters are the selected canary deployment values (deploy/canary.json): gas ceiling
+///         Parameters are the mainnet deployment values (deploy/mainnet.json): gas ceiling
 ///         0.5 gwei, reserve 0.005 ETH, TVL cap 2 ETH, routine budget 0.03 ETH refilling 0.01 ETH a day,
 ///         no essential budget, no markup, 25% keeper share.
 ///         Stated variations are named in each regime that needs one (distributions on; the real
@@ -94,14 +94,26 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
             assertEq(actors[i].code.length, 0, "test actor has code on mainnet");
             assertEq(actors[i].balance, 0, "test actor has mainnet balance");
         }
+        // D62 live mainnet state: ShapePacks is oracle-exempt, so the 6-unit backing (~0.065 ETH,
+        // above the ~0.036 ETH oracle cap) can list. The real FWA owner makes the call.
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         vm.deal(alice, 50 ether);
         vm.deal(bob, 50 ether);
     }
 
-    /// @dev The selected canary deployment values, read from deploy/canary.json (the file
+    /// @dev Un-exempt ShapePacks and set a fresh high oracle ask so the 6-unit backing still lists;
+    ///      the oracle cap only bites the regimes that exercise it (kick, repoint, gas spike).
+    function _useOracle(uint256 ask) internal {
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), false);
+        _setPackAsk(ask);
+    }
+
+    /// @dev The mainnet deployment values, read from deploy/mainnet.json (the file
     ///      script/deploy.sh broadcasts), so every regime runs the configuration that ships.
-    function _canary() internal view returns (VaultLib.Params memory p) {
-        string memory v = vm.readFile("deploy/canary.json");
+    function _values() internal view returns (VaultLib.Params memory p) {
+        string memory v = vm.readFile("deploy/mainnet.json");
         p.minEdgeBps = uint16(vm.parseJsonUint(v, ".minEdgeBps"));
         p.bufferBps = uint16(vm.parseJsonUint(v, ".bufferBps"));
         p.distributionBps = uint16(vm.parseJsonUint(v, ".distributionBps"));
@@ -130,14 +142,14 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         depositedCum = address(vault).balance; // seed and dust are capitalization inflow
     }
 
-    /// @dev Baselines after an inherited _select deploy (3 ETH seed, one vault listing among 30 real listings).
+    /// @dev Baselines after an inherited _select deploy (3 ETH seed, one six-unit vault listing among
+    ///      30 real listings). The vault's own pack mints 2 Shapes (0.05 + 0.01) at 0.002 ETH fee.
     function _afterSelect() internal {
         vm.deal(alice, 1 ether);
         depositedCum = deployBalance;
-        keeperPaidCum = selectPay; // restock + list in _select paid this contract
-        uint256 mints = (COUNT * 3 + 9) / 10; // 30 packs x 3 units = 90 units -> 9 mints
-        mintFeesCum = mints * SHAPES.mintFee();
-        mintedValueCum = mints * 0.1 ether;
+        keeperPaidCum = selectPay; // the build in _select paid this contract
+        mintFeesCum = COUNT * 2 * SHAPES.mintFee();
+        mintedValueCum = COUNT * UNITS * UNIT;
         backingPostedCum = COUNT * B;
     }
 
@@ -162,35 +174,41 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
 
     // ---- measured vault-call wrappers (accumulate keeper pay and realized fee income)
 
+    /// @dev Build-and-list `count` packs of `units`. Build mints `n` Shapes per pack (0.001 ETH fee
+    ///      each), mints `units x 0.01` of redeemable pack value, and posts each pack's backing to FWA.
     function _kRestock(address who, uint256 count, uint256 units) internal {
+        uint256 vb = address(vault).balance;
         uint256 b = who.balance;
-        uint256 loose = vault.looseShapeCount();
         vm.prank(who);
         TestVaultOps.restock(vault, count, units, 0);
-        keeperPaidCum += who.balance - b;
-        // Each mint adds 0.1 ETH of redeemable value and a 0.001 ETH fee.
-        uint256 need = count * units;
-        uint256 mints = need > loose ? (need - loose + 9) / 10 : 0;
-        mintFeesCum += mints * SHAPES.mintFee();
-        mintedValueCum += mints * 0.1 ether;
+        uint256 pay = who.balance - b;
+        keeperPaidCum += pay;
+        (, uint256 n) = VaultLib.makeup(units);
+        uint256 fees = count * n * SHAPES.mintFee();
+        mintFeesCum += fees;
+        mintedValueCum += count * units * UNIT;
+        // The vault spends: backing (to FWA) + pack value + mint fees + keeper pay.
+        backingPostedCum += (vb - address(vault).balance) - pay - count * units * UNIT - fees;
         _guard();
     }
 
     /// @dev _kRestock that returns false instead of reverting when the vault refuses the batch.
     function _kTryRestock(address who, uint256 count, uint256 units) internal returns (bool) {
+        uint256 vb = address(vault).balance;
         uint256 b = who.balance;
-        uint256 loose = vault.looseShapeCount();
-        uint256[] memory proposed = TestVaultOps.buildProposals(vault, count, units);
+        uint256[] memory proposed = TestVaultOps.proposals(vault, count, units);
         vm.prank(who);
-        try vault.restock(units, proposed, 0) {}
+        try vault.build(units, proposed, 0) {}
         catch {
             return false;
         }
-        keeperPaidCum += who.balance - b;
-        uint256 need = count * units;
-        uint256 mints = need > loose ? (need - loose + 9) / 10 : 0;
-        mintFeesCum += mints * SHAPES.mintFee();
-        mintedValueCum += mints * 0.1 ether;
+        uint256 pay = who.balance - b;
+        keeperPaidCum += pay;
+        (, uint256 n) = VaultLib.makeup(units);
+        uint256 fees = count * n * SHAPES.mintFee();
+        mintFeesCum += fees;
+        mintedValueCum += count * units * UNIT;
+        backingPostedCum += (vb - address(vault).balance) - pay - count * units * UNIT - fees;
         _guard();
         return true;
     }
@@ -209,9 +227,12 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
 
     function _kSync(address who, uint256[] memory ids) internal {
         uint256 b = who.balance;
+        uint256 credit = FWA.feeCredit(address(vault));
         vm.prank(who);
         TestVaultOps.sync(vault, ids, 0);
         keeperPaidCum += who.balance - b;
+        // A sync sweeps the fee credit into the balance when that pays: harvested fee income.
+        feeHarvestedCum += credit - FWA.feeCredit(address(vault));
         _guard();
     }
 
@@ -372,7 +393,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         uint256 reserveNeed = uint256(p.reserve) + _owed();
 
         (uint256 backingHeld, uint256 backingImplied, uint256 packHeld) = _fwaHoldings();
-        uint256 inv = vault.looseShapeCount() * UNIT;
+        uint256 inv; // no loose Shapes in the direct-mint recipe
         uint256[] memory idle = TestVaultOps.idle(vault);
         for (uint256 j; j < idle.length; ++j) {
             inv += PACKS.valueOf(idle[j]);
@@ -386,7 +407,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         k[4] = Bucket("vault free ETH (reserve + idle)", free, false, 0, true, reserveNeed);
         k[5] = Bucket("backing held by FWA (active listings)", backingHeld, true, backingImplied, false, 0);
         k[6] = Bucket("pack value in FWA custody (listed)", packHeld, false, 0, false, 0);
-        k[7] = Bucket("inventory held by vault (idle packs + loose Shapes)", inv, false, 0, false, 0);
+        k[7] = Bucket("inventory held by vault (idle packs)", inv, false, 0, false, 0);
         k[8] = Bucket("FWA fees uncollected (pending + credit)", _feesHeld(), false, 0, false, 0);
         // Request charges held to pay the next checkpoint's keeper (D56); the remainder joins free ETH.
         k[9] = Bucket("request charges held for the next checkpoint", pool, false, 0, true, pool);
@@ -427,11 +448,11 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
 contract VaultFlowPinnedTest is VaultFlowBase {
     // ------------------------------------------------------------------ pinned-block regimes
 
-    /// @dev Initial capitalization: deploy at the canary seed, then the first deposit priced into
+    /// @dev Initial capitalization: deploy at the mainnet seed, then the first deposit priced into
     ///      shares. Shows the seed and the first holder's capital resting as free vault ETH.
     function test_flow_init() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _toBlackout();
@@ -448,7 +469,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      standing load instead (see report).
     function test_flow_max_load() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1.98 ether);
         _toBlackout();
@@ -458,8 +479,10 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         uint256 built;
         uint256 pay0 = keeperPaidCum;
         (uint256 routineBefore,) = vault.budget();
+        // Build mints and lists at once; the batch is capped at MAX_LIST_BATCH (8), so counts above
+        // it are refused and the loop steps down. Each admitted pack is both built and listed.
         for (uint256 c = 10; c != 0;) {
-            if (_kTryRestock(keeper, c, 3)) { built += c; listed += _kList(keeper, c); }
+            if (_kTryRestock(keeper, c, 6)) { built += c; listed += c; }
             else --c;
         }
         // Fixed quote price: min(0.2 gwei bid, basefee 0.15 + maxTip 0.05, ceiling 0.5), no markup (V1).
@@ -491,13 +514,13 @@ contract VaultFlowPinnedTest is VaultFlowBase {
 
     function _inactive(string memory regime, uint256 intervals) internal {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _toBlackout();
         _kCheckpoint(keeper);
         _toOpen();
-        _kRestock(keeper, 5, 3);
+        _kRestock(keeper, 5, 6);
         _kList(keeper, 5);
         for (uint256 i; i < intervals; ++i) {
             vm.warp(block.timestamp + INTERVAL);
@@ -508,13 +531,13 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         flowReport(regime, a, f);
     }
 
-    /// @dev Gas spike after deployment: a position is listed at low gas (setup), then the price is
-    ///      lifted above the 0.5 gwei ceiling. No call is refused for gas price (D51): the
-    ///      checkpoint runs, paid at the ceiling price from its request charges; a build is refused
-    ///      by its own payback gate, which prices keeper pay at the ceiling (D56).
+    /// @dev Gas spike after deployment: a position is listed at low gas (setup), then the basefee is
+    ///      lifted to 2 gwei, four times the 0.5 gwei ceiling. No call is refused for gas price (D51):
+    ///      a profitable build still runs, and both it and the checkpoint are paid at the ceiling
+    ///      price, never the spiked basefee (D56). The spike never reaches holder ETH (O6 limit).
     function test_flow_gas_spike() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         // Setup at low gas, before the measured window.
         vm.fee(BASE_FEE);
         vm.txGasPrice(GAS_PRICE);
@@ -522,17 +545,16 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _toBlackout();
         _kCheckpoint(keeper);
         _toOpen();
-        _kRestock(keeper, 3, 3);
-        _kList(keeper, 3);
+        _kRestock(keeper, 3, 6);
         // The spike: 2 gwei, four times the ceiling.
         Snap memory a = flowBegin(2 gwei, 1.95 gwei, PINNED);
-        // At the ceiling the calibrated build cannot repay itself within the real oracle cap.
         uint256 paid0 = keeperPaidCum;
-        uint256 balance = address(vault).balance;
-        uint256 idle = vault.idlePackCount();
-        assertFalse(_kTryRestock(keeper, 1, 3), "the economic payback gate refuses an unprofitable build");
+        assertTrue(_kTryRestock(keeper, 1, 6), "D51: a profitable build runs even at a 2 gwei spike");
         uint256 buildPay = keeperPaidCum - paid0;
-        assertEq(buildPay, 0); assertEq(address(vault).balance, balance); assertEq(vault.idlePackCount(), idle);
+        VaultLib.Params memory pp = vault.getParams();
+        // Priced at the ceiling (min(basefee+tip, ceiling) = gasCeiling), not the 2 gwei basefee.
+        assertEq(buildPay, (VaultLib.Q_BUILD + VaultLib.buildGas(2) + VaultLib.Q_LISTED) * pp.gasCeiling
+            + 2 * pp.workFee, "build paid at the ceiling price, not the spike");
         _deposit(bob, 0.5 ether);
         _toBlackout();
         uint256 kb = keeper.balance;
@@ -553,15 +575,16 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      unlisting/redemption still work (D34). Positions are synced before the snapshot.
     function test_flow_oracle_change() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _useOracle(0.1 ether); // real oracle active (cap 0.11 > the 6-unit backing): needed to kick
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _toBlackout();
         _kCheckpoint(keeper);
         _toOpen();
-        _kRestock(keeper, 3, 3);
+        _kRestock(keeper, 3, 6);
         uint256[] memory ids = _idsOf(_kList(keeper, 3));
-        _setPackAsk(0.025 ether); // cap 0.0275 < 0.0303 posted (D62 floor): FWA may kick
+        _setPackAsk(0.025 ether); // cap 0.0275 < the ~0.065 posted backing: FWA may kick
         _toBlackout();
         uint256 vb = address(vault).balance;
         IFwaAdmin(address(FWA)).kickListing(ids[0]);
@@ -570,7 +593,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         // Repoint the oracle so no cap can be read; edge fails, nothing new lists.
         vm.prank(IOwnable(address(FWA)).owner());
         IFwaAdmin(address(FWA)).setAddr(64, address(PACKS));
-        (, uint256 backing, bool ok) = vault.edge(3);
+        (, uint256 backing, bool ok) = vault.edge(6);
         uint256 packsBack = TestVaultOps.idle(vault).length;
         assertGe(packsBack, 1, "kicked pack recovered to inventory");
         // With the oracle broken, alice redeems everything: the vault unlists the rest, liquidates
@@ -602,13 +625,13 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      and recoverable; the backing counter still matches real FWA holdings (held == implied).
     function test_flow_keeper_delay() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _toBlackout();
         _kCheckpoint(keeper);
         _toOpen();
-        _kRestock(keeper, 4, 3);
+        _kRestock(keeper, 4, 6);
         _kList(keeper, 4);
         // No keeper acts for a long time. A no-flow checkpoint is refused (LOW-1 repair).
         vm.warp(block.timestamp + INTERVAL);
@@ -627,14 +650,14 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      pro rata from free ETH, the backing is unwound, the next checkpoint fills the rest.
     function test_flow_withdrawals() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _deposit(bob, 1 ether);
         _toBlackout();
         _kCheckpoint(keeper);
         _toOpen();
-        _kRestock(keeper, 10, 3);
+        _kRestock(keeper, 10, 6);
         uint256[] memory ids = _idsOf(_kList(keeper, 10));
         uint256 aShares = vault.shareBalance(alice);
         uint256 bShares = vault.shareBalance(bob);
@@ -671,7 +694,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      only deploy bob's capital and the seed.
     function test_flow_settled_unclaimed() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _deposit(bob, 1 ether);
@@ -691,8 +714,10 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _deposit(alice, 0.01 ether); // touch: her entitlement settles to claimableEth
         uint256 liabilities = vault.pendingDepositTotal() + vault.redemptionReserve()
             + vault.distributionReserve() + vault.claimableTotal();
-        _kRestock(keeper, 10, 3);
-        _kList(keeper, 10);
+        // Only bob's ~1 ETH is deployable (alice's filled redemption is a liability); five six-unit
+        // packs (~0.65 ETH) fit, more would exceed it.
+        _kRestock(keeper, 5, 6);
+        _kList(keeper, 5);
         // Checked before the claim, while the entitlement is still a liability: idle ETH excludes
         // it, and the vault balance never falls below its liabilities.
         uint256 spendable = vault.idleEth();
@@ -707,11 +732,11 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         flowReport("settled_unclaimed", a, f);
     }
 
-    /// @dev Distributions on (stated variation: distributionBps 2000; the canary ships 0). A 1 ETH
+    /// @dev Distributions on (stated variation: distributionBps 2000; mainnet ships 0). A 1 ETH
     ///      forced gain above the high-water mark is distributed to live shares and claimed.
     function test_flow_distributions() public {
         _forkPinned();
-        VaultLib.Params memory p = _canary();
+        VaultLib.Params memory p = _values();
         p.distributionBps = 2_000;
         _deploy(0.01 ether, p);
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
@@ -735,14 +760,14 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      holders redeem in full. Only the dead-share seed slice remains in the vault.
     function test_flow_wind_down() public {
         _forkPinned();
-        _deploy(0.01 ether, _canary());
+        _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _deposit(bob, 0.5 ether);
         _toBlackout();
         _kCheckpoint(keeper);
         _toOpen();
-        _kRestock(keeper, 8, 3);
+        _kRestock(keeper, 8, 6);
         uint256[] memory ids = _idsOf(_kList(keeper, 8));
         vm.prank(owner);
         vault.startWindDown();
@@ -793,12 +818,12 @@ contract VaultFlowPinnedTest is VaultFlowBase {
 contract VaultFlowSelectionTest is VaultFlowBase {
     // ------------------------------------------------------------------ selection-fork regimes
     // The real VRF fixtures (SelectionBase) carry their own deploy: 3 ETH seed, gasCeiling 50 gwei,
-    // One vault listing among 30 real listings. Resolution and harvest run at a canary-realistic 0.45/0.4 gwei.
+    // One vault listing among 30 real listings. Resolution and harvest run at a realistic 0.45/0.4 gwei.
 
     /// @dev Bid outcome: the purchaser takes the bid; the vault keeps the pack and loses the
     ///      backing. The pack returns to inventory on sync, the fee share is harvested.
     function test_flow_acquire_bid() public {
-        Candidate memory c = late();
+        Candidate memory c = primary();
         _select(c);
         _afterSelect();
         Snap memory a = flowBegin(0.45 gwei, 0.4 gwei, c.requestBlock);
@@ -820,7 +845,7 @@ contract VaultFlowSelectionTest is VaultFlowBase {
     /// @dev Keep outcome: the purchaser keeps the pack; the vault gets the backing back less FWA's
     ///      settlement fee, and the pack value leaves to the purchaser.
     function test_flow_acquire_keep() public {
-        Candidate memory c = late();
+        Candidate memory c = primary();
         _select(c);
         _afterSelect();
         Snap memory a = flowBegin(0.45 gwei, 0.4 gwei, c.requestBlock);
@@ -845,7 +870,7 @@ contract VaultFlowSelectionTest is VaultFlowBase {
     /// @dev Silent purchaser: past the settlement window the vault reclaims the better outcome
     ///      (backing, since B(1-s) > P), inside sync. The pack goes to the purchaser.
     function test_flow_acquire_silent() public {
-        Candidate memory c = late();
+        Candidate memory c = primary();
         _select(c);
         _afterSelect();
         Snap memory a = flowBegin(0.45 gwei, 0.4 gwei, c.requestBlock);
@@ -854,12 +879,18 @@ contract VaultFlowSelectionTest is VaultFlowBase {
         (, uint64 units, uint128 backing) = TestVaultOps.position(vault, selected);
         uint256 vb = address(vault).balance;
         uint256 kb = address(this).balance;
+        uint256 creditBefore = FWA.feeCredit(address(vault));
         vm.prank(address(this));
         TestVaultOps.sync(vault, _one(selected), 0);
         uint256 pay = address(this).balance - kb;
         keeperPaidCum += pay;
-        uint256 reclaimed = (address(vault).balance - vb) + pay;
-        assertEq(reclaimed, uint256(backing) * 9_900 / 10_000, "vault reclaimed backing on silence");
+        // The sync also economically sweeps the selection fee credit into the balance; that is
+        // harvested fee income, not returned backing, so it is reported separately.
+        uint256 swept = creditBefore - FWA.feeCredit(address(vault));
+        feeHarvestedCum += swept;
+        uint256 reclaimed = (address(vault).balance - vb) + pay - swept;
+        assertEq(reclaimed, uint256(backing) * (10_000 - FWA.ownerSettlementFeeBps()) / 10_000,
+            "vault reclaimed backing on silence");
         backingReturnedCum += reclaimed;
         settlementCutCum += backing - reclaimed;
         packToPurchaserCum += uint256(units) * UNIT;
@@ -873,10 +904,11 @@ contract VaultFlowSelectionTest is VaultFlowBase {
     ///      is busy (a listing would be staged and earn nothing); once the queue drains the relist
     ///      goes in active. Regime name kept for the asset-flow config.
     function test_flow_staged_activation() public {
-        Candidate memory c = late();
+        Candidate memory c = primary();
         _select(c);
         _afterSelect();
         Snap memory a = flowBegin(0.45 gwei, 0.4 gwei, c.requestBlock);
+        _pendForeignAcquisition(); // real pending request keeps FWA's queue busy for the relist refusal
         _deposit(alice, 0.2 ether);
         (,, uint128 backing) = TestVaultOps.position(vault, selected);
         vm.prank(c.purchaser);
@@ -885,7 +917,7 @@ contract VaultFlowSelectionTest is VaultFlowBase {
         _kSync(address(this), _one(selected));
         _kHarvest(address(this), TestVaultOps.open(vault));
         assertGt(FWA.unsettledAcquisitionCount(), 0, "queue busy");
-        uint256[] memory planned19 = TestVaultOps.proposals(vault, 1, 3);
+        uint256[] memory planned19 = TestVaultOps.proposals(vault, 1, 6);
         vm.expectRevert(PackVault.Nothing.selector);
         vault.list(planned19, 0);
         _drainQueue();
@@ -912,19 +944,21 @@ contract VaultFlowSelectionTest is VaultFlowBase {
         preexisting = 0;
         vm.fee(0.1 gwei);
         vm.txGasPrice(0.15 gwei);
+        // D62 live state: ShapePacks is oracle-exempt so the 6-unit backing can list.
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         IFWAToken token = IFWAToken(FWA.token());
         IFWARewards rewards = IFWARewards(FWA.rewards());
 
-        VaultLib.Params memory p = _canary();
-        vm.deal(address(this), 5 ether);
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 2 ether);
+        VaultLib.Params memory p = _values();
+        vm.deal(address(this), 6 ether);
+        // Seed covers 20 six-unit packs (~0.13 ETH each to list).
+        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether);
         depositedCum = address(vault).balance;
-        uint256 need = 20 * 3;
-        uint256 mints = (need + 9) / 10; // 20 packs x 3 units -> 6 mints of 0.1 ETH
-        mintFeesCum = mints * SHAPES.mintFee();
-        mintedValueCum = mints * 0.1 ether;
+        mintFeesCum = 20 * 2 * SHAPES.mintFee(); // 20 packs x 2 Shapes x 0.001 ETH
+        mintedValueCum = 20 * 6 * UNIT;
         uint256 bthis = address(this).balance;
-        TestVaultOps.restock(vault, 20, 3, 0);
+        TestVaultOps.restock(vault, 20, 6, 0);
         TestVaultOps.list(vault, 20, 0);
         keeperPaidCum = address(this).balance - bthis; // restock + list reimburse this contract
         backingPostedCum = 0;

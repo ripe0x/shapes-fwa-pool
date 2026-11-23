@@ -297,6 +297,61 @@ def exercise_vault_reorg(R):
     return result
 
 
+def alloc_event(id_, at, block, idx):
+    return event("PositionUpdated", dict(listingId=id_, packId=id_ + 100, value=3 * 10**16,
+                 backing=4 * 10**16 + id_ * 10_000, feeDebt=0, allocatedAt=at, state=2), block, idx)
+
+
+def receipt_recovery_tests(directory):
+    """A booked-Allocated position kept (or kicked) early, where FWA force-sent the payment by
+    SELFDESTRUCT so the account's receive reverted (no CashReceipt event, pendingReceipts()==0), is
+    surfaced for a live status check INSIDE the settlement window. The keeper then reads its FWA
+    status and syncs it promptly instead of waiting for expiry; discovery never depends on CashReceipt.
+    """
+    T, W = 1_000_000, 100
+    # One booked-Allocated position inside the window, with no CashReceipt at all.
+    book = I.EventIndex(directory / "recovery-one.sqlite", 1, VAULT, 10)
+    book.append(10, 10, "hash-10", [alloc_event(1, T, 10, 0)])
+    assert not book.db.execute("SELECT * FROM receipts").fetchall()
+    # Inside the window (allocated_at > now - window) the expiry query excludes it; the status-check
+    # set surfaces it, so a terminal outcome at FWA with no receipt is still found.
+    assert book.candidates(16, 16, now=T + 10, settlement_window=W)[1] == [1]
+    # now unknown keeps the legacy semantics: the inside-window status check does not run.
+    assert book.candidates(16, 16)[1] == [1]  # via the unbounded expiry path only
+    book.close()
+
+    # Two inside-window positions with a per-class quota of 1 rotate across bounded passes via a
+    # persisted cursor, and the rotation survives a keeper restart.
+    book = I.EventIndex(directory / "recovery-rot.sqlite", 1, VAULT, 10)
+    book.append(10, 10, "hash-10", [alloc_event(1, T, 10, 0), alloc_event(2, T, 10, 1)])
+    seen = set(book.candidates(1, 1, now=T + 10, settlement_window=W)[1])
+    book.close()
+    book = I.EventIndex(directory / "recovery-rot.sqlite", 1, VAULT, 10)
+    for _ in range(4):
+        seen |= set(book.candidates(1, 1, now=T + 10, settlement_window=W)[1])
+    assert seen == {1, 2}, seen
+    # An expiry-eligible allocation and an inside-window one are both due, each counted once.
+    book.append(11, 11, "hash-11", [alloc_event(3, T - 10_000, 11, 0)])
+    due = book.candidates(16, 16, now=T + 10, settlement_window=W)[1]
+    assert sorted(due) == [1, 2, 3] and len(due) == len(set(due)), due
+    # A reorg rollback clears the rotation cursor with the projection.
+    book.rollback(9)
+    assert book.meta("alloc_after") is None and not book.candidates(16, 16, now=T + 10, settlement_window=W)[1]
+    book.close()
+
+    # The id column is TEXT, so `ORDER BY id` is lexical ('10' < '100' < '9'); the rotation's
+    # id<=after wrap-around still visits every id, so a numerically larger id is never starved.
+    book = I.EventIndex(directory / "recovery-affinity.sqlite", 1, VAULT, 10)
+    book.append(10, 10, "hash-10", [alloc_event(9, T, 10, 0), alloc_event(10, T, 10, 1), alloc_event(100, T, 10, 2)])
+    seen = set()
+    for _ in range(6):  # quota of 1; wrap-around must surface all three within a few passes
+        seen |= set(book.candidates(1, 1, now=T + 10, settlement_window=W)[1])
+    assert seen == {9, 10, 100}, seen
+    book.close()
+    print("receipt recovery: booked-Allocated kept/kicked early (no CashReceipt) surfaced inside the "
+          "settlement window, rotating across passes, no double count, cleared on reorg: pass")
+
+
 def rotation_tests(directory):
     """More than sixteen authentic returned packs surface across bounded successive keeper
     passes, with a process restart mid-rotation and a reorg (prefix rollback + replay) restoring
@@ -349,6 +404,24 @@ def rotation_tests(directory):
           "reorg replay restores the projection: pass")
 
 
+def exposure_tests(directory):
+    """Every open position counts toward selection-weight exposure, past the old 512 read cap;
+    settlement and a reorg move the count with the book, and a restart keeps it."""
+    path = directory / "exposure.sqlite"
+    book = I.EventIndex(path, 1, VAULT, 1)
+    book.append(1, 1, "e-1", [pos(i, backing=4 * 10**16, block=1, idx=i) for i in range(600)])
+    book.append(2, 2, "e-2", [pos(i, state=2, backing=4 * 10**16, block=2, idx=i) for i in range(10)] +
+                [pos(i, state=0, block=2, idx=10 + i) for i in range(10, 20)])
+    assert len(book.open_backings()) == 590  # 580 Active + 10 Allocated; 10 settled drop out
+    book.rollback(1)
+    assert len(book.open_backings()) == 600
+    book.close()
+    book = I.EventIndex(path, 1, VAULT, 1)
+    assert book.open_backings() == [4 * 10**16] * 600
+    book.close()
+    print("keeper exposure: 600 open positions counted from the index; settlement, reorg, restart: pass")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--canonical-read-check", action="store_true", help="also check discovery-hash repair against real Tenderly block hashes")
@@ -356,4 +429,6 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as d:
         projection_tests(Path(d))
         discovery_tests(Path(d), options.canonical_read_check)
+        receipt_recovery_tests(Path(d))
         rotation_tests(Path(d))
+        exposure_tests(Path(d))

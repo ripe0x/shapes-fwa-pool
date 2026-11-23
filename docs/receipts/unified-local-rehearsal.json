@@ -1,0 +1,21 @@
+{
+ "fork": "anvil mainnet fork at 26461778 via Tenderly gateway, local only",
+ "deploy_gas": 15752358,
+ "create_manager_gas": 462707,
+ "keeper_build_7": {
+  "gas": 8343705,
+  "pay_wei": 1294905693300000
+ },
+ "exit_unlist_7": {
+  "gas": 1974238,
+  "pay_wei": 330110943605000
+ },
+ "exit_liquidate": {
+  "gas": 998433,
+  "pay_wei": 227467807250000
+ },
+ "manager_funded_wei": 1000000000000000000,
+ "manager_before_withdraw_wei": 984147515555845000,
+ "mint_fees_wei": 14000000000000000,
+ "identity": "1e18 - 14e15 - (1294905693300000+330110943605000+227467807250000) == 984147515555845000: True"
+}

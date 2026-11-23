@@ -2,19 +2,51 @@
 pragma solidity 0.8.30;
 
 import {VaultLib} from "./VaultLib.sol";
-import {IFWAV2, IFWAView, LISTING_ALLOCATED, LISTING_SETTLED} from "./interfaces/External.sol";
+import {IFWAV2, IFWAView, IShapePacks, LISTING_ACTIVE, LISTING_ALLOCATED, LISTING_SETTLED} from "./interfaces/External.sol";
 
 /// @notice The read half of VaultLib's scan proof, a separate library only for EIP-170 size.
 library ScanLib {
-    /// @dev Reads the FWA listing of every open position the book holds Active and selects, in
-    ///      allocation-time order (packed `allocatedAt << 192 | id`), each one FWA allocated; then
-    ///      moves the cursor to FWA's completed prefix `end`. FWA allocates a listing only while advancing
-    ///      `nextSequenceToProcess`, so no completed entry before `end` keeps an unapplied own
-    ///      selection. Position IDs exist only for listings VaultLib.admit validated, and FWA never
-    ///      changes a listing's identity (so the journal's `_validate` is not repeated here; `_syncTerminal`
-    ///      re-validates before any backing moves). With more than MAX_SELECTIONS found, or an order the
-    ///      allocation queue cannot take, it changes nothing and returns false: the caller walks the
-    ///      journal instead. `scanned` counts the listings read by a completed scan.
+    /// @dev Every position the book holds Allocated must still be Allocated at FWA. A settlement
+    ///      pays the account in its own transaction; if receive() could not record the receipt
+    ///      (forced ETH), the cash would otherwise count beside the position until it is synced.
+    ///      Reads at most MAX_ALLOCATION_SCAN queue entries from the head (else CatchUpFirst: sync
+    ///      and prune first), so pricing cost never grows with allocation history.
+    ///      A kick refunds B the same way, so while FWA can kick (the ShapePacks oracle exemption
+    ///      lifted) and the account holds at most MAX_ALLOCATION_SCAN open entries, every booked
+    ///      Active listing must also still be Active at FWA. Above that the check is skipped, not
+    ///      refused, so pricing never stalls on FWA's exemption: an unrecorded kick refund needs
+    ///      receive() to exceed FWA's 100,000 gas stipend (it uses 35,148), and with the exemption in
+    ///      place no listing can be kicked.
+    function requireAllocatedCurrent(VaultLib.Book storage b, IFWAV2 f, IShapePacks packs)
+        external view returns (uint256 entries, uint256 reads)
+    {
+        uint256 n = b.open.length;
+        if (b.activeCount != 0 && n <= VaultLib.MAX_ALLOCATION_SCAN && !f.oracleExemptCollections(address(packs))) {
+            entries = n;
+            for (uint256 i; i < n; ++i) {
+                uint256 id = b.open[i];
+                if (b.positions[id].state != VaultLib.ACTIVE) continue;
+                ++reads;
+                if (IFWAView(address(f)).listings(id).status != LISTING_ACTIVE) revert VaultLib.PendingReceipts();
+            }
+        }
+        if (b.allocatedValue == 0) return (entries, reads);
+        uint256 head = b.allocationHead;
+        uint256 queued = b.allocationQueue.length - head;
+        if (queued > VaultLib.MAX_ALLOCATION_SCAN) revert VaultLib.CatchUpFirst();
+        entries += queued;
+        for (uint256 i = head; i < head + queued; ++i) {
+            uint256 id = b.allocationQueue[i];
+            if (b.positions[id].state != VaultLib.ALLOCATED) continue;
+            ++reads;
+            uint8 status = IFWAView(address(f)).listings(id).status;
+            // A bid pays nothing and returns the pack: the booked position already counts it.
+            if (status == LISTING_ALLOCATED || (status == LISTING_SETTLED
+                && (VaultLib.owns(packs, b.positions[id].packId) || f.stuckNFTRecipient(id) == address(this)))) continue;
+            revert VaultLib.PendingReceipts();
+        }
+    }
+
     function rebase(VaultLib.Book storage b, IFWAV2 f) external returns (bool, uint256 scanned, uint256 own) {
         uint64 end = f.nextSequenceToProcess();
         uint256 backlog = end - b.acquisitionCursor;

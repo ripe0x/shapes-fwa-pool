@@ -6,6 +6,7 @@ import {TestVaultOps} from "../utils/TestVaultOps.sol";
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
 import {ReconcileTrace} from "../utils/ReconcileTrace.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {VaultLib} from "../../src/VaultLib.sol";
 import {Charges} from "../utils/Charges.sol";
 import {LISTING_ACTIVE} from "../../src/interfaces/External.sol";
 
@@ -51,14 +52,22 @@ contract ForkReconcileTest is SelectionBase {
 
     function test_reconcileFullCycle() public {
         if (vm.exists(OUT)) vm.removeFile(OUT);
-        Candidate memory c = late();
+        Candidate memory c = primary();
         _select(c); // deploy (3 ETH seed), restock 30, list 30, real request + fulfillment
+        _pendForeignAcquisition(); // real pending request: busy queue for the relist refusal, then a
+                                   // foreign refund the catchup drains (the historical count=5 candidate
+                                   // left these for free; the single-count candidate does not).
+        // Keep the keeper share low enough that the resolving sync does not economically sweep the
+        // selection fee credit; the explicit harvest below collects it instead, as the Python mirror
+        // (sim/vault.py) models. The default share would sweep this fixture's larger credit in-sync.
+        VaultLib.Params memory pr = vault.getParams(); pr.keeperShareBps = 500;
+        vm.prank(vault.owner()); vault.setParams(pr);
         vm.writeLine(
             OUT,
             string.concat(
                 '{"step":"setup","deployBalance":', vm.toString(deployBalance),
                 ',"selectPay":', vm.toString(selectPay),
-                ',"count":', vm.toString(COUNT), ',"units":3,"backing":', vm.toString(B),
+                ',"count":', vm.toString(COUNT), ',"units":6,"backing":', vm.toString(B),
                 ',"activationDebt":', vm.toString(activationDebt), ',"initCursor":', vm.toString(vault.acquisitionCursor()), ',"selectedListing":', vm.toString(selected), ',"backings":[', vm.toString(B), '],"acqFee":', vm.toString(acqFee), ',"acqCutBps":', vm.toString(acqCutBps),
                 ',"acqCrownBps":', vm.toString(acqCrownBps), ',"acqActive":', vm.toString(acqActive),
                 ',"balance":', vm.toString(address(vault).balance), "}"
@@ -106,7 +115,7 @@ contract ForkReconcileTest is SelectionBase {
         TestVaultOps.harvest(vault, TestVaultOps.open(vault), 0);
         uint256 gHarvest = g - gasleft();
         _snap("harvest");
-        uint256[] memory planned9 = TestVaultOps.proposals(vault, 1, 3);
+        uint256[] memory planned9 = TestVaultOps.proposals(vault, 1, UNITS);
 
         // FWA's queue is busy (the forked block's other request): the vault refuses to list into it.
         vm.expectRevert(PackVault.Nothing.selector);

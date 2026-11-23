@@ -10,6 +10,7 @@ historical default 26,418,539 is the 2026-11-18 campaign.
 import argparse
 import hashlib
 import json
+import re
 import os
 import socket
 import subprocess
@@ -23,13 +24,25 @@ from eth_utils import keccak, to_checksum_address
 ROOT = Path(__file__).resolve().parent.parent
 PORT = int(os.environ.get("PACK_VAULT_LOCAL_PORT", 8557))
 RPC = f"http://127.0.0.1:{PORT}"
-FORK_RPC = "https://mainnet.gateway.tenderly.co"
+# Tenderly's public gateway by default. REHEARSAL_FORK_RPC (environment only) can name another
+# upstream for the fork; its URL can carry an API key, so scrub() removes it from every record.
+FORK_RPC = os.environ.get("REHEARSAL_FORK_RPC") or "https://mainnet.gateway.tenderly.co"
+
+
+def scrub(text):
+    text = text.replace(FORK_RPC, "<fork-rpc>") if "tenderly" not in FORK_RPC else text
+    return re.sub(r"(https?://[^\s\"']*/v[0-9]+/)[A-Za-z0-9_-]{8,}", r"\1<key>", text)
+
 FORK_BLOCK = int(os.environ.get("PACK_VAULT_FORK_BLOCK", 26_418_539))
 MAX_GAS = 16_777_216
 CODE_SIZE = 24_576
 ACTOR_ETH = 10 * 10**18
+# mgra/mgrb/mgrc own personal managers (the unified system's permissionless clones); purchaser is a
+# fresh FWA purchaser for the manager outcome paths. All are fresh label-derived addresses, verified
+# clean before funding, never Anvil dev accounts (rehearse_unified.py).
 ACTORS = {name: to_checksum_address(keccak(text=f"pack-vault-rehearsal-{name}")[-20:])
-          for name in ("deployer", "holder", "holder2", "keeper", "kicker", "owner")}
+          for name in ("deployer", "holder", "holder2", "keeper", "kicker", "owner",
+                       "mgra", "mgrb", "mgrc", "purchaser")}
 ORACLE = "0xaA4D9009a4664604b57644bF13e447E9036727DC"
 ORACLE_OWNER = "0x9306342f408185180987bBe69B5AFDCaD5e971b4"  # pinned deployed owner(), read 2026-11-18
 ENV_MANIFEST = "PACK_VAULT_LOCAL_BATCH"
@@ -64,7 +77,7 @@ def quantity(v):
 
 
 def values(calibration=False):
-    v = json.loads((ROOT / "deploy/canary.example.json").read_text())
+    v = json.loads((ROOT / "deploy/mainnet.json").read_text())
     v["owner"] = ACTORS["owner"]
     if calibration:
         v["tvlCapWei"] = 12 * 10**18
@@ -83,11 +96,11 @@ def plan():
         external_test_signer=dict(address=ORACLE_OWNER, target=ORACLE, action="setFloor(packs,ask)",
                                   added_funding_wei=0, preconditions="pinned owner/code/nonce/balance readback; existing balance funds gas"),
         per_transaction_gas_limit=MAX_GAS, runtime_code_limit=CODE_SIZE, production_broadcasts=0,
-        canary_values=values(), calibration_values=values(True),
+        launch_values=values(), calibration_values=values(True),
         phase_isolation="evm_snapshot/revert reuses the single funded baseline between phases; no second balance credit",
         phases=[
-            "Fresh production script/deploy.sh deployment and postflight; 2ETH canary lifecycle using normal keeper/index, restart, tokens/burn, oracle kick, policy swap, gas spike, redemption, wind-down",
-            "Fresh production deployment for the holder workflow and a separate owner wind-down (rehearse_current.py), selected canary values and budgets; restart normal keeper; holder-run exits with loss limits",
+            "Fresh production script/deploy.sh deployment and postflight; mainnet-values lifecycle using normal keeper/index, restart, tokens/burn, oracle kick, policy swap, gas spike, redemption, wind-down",
+            "Fresh production deployment for the holder workflow and a separate owner wind-down (rehearse_current.py), mainnet values and budgets; restart normal keeper; holder-run exits with loss limits",
             "Fresh12ETH test-only calibration vault, same budgets; <=6ETH deposits by each of two holders; masks3+30; max16 listing/unlisting/harvest/token/sync items, total30Shapes restock/liquidation, exact fee witness checkpoints",
             "Genuine external FWA acquire requests in bounded batches, expire through real processor, measure1/16 refunded global journal entries and higher gas; withdraw actual refund; no fabricated VRF success",
         ],
@@ -115,7 +128,7 @@ def load_manifest():
     fork = info.get("forkConfig") or {}
     if (str(fork.get("forkUrl")).rstrip("/") != FORK_RPC.rstrip("/")
             or quantity(fork.get("forkBlockNumber", -1)) != FORK_BLOCK):
-        raise RuntimeError(f"unexpected Anvil fork metadata: {fork}")
+        raise RuntimeError(scrub(f"unexpected Anvil fork metadata: {fork}"))
     if rpc("eth_getBlockByNumber", hex(FORK_BLOCK), False)["hash"] != m["fork_hash"]:
         raise RuntimeError("fork base block hash changed")
     return m
@@ -132,7 +145,7 @@ def append_action(record):
     if CURRENT_DEPLOYMENT is not None:
         record["vault_context"] = CURRENT_DEPLOYMENT
     with open(m["actions"], "a") as f:
-        f.write(json.dumps(record) + "\n")
+        f.write(scrub(json.dumps(record)) + "\n")
 
 
 def prepare_actor(address):
@@ -209,8 +222,14 @@ def deploy(v, label):
         raise RuntimeError(f"refusing to overwrite existing values: {path}")
     path.write_text(json.dumps(v, indent=2) + "\n")
     try:
+        # Price the broadcast above the node's current base fee. The fork runs at a fixed --base-fee
+        # (plan()), but forge otherwise estimates from the forked block's lower history and underprices
+        # ("max fee per gas less than block base fee"). Read the pending base fee directly (not through
+        # inclusion_context, whose deterministic-next-block check rejects the forced --base-fee on a
+        # fresh fork before any block is mined).
+        deploy_base = quantity(rpc("eth_getBlockByNumber", "pending", False)["baseFeePerGas"])
         env = {**os.environ, "RPC_URL": RPC,
-               "FORGE_WALLET_ARGS": f"--unlocked --sender {ACTORS['deployer']}",
+               "FORGE_WALLET_ARGS": f"--unlocked --sender {ACTORS['deployer']} --with-gas-price {2 * deploy_base + 50_000_000}",
                "FOUNDRY_GAS_LIMIT": str(MAX_GAS)}
         # Forge's offchain script harness embeds creation code and exceeds EIP170. Keep its
         # default harness behavior; the actual Anvil node enforces24576 on every deployment.
@@ -240,12 +259,20 @@ def deploy(v, label):
         source, name, address = reference.rsplit(":", 2)
         code = bytes.fromhex(cast("code", address)[2:])
         artifact = json.loads((ROOT / "out" / Path(source).name / f"{name}.json").read_text())["deployedBytecode"]
-        compiled = bytearray.fromhex(artifact["object"].removeprefix("0x"))
+        # The compiled object carries __$...$__ placeholders where linked library addresses are
+        # injected at deploy time (a library that calls another library); zero those hex positions
+        # before parsing, then zero link and immutable references in both and compare the rest.
+        obj = list(artifact["object"].removeprefix("0x"))
+        offsets = [o for libs in artifact.get("linkReferences", {}).values()
+                   for refs in libs.values() for o in refs]
+        for o in offsets:
+            obj[o["start"] * 2:(o["start"] + o["length"]) * 2] = "0" * (o["length"] * 2)
+        compiled = bytearray.fromhex("".join(obj))
         actual = bytearray(code)
-        for references in artifact.get("immutableReferences", {}).values():
-            for offset in references:
-                start, length = offset["start"], offset["length"]
-                actual[start:start + length] = compiled[start:start + length] = bytes(length)
+        offsets += [o for refs in artifact.get("immutableReferences", {}).values() for o in refs]
+        for o in offsets:
+            start, length = o["start"], o["length"]
+            actual[start:start + length] = compiled[start:start + length] = bytes(length)
         if actual != compiled or len(code) > CODE_SIZE:
             raise RuntimeError("linked library runtime differs from frozen compiled artifact or exceeds EIP170")
         if not any(d["address"].lower() == address.lower() for d in deployments):
@@ -305,8 +332,11 @@ def run_approved(calibration_first=False):
         env = {**os.environ, "FOUNDRY_GAS_LIMIT": str(MAX_GAS)}
         env.pop("FOUNDRY_CODE_SIZE_LIMIT", None)
         baseline = rpc("evm_snapshot")
-        scripts = PHASES or (["measure_gas.py", "rehearse_canary.py", "rehearse_current.py"] if calibration_first else
-                             ["rehearse_canary.py", "rehearse_current.py", "measure_gas.py"])
+        # Unified system (D77): one build-and-list strategy on PackVault plus permissionless
+        # PackManager clones. rehearse_unified.py is the whole end-to-end rehearsal. The pre-A3
+        # restock/split phase and calibration scripts are retired; gas is recalibrated from the
+        # rehearsal's own keeper receipts and the ForkMaxBatchGas Forge suite.
+        scripts = PHASES or ["rehearse_unified.py"]
         for number, script in enumerate(scripts):
             if number:
                 if not rpc("evm_revert", baseline):
@@ -317,9 +347,9 @@ def run_approved(calibration_first=False):
                 attempt += 1
                 path = work / f"{number}-{script}-attempt{attempt}.log"
                 print(f"START phase={script} log={path} manifest={manifest}", flush=True)
-                with open(path, "w") as output:
-                    result = subprocess.run([sys.executable, str(ROOT / "keeper" / script)], cwd=ROOT, env=env,
-                                            stdout=output, stderr=subprocess.STDOUT)
+                result = subprocess.run([sys.executable, str(ROOT / "keeper" / script)], cwd=ROOT, env=env,
+                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                path.write_text(scrub(result.stdout))
                 if not result.returncode:
                     break
                 print(f"PAUSED phase={script} exit={result.returncode} log={path}; node and ledger preserved. "
@@ -364,6 +394,6 @@ if __name__ == "__main__":
                  ("--fork-block", str(args.fork_block), "--port", str(args.port))]])
     PHASES = args.phases
     if args.plan:
-        print(json.dumps(plan(), indent=2))
+        print(scrub(json.dumps(plan(), indent=2)))
     else:
         run_approved(args.calibration_first)

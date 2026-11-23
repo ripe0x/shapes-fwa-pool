@@ -30,5 +30,5 @@ step forge-all forge test "${FORK[@]}" --no-match-test "$SCALE" -vv
 # setup; the measured production calls inside still assert the 16,777,216 transaction cap.
 step forge-scale forge test "${FORK[@]}" --match-test "$SCALE" --gas-limit 10000000000 -vv
 step reconcile python3 sim/reconcile.py
-step release-check python3 script/release.py check deploy/canary.json
+step release-check python3 script/release.py check deploy/mainnet.json
 echo "all checks passed; logs in $LOG_DIR"

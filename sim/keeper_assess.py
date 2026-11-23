@@ -3,8 +3,7 @@
 
 Same demand everywhere: the actual trailing 30 days at formal.PIN (11,604 successful and 5,090
 refunded requests, recorded foreign weight and purchaser responses, in-window bids), repeated for
-360 days plus a full holder exit. Values come from deploy/canary.json (2 ETH canary) and
-deploy/mainnet.json (6.8 and 20 ETH), optionally overridden per scenario. Gas is the total price
+360 days plus a full holder exit. Values come from deploy/mainnet.json (1.96, 6.8 and 20 ETH), optionally overridden per scenario. Gas is the total price
 (basefee + 0.05 gwei tip); spike paths hold a higher price over a range of operating days.
 
 Usage: sim/keeper_assess.py [--seeds 400] [--workers 12] [--only LABEL ...] [--out PATH]
@@ -25,20 +24,20 @@ import formal as FM  # noqa: E402
 import forward as F  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-CANARY = 1_960_100_000_000_000_000  # formal.py: the 2 ETH cap less the seed and its dust
+SMALL = 1_960_100_000_000_000_000  # formal.py's 1.96 ETH holder cell
 
 # (label, config, principal wei, gas (base total gwei, spike total gwei, from day, to day), value overrides)
 SCENARIOS = [(f"{name}|{gas[0]}" + (f"|spike{gas[1]}@{gas[2]}-{gas[3]}" if gas[1] else ""), config, principal, gas, {})
-             for name, config, principal in (("2eth", "canary", CANARY), ("6.8eth", "mainnet", 68 * 10**17),
+             for name, config, principal in (("2eth", "mainnet", SMALL), ("6.8eth", "mainnet", 68 * 10**17),
                                              ("20eth", "mainnet", 20 * 10**18))
              for gas in ((0.15, 0, 0, 0), (0.5, 0, 0, 0), (0.5, 2.0, 30, 120), (0.5, 1.0, 30, 360))]
-# The refill the owner's limits assume (0.0008 ETH a day, main's canary value), against PR 2's 0.01.
-SCENARIOS.append(("2eth|0.5|refill0.0008", "canary", CANARY, (0.5, 0, 0, 0),
+# The refill the owner's limits assume (0.0008 ETH a day, an earlier default), against PR 2's 0.01.
+SCENARIOS.append(("2eth|0.5|refill0.0008", "mainnet", SMALL, (0.5, 0, 0, 0),
                   dict(routineRatePerDayWei=800_000_000_000_000)))
 # Diagnostic, not the gate: the window without its busiest day (4,916 of 11,604 successful
 # acquisitions), the other 29 days tiled instead.
 SCENARIOS += [(f"{name}|0.5|without-peak-day", config, principal, (0.5, 0, 0, 0), dict(_drop_peak_day=True))
-              for name, config, principal in (("2eth", "canary", CANARY), ("6.8eth", "mainnet", 68 * 10**17),
+              for name, config, principal in (("2eth", "mainnet", SMALL), ("6.8eth", "mainnet", 68 * 10**17),
                                               ("20eth", "mainnet", 20 * 10**18))]
 
 

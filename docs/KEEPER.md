@@ -10,23 +10,45 @@ Standalone `harvest` is unpaid. Eligible sync may sweep economical credit or cla
 economic decisions and is imported by the simulation. `tx.py` retains nonce, replacement, restart,
 lost-response and receipt-reorg handling. The vault authenticates financial facts independently.
 
+**One keeper, many accounts.** The keeper services every account from one signer: explicit
+PackVault and/or PackManager address(es), plus every personal manager a `--factory`
+(`PackManagerFactory`) has created. Discovery is bounded — each pass reads `managerCount()` and
+fetches only indices not yet in `keeper/discovered-<factory>.json`; no pass rescans the whole set.
+One signer means one nonce stream and at most one in-flight transaction across all accounts, so they
+are serviced in turn and resume the same pending transaction first. Each account keeps its own event
+index and plan, and is fully isolated: one account's revert, empty budget, paused listing or stuck
+position never stops work on the others (`/health` reports per-account status). `read_state` branches
+on account type (detected via `factory.isManager` or by probing a pool-only view): a personal
+manager has no shares, deposits, redemptions, checkpoints or distributions, so those pool-only views
+are never read and `checkpoint` is never planned for it; `windingDown` is the owner's reversible exit
+mode (`setExiting`).
+
 ```sh
 python3 keeper/keeper.py <vault> --rpc https://mainnet.gateway.tenderly.co
-python3 keeper/keeper.py <vault> --send --account <keystore> --rpc https://mainnet.gateway.tenderly.co \
-  --loop 300 --confirmations 2 --health-port 8788 --burn-tokens
-python3 keeper/keeper.py <vault> --status
+python3 keeper/keeper.py <vault> [<manager>...] --factory <factory> --send --account <keystore> \
+  --rpc https://mainnet.gateway.tenderly.co --loop 300 --confirmations 2 --health-port 8788 --burn-tokens
+python3 keeper/keeper.py <vault> --factory <factory> --status
 ```
 
 Signing uses the existing cast keystore. No raw key belongs in an argument or file. The keeper
 needs its own ETH for gas. Token burns remain unpaid and require operator opt-in.
 
+**Selection-weight exposure (monitoring only).** `/health` reports the keeper's combined share of
+FWA selection weight across every account it runs: the sum over its own Active listings of each
+listing's FWA weight `1e36 / backing`, over `FWA.totalWeight()`. It surfaces as an `EXPOSURE_SHARE`
+info line, and as an `EXPOSURE_SHARE_HIGH` action once the share reaches `EXPOSURE_SHARE_HIGH_BPS`
+(10%, `policy.py`). Backings come from each account's event index (every open listing, no cap,
+reorg-repaired), not from chain reads; an account whose pass fails still counts from its saved index, and one with no index yet raises `EXPOSURE_INCOMPLETE`. It never changes a plan — at a high share the operator widens backings or adds
+independent listers.
+
 | State | Default or behavior |
 | --- | --- |
-| Transaction state | `keeper/state-<vault>.json`; `--state` overrides it |
+| Transaction state | `keeper/state-<factory-or-first-account>.json` (one per signer, shared across accounts); `--state` overrides it |
+| Manager discovery | `keeper/discovered-<factory>.json`; bounded — only new `managerAt` indices are fetched per pass |
 | Event index | `keeper/index-<chain>-<vault>-<deploymentBlock>.sqlite`; `--index` overrides it |
 | Initial reconstruction | starts at the earlier of deployment and the trailing-seven-day volume boundary |
 | Log ingestion | at most eight ranges of 2,000 blocks per pass; saved progress resumes on the next pass |
-| Ordinary candidates | independent returned/receipt, unseen-selection, expired and rotating OWED candidates, at most 16 per class; at most 80 hydrated positions including active witnesses |
+| Ordinary candidates | independent returned/receipt, unseen-selection, expired, inside-window booked-Allocated status checks and rotating OWED candidates, at most 16 per class; at most 80 hydrated positions including active witnesses |
 | Discovery upgrade | replay missing allocation/bid history in at most eight adaptive ranges per pass, independently of the financial head |
 | Reorg repair | verify both saved canonical prefixes, roll back affected ranges and replay retained events |
 | Financial authority | onchain acquisition cursor, pending receipt count, listing authentication and exact book |
@@ -49,12 +71,12 @@ a bounded candidate set. Complete portfolio getters are absent from the producti
 
 | Call | Required inputs and bounds |
 | --- | --- |
-| `restock(units, backingProposals, minPay)` | allowed pack size; at most 30 total new units; actual proposed funding plus maintained waiting-inventory funding |
-| `list(backingProposals, minPay)` | at most 8 proposals, each an unused 10,000 wei multiple inside the live target interval and every economic gate |
+| `build(units, backingProposals, minPay)` | allowed pack size (mask); each pack mints its Shapes straight into ShapePacks (6 units = one 0.05 + one 0.01 Shape, two paid mints) and is listed at once; at most 8 packs per call; capital must cover maintained waiting-inventory funding, every pack's mint cost and every backing |
+| `list(backingProposals, minPay)` | relists only idle (returned) packs; at most 8 proposals, each an unused 10,000 wei multiple inside the live target interval and every economic gate |
 | `sync(ids, witnessId, minPay)` | automatic job: at most 128 global records, 16 actual own selections, 16 supplied terminal or active funding IDs and 16 pruned heads; independent bounds |
 | `checkpoint(witnessId, minPay)` | one authenticated live fee witness when active count is nonzero; complete journal, no receipts, clean nonexpired allocation head, blackout and drained requests |
 | `unlist(ids, minPay)` / `harvest(ids, minPay)` | at most 16 IDs; harvest IDs strictly ascending; crown exit protection remains |
-| `liquidate(maxCount, minPay)` | at most 16 items and 30 ordinary backing units; oversized gifts use an isolated claim of at most 30 Shapes |
+| `liquidate(maxCount, minPay)` | at most 16 items and 60 ordinary backing units per call; oversized gifts use an isolated claim of at most 30 Shapes |
 | `burnTokens(ids)` | at most 16 candidates; unpaid; stale IDs cannot block credit withdrawal and burning |
 
 Operation identifier 4 (old staged activation) is retired. New admission atomically requires an
@@ -89,6 +111,16 @@ An optional short foreign tail can advance unpaid with `minPay=0`; positive `min
 insufficient payment atomically. The normal keeper waits for useful batches or an actual checkpoint
 candidate. All sync, including mixed jobs during redemption/wind-down, spends routine permission.
 D64 still leaves unlisting and liquidation to callers when essential permission is zero.
+
+Terminal-work discovery never depends on a `CashReceipt` event. A booked-Allocated position is
+surfaced for a live FWA-status check every pass while it is still inside its settlement window (a
+bounded rotating class, the complement of the expiry class), so an early keep or a kick whose
+payment FWA force-sent by `SELFDESTRUCT` — the account's `receive` reverted, no `CashReceipt`,
+`pendingReceipts()` stays zero — is synced promptly instead of waiting for expiry. Because the
+keeper surfaces it, `sync` runs before any `checkpoint` (checkpoint plans only when nothing is
+`due`), so the keeper never loops a checkpoint the vault reverts with `PendingReceipts` while a
+booked-Allocated position is not Allocated at FWA. A booked-Active position FWA shows withdrawn
+(kicked) sorts first in the active set by zero debt and is caught the same way.
 
 Returned-pack discovery authenticates FWA's `NFTAllocated`, `DepositorBidAccepted` and
 `DepositorBidAcceptedAsTokens` events and this vault's depositor identity. It retains selections
@@ -152,7 +184,22 @@ Owner `startWindDown()` remains one-way. Process journal/receipts, resolve alloc
 crown protection, liquidate in bounded calls, and checkpoint redemptions in blackout. Holders claim
 their own balances. Oracle or admission failures cannot block the recovery paths.
 
-Local rehearsal is prepared by `python3 keeper/rehearsal_batch.py --plan`. Its execution entry is
-reserved for an explicitly approved isolated local batch. Current command receipts and remaining
-launch gates are recorded in `docs/REPORT.md`; historical keeper profit tables do not validate the
-new quote schedule.
+Local rehearsal (unified system, D77) is one command on a fresh local mainnet fork, no public write:
+
+```sh
+python3 keeper/rehearse_unified.py --fork-block <recent> --port <free, not 8545>
+```
+
+It deploys the pooled vault and factory through `script/deploy.sh`, creates several personal
+managers for different owners, runs this keeper signing through an encrypted keystore on a durable
+`/data` volume exactly as `keeper/entrypoint.sh` does, and exercises discovery, build/list, the
+pooled deposit/checkpoint/redeem/claim cycle, manager withdrawals and owner exit, restart and
+container replacement on the same volume, the backup worker, and the lost-response/race/reorg and
+event-index paths through `keeper/test_tx.py` and `keeper/test_index.py`. It writes
+`docs/receipts/unified-production-rehearsal.json`. Real-FWA-VRF keep/bid/expiry needs the vault to
+list at the exact backing `sim/find_selection.py` searched `test/fixtures/selection.json` against;
+when a recipe or purchaser-gas change moves `edge(6)` the fixtures are stale and the rehearsal
+records that gap with the regeneration command instead of fabricating a selection (those outcomes
+are proven in the Forge `ForkSelection`/`ForkManager`/`VaultFlow` suites). It is launched through
+`keeper/rehearsal_batch.py`, which owns the Anvil node, the fresh label-derived actors and the
+manifest. Historical keeper profit tables do not validate the new quote schedule.

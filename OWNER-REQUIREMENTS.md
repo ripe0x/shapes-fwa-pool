@@ -83,6 +83,11 @@ after** at canary budgets (routine 0.03 ETH; no essential budget, D64) (measured
 `test/audit/release/AuditOwnerExtraction.t.sol`). Raising `tvlCap` exposes more holders to bad
 settings but does not raise that rate. Mitigation: the owner key is a multisig or hardware wallet.
 
+Update (owner, 2026-11-22, launch audits A and B): the numbers above understate the current
+bytecode maxima (routine 0.3 ETH cap at 0.02 a day, essential 0.1 at 0.005 a day, 50 gwei ceiling;
+audit B measured 0.3726 ETH over 30 days on the canary). The owner accepts owner-key compromise as
+a risk without a numeric bound and does not want it raised again.
+
 
 ## A2. Position accounting integration (owner, 2026-11-18)
 
@@ -149,3 +154,84 @@ recorded here.
 27. (2026-11-18) Complete event-based returned-pack discovery: authenticate both actual bid events,
     retain unreconciled own selections, discover expiry independently, replay missing history on
     existing-index upgrade, and verify more than16allocations with restart/reorg behavior.
+
+## A3. Unified shapes FWA system (owner, 2026-11-21)
+
+Source: the owner's "Implement the unified shapes FWA system" brief (2026-11-21, main 78ad729,
+research PR #1). It supersedes A2.20's "No factory ... shared exposure contract ... new mint/coin
+strategy" for this work, and D62's bid-favouring backing floor. Owner's words:
+
+28. "Build one unified system for automatically managing shapes and shape packs on FWA, supporting
+    two products": "A shared pool where multiple depositors contribute capital and earn
+    proportional returns" and "A personal manager factory where anyone can deploy their own isolated
+    manager". "Both products must execute the same underlying strategy implementation."
+29. "There must be exactly one authoritative implementation of these strategy mechanics." "Do not
+    add a separately funded central strategy contract or shared asset custodian." "Assets belonging
+    to one manager must never become accessible to another manager or to the factory."
+30. "The factory must not have authority to withdraw funds, replace the manager's owner, redirect
+    proceeds, or change individual manager settings." "Do not charge an additional factory or
+    management fee". "Do not introduce upgradeable manager implementations unless absolutely
+    necessary."
+31. Recipe: "A 0.06 eth pack consisting of one newly minted 0.05 eth shape and one newly minted 0.01
+    eth shape" using "the deployed shape packs contract's native ability to mint shapes directly into
+    a pack". "Do not redeem and remint returned packs merely to collect another fee." "Do not reduce
+    the live mint fee from 0.001 eth merely to force a recipe to pass."
+32. Keep incentive: "Pack value: 0.06 eth. Backing: approximately 0.0648 eth ... Minimum modeled
+    advantage for keeping versus the best alternative: 0.0003 eth after relevant gas." "These are
+    starting points, not fixed constants." "Pause fresh investment when the required economic
+    conditions are unavailable. Preserve settlement, asset recovery, and withdrawals".
+33. "Prefer live FWA admission economics and independent account safety checks unless the tests
+    demonstrate a need for centralized exposure enforcement." "Never allow a factory controlled
+    registry to become a custody authority."
+34. "The system should operate with one keeper codebase." "One manager with inadequate cash, paused
+    listings, or a stuck position must not prevent useful work on other managers." "Do not add an
+    onchain keeper coordinator unless it is necessary."
+35. "Preserve the pooled vault's recently implemented two step ownership handover and prohibition
+    on ownership renunciation." "Do not make production contracts upgradeable just to simplify code
+    sharing."
+36. "Use the formal existing 10% net annual return requirement as the pooled vault acceptance
+    hurdle. Do not value FWA token rewards as depositor income." "If an economic requirement fails,
+    do not hide the failure or lower the requirement."
+37. "Do not merge, deploy publicly, move real funds, or change the live shapes mint fee." Create a
+    branch from main, push, open a draft PR.
+
+B2 O3/O4/O6 change meaning under item 32: purchasers are now expected to keep (B (1 - s) back to the
+account and a replacement build with fresh mints) rather than bid. The restated outcomes are in
+`asset-flow.json` (unsigned) and `docs/UNIFIED-SYSTEM.md`; no new owner signature exists.
+
+## A4. Complete the unified system for release (owner, 2026-11-21)
+
+Architecture accepted as built (A3); "Do not redesign the project, introduce additional contract
+layers, or reopen decisions that are already supported by evidence."
+
+1. FWA payment receipts: "A payment callback failure must not permanently prevent an account from
+   resolving a legitimate FWA position or recovering its funds." Recovery must authenticate the FWA
+   listing, depositor, pack, status and outcome; prevent fabricated, duplicate and misattributed
+   receipts; preserve protected liabilities and correct NAV; work for pools and managers and "even if
+   the original callback exhausted its gas allowance". "Do not assume that matching an eth balance
+   increase alone proves a particular settlement outcome." (D84)
+2. Recipe: a matched comparison of 0.03 and 0.06 packs through the formal simulator with identical
+   inputs, enough seeds for the downside, keep rates 0-100% and stressed demand and gas. "Retain 0.06
+   as the preferred recipe unless the stronger comparison demonstrates that another simple recipe
+   materially improves the combined objectives." 10% a year net stays the minimum gate. "Do not reduce
+   the current 0.001 eth shapes mint fee." The all-bids case is a stress case, not assumed to be a
+   lower bound.
+3. "Decouple purchaser gas assumptions from keeper compensation." "Prefer an explicit, bounded
+   purchaser gas assumption." No new oracle, role or configuration subsystem. (D85)
+4. Production keeper rehearsal on a fresh fork with the production image, encrypted keys, durable
+   state, multiple managers, outcomes, restarts, container replacement, backup keeper, lost responses,
+   nonce races, per-account failure isolation, index persistence and reorgs. Retire scripts that
+   target the old `restock` API. "Do not simulate successful recovery by manually changing protected
+   accounting state."
+5. Independent review of the final source; all tests, reconciliations and regimes to the wei.
+6. A fresh unsigned acceptance package bound to the final bytecode, values, libraries and keeper
+   image. "Do not generate or reuse an owner signature."
+7. Canary: the existing 2 eth pooled canary as a limited technical deployment. "Do not increase the
+   initial capital exposure merely to produce better modeled investment results." "Distinguish
+   authorization to deploy a contract from authorization to offer the personal manager product
+   publicly."
+8. Final simplification pass without weakening security, accounting or performance.
+
+Update (owner, 2026-11-22): no canary, ever. Item 7 is withdrawn; deployment uses
+`deploy/mainnet.json`, which has no deposit cap (set 2026-11-17, cba0cf5).
+"Do not merge, deploy, sign acceptance documents, or spend real funds."

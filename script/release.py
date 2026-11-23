@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Release identity for PackVault: one manifest binds what was tested to what deploys.
+"""Release identity for PackVault and PackManagerFactory: one manifest binds what was tested to what deploys.
 
   script/release.py manifest                    write deploy/release-manifest.json (after forge build)
   script/release.py check <values>              sources, build, values, keeper and evidence match it
   script/release.py check <values> --broadcast  also the owner's signature on the acceptance package
-  script/release.py postflight <vault> <values> [owner] read a deployed vault back against manifest and values
+  script/release.py postflight <vault> <values> [owner] [factory]  read deployed contracts back against manifest and values
   script/release.py keeper-config <vault> <values> [owner]  postflight, then set VAULT in both Fly configs
 
 The owner accepts a release by signing the sha256 of docs/release/acceptance.json (which names the
@@ -28,15 +28,20 @@ SIGNERS = ROOT / "deploy/allowed_signers"
 RPC = os.environ.get("RPC_URL", "https://mainnet.gateway.tenderly.co")
 CODE_LIMIT = 24_576
 CREATE2_FACTORY = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
-CONTRACTS = {"PackVault": "src/PackVault.sol", "VaultLib": "src/VaultLib.sol", "ScanLib": "src/ScanLib.sol",
-             "KeeperPolicyV1": "src/KeeperPolicy.sol"}
+CONTRACTS = {"PackVault": "src/PackVault.sol", "PackManager": "src/PackManager.sol",
+             "PackManagerFactory": "src/PackManagerFactory.sol", "StrategyLib": "src/StrategyLib.sol",
+             "VaultLib": "src/VaultLib.sol", "ScanLib": "src/ScanLib.sol", "KeeperPolicyV1": "src/KeeperPolicy.sol"}
+# Linked libraries in dependency order: VaultLib links ScanLib, StrategyLib links VaultLib; both
+# accounts (PackVault, the PackManager implementation) link VaultLib and StrategyLib.
+LIBRARIES = ["ScanLib", "VaultLib", "StrategyLib"]
 KEEPER = ["keeper/Dockerfile", "keeper/entrypoint.sh", "keeper/requirements.txt", "keeper/keeper.py",
           "keeper/policy.py", "keeper/tx.py", "keeper/index.py", "fly.keeper-primary.toml", "fly.keeper-backup.toml"]
-VALUES = ["deploy/canary.json", "deploy/mainnet.json"]
+VALUES = ["deploy/mainnet.json"]
 # The acceptance package names this manifest, so it is not listed here (no cycle).
-EVIDENCE = ["docs/receipts/formal-assessment.json", "docs/receipts/release-rehearsal/result.json",
-            "docs/receipts/image-rehearsal/ci-44577532617.json", "docs/receipts/release-review.md",
-            "docs/receipts/release-verify/SUMMARY.md", "docs/receipts/allocation-burst-coverage.md", "asset-flow.json"]
+EVIDENCE = ["docs/receipts/formal-assessment.json", "docs/receipts/recipe-comparison.json",
+            "docs/receipts/unified-production-rehearsal.json", "docs/receipts/unified-selection-rehearsal.json",
+            "docs/receipts/image-rehearsal/ci-44948198556.json", "docs/receipts/unified-review.md",
+            "docs/receipts/unified-verify/SUMMARY.md", "asset-flow.json"]
 
 
 def sha(path):
@@ -84,17 +89,24 @@ def build():
                          initcode_sha256=hashlib.sha256(init).hexdigest())
     from eth_utils import keccak, to_checksum_address
     create2 = lambda init: keccak(b"\xff" + bytes.fromhex(CREATE2_FACTORY[2:]) + bytes(32) + keccak(init))[12:]  # noqa: E731
-    # forge script deploys each library through the factory with salt 0; VaultLib links ScanLib.
-    scan = create2(bytes.fromhex(artifact("ScanLib")["bytecode"]["object"].removeprefix("0x")))
-    lib = artifact("VaultLib")["bytecode"]
-    refs = lib["linkReferences"]
-    assert list(refs) == ["src/ScanLib.sol"] and list(refs["src/ScanLib.sol"]) == ["ScanLib"], refs
-    code = bytearray.fromhex(re.sub(r"__\$[0-9a-f]{34}\$__", "0" * 40, lib["object"].removeprefix("0x")))
-    for r in refs["src/ScanLib.sol"]["ScanLib"]:
-        code[r["start"]:r["start"] + r["length"]] = scan
-    out["ScanLib"]["create2_address"] = to_checksum_address(scan)
-    out["VaultLib"]["create2_address"] = to_checksum_address(create2(bytes(code)))
+    # forge script deploys each library through the factory with salt 0, linking earlier ones.
+    addresses = {}
+    for name in LIBRARIES:
+        code = artifact(name)["bytecode"]
+        addresses[name] = create2(linked(code["object"], code.get("linkReferences", {}), addresses))
+        out[name]["create2_address"] = to_checksum_address(addresses[name])
     return out
+
+
+def linked(obj, refs, addresses):
+    """Creation or runtime bytes with every library reference set to its address."""
+    code = bytearray.fromhex(re.sub(r"__\$[0-9a-f]{34}\$__", "0" * 40, obj.removeprefix("0x")))
+    for libs in refs.values():
+        for name, rs in libs.items():
+            assert name in addresses, f"{name} must be deployed before what links it"
+            for r in rs:
+                code[r["start"]:r["start"] + r["length"]] = addresses[name]
+    return bytes(code)
 
 
 def toolchain():
@@ -108,8 +120,8 @@ def toolchain():
 
 
 def manifest():
-    m = dict(name="PackVault mainnet canary", sources=sources(), toolchain=toolchain(), build=build(),
-             deployment_values="deploy/canary.json", values={v: sha(v) for v in VALUES},
+    m = dict(name="PackVault and PackManagerFactory mainnet", sources=sources(), toolchain=toolchain(), build=build(),
+             deployment_values="deploy/mainnet.json", values={v: sha(v) for v in VALUES},
              keeper={k: sha(k) for k in KEEPER},
              evidence={e: sha(e) for e in EVIDENCE if (ROOT / e).exists()})
     for name, b in m["build"].items():
@@ -157,28 +169,33 @@ def first(raw):
     return raw.split()[0]
 
 
-def postflight(vault, values, owner=None):
-    """Read the deployed vault and its library and policy back; stop on any difference."""
+def postflight(vault, values, owner=None, factory=None):
+    """Read the deployed vault, factory, implementation, libraries and policy back; stop on any difference."""
     m, v = json.loads(MANIFEST.read_text()), json.loads(Path(values).read_text())
     fail = []
     check = lambda ok, what: ok or fail.append(what)  # noqa: E731
     policy = cast("call", vault, "keeperPolicy()(address)")
-    lib = m["build"]["VaultLib"]["create2_address"]
-    scan = m["build"]["ScanLib"]["create2_address"]
-    for name, address in (("PackVault", vault), ("KeeperPolicyV1", policy), ("VaultLib", lib), ("ScanLib", scan)):
+    libs = {name: m["build"][name]["create2_address"] for name in LIBRARIES}
+    deployed = [("PackVault", vault), ("KeeperPolicyV1", policy)] + [(n, a) for n, a in libs.items()]
+    if factory:
+        implementation = cast("call", factory, "implementation()(address)")
+        deployed += [("PackManagerFactory", factory), ("PackManager", implementation)]
+        check(cast("call", factory, "policy()(address)").lower() == policy.lower(), "factory default policy")
+        check(cast("call", implementation, "factory()(address)").lower() == factory.lower(), "implementation factory")
+        check(int(cast("call", implementation, "owner()(address)"), 16) == 0, "implementation has an owner")
+        for k, sig in (("fwa", "fwa()(address)"), ("shapes", "shapes()(address)"), ("packs", "packs()(address)")):
+            check(cast("call", implementation, sig).lower() == v[k].lower(), f"implementation {k}")
+    for name, address in deployed:
         a = artifact(name)
         code = cast("code", address)
         runtime = normalized(code, links(a["deployedBytecode"]), a["deployedBytecode"].get("immutableReferences", {}).values())
         check(hashlib.sha256(runtime).hexdigest() == m["build"][name]["runtime_sha256"], f"{name} runtime at {address}")
-    # The vault's runtime must call the manifest's library, not another one.
-    vcode = bytes.fromhex(cast("code", vault)[2:])
-    for refs in links(artifact("PackVault")["deployedBytecode"]):
-        for r in refs:
-            check(vcode[r["start"]:r["start"] + 20].hex() == lib[2:].lower(), "PackVault links another VaultLib")
-    lcode = bytes.fromhex(cast("code", lib)[2:])
-    for refs in links(artifact("VaultLib")["deployedBytecode"]):
-        for r in refs:
-            check(lcode[r["start"]:r["start"] + 20].hex() == scan[2:].lower(), "VaultLib links another ScanLib")
+        # Every linked call must reach the manifest's library, not another one.
+        onchain = bytes.fromhex(code[2:])
+        for libs_ in a["deployedBytecode"].get("linkReferences", {}).values():
+            for lib, rs in libs_.items():
+                for r in rs:
+                    check(onchain[r["start"]:r["start"] + 20].hex() == libs[lib][2:].lower(), f"{name} links another {lib}")
     owner = owner or v["owner"]  # after a D76 handover, pass the current owner
     check(cast("call", vault, "owner()(address)").lower() == owner.lower(), "owner")
     for k, sig in (("fwa", "fwa()(address)"), ("shapes", "shapes()(address)"), ("packs", "packs()(address)")):
@@ -204,14 +221,24 @@ def postflight(vault, values, owner=None):
     check(int(first(cast("balance", vault))) >= v["seedWei"], "seed balance")
     if fail:
         sys.exit("postflight FAILED: " + "; ".join(fail))
-    print(f"postflight passed: {vault} policy {policy} library {lib} owner {owner}")
+    print(f"postflight passed: {vault} policy {policy} libraries {libs} owner {owner}"
+          + (f" factory {factory}" if factory else " (factory not checked)"))
     print("verification commands (Etherscan; ETHERSCAN_API_KEY from your environment):")
+    scan, lib, strategy = libs["ScanLib"], libs["VaultLib"], libs["StrategyLib"]
+    accounts = f"--libraries src/VaultLib.sol:VaultLib:{lib} --libraries src/StrategyLib.sol:StrategyLib:{strategy}"
     print(f"  forge verify-contract {scan} src/ScanLib.sol:ScanLib --chain mainnet --watch")
     print(f"  forge verify-contract {lib} src/VaultLib.sol:VaultLib --chain mainnet "
           f"--libraries src/ScanLib.sol:ScanLib:{scan} --watch")
+    print(f"  forge verify-contract {strategy} src/StrategyLib.sol:StrategyLib --chain mainnet "
+          f"--libraries src/VaultLib.sol:VaultLib:{lib} --watch")
     print(f"  forge verify-contract {policy} src/KeeperPolicy.sol:KeeperPolicyV1 --chain mainnet --watch")
     print(f"  forge verify-contract {vault} src/PackVault.sol:PackVault --chain mainnet --guess-constructor-args "
-          f"--libraries src/VaultLib.sol:VaultLib:{lib} --watch")
+          f"{accounts} --watch")
+    if factory:
+        print(f"  forge verify-contract {factory} src/PackManagerFactory.sol:PackManagerFactory --chain mainnet "
+              f"--guess-constructor-args {accounts} --watch")
+        print(f"  forge verify-contract {implementation} src/PackManager.sol:PackManager --chain mainnet "
+              f"--guess-constructor-args {accounts} --watch")
 
 
 def keeper_config(vault, values, owner=None):
@@ -235,7 +262,7 @@ def main():
         if found:
             sys.exit(1)
         print("release check passed" + (" with owner signature" if "--broadcast" in args else " (no signature checked)"))
-    elif cmd == "postflight" and len(args) in (2, 3):
+    elif cmd == "postflight" and len(args) in (2, 3, 4):
         postflight(*args)
     elif cmd == "keeper-config" and len(args) in (2, 3):
         keeper_config(*args)

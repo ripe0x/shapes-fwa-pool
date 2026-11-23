@@ -1,0 +1,59 @@
+{
+ "fork_block": 26310896,
+ "request_block": 26310897,
+ "backing": 64896174863380000,
+ "coordinator": "0xD7f86b4b8Cae7D942340FF628F82735b7a20893a",
+ "disclosure": "real FWA + real request + real historical word; only the VRF coordinator's cryptographic proof check is skipped by impersonating the real coordinator address",
+ "outcomes": {
+  "keep": {
+   "kind": "keep",
+   "listing": 96606,
+   "request_id": "23396256266377928925538615874971698958849138171401400975440700398530836641392",
+   "word": "103628759253253535040241001720445318979030538452184349848691929605069784526581",
+   "purchaser": "0x88d0e89E7f502Aa49a564b683e19089c771776c3",
+   "allocated": true,
+   "fwa_status": 4,
+   "vault_received_wei": 64437303025351159,
+   "resolved": true
+  },
+  "bid": {
+   "kind": "bid",
+   "listing": 96606,
+   "request_id": "23396256266377928925538615874971698958849138171401400975440700398530836641392",
+   "word": "103628759253253535040241001720445318979030538452184349848691929605069784526581",
+   "purchaser": "0x88d0e89E7f502Aa49a564b683e19089c771776c3",
+   "allocated": true,
+   "fwa_status": 4,
+   "idle_after_bid": 1,
+   "relisted_open": 1,
+   "resolved": true
+  },
+  "expiry": {
+   "kind": "expiry",
+   "listing": 96606,
+   "request_id": "23396256266377928925538615874971698958849138171401400975440700398530836641392",
+   "word": "103628759253253535040241001720445318979030538452184349848691929605069784526581",
+   "purchaser": "0x88d0e89E7f502Aa49a564b683e19089c771776c3",
+   "allocated": true,
+   "fwa_status": 4,
+   "vault_reclaimed_wei": 64437303026335159,
+   "resolved": true
+  },
+  "forced_keep": {
+   "kind": "forced_keep",
+   "listing": 96606,
+   "request_id": "23396256266377928925538615874971698958849138171401400975440700398530836641392",
+   "word": "103628759253253535040241001720445318979030538452184349848691929605069784526581",
+   "purchaser": "0x88d0e89E7f502Aa49a564b683e19089c771776c3",
+   "allocated": true,
+   "fwa_status": 4,
+   "pending_receipts_at_force": 0,
+   "booked_state_before_sync": 1,
+   "booked_state_after_sync": 0,
+   "resolved": true,
+   "receive_failed_no_cashreceipt": true
+  }
+ },
+ "vault": "0x2d31f41956bdb937936081b6ab080b9c8b91f975",
+ "all_outcomes_passed": true
+}

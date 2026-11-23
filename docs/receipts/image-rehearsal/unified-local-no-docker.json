@@ -1,0 +1,203 @@
+{
+ "steps": [
+  {
+   "step": "primary prices the deposit at the blackout",
+   "at_block": 26450247
+  },
+  {
+   "step": "keepers build and list",
+   "at_block": 26450271
+  },
+  {
+   "step": "replacement prices the redemption through a lost RPC response",
+   "at_block": 26450284
+  },
+  {
+   "step": "backup completes a clean pass",
+   "at_block": 26450284
+  }
+ ],
+ "fork_block": 26450200,
+ "fork_hash": "0xda7052eb890b621f2ed635feb0af056e155f801305427af666aa7930d4baabc5",
+ "image": null,
+ "foundry": "cast Version: 1.8.1",
+ "postflight": "postflight passed: 0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461 policy 0xF1554E2a90CDee24250f7fC00C8eF3eb5e883163 libraries {'ScanLib': '0x35ab550B981c7BD1553b6A29020B10ac25e0aD3b', 'VaultLib': '0x3a0b17F05D43Ad1E2591A52AbDEF7cBEb0C34d39', 'StrategyLib': '0x4EAd73ee37B191F6be5193deda596B13f535df88'} owner 0x7683eaAFbF5f8d94004a703bF0c85248C0B1AcCa (factory not checked)\nverification commands (Etherscan; ETHERSCAN_API_KEY from your environment):\n  forge verify-contract 0x35ab550B981c7BD1553b6A29020B10ac25e0aD3b src/ScanLib.sol:ScanLib --chain mainnet --watch\n  forge verify-contract 0x3a0b17F05D43Ad1E2591A52AbDEF7cBEb0C34d39 src/VaultLib.sol:VaultLib --chain mainnet --libraries src/ScanLib.sol:ScanLib:0x35ab550B981c7BD1553b6A29020B10ac25e0aD3b --watch\n  forge verify-contract 0x4EAd73ee37B191F6be5193deda596B13f535df88 src/StrategyLib.sol:StrategyLib --chain mainnet --libraries src/VaultLib.sol:VaultLib:0x3a0b17F05D43Ad1E2591A52AbDEF7cBEb0C34d39 --watch\n  forge verify-contract 0xF1554E2a90CDee24250f7fC00C8eF3eb5e883163 src/KeeperPolicy.sol:KeeperPolicyV1 --chain mainnet --watch\n  forge verify-contract 0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461 src/PackVault.sol:PackVault --chain mainnet --guess-constructor-args --libraries src/VaultLib.sol:VaultLib:0x3a0b17F05D43Ad1E2591A52AbDEF7cBEb0C34d39 --libraries src/StrategyLib.sol:StrategyLib:0x4EAd73ee37B191F6be5193deda596B13f535df88 --watch",
+ "vault": "0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461",
+ "factory": "0x1d274f470be25c17b0d2f9745b45ca6f3289279e",
+ "before_replacement": {
+  "stats": {
+   "sent": 2,
+   "mined": 1,
+   "reverted": 0,
+   "replaced": 0,
+   "dropped": 0,
+   "reorged": 0,
+   "skipped_expected": 0,
+   "skipped_loss": 0,
+   "spent_wei": 12432766663212,
+   "paid_wei": 38151570080000
+  },
+  "pending": {
+   "label": "build",
+   "to": "0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461",
+   "args": [
+    "build(uint256,uint256[],uint256)",
+    "6",
+    "[64896174863380000,64896174863390000,64896174863370000,64896174863400000,64896174863360000,64896174863410000,64896174863350000,64896174863420000]",
+    "711356197328000"
+   ],
+   "nonce": 1,
+   "gas": 13381805,
+   "est": 10705444,
+   "prio": 50000000,
+   "max_fee": 50034314,
+   "sent_block": 26450270,
+   "replacements": 0,
+   "hashes": [
+    "0xb9e2b94c30761f159672ac325a6e4ae6870aa48dd47a85225ad81c351930e6dd"
+   ],
+   "expected_pay": 889195246660000,
+   "submitted": 1795281940
+  },
+  "counted": [
+   {
+    "label": "checkpoint",
+    "block": 26450247,
+    "status": 1,
+    "gas_used": 246579,
+    "pay": 38151570080000
+   }
+  ],
+  "head": 26450269
+ },
+ "after_replacement": {
+  "stats": {
+   "sent": 2,
+   "mined": 3,
+   "reverted": 0,
+   "replaced": 0,
+   "dropped": 0,
+   "reorged": 0,
+   "skipped_expected": 0,
+   "skipped_loss": 0,
+   "spent_wei": 672395541240821,
+   "paid_wei": 1270112582985000
+  },
+  "pending": null,
+  "counted": [
+   {
+    "label": "checkpoint",
+    "block": 26450247,
+    "status": 1,
+    "gas_used": 246579,
+    "pay": 38151570080000
+   },
+   {
+    "label": "build",
+    "block": 26450271,
+    "status": 1,
+    "gas_used": 9430519,
+    "pay": 889195246660000
+   },
+   {
+    "label": "build",
+    "block": 26450284,
+    "status": 1,
+    "gas_used": 3765234,
+    "pay": 342765766245000
+   }
+  ],
+  "head": 26450284
+ },
+ "dropped_transaction": "0x29216c6e69bfc0dd8c822b204cf120fdf585bb795c45eb0e7b74cf43174aabc9",
+ "dropped_transaction_status": 1,
+ "backup": {
+  "stored": {
+   "stats": {
+    "sent": 1,
+    "mined": 1,
+    "reverted": 0,
+    "replaced": 0,
+    "dropped": 0,
+    "reorged": 0,
+    "skipped_expected": 0,
+    "skipped_loss": 0,
+    "spent_wei": 15178482505608,
+    "paid_wei": 38002469960000
+   },
+   "pending": null,
+   "counted": [
+    {
+     "label": "checkpoint",
+     "block": 26450279,
+     "status": 1,
+     "gas_used": 303528,
+     "pay": 38002469960000
+    }
+   ],
+   "head": 26450284
+  },
+  "health": {
+   "last_pass": 1795281922,
+   "block": 26450251,
+   "status": [
+    [
+     "CONTEXT_MOVED",
+     "wait",
+     "head changed during prospective pricing; refresh quote"
+    ],
+    [
+     "EXPOSURE_SHARE",
+     "info",
+     "keeper holds 0.00% of FWA selection weight across its accounts"
+    ]
+   ],
+   "accounts": {
+    "0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461": {
+     "pooled": true,
+     "status": [
+      [
+       "CONTEXT_MOVED",
+       "wait",
+       "head changed during prospective pricing; refresh quote"
+      ]
+     ]
+    }
+   },
+   "exposure": [
+    [
+     "EXPOSURE_SHARE",
+     "info",
+     "keeper holds 0.00% of FWA selection weight across its accounts"
+    ]
+   ],
+   "policy_count": 1,
+   "pending": null,
+   "stats": {
+    "sent": 1,
+    "mined": 1,
+    "reverted": 0,
+    "replaced": 0,
+    "dropped": 0,
+    "reorged": 0,
+    "skipped_expected": 1,
+    "skipped_loss": 0,
+    "spent_wei": 15178482505608,
+    "paid_wei": 38002469960000
+   },
+   "errors": [],
+   "pass_errors": 0,
+   "ok": true,
+   "fresh": true,
+   "attention": []
+  }
+ },
+ "lost_races": [],
+ "primary_nonce": 3,
+ "primary_sends_counted": 2,
+ "result": "PASS",
+ "worker_log_tails": {
+  "primary-replacement": "",
+  "backup": "Error: server returned an error response: error code -32603: Fork Error: Transport(Custom(\"error decoding response body for url (https://mainnet.gateway.tenderly.co/ request or response body error: error reading a body from connection: connection error detected: detected excessive load generating behavior (b\\\"too_many_data_frames\\\")\"))\n"
+ }
+}

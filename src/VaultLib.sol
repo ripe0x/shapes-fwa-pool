@@ -16,15 +16,25 @@ import {
     LISTING_WITHDRAWN
 } from "./interfaces/External.sol";
 
-interface ISyncVault {
-    function accountedNav(uint256 witnessId) external view returns (uint256);
+/// @notice What the shared strategy reads from the account it runs in (PackVault or PackManager):
+///         ETH it may spend on keeper pay (`freeEth`) and on new exposure (`idleEth`). Each
+///         account defines both from its own liabilities; the strategy never sees them otherwise.
+interface IAccount {
     function freeEth() external view returns (uint256);
+    function idleEth() external view returns (uint256);
+}
+
+/// @notice PackVault's share-price reads, used only for its distribution checkpoint tail.
+interface ISyncVault is IAccount {
+    function accountedNav(uint256 witnessId) external view returns (uint256);
     function totalShares() external view returns (uint256);
     function highWaterMark() external view returns (uint256);
 }
 
-/// @notice Linked library for PackVault: the live FWA economics read. Split out only to keep
-///         PackVault under EIP-170; it runs in the vault's context and holds no state.
+/// @notice Shared strategy core, linked into PackVault and PackManager (with StrategyLib and
+///         ScanLib). Runs by DELEGATECALL in the calling account's context, so that account is the
+///         FWA depositor and owns every asset; the library holds no state and reads only the
+///         storage pointers it is passed. Split into three libraries only for EIP-170 size.
 library VaultLib {
     uint256 internal constant BPS = 10_000;
     uint256 internal constant DEAD_SHARES = 1e15;
@@ -56,6 +66,17 @@ library VaultLib {
 
     uint256 internal constant UNIT = 0.01 ether;
 
+    /// @notice Everything the shared strategy owns in an account: governed parameters, keeper
+    ///         budgets, the position book, the keeper payment policy and the two operating flags.
+    struct Strategy {
+        Params params;
+        Budget budget;
+        Book book;
+        address policy;
+        bool listingPaused;
+        bool windingDown;
+    }
+
     // ---------------------------------------------------------------- bounds and quotes
 
     uint256 internal constant MAX_WORK_FEE = 0.00005 ether; // per unit of work (D55, D56)
@@ -70,9 +91,20 @@ library VaultLib {
     uint256 internal constant MAX_ROUTINE_RATE = 0.02 ether;
     uint256 internal constant MAX_ESSENTIAL_CAP = 0.1 ether;
     uint256 internal constant MAX_ESSENTIAL_RATE = 0.005 ether;
-    uint256 internal constant MAX_PACK_UNITS = 30; // a first build from empty inventory fits EIP-7825 (audit E11)
-    uint256 internal constant MIN_PACK_UNITS = 3;
-    uint256 internal constant SHAPES_PER_MINT = 10;
+    uint256 internal constant MAX_PACK_UNITS = 30; // at most 30 x 0.01 ETH: bounded redemption work
+    uint256 internal constant MIN_PACK_UNITS = 3; // ShapePacks' minimum pack value, 0.03 ETH
+    uint256 internal constant REF_UNITS = 6; // the reference recipe: one 0.05 and one 0.01 Shape
+
+    /// Purchaser keep incentive. A selected purchaser keeps the pack when it is worth more than the
+    /// best bid FWA offers (ETH or token bid), after the gas to redeem it, by at least this much.
+    uint256 internal constant MIN_KEEP_ADVANTAGE = 0.0003 ether;
+    /// ShapePacks.redeem gas: a pack plus each Shape it holds. Measured on a fork (execution gas):
+    /// 2 Shapes 157,023, 5 Shapes 245,212, 7 Shapes (the most any allowed size holds) 304,115.
+    uint256 internal constant Q_PURCHASER_REDEEM_PACK = 100_000;
+    uint256 internal constant Q_PURCHASER_REDEEM_SHAPE = 30_000;
+    /// The purchaser's redeem gas is priced at this fixed bound, independent of the keeper's gas
+    /// ceiling: keeping stays the better choice for any purchaser paying up to 2 gwei.
+    uint256 internal constant PURCHASER_GAS_PRICE = 2 gwei;
 
     /// Fixed gas quotes from billed receipts (keeper/measure_gas.py, docs/GAS.md). The journal
     /// always consumes its full bounded job; only a required checkpoint can pay for a foreign
@@ -80,10 +112,14 @@ library VaultLib {
     /// callers from splitting work merely to collect additional bases.
     // One checkpoint per interval cannot be split, so it is quoted at measured billed gas.
     uint256 internal constant Q_CHECKPOINT = 360_000;
-    uint256 internal constant Q_RESTOCK = 280_000;
-    uint256 internal constant Q_PACK = 325_000; // createPack at the three-Shape reference size
-    uint256 internal constant Q_PACK_UNIT = 100_000; // each additional packed Shape
-    uint256 internal constant Q_MINT = 2_200_000; // one 0.1 ETH mint split ten ways (2.10M-2.26M by block)
+    /// Checkpoint proof that booked allocations are still Allocated at FWA (ScanLib), per queue
+    /// entry examined and per FWA listing read.
+    uint256 internal constant Q_ALLOCATION_ENTRY = 6_000;
+    uint256 internal constant Q_ALLOCATION_READ = 30_000;
+    uint256 internal constant Q_BUILD = 300_000; // call base for build-and-list (one 0.06 pack billed 1,667,619 in all)
+    // createPack minting straight into the pack (ForkDirectMint: 381k / 534k / 627k gas for 1 / 2 / 3 Shapes)
+    uint256 internal constant Q_BUILD_PACK = 300_000;
+    uint256 internal constant Q_BUILD_SHAPE = 130_000;
     uint256 internal constant Q_LIST = 280_000;
     uint256 internal constant Q_LISTED = 825_000;
     uint256 internal constant Q_SYNC = 85_000;
@@ -103,21 +139,26 @@ library VaultLib {
     uint256 internal constant Q_RECOVERY_BASE = 100_000;
     uint256 internal constant Q_RECOVERY_SHAPE = 35_000;
     uint256 internal constant Q_RECOVERY_UNSEAL = 70_000;
-    uint256 internal constant Q_LIQ_SHAPE = 65_000;
     uint256 internal constant Q_HARVESTED = 80_000; // per listing with fees claimed
     uint256 internal constant Q_CREDIT = 40_000;
     uint256 internal constant Q_FUND = 40_000;
-    /// A 3-unit position (0.03 ETH pack + ~0.0363 backing): what request charges are scaled by.
-    uint256 internal constant POSITION_VALUE = 0.0663 ether;
+    /// A bid cycle's quoted gas: select and resolve, relist, and the fee claim that funds it.
+    uint256 internal constant CYCLE_GAS = Q_POSITION_SYNC + Q_LISTED + Q_HARVESTED;
+    /// A reference position (0.06 ETH pack + ~0.0648 backing): what request charges are scaled by.
+    uint256 internal constant POSITION_VALUE = 0.1248 ether;
 
     uint256 internal constant MAX_BATCH = 16;
     uint256 internal constant MAX_JOURNAL = 128;
     uint256 internal constant MAX_SELECTIONS = 16;
+    /// Pricing reads at most this many allocation queue entries. The queue from its head holds only
+    /// allocations newer than the oldest unresolved one, which a checkpoint already requires to be
+    /// inside FWA's settlement window, so a longer queue waits at most one window for sync.
+    uint256 internal constant MAX_ALLOCATION_SCAN = 32;
     uint256 internal constant MAX_TERMINALS = 16;
     uint256 internal constant MAX_PRUNES = 16;
     uint256 internal constant MAX_LIST_BATCH = 8;
     uint256 internal constant LIST_CALL_GAS = 1_200_000;
-    uint256 internal constant MAX_RESTOCK_UNITS = 30;
+    uint256 internal constant MAX_REDEEM_SHAPES = 30; // Shapes burned per liquidation call
     uint8 internal constant NONE = 0;
     uint8 internal constant ACTIVE = 1;
     uint8 internal constant ALLOCATED = 2;
@@ -142,6 +183,7 @@ library VaultLib {
         uint256 value;
         uint256 floor;
         uint256 cycleCost;
+        uint256 build;
         bool ok;
     }
 
@@ -167,7 +209,6 @@ library VaultLib {
         uint256[] idlePacks;
         uint256[] recoveryPacks;
         mapping(uint256 => bool) recoveryUnsealed;
-        uint256[] looseShapes;
         mapping(uint256 => uint256) idleQuote;
         uint256 idleFunding;
         mapping(uint256 => uint256) idForBacking;
@@ -194,7 +235,6 @@ library VaultLib {
     error OutOfOrder();
     error InvalidListing();
     error InvalidJournal();
-    error MissingReceipt();
     error CatchUpFirst();
     error PendingReceipts();
     error InvalidBacking();
@@ -336,8 +376,26 @@ library VaultLib {
         ) revert OutOfBounds();
     }
 
-    function packGas(uint256 units) internal pure returns (uint256) {
-        return Q_PACK + (units > MIN_PACK_UNITS ? units - MIN_PACK_UNITS : 0) * Q_PACK_UNIT;
+    /// @notice ShapePacks makeup for a pack of `units` x 0.01 ETH, minted straight into the pack:
+    ///         fewest Shapes from the 0.1, 0.05 and 0.01 denominations (index 2, 1, 0 of the nine).
+    ///         Six units are one 0.05 and one 0.01 Shape: two paid primary mints.
+    function makeup(uint256 units) internal pure returns (uint32[] memory counts, uint256 shapeCount) {
+        counts = new uint32[](9);
+        counts[2] = uint32(units / 10);
+        counts[1] = uint32(units % 10 / 5);
+        counts[0] = uint32(units % 5);
+        shapeCount = uint256(counts[0]) + counts[1] + counts[2];
+    }
+
+    function buildGas(uint256 shapeCount) internal pure returns (uint256) {
+        return Q_BUILD_PACK + shapeCount * Q_BUILD_SHAPE;
+    }
+
+    /// @notice Building one pack of `units` and listing it, at the envelope now, plus its paid
+    ///         primary mint fees (one per Shape).
+    function buildCost(Params storage p, uint256 units, uint256 mintFee) public view returns (uint256) {
+        (, uint256 n) = makeup(units);
+        return quote(p, buildGas(n) + Q_LISTED, 2, false) + n * mintFee;
     }
 
     /// @notice A request's checkpoint charge: one checkpoint at its envelope, at cost plus one unit.
@@ -345,13 +403,14 @@ library VaultLib {
         return quote(p, Q_CHECKPOINT, 1, true);
     }
 
-    /// @notice Deployment charge per POSITION_VALUE deposited: building and listing one position
-    ///         at its envelope now plus its Shapes mint fee share, and never less than the most a
+    /// @notice Deployment charge per POSITION_VALUE deposited: building and listing one reference
+    ///         position at its envelope now plus its mint fees, and never less than the most a
     ///         builder can net over its own gas (markup at the ceiling, the tip it is repaid but
     ///         need not pay, and the two work fees).
     function deployCharge(Params storage p, uint256 mintFee) external view returns (uint256) {
-        uint256 g = Q_PACK + Q_MINT * MIN_PACK_UNITS / SHAPES_PER_MINT + Q_LISTED;
-        return M.max(quote(p, g, 2, false) + mintFee * MIN_PACK_UNITS / SHAPES_PER_MINT,
+        (, uint256 n) = makeup(REF_UNITS);
+        uint256 g = buildGas(n) + Q_LISTED;
+        return M.max(quote(p, g, 2, false) + mintFee * n,
             g * (p.gasCeiling * p.payMarkupBps + p.maxTip * (BPS + p.payMarkupBps)) / BPS + 2 * p.workFee);
     }
 
@@ -359,23 +418,20 @@ library VaultLib {
     function unwindCharge(Params storage p) external view returns (uint256) {
         // No essential budget means exit work is unpaid (withdrawers run it): nothing to charge.
         if (p.essentialCap == 0) return 0;
-        return quote(p, Q_UNLISTED + Q_LIQ_PACK + MIN_PACK_UNITS * Q_REDEEM_SHAPE, 2, true);
+        (, uint256 n) = makeup(REF_UNITS);
+        return quote(p, Q_UNLISTED + Q_LIQ_PACK + n * Q_REDEEM_SHAPE, 2, true);
     }
 
-
-    /// @notice Live edge for a pack of `units` x 0.01 ETH: k, the backing a new listing would post
-    ///         (cap less the buffer, zero when the gate fails) and whether the gate passes.
-    /// @notice Backing for a new listing and whether to list (D62). Every position earns the same
-    ///         per acquisition whatever its backing (FWA splits fees evenly and selects by 1/B), so
-    ///         backing only moves capital per position and gas per cycle:
-    ///         - floor: P / d, so a purchaser prefers FWA's bid payout d x B to keeping a pack worth P
-    ///           and the pack keeps cycling (a keep forces a rebuild), and P / (1 - s), so a keep
-    ///           never loses;
-    ///         - `build`: enough that one bid cycle repays building a pack at today's price (the
-    ///           build gate), so new packs stay possible as gas rises;
-    ///         - gas-optimal (c + sqrt(c^2 + a c P)) / a, with a = k - 1 and c a cycle's pay at the
-    ///           routine ceiling: above the floor only when gas is high;
-    ///         capped at FWA's oracle cap less the buffer unless FWA exempts the collection.
+    /// @notice Backing for a new listing of a pack of `units` x 0.01 ETH, and whether to list.
+    ///         FWA splits each acquisition fee evenly over active listings and selects by 1/B, so a
+    ///         listing expects fees k B before selection. A selected purchaser then keeps the pack
+    ///         (the account gets B (1 - s) back) or takes FWA's best bid, max(ETH, token) x B (the
+    ///         account keeps the pack and loses B). Backing is the largest amount at which keeping
+    ///         still beats the best bid by MIN_KEEP_ADVANTAGE after the gas to redeem the pack, so
+    ///         purchasers keep packs and each keep pays for fresh primary mints. It lists only when
+    ///         both outcomes are profitable after the keeper pay of the cycle (`_profitable`), it
+    ///         is at least P / 0.95 (a keep never loses at FWA's immutable 5% settlement-fee cap),
+    ///         and FWA's oracle cap less the buffer allows it (FWA exempts ShapePacks today).
     function edge(Params storage p, IFWAV2 f, address packs, uint256 units, uint256 build)
         public
         view
@@ -390,23 +446,26 @@ library VaultLib {
     {
         (t.k, t.cap, t.settlementFee) = economics(f, packs);
         t.value = units * UNIT;
-        uint256 floor = M.max(M.divUp(t.value * BPS, BPS - t.settlementFee),
-            M.divUp(t.value * BPS, f.settlementDiscountBps()));
-        t.desired = floor;
-        if (t.k > 1e18) {
-            t.cycleCost = quote(p, Q_POSITION_SYNC + Q_LISTED + Q_HARVESTED, 2, false);
-            uint256 a = t.k - 1e18;
-            uint256 c = (Q_POSITION_SYNC + Q_LISTED + Q_HARVESTED) * p.gasCeiling * (BPS + p.payMarkupBps) / BPS + 2 * p.workFee;
-            t.desired = M.max(t.desired, (c + M.sqrt(c * c + a * c / 1e18 * t.value)) * 1e18 / a);
-            t.desired = M.max(t.desired, M.divUp((build + t.cycleCost) * 1e18, a));
-        }
+        t.build = build;
+        t.floor = t.value + t.value / 19 + (t.value % 19 == 0 ? 0 : 1);
+        uint256 bid = M.max(f.settlementDiscountBps(), f.tokenSettlementDiscountBps());
+        (, uint256 shapes) = makeup(units);
+        uint256 margin =
+            MIN_KEEP_ADVANTAGE + (Q_PURCHASER_REDEEM_PACK + shapes * Q_PURCHASER_REDEEM_SHAPE) * PURCHASER_GAS_PRICE;
+        if (bid != 0 && t.value > margin) t.desired = (t.value - margin) * BPS / bid / BPS * BPS;
         if (t.cap != type(uint256).max) t.desired = M.min(t.desired, t.cap * (BPS - p.bufferBps) / BPS);
-        // Bid outcome B (k - 1) > 0 given k >= 1 + edge; spending callers also require it to clear
-        // the keeper pay it causes (cycleNet). Keep outcome B (k - s) >= P holds from the floor.
-        t.ok = t.cap != 0 && t.k >= 1e18 + uint256(p.minEdgeBps) * 1e14 && t.k > t.settlementFee * 1e14
-            && t.desired >= floor && t.desired * (t.k - t.settlementFee * 1e14) >= t.value * 1e18;
+        t.cycleCost = quote(p, CYCLE_GAS, 2, false);
+        t.ok = t.cap != 0 && t.k >= 1e18 + uint256(p.minEdgeBps) * 1e14 && t.desired >= t.floor
+            && _profitable(t, t.desired, false);
         if (!t.ok) t.desired = 0;
-        t.floor = M.max(floor, t.value + t.value / 19 + (t.value % 19 == 0 ? 0 : 1));
+    }
+
+    /// @dev Both outcomes of one selection clear the keeper pay of the cycle: the bid outcome
+    ///      B (k - 1), and the keep outcome B (k - s) - P, which also repays the replacement build
+    ///      when the pack is newly built. Requires k >= 1 (checked before).
+    function _profitable(BackingTerms memory t, uint256 backing, bool newlyBuilt) private pure returns (bool) {
+        return backing * (t.k - 1e18) / 1e18 > t.cycleCost
+            && backing * (t.k - t.settlementFee * 1e14) / 1e18 >= t.value + t.cycleCost + (newlyBuilt ? t.build : 0);
     }
 
 
@@ -475,14 +534,10 @@ library VaultLib {
     }
 
     function addInventory(Book storage b, uint256 packId, uint256 value) internal {
-        addInventory(b, packId, value, 0);
-    }
-
-    function addInventory(Book storage b, uint256 packId, uint256 value, uint256 backingQuote) internal {
         if (value == 0 || b.idleValueOf[packId] != 0 || b.packToListing[packId] != 0) revert Duplicate();
         b.trackedValue += value;
         b.idleValue += value;
-        _toIdle(b, packId, value, backingQuote);
+        _toIdle(b, packId, value, 0);
     }
 
     function _toIdle(Book storage b, uint256 packId, uint256 value, uint256 backingQuote) private {
@@ -662,8 +717,10 @@ library VaultLib {
     }
 
     function admit(Book storage b, IFWAV2 f, IShapePacks packs, uint256 packId, uint256 backing)
-        external returns (uint256 id)
+        public returns (uint256 id)
     {
+        // Backing identifies this listing's cash receipt: two open listings may never share it.
+        if (b.idForBacking[backing] != 0) revert Duplicate();
         _rebaseUnexposed(b, f);
         uint256 active = f.activeListingCount();
         // FWA's private staging FIFO may activate foreign listings during admission.
@@ -891,22 +948,28 @@ library VaultLib {
             l = listing(f, id);
         }
         if (l.status == LISTING_ACTIVE) return false;
-        uint8 kind = b.receipts[id].kind;
+        // FWA changes a listing's status and pays its depositor in the same transaction
+        // (forceSafeTransferETH, which force-sends when receive() fails), so FWA's record alone
+        // proves the outcome and its cash. The receipt only gates checkpoints until this sync;
+        // a payment whose receipt was never recorded resolves here the same way.
+        bool owned = owns(packs, p.packId);
+        bool returned = owned || f.stuckNFTRecipient(id) == address(this);
         if (l.status == LISTING_SETTLED) {
             if (p.state == ACTIVE) return false;
             if (p.state != ALLOCATED) revert InvalidListing();
-            if (kind == 1) {
+            // Keep, relist, expiry or default: B (1 - s) paid, the pack went to the purchaser.
+            // A bid returns the pack to the depositor (or owes it) and pays nothing. A kept pack
+            // that came back (a gift, perhaps with extra Shapes) joins inventory at its actual value.
+            if (b.receipts[id].kind == 1 || !returned) {
                 release(b, id, p.backing);
                 keep(b, id);
-                if (owns(packs, p.packId)) addInventory(b, p.packId, packs.valueOf(p.packId));
+                if (owned) addInventory(b, p.packId, packs.valueOf(p.packId));
                 return true;
             }
-            if (kind != 0) revert MissingReceipt();
         } else if (l.status == LISTING_WITHDRAWN) {
-            if (p.state != ACTIVE || kind != 2) revert MissingReceipt();
+            // Only a kick withdraws a listing outside this account's own calls: B refunded, pack returned.
+            if (p.state != ACTIVE || !returned) revert InvalidListing();
         } else return false;
-        bool owned = owns(packs, p.packId);
-        if (!owned && f.stuckNFTRecipient(id) != address(this)) revert MissingReceipt();
         release(b, id, p.backing);
         returnPack(b, id, owned);
         return true;
@@ -958,23 +1021,26 @@ library VaultLib {
     }
 
     function accountedNav(Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
-        external view returns (uint256)
+        external view returns (uint256 value)
     {
-        return _accountedNav(b, f, packs, freeEth, witnessId);
+        (value,) = _accountedNav(b, f, packs, freeEth, witnessId);
     }
 
+    /// @return value NAV; gasQ the checkpoint's quoted gas, including the allocation proof it read.
     function checkpointNav(Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
-        external returns (uint256)
+        external returns (uint256 value, uint256 gasQ)
     {
         _rebaseUnexposed(b, f);
         return _accountedNav(b, f, packs, freeEth, witnessId);
     }
 
     function _accountedNav(Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
-        private view returns (uint256)
+        private view returns (uint256, uint256 gasQ)
     {
         if (b.acquisitionCursor != f.nextSequenceToProcess()) revert CatchUpFirst();
         if (b.pendingPlusOne != 1) revert PendingReceipts();
+        (uint256 entries, uint256 reads) = ScanLib.requireAllocatedCurrent(b, f, packs);
+        gasQ = Q_CHECKPOINT + entries * Q_ALLOCATION_ENTRY + reads * Q_ALLOCATION_READ;
         uint256 pending;
         if (b.activeCount != 0) {
             Position memory p = b.positions[witnessId];
@@ -983,81 +1049,52 @@ library VaultLib {
             _validate(l, packs, p.packId, p.backing);
             pending = f.pendingFees(witnessId);
         }
-        return nav(b, freeEth, f.feeCredit(address(this)), witnessId, pending);
+        return (nav(b, freeEth, f.feeCredit(address(this)), witnessId, pending), gasQ);
     }
 
     function validateBacking(Params storage p, Book storage b, IFWAV2 f, address packs,
         uint256 units, uint256 backing, uint256 build, bool newlyBuilt) public view
     {
-        _validateBacking(p, b, _backingTerms(p, f, packs, units, build), backing, build, newlyBuilt);
+        _validateBacking(p, b, _backingTerms(p, f, packs, units, build), backing, newlyBuilt);
     }
 
     function _validateBacking(Params storage p, Book storage b, BackingTerms memory t,
-        uint256 backing, uint256 build, bool newlyBuilt) private view
+        uint256 backing, bool newlyBuilt) private view
     {
         if (!t.ok || backing == 0 || backing > type(uint128).max || backing % BPS != 0
             || b.idForBacking[backing] != 0) revert InvalidBacking();
         uint256 delta = backing > t.desired ? backing - t.desired : t.desired - backing;
         if (delta > (b.reservedCount + 1) * BPS) revert InvalidBacking();
         if (backing < t.floor || (t.cap != type(uint256).max && backing > t.cap * (BPS - p.bufferBps) / BPS)
-            || backing * (t.k - t.settlementFee * 1e14) < t.value * 1e18) revert InvalidBacking();
-        uint256 gross = backing * (t.k - 1e18) / 1e18;
-        uint256 net = gross > t.cycleCost ? gross - t.cycleCost : 0;
-        if (net == 0 || (newlyBuilt && build > net)) revert InvalidBacking();
+            || !_profitable(t, backing, newlyBuilt)) revert InvalidBacking();
     }
 
-    function _cycleNet(Params storage p, uint256 k, uint256 backing) private view returns (uint256) {
-        if (k <= 1e18) return 0;
-        uint256 gross = backing * (k - 1e18) / 1e18;
-        uint256 cost = quote(p, Q_POSITION_SYNC + Q_LISTED + Q_HARVESTED, 2, false);
-        return gross > cost ? gross - cost : 0;
-    }
-
-    function restock(Params storage p, Book storage b, IFWAV2 f, IShapePacks packs, IShapes shapes,
-        uint256 units, uint256[] calldata backingProposals, uint256 available) external returns (uint256 mints)
+    /// @notice Mint `count` packs of `units` straight into ShapePacks (one paid primary mint per
+    ///         Shape, no split) and list each at its validated backing proposal. `available` is the
+    ///         account's spendable ETH; idle packs keep their reserved backing (`idleFunding`).
+    function buildAndList(Params storage p, Book storage b, IFWAV2 f, IShapePacks packs, IShapes shapes,
+        uint256 units, uint256[] calldata backingProposals, uint256 available) external
     {
         uint256 count = backingProposals.length;
-        if (count == 0 || units < MIN_PACK_UNITS || units > MAX_PACK_UNITS
-            || count * units > MAX_RESTOCK_UNITS || (p.packUnitsMask >> units) & 1 == 0) revert BadBatch();
+        if (count == 0 || count > MAX_LIST_BATCH || units < MIN_PACK_UNITS || units > MAX_PACK_UNITS
+            || (p.packUnitsMask >> units) & 1 == 0) revert BadBatch();
+        (uint32[] memory counts, uint256 n) = makeup(units);
         uint256 fee = shapes.mintFee();
-        uint256 build = quote(p, packGas(units) + Q_MINT * units / SHAPES_PER_MINT + Q_LISTED, 2, false) + fee * units / SHAPES_PER_MINT;
-        BackingTerms memory terms = _backingTerms(p, f, address(packs), units, build);
-        uint256 funding = b.idleFunding;
+        uint256 price = units * UNIT + n * fee;
+        BackingTerms memory terms = _backingTerms(p, f, address(packs), units, buildCost(p, units, fee));
+        uint256 need = b.idleFunding + count * price;
+        for (uint256 i; i < count; ++i) need += backingProposals[i];
+        if (available < need) revert InsufficientBacking();
+        uint256[] memory none = new uint256[](0);
         for (uint256 i; i < count; ++i) {
-            _validateBacking(p, b, terms, backingProposals[i], build, true);
-            funding += backingProposals[i];
+            // Validated one at a time, as in `list`: each admission widens the identifier interval.
+            _validateBacking(p, b, terms, backingProposals[i], true);
+            uint256 packId = packs.createPack{value: price}(none, counts);
+            // ShapePacks records exactly the minted backing; a different value is not our pack.
+            if (packs.valueOf(packId) != units * UNIT) revert MissingInventory();
+            addInventory(b, packId, units * UNIT);
+            admit(b, f, packs, packId, backingProposals[i]);
         }
-        uint256 need = count * units;
-        uint256 have = b.looseShapes.length;
-        mints = need > have ? (need - have + SHAPES_PER_MINT - 1) / SHAPES_PER_MINT : 0;
-        if (available < mints * (0.1 ether + fee) + funding) revert InsufficientBacking();
-        uint256 freshCount = mints * SHAPES_PER_MINT;
-        uint256[] memory fresh = new uint256[](freshCount);
-        if (mints != 0) {
-            uint8[] memory outs = new uint8[](SHAPES_PER_MINT);
-            for (uint256 i; i < mints; ++i) {
-                uint256 big = shapes.mint{value: 0.1 ether + fee}(0.1 ether);
-                b.trackedValue += 0.1 ether;
-                b.idleValue += 0.1 ether;
-                uint256[] memory ids = shapes.split(big, outs);
-                for (uint256 j; j < ids.length; ++j) fresh[i * SHAPES_PER_MINT + j] = ids[j];
-            }
-        }
-        uint32[] memory noMint = new uint32[](9);
-        for (uint256 c; c < count; ++c) {
-            uint256[] memory ids = new uint256[](units);
-            for (uint256 j; j < units; ++j) {
-                if (freshCount != 0) ids[j] = fresh[--freshCount];
-                else {
-                    ids[j] = b.looseShapes[b.looseShapes.length - 1];
-                    b.looseShapes.pop();
-                }
-            }
-            uint256 packId = packs.createPack(ids, noMint);
-            _toIdle(b, packId, units * UNIT, backingProposals[c]);
-        }
-        // Only genuine leftovers enter the persistent loose-Shape stack.
-        for (uint256 i; i < freshCount; ++i) b.looseShapes.push(fresh[i]);
     }
 
     /// @dev An extended gift may contain arbitrarily many Shapes. Never enumerate its contents.
@@ -1071,12 +1108,12 @@ library VaultLib {
         }
         uint256 before = address(this).balance;
         uint256 supply = shapes.totalSupply();
-        packs.claimEth(id, MAX_RESTOCK_UNITS, payable(address(this)));
+        packs.claimEth(id, MAX_REDEEM_SHAPES, payable(address(this)));
         uint256 out = address(this).balance - before;
         // The immutable Shapes path burns exactly the claimed IDs before its sole ETH callback.
         // No other supply mutation can interleave while this guarded vault receives that ETH.
         uint256 burned = supply - shapes.totalSupply();
-        if (out == 0 || burned == 0 || burned > MAX_RESTOCK_UNITS) revert MissingInventory();
+        if (out == 0 || burned == 0 || burned > MAX_REDEEM_SHAPES) revert MissingInventory();
         gasQ += burned * Q_RECOVERY_SHAPE;
         b.trackedValue -= out;
         b.idleValue -= out;

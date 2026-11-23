@@ -1,12 +1,14 @@
 name: Keeper image rehearsal
 
-# Builds the production keeper image (keeper/Dockerfile, the image Fly deploys) and runs it against a
-# fresh local mainnet fork: encrypted disposable keystores, primary and backup workers, container
-# replacement on the same volume, and a lost RPC response. Local simulated funds only.
+# On a keeper change: build the production keeper image (keeper/Dockerfile, the image Fly deploys) and
+# smoke it (entrypoint, pinned toolchain, shared volume). Minutes, no fork.
+# On manual dispatch (release candidates only): also run it against a fresh local mainnet fork with
+# encrypted disposable keystores, primary and backup workers, container replacement on the same
+# volume and a lost RPC response. Local simulated funds only.
 on:
   push:
-    branches: [codex/incremental-position-integration]
-    paths: [keeper/**, script/**, src/**, deploy/**, foundry.toml, .github/workflows/keeper-image.yml]
+    branches: [claude/unified-shapes-fwa-system-852d17]
+    paths: [keeper/**, .github/workflows/keeper-image.yml]
   workflow_dispatch:
 
 permissions:
@@ -15,7 +17,7 @@ permissions:
 jobs:
   image:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 60  # the dispatch rehearsal; a push run takes minutes
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,16 +31,18 @@ jobs:
           echo "$HOME/.foundry/bin" >> "$GITHUB_PATH"
           python3 -m pip install --no-cache-dir -r keeper/requirements.txt
       - name: Build contracts
+        if: github.event_name == 'workflow_dispatch'
         run: forge build --skip test
       - name: Build production image
         run: docker build --platform linux/amd64 -f keeper/Dockerfile -t packvault-keeper:${{ github.sha }} .
       - name: Image smoke and shared volume
         run: python3 keeper/test_packaging.py --image packvault-keeper:${{ github.sha }}
       - name: Image against a fresh fork
+        if: github.event_name == 'workflow_dispatch'
         shell: bash  # pipefail: a failed rehearsal fails the job despite tee
         run: python3 keeper/rehearse_image.py --image packvault-keeper:${{ github.sha }} | tee image-rehearsal.json
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch'
         with:
           name: image-rehearsal
           path: image-rehearsal.json

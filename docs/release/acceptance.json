@@ -1,156 +1,179 @@
 {
- "name": "PackVault mainnet canary acceptance package (unsigned)",
- "commit": "e8458b55e4a8f113459615298936491a7e4abdaa",
- "manifest_sha256": "9a9f5b137bf5682c2f15c7f76d44655ab7f7b52c9c8bc6ae58f405c6a2a6da71",
- "deployment_values": "deploy/canary.json",
- "deployment_values_sha256": "530dbc542ae3dc4ab9e6a1e39218fccef7c5b2d80a5057835d23b9ef6f69138c",
- "asset_flow_outcomes_sha256": "226c8e341787202636d706aa374942fcc2fb016d6bea6815966fd094132cc2d1",
+ "name": "Unified shapes FWA system: pooled vault and personal manager factory",
+ "commit": "7ad76a0d8d3eea3c99fa1a1e871f6c435683fb72",
+ "manifest": "deploy/release-manifest.json",
+ "manifest_sha256": "86ef59847800ff203ab66f1413a8cbb844377005ff1c1208f902ea9d2ef636bb",
+ "deployment_values": "deploy/mainnet.json",
+ "deployment_values_sha256": "4f6daca9a77e96f2e52295de3072f0256095aa360a9caf8f8d15da108f02fe79",
+ "manager_default_values": "deploy/manager.json",
+ "asset_flow": "asset-flow.json",
+ "asset_flow_outcomes_sha256": "dbe267c39a299f3bf62424e35e52f9eae5d76090ba1e95f4c338c366e1b094f9",
+ "keeper_image": {
+  "inputs": "manifest field keeper (Dockerfile, entrypoint, requirements, keeper.py, policy.py, tx.py, index.py, Fly configs)",
+  "ci_fork_rehearsal": "run 44948198556 at 02c0a74, PASS: pooled vault and one factory-created manager served by one signer; docs/receipts/image-rehearsal/ci-44948198556.json"
+ },
  "signing": "printf %s <sha256 of this file> | ssh-keygen -Y sign -f <owner key> -n packvault-release > deploy/release-acceptance.sig",
+ "signature": null,
  "engineering": {
-  "full_suite": "237 of 243 forge tests passed in one run, 2 opt-in skipped; 4 failures resolved and rerun to pass (docs/receipts/release-verify/SUMMARY.md)",
-  "reconciliations": "both fork cycles match the Python model to the wei",
-  "regimes": "16 asset-flow regimes, zero bucket mismatches; O3-O10 within bounds; O2 fails",
+  "full_suite": "script/verify.sh at 3b4d9b3: 279 fork tests passed, 0 failed, 1 opt-in exporter skipped; scale 3/3; replay 0 mismatches; reconciler to the wei on three paths; release check ok",
+  "reconciliations": "full cycle, partial fill and wind-down, scan path: every bucket to the wei",
+  "asset_flow": "16 regimes, outcomes O1-O11 pass; owner-signed 2026-11-22; gate PASS",
   "sizes": {
-   "PackVault": 24136,
-   "VaultLib": 24304,
+   "PackVault": 16960,
+   "VaultLib": 23482,
+   "PackManager": 12494,
+   "PackManager_clone": 44,
+   "PackManagerFactory": 1365,
    "KeeperPolicyV1": 216,
-   "limit": 24576
+   "limit": 24576,
+   "libraries": "manifest"
   },
-  "largest_sync_measured_gas": 2540933,
-  "largest_sync_padded": 3176166,
-  "combined_sync_bound_padded": 10576250,
+  "deployment_gas": {
+   "total": 16070106,
+   "ScanLib": 719323,
+   "VaultLib": 5157757,
+   "StrategyLib": 2817411,
+   "KeeperPolicyV1": 100155,
+   "PackVault": 4144141,
+   "PackManagerFactory": 3131319
+  },
+  "manager_create_gas": 474175,
+  "fwa_push_receive_gas": {
+   "keep_payment": 52363,
+   "cold_kick_refund": 35148,
+   "stipend": 100000
+  },
+  "allocation_proof": {
+   "max_entries": 32,
+   "gas_at_bound": 188361,
+   "quote_at_bound": 222000,
+   "refusal_gas_any_history": 34519,
+   "kick_check": "while the ShapePacks oracle exemption is lifted: every open listing, at most 32, else CatchUpFirst at no more than 39,766 gas; two open listings cost 41,043 gas against a 72,000 quote"
+  },
+  "largest_batch_gas_padded": 13000000,
   "tx_cap": 16777216,
+  "payment_recovery": "ForkReceiptRecovery.t.sol: forced keep, forced default and forced kick (manager and pool) resolve once; pool pricing refused until synced, matching the recorded path; without the kick check the unsynced pool kick priced NAV one backing too high; low-gas sweep never forces an unrecorded payment",
   "rehearsal": {
-   "block": 26450200,
-   "hash": "0xda7052eb890b621f2ed635feb0af056e155f801305427af666aa7930d4baabc5",
-   "result": "pass",
-   "holder_loss_wei": 16145496644398700,
-   "holder_paid_in_wei": 1990182217000000000,
-   "seed_residue_wei": 10025117557698457
+   "receipt": "docs/receipts/unified-production-rehearsal.json",
+   "fork_block": 26463991,
+   "result": "all 17 steps pass on one warm fork at 02c0a74 (upstream Alchemy via REHEARSAL_FORK_RPC while Tenderly's gateway rate-limited; URL scrubbed from records)",
+   "also": "docs/receipts/unified-production-rehearsal-26464497.json (earlier source)",
+   "outcomes": "docs/receipts/unified-selection-rehearsal.json"
   },
-  "image_ci_run": 44577532617,
-  "image_result": "PASS",
-  "independent_review": "no defects; items A3 below"
+  "independent_review": "docs/receipts/unified-review.md: no critical, high or medium; S1 low fixed after the review of e755307 (D84)",
+  "exposure_monitoring": "keeper counts every open listing from each account's event index (no cap, reorg-repaired), failed accounts included; EXPOSURE_INCOMPLETE when an account has no index"
  },
  "economic": {
-  "window": {
-   "start": 1792512215,
-   "end": 1795104215,
-   "successful": 11604,
-   "refunded": 5090,
-   "successful_per_day": 386.8,
-   "daily_successful": null,
-   "purchaser_responses": {
-    "DepositorBidAccepted": 8134,
-    "NFTKept": 2391,
-    "DepositorBidAcceptedAsTokens": 888,
-    "silent": 191
-   }
+  "formal_gate": {
+   "receipt": "docs/receipts/formal-assessment.json",
+   "hurdle": "10% a year net",
+   "window_successful_per_day": 356.7,
+   "holder_1_96_eth": {
+    "median_pct": 70.6,
+    "p10_pct": -55.3,
+    "worst_pct": -61.5,
+    "losing_runs": "5/16",
+    "creator_mint_fees_eth_per_year": 0.079
+   },
+   "pool_6_8_eth": {
+    "median_pct": 55.9,
+    "p10_pct": 9.3,
+    "worst_pct": -26.4,
+    "losing_runs": "1/16",
+    "creator_mint_fees_eth_per_year": 0.24
+   },
+   "pool_20_eth": {
+    "median_pct": 37.7,
+    "p10_pct": 22.0,
+    "worst_pct": 6.0,
+    "losing_runs": "0/16",
+    "creator_mint_fees_eth_per_year": 0.62
+   },
+   "result": "passes on the median at every size"
   },
-  "canary_0_5_gwei": {
-   "runs": 16,
-   "completed_claims": 16,
-   "median_return_bps": -528,
-   "mean_return_bps": 531,
-   "p10_return_bps": -6710,
-   "worst_return_bps": -7539,
-   "loss_runs": 9,
-   "mean_creator_mint_fees_eth": 0.013875,
-   "mean_routine_keeper_eth": 1.525220375
-  },
-  "mainnet_6_8_eth_0_5_gwei": {
-   "runs": 16,
-   "completed_claims": 16,
-   "median_return_bps": 7624,
-   "mean_return_bps": 7520,
-   "p10_return_bps": 3424,
-   "worst_return_bps": -926,
-   "loss_runs": 1,
-   "mean_creator_mint_fees_eth": 0.066,
-   "mean_routine_keeper_eth": 4.43729153125
-  },
-  "mainnet_20_eth_0_5_gwei": {
-   "runs": 16,
-   "completed_claims": 16,
-   "median_return_bps": 4941,
-   "mean_return_bps": 4989,
-   "p10_return_bps": 1776,
-   "worst_return_bps": 1393,
-   "loss_runs": 0,
-   "mean_creator_mint_fees_eth": 0.1394375,
-   "mean_routine_keeper_eth": 6.521608718749999
-  },
-  "bid_outcome_0_5_gwei": {
-   "total_price_gwei": 0.5,
-   "backing_wei": 49947348578411618,
-   "k": 1.0384605,
-   "edge_before_gas_wei": 1921000000000000,
-   "cycle_quote_wei": 676000000000000,
-   "net_wei": 1245000000000000,
-   "positive": true
-  },
-  "exit_windows": {
-   "blackouts": 60,
-   "usable_blackouts": 59,
-   "days_with_usable_window": 30,
-   "days": 30,
-   "minimum_per_day_met": true
-  },
-  "holder_return_requirement": "FAIL at the 2 ETH canary; pass at 6.8 and 20 ETH"
+  "recipe_comparison": {
+   "receipt": "docs/receipts/recipe-comparison.json",
+   "decision": "0.06 direct mint",
+   "creator_fees_ratio_vs_0_03_bulk_split": "2.6x to 5.4x in every cell",
+   "holder_1_96_eth_0_06_median_pct": {
+    "all_bid": 22.8,
+    "observed": 34.3,
+    "keep_50": 80.7,
+    "all_keep": 136.8
+   },
+   "holder_1_96_eth_0_03_bulk_split_median_pct": {
+    "all_bid": 25.1,
+    "observed": 37.5,
+    "keep_50": 65.4,
+    "all_keep": 122.2
+   },
+   "pool_20_eth_0_06_median_pct": {
+    "all_bid": 39.3,
+    "observed": 45.9,
+    "keep_50": 69.4,
+    "all_keep": 88.2
+   },
+   "quieter_demand_1_96_eth_0_06_median_pct": {
+    "all_bid": 0.6,
+    "all_keep": 9.8
+   },
+   "zero_demand_1_96_eth_pct": -2.3,
+   "0_03_direct": "never lists"
+  }
  },
  "decisions": [
   {
-   "id": "A1",
-   "requirement": "OWNER-REQUIREMENTS A.3/A.8, B2 O1: holder return >=10%/yr",
-   "status": "fails at 2 ETH canary",
-   "recommendation": "deploy the 2 ETH canary as an owner-funded functional test, review after 14 days or 5 real selections",
-   "cost": "about 0.06 ETH routine pay over 14 days at 0.5 gwei"
+   "id": "U1",
+   "item": "Holder return (mainnet values, no deposit cap)",
+   "facts": "formal gate median +70.6% but 5 of 16 years lose (p10 -55.3%); with the last 10 days' quieter demand the 1.96 ETH median is +0.6% (all bid) to +9.8% (all keep), below the hurdle",
+   "recommendation": "small pools carry a wide loss tail (5 of 16 modeled years lose at 1.96 ETH); none lose at 20 ETH"
   },
   {
-   "id": "A2",
-   "requirement": "asset-flow O2: quoted gas per position built and listed <= 1,750,000",
-   "measured": 1919655,
-   "exception_gas": 169655,
-   "exception_eth_per_position_at_0_5_gwei": "0.0000848275",
-   "yearly_eth": {
-    "canary": 0.0039,
-    "mainnet_6_8": 0.019,
-    "mainnet_20": 0.039
-   }
+   "id": "U2",
+   "item": "Recipe: 0.06 direct mint",
+   "facts": "2.6-5.4x the creator revenue of 0.03 bulk-split; higher return at 20 ETH; at 1.96 ETH 0.03 bulk-split's median is slightly higher under all-bid and observed behaviour with a milder tail"
   },
   {
-   "id": "A3",
-   "item": "raised constants",
-   "values": {
-    "MAX_ROUTINE_RATE": "0.01->0.02 ETH/day",
-    "Q_PACK_UNIT": "35000->100000",
-    "Q_SELECTED": "160000->180000",
-    "Q_REQUIRED_TAIL": "110000->120000"
-   }
+   "id": "U3",
+   "item": "Purchaser gas bound PURCHASER_GAS_PRICE = 2 gwei (D85)",
+   "facts": "backing 0.06489617486338 ETH; keep advantage +0.0003 ETH at any assumption; keeper ceiling no longer affects listing"
   },
   {
-   "id": "A4",
-   "item": "spending and owner-key bounds",
-   "canary_first_24h_routine_eth": 0.04,
-   "canary_daily_routine_eth": 0.01,
-   "compromised_owner_first_24h_eth": 0.055,
-   "compromised_owner_daily_eth": 0.025,
-   "checkpoint_per_interval_eth": 0.00074
+   "id": "U4",
+   "item": "FWA payment receipts (D84)",
+   "facts": "settlement from FWA's record; pricing gated and bounded at 32 allocation entries; while kicks are possible (exemption lifted) every open listing is checked, at most 32",
+   "residual": "if FWA lifts the exemption, a kick refund is force-sent with no receipt, and FWA restores the exemption before sync, pricing counts the refund beside the position: NAV high by 0.0649 ETH per such kick until the permissionless sync",
+   "above_32_listings": "the kick check is skipped above 32 open listings, so pricing never waits on FWA's exemption; an unrecorded kick refund there (receive above FWA's 100,000 gas stipend) would price one backing high until sync"
   },
   {
-   "id": "A5",
-   "item": "coverage limits",
-   "text": "no authentic >16 own allocations; combined sync is a bound; pure-128 success bounded; keeper races cost gas"
+   "id": "U5",
+   "item": "Spending (mainnet values)",
+   "routine_first_24h_eth": 0.12,
+   "routine_daily_eth": 0.02,
+   "essential_budget_eth": 0,
+   "checkpoint": "from request charges only, at most once per 12 h: 360,000 gas + 6,000 per allocation entry or open listing read + 30,000 per FWA read at 2 gwei + one work fee",
+   "owner_key": "accepted risk B3, no numeric bound (owner, 2026-11-22)"
   },
   {
-   "id": "A6",
-   "item": "new unsigned asset-flow outcomes replace the 2026-11-17 signature for this candidate"
+   "id": "U6",
+   "item": "Asset-flow outcomes O1-O11, signed 2026-11-22, replace the 2026-11-17 signature for this candidate",
+   "outcomes_sha256": "dbe267c39a299f3bf62424e35e52f9eae5d76090ba1e95f4c338c366e1b094f9"
   },
   {
-   "id": "A7",
-   "item": "signing authorizes no broadcast, funding or Fly deployment"
+   "id": "U7",
+   "item": "Coverage limits",
+   "text": "the production image's fork rehearsal runs in CI (no Docker on the build Mac); the rehearsal's real-VRF outcomes impersonate the coordinator (real request and word, proof check skipped); the Python mirror does not model the in-sync fee-credit sweep at the default keeper share, so the reconcile fork run uses a share at which the credit waits; matched 6.8 and 50 ETH recipe cells ran only as a 2-seed pilot; the holder-run unlist in the image rehearsal was exercised in CI run 44946918814 (which then failed on liquidate timing, fixed) but the passing run 44948198556 had no shortfall to unwind; the local rehearsal fork used Alchemy, not Tenderly"
+  },
+  {
+   "id": "U8",
+   "item": "Authority",
+   "text": "signing authorizes no broadcast, funding, Fly deployment or public offer of personal managers; each is a separate owner decision"
   }
  ],
  "human_readable": "docs/release/ACCEPTANCE.md",
- "runbook": "docs/release/RUNBOOK.md"
+ "runbook": "docs/release/RUNBOOK.md",
+ "history": [
+  "docs/release/history/acceptance-pr2-candidate-unsigned.json",
+  "docs/release/history/asset-flow-signed-2026-11-17.json"
+ ]
 }

@@ -8,7 +8,9 @@ import {IKeeperPolicy} from "../../src/KeeperPolicy.sol";
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 import {Charges} from "../utils/Charges.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {PackAccount} from "../../src/PackAccount.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
+import {StrategyLib} from "../../src/StrategyLib.sol";
 import {LISTING_ALLOCATED} from "../../src/interfaces/External.sol";
 
 /// @dev A real deployed hostile keeper policy an owner could set: it always offers the maximum.
@@ -32,8 +34,7 @@ contract ScanSyncForeignTest is ForkBase {
         p.payMarkupBps = 0; p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei;
         vm.prank(owner); vault.setParams(p);
         vm.deal(address(vault), 5 ether);
-        vm.prank(keeper); TestVaultOps.restock(vault, 1, 3, 0);
-        vm.prank(keeper); TestVaultOps.list(vault, 1, 0);
+        vm.prank(keeper); TestVaultOps.restock(vault, 1, UNITS, 0); // build lists it at once
         assertEq(vault.openListingCount(), 1);
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
     }
@@ -55,7 +56,7 @@ contract ScanSyncForeignTest is ForkBase {
     }
 
     function _billedScan() internal returns (uint256 billed, uint256 pay) {
-        bytes memory input = abi.encodeCall(PackVault.sync, (new uint256[](0), uint256(0), uint256(0)));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0)));
         uint256 intrinsic = 21_000;
         for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
         vm.cool(address(vault)); vm.cool(address(FWA)); vm.cool(address(vault.keeperPolicy()));
@@ -77,7 +78,7 @@ contract ScanSyncForeignTest is ForkBase {
         assertEq(pay, 0, "no own selection, no checkpoint: unpaid");
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess(), "one scan cleared it");
         assertEq(address(vault).balance, cash, "no vault cash moved");
-        vm.expectRevert(VaultLib.Nothing.selector);
+        vm.expectRevert(StrategyLib.Nothing.selector);
         vm.prank(keeper); vault.sync(new uint256[](0), 0, 0);
     }
 
@@ -127,17 +128,17 @@ contract ScanSyncForeignTest is ForkBase {
         vm.prank(keeper); uint256 paddedPay = vault.sync(padded, 0, 0);
         assertEq(paddedPay, 0, "irrelevant ids do not manufacture pay");
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
-        vm.expectRevert(VaultLib.Nothing.selector);
+        vm.expectRevert(StrategyLib.Nothing.selector);
         vm.prank(keeper); vault.sync(new uint256[](0), 0, 0);
         assertTrue(vm.revertToState(snapshot));
         vm.prank(keeper); uint256 plainPay = vault.sync(new uint256[](0), 0, 0);
         assertEq(plainPay, paddedPay, "padding changes nothing: a split later call earns no second scan");
-        vm.expectRevert(VaultLib.Nothing.selector);
+        vm.expectRevert(StrategyLib.Nothing.selector);
         vm.prank(keeper); vault.sync(padded, 0, 0);
     }
 }
 
-/// @notice Own-selection scan-path guards on the real VRF replay fixture (late()): a paid scan is
+/// @notice Own-selection scan-path guards on the real VRF replay fixture (primary()): a paid scan is
 ///         capped by the vault's own quote and budget, delaying it loses no fees and cannot misprice
 ///         shares, budget exhaustion is recoverable, and a full redemption settles to the holder's
 ///         exact NAV share without ever funding keeper pay from liabilities.
@@ -176,7 +177,7 @@ contract ScanSyncSelectionTest is SelectionBase {
     // (a) Routine pay never exceeds the routine budget: with the budget below the scan quote, the
     //     paid scan pays exactly the budget and leaves it at zero.
     function test_a_routinePayCappedByBudget() public {
-        _select(late()); _clean();
+        _select(primary()); _clean();
         _backlog(45);
         VaultLib.Params memory p = vault.getParams();
         p.routineRate = 0; p.routineCap = 0.00008 ether; // below SCAN_Q at 0.5 gwei (= 0.0001475 ETH)
@@ -194,7 +195,7 @@ contract ScanSyncSelectionTest is SelectionBase {
     // (i) A hostile keeper policy (owner-set, always offers the maximum) cannot raise scan pay above
     //     the vault's own fixed quote and budget.
     function test_i_hostilePolicyCappedAtVaultQuote() public {
-        _select(late()); _clean();
+        _select(primary()); _clean();
         _backlog(45);
         PolicyMaxOffer greedy = new PolicyMaxOffer();
         vm.prank(vault.owner()); vault.setPolicy(address(greedy));
@@ -209,7 +210,7 @@ contract ScanSyncSelectionTest is SelectionBase {
     // (f) Budget exhaustion is recoverable: with no routine budget the paid scan is refused and the
     //     selection stays pending; after the budget refills over time the paid scan succeeds.
     function test_f_budgetExhaustionRecoverable() public {
-        _select(late()); _clean();
+        _select(primary()); _clean();
         _backlog(45);
         uint64 cursor = vault.acquisitionCursor();
         VaultLib.Params memory p = vault.getParams();
@@ -218,7 +219,7 @@ contract ScanSyncSelectionTest is SelectionBase {
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
         (uint256 routine,) = vault.budget();
         assertEq(routine, 0, "budget exhausted");
-        vm.expectRevert(PackVault.Payment.selector);
+        vm.expectRevert(StrategyLib.Payment.selector);
         vault.sync(new uint256[](0), 0, 1);
         assertEq(vault.acquisitionCursor(), cursor, "refused pay rolls back the scan: selection still pending");
         // Owner restores a refill rate and cap; time then refills the routine budget.
@@ -236,7 +237,7 @@ contract ScanSyncSelectionTest is SelectionBase {
     // (e) A delayed sync cannot misprice shares: with an unapplied own selection, checkpoint pricing
     //     reverts CatchUpFirst until the scan; and the applied NAV is identical to the journal path.
     function test_e_delayedSyncCannotMispriceSharesCatchUpFirst() public {
-        _select(late()); _clean();
+        _select(primary()); _clean();
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
         // Cursor is behind the real selection, so NAV pricing refuses to run (CatchUpFirst): a stale
         // sync cannot misprice a deposit or redemption against an unapplied own selection.
@@ -266,7 +267,7 @@ contract ScanSyncSelectionTest is SelectionBase {
     //     the selection is applied immediately (journal) or after a long backlog (one late scan). The
     //     only difference is the legitimate keeper gas quote of each path.
     function test_d_delayedMaintenanceLosesNoFees() public {
-        _select(late()); _clean();
+        _select(primary()); _clean();
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
         uint256 credit = FWA.feeCredit(address(vault)); // the selection's fee share, uncollected
 
@@ -294,7 +295,7 @@ contract ScanSyncSelectionTest is SelectionBase {
     // (j) A full redemption settles to the holder's exact NAV share; the scan/checkpoint/claim never
     //     fund keeper pay from liabilities, and with gas above the ceiling pay is capped at it.
     function test_j_fullRedemptionSettlesWithoutFundingPayFromLiabilities() public {
-        _select(late());
+        _select(primary());
         VaultLib.Params memory p = vault.getParams();
         p.payMarkupBps = 0; p.workFee = 0; p.maxTip = 0; p.keeperShareBps = 0;
         p.gasCeiling = 0.5 gwei; p.essentialCeiling = 0.5 gwei; // pay capped at this ceiling
@@ -317,7 +318,7 @@ contract ScanSyncSelectionTest is SelectionBase {
         // The purchaser keeps the pack; the terminal resolves and the position closes, leaving the
         // vault holding the settlement proceeds against which the holder redeems.
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
-        vm.prank(late().purchaser); IFwaSettle(address(FWA)).keepNFT(selected);
+        vm.prank(primary().purchaser); IFwaSettle(address(FWA)).keepNFT(selected);
         vault.sync(_one(selected), 0, 0);
         assertEq(vault.openListingCount(), 0, "selection resolved, no active exposure");
 

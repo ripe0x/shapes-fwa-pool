@@ -2,7 +2,7 @@
 pragma solidity 0.8.30;
 
 import {Vm} from "forge-std/Vm.sol";
-import {ForkBase} from "./ForkBase.sol";
+import {ForkBase, IOwnable, IFwaAdmin} from "./ForkBase.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {Charges} from "../utils/Charges.sol";
@@ -21,6 +21,10 @@ contract ForkPartialReconcileTest is ForkBase {
             assertEq(actors[i].code.length, 0); assertEq(actors[i].balance, 0);
         }
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
+        // D62: ShapePacks is oracle-exempt (the real admin call ForkBase makes), so a 0.06 ETH pack
+        // lists at its edge backing instead of being clamped to the stale historical floor cap.
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         VaultLib.Params memory p = defaultParams();
         p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei; p.payMarkupBps = 0;
         p.reserve = 0.005 ether; p.tvlCap = 2 ether;
@@ -59,8 +63,8 @@ contract ForkPartialReconcileTest is ForkBase {
         this.assertGasContext();
         if (vm.exists(OUT)) vm.removeFile(OUT);
         vm.writeLine(OUT, string.concat('{"step":"setup","deployBalance":', vm.toString(address(vault).balance),
-            ',"initCursor":', vm.toString(vault.acquisitionCursor()), ',"count":0,"units":3,"essentialCap":0,"mintFee":',
-            vm.toString(SHAPES.mintFee()), '}'));
+            ',"initCursor":', vm.toString(vault.acquisitionCursor()), ',"count":6,"units":', vm.toString(UNITS),
+            ',"essentialCap":0,"mintFee":', vm.toString(SHAPES.mintFee()), '}'));
         uint256 ck = vault.requestCharge();
         uint256 gross = Charges.grossFor(vault, 1 ether);
         vm.prank(alice); vault.deposit{value: gross}();
@@ -70,16 +74,16 @@ contract ForkPartialReconcileTest is ForkBase {
         _snap("deposit");
         toBlackout(); checkpoint(); _snap("checkpoint1"); toOpen();
 
-        uint256[] memory planned = TestVaultOps.buildProposals(vault, 10, 3);
-        vm.writeLine(OUT, string.concat('{"step":"restockInputs","count":10,"units":3,"proposals":', ReconcileTrace.uints(planned), '}'));
-        vm.prank(keeper); vault.restock(3, planned, 0); _snap("restock");
-        uint256[] memory proposed = TestVaultOps.proposals(vault, 10, 3);
+        // Build-and-list six UNITS packs: each mints its Shapes straight into ShapePacks and lists at
+        // once (no separate list step). Six fits a 1 ETH deposit at 0.06 ETH value plus backing.
         vm.recordLogs();
-        vm.prank(keeper); TestVaultOps.list(vault, proposed.length, 0);
-        uint256[] memory listedIds = _listedIds(proposed.length);
-        vm.writeLine(OUT, string.concat('{"step":"listInputs","backings":', ReconcileTrace.uints(proposed),
-            ',"ids":', ReconcileTrace.uints(listedIds), '}'));
-        _snap("list");
+        vm.prank(keeper); TestVaultOps.restock(vault, 6, UNITS, 0);
+        uint256[] memory builtIds = _listedIds(6);
+        uint256[] memory backings = new uint256[](builtIds.length);
+        for (uint256 i; i < builtIds.length; ++i) { (,, uint128 b) = TestVaultOps.position(vault, builtIds[i]); backings[i] = b; }
+        vm.writeLine(OUT, string.concat('{"step":"buildInputs","count":6,"units":', vm.toString(UNITS),
+            ',"ids":', ReconcileTrace.uints(builtIds), ',"backings":', ReconcileTrace.uints(backings), '}'));
+        _snap("build");
         uint256 shares = vault.shareBalance(alice);
         ck = vault.requestCharge();
         uint256 unwind = Charges.redeemCharge(vault, shares);
@@ -95,7 +99,7 @@ contract ForkPartialReconcileTest is ForkBase {
         vm.prank(keeper); vault.unlist(ids, 0); _snap("unlist");
         assertEq(vault.openListingCount(), 0);
         vm.prank(keeper); vault.liquidate(16, 0); _snap("liquidate");
-        assertEq(vault.idlePackCount(), 0); assertEq(vault.looseShapeCount(), 0);
+        assertEq(vault.idlePackCount(), 0);
         toBlackout(); checkpoint(); _snap("checkpoint2");
         assertEq(vault.lockedShares(), 0);
         uint256 before = alice.balance;

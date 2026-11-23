@@ -1,0 +1,264 @@
+{
+ "run": "https://github.com/ripe0x/shapes-fwa-pool/actions/runs/44948198556",
+ "commit": "02c0a741235adef9cc6d29047333c5afed254238",
+ "steps": [
+  {
+   "step": "primary prices the deposit at the blackout",
+   "at_block": 26450242
+  },
+  {
+   "step": "keepers build and list",
+   "at_block": 26450247
+  },
+  {
+   "step": "primary builds and lists for the manager",
+   "at_block": 26450247
+  },
+  {
+   "step": "primary /health serves the vault and the manager",
+   "at_block": 26450247
+  },
+  {
+   "step": "replacement prices the redemption through a lost RPC response",
+   "at_block": 26450251
+  },
+  {
+   "step": "replacement /health serves the vault and the manager",
+   "at_block": 26450256
+  },
+  {
+   "step": "backup completes a clean pass",
+   "at_block": 26450259
+  }
+ ],
+ "fork_block": 26450200,
+ "fork_hash": "0xda7052eb890b621f2ed635feb0af056e155f801305427af666aa7930d4baabc5",
+ "image": "packvault-keeper:02c0a741235adef9cc6d29047333c5afed254238",
+ "foundry": "cast Version: 1.8.1",
+ "vault": "0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461",
+ "factory": "0x1d274f470be25c17b0d2f9745b45ca6f3289279e",
+ "postflight": "postflight passed: 0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461 policy 0xF1554E2a90CDee24250f7fC00C8eF3eb5e883163 libraries {'ScanLib': '0x100366204B6d05A36a279201Fd630a563F1D0F3B', 'VaultLib': '0x4db7F4902603060FCa7E3d3f122f45F8882895ae', 'StrategyLib': '0x814aFbEf978b1D998BAFB0723dce05bc70993C22'} owner 0x7683eaAFbF5f8d94004a703bF0c85248C0B1AcCa factory 0x1d274f470be25c17b0d2f9745b45ca6f3289279e\nverification commands (Etherscan; ETHERSCAN_API_KEY from your environment):\n  forge verify-contract 0x100366204B6d05A36a279201Fd630a563F1D0F3B src/ScanLib.sol:ScanLib --chain mainnet --watch\n  forge verify-contract 0x4db7F4902603060FCa7E3d3f122f45F8882895ae src/VaultLib.sol:VaultLib --chain mainnet --libraries src/ScanLib.sol:ScanLib:0x100366204B6d05A36a279201Fd630a563F1D0F3B --watch\n  forge verify-contract 0x814aFbEf978b1D998BAFB0723dce05bc70993C22 src/StrategyLib.sol:StrategyLib --chain mainnet --libraries src/VaultLib.sol:VaultLib:0x4db7F4902603060FCa7E3d3f122f45F8882895ae --watch\n  forge verify-contract 0xF1554E2a90CDee24250f7fC00C8eF3eb5e883163 src/KeeperPolicy.sol:KeeperPolicyV1 --chain mainnet --watch\n  forge verify-contract 0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461 src/PackVault.sol:PackVault --chain mainnet --guess-constructor-args --libraries src/VaultLib.sol:VaultLib:0x4db7F4902603060FCa7E3d3f122f45F8882895ae --libraries src/StrategyLib.sol:StrategyLib:0x814aFbEf978b1D998BAFB0723dce05bc70993C22 --watch\n  forge verify-contract 0x1d274f470be25c17b0d2f9745b45ca6f3289279e src/PackManagerFactory.sol:PackManagerFactory --chain mainnet --guess-constructor-args --libraries src/VaultLib.sol:VaultLib:0x4db7F4902603060FCa7E3d3f122f45F8882895ae --libraries src/StrategyLib.sol:StrategyLib:0x814aFbEf978b1D998BAFB0723dce05bc70993C22 --watch\n  forge verify-contract 0x207a000020b96aA26F3D79eB34eFC5F280D06E10 src/PackManager.sol:PackManager --chain mainnet --guess-constructor-args --libraries src/VaultLib.sol:VaultLib:0x4db7F4902603060FCa7E3d3f122f45F8882895ae --libraries src/StrategyLib.sol:StrategyLib:0x814aFbEf978b1D998BAFB0723dce05bc70993C22 --watch",
+ "manager": "0x6d4f8Dd3f460f0E8843143e27CDe3347b040Be3E",
+ "manager_open": 3,
+ "before_replacement": {
+  "stats": {
+   "sent": 2,
+   "mined": 1,
+   "reverted": 0,
+   "replaced": 0,
+   "dropped": 0,
+   "reorged": 0,
+   "skipped_expected": 0,
+   "skipped_loss": 0,
+   "spent_wei": 12541064589505,
+   "paid_wei": 38298254600000
+  },
+  "pending": {
+   "label": "build",
+   "to": "0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461",
+   "args": [
+    "build(uint256,uint256[],uint256)",
+    "6",
+    "[64896174863380000,64896174863390000,64896174863370000,64896174863400000,64896174863360000,64896174863410000,64896174863350000,64896174863420000]",
+    "715343849472000"
+   ],
+   "nonce": 1,
+   "gas": 13359679,
+   "est": 10687743,
+   "prio": 50000000,
+   "max_fee": 50910336,
+   "sent_block": 26450246,
+   "replacements": 0,
+   "hashes": [
+    "0x188079cf3c61ed5690a6d3bfb1a8cb72b6b47ddf87838ceb97fe051cc4e39da3"
+   ],
+   "expected_pay": 894179811840000,
+   "submitted": 1795294275
+  },
+  "counted": [
+   {
+    "label": "checkpoint",
+    "block": 26450242,
+    "status": 1,
+    "gas_used": 246733,
+    "pay": 38298254600000
+   }
+  ],
+  "head": 26442239
+ },
+ "holder_unwind": [
+  {
+   "refused": [
+    "unlist",
+    "ate gas: server returned an error response: error code 3: execution reverted: custom error 0x93a2df34, data: \\\"0x93a2df34\\\": UnlistNotAllowed\"}],\"warnings\":[]}\n"
+   ]
+  },
+  {
+   "refused": [
+    "liquidate",
+    " to estimate gas: server returned an error response: error code 3: execution reverted: custom error 0xf9820cc1, data: \\\"0xf9820cc1\\\": Nothing\"}],\"warnings\":[]}\n"
+   ]
+  },
+  {
+   "refused": [
+    "unlist",
+    "ate gas: server returned an error response: error code 3: execution reverted: custom error 0x93a2df34, data: \\\"0x93a2df34\\\": UnlistNotAllowed\"}],\"warnings\":[]}\n"
+   ]
+  },
+  {
+   "refused": [
+    "liquidate",
+    " to estimate gas: server returned an error response: error code 3: execution reverted: custom error 0xf9820cc1, data: \\\"0xf9820cc1\\\": Nothing\"}],\"warnings\":[]}\n"
+   ]
+  }
+ ],
+ "after_replacement": {
+  "stats": {
+   "sent": 2,
+   "mined": 3,
+   "reverted": 0,
+   "replaced": 0,
+   "dropped": 0,
+   "reorged": 0,
+   "skipped_expected": 0,
+   "skipped_loss": 0,
+   "spent_wei": 503011359416283,
+   "paid_wei": 970589827000000
+  },
+  "pending": null,
+  "counted": [
+   {
+    "label": "checkpoint",
+    "block": 26450242,
+    "status": 1,
+    "gas_used": 246733,
+    "pay": 38298254600000
+   },
+   {
+    "label": "build",
+    "block": 26450247,
+    "status": 1,
+    "gas_used": 9413578,
+    "pay": 894179811840000
+   },
+   {
+    "label": "checkpoint",
+    "block": 26450251,
+    "status": 1,
+    "gas_used": 308219,
+    "pay": 38111760560000
+   }
+  ],
+  "head": 26442239
+ },
+ "replacement_health_accounts": [
+  "0x6d4f8Dd3f460f0E8843143e27CDe3347b040Be3E",
+  "0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461"
+ ],
+ "dropped_transaction": "0x48cbfdf7c1843da56e6cac9dc80d987823f8eff9608d1d1e1eb1238163cbdbbd",
+ "dropped_transaction_status": 1,
+ "backup": {
+  "stored": {
+   "stats": {
+    "sent": 1,
+    "mined": 1,
+    "reverted": 0,
+    "replaced": 0,
+    "dropped": 0,
+    "reorged": 0,
+    "skipped_expected": 0,
+    "skipped_loss": 0,
+    "spent_wei": 197880624080982,
+    "paid_wei": 345233012070000
+   },
+   "pending": null,
+   "counted": [
+    {
+     "label": "build",
+     "block": 26450245,
+     "status": 1,
+     "gas_used": 3913983,
+     "pay": 345233012070000
+    }
+   ],
+   "head": 26450257
+  },
+  "health": {
+   "last_pass": 1795294304,
+   "block": 26450257,
+   "status": [
+    [
+     "RESERVE_BELOW_NEED",
+     "info",
+     "reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH"
+    ],
+    [
+     "RESERVE_BELOW_NEED",
+     "info",
+     "reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH"
+    ],
+    [
+     "EXPOSURE_SHARE",
+     "info",
+     "keeper holds 0.42% of FWA selection weight across its accounts"
+    ]
+   ],
+   "accounts": {
+    "0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461": {
+     "pooled": true,
+     "status": [
+      [
+       "RESERVE_BELOW_NEED",
+       "info",
+       "reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH"
+      ]
+     ]
+    },
+    "0x6d4f8Dd3f460f0E8843143e27CDe3347b040Be3E": {
+     "pooled": false,
+     "status": [
+      [
+       "RESERVE_BELOW_NEED",
+       "info",
+       "reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH"
+      ]
+     ]
+    }
+   },
+   "exposure": [
+    [
+     "EXPOSURE_SHARE",
+     "info",
+     "keeper holds 0.42% of FWA selection weight across its accounts"
+    ]
+   ],
+   "policy_count": 2,
+   "pending": null,
+   "stats": {
+    "sent": 1,
+    "mined": 1,
+    "reverted": 0,
+    "replaced": 0,
+    "dropped": 0,
+    "reorged": 0,
+    "skipped_expected": 0,
+    "skipped_loss": 0,
+    "spent_wei": 197880624080982,
+    "paid_wei": 345233012070000
+   },
+   "errors": [],
+   "pass_errors": 0,
+   "ok": true,
+   "fresh": true,
+   "attention": []
+  }
+ },
+ "lost_races": [],
+ "primary_nonce": 4,
+ "primary_sends_counted": 2,
+ "result": "PASS",
+ "worker_log_tails": {
+  "primary-replacement": "",
+  "backup-restarted": ""
+ }
+}

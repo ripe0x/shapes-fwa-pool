@@ -1,0 +1,237 @@
+{
+ "fork_block": 26464497,
+ "fork_hash": "0x7f85b42d6eea0778742897c9b2f89981b338d12fc2b63ca6f3d04d2b93732712",
+ "rpc": "http://127.0.0.1:8611",
+ "docker": false,
+ "steps": {
+  "1_deploy": {
+   "vault": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+   "factory": "0x321d151f896c205ac5c747c2cff4e9a0e185a27c",
+   "fwa_admission": "already admitted at this fork block",
+   "edge6_backing": 64896174863380000,
+   "edge6_ok": true,
+   "k": 1038460499999999995
+  },
+  "2_managers": [
+   {
+    "manager": "0xf6b8c92E37556D372175EE2567A861265dE1Feaf",
+    "owner": "0xd3eFCe3EE81F36ca0aed496b23fa0779967EddCf",
+    "seed_wei": 1000000000000000000
+   },
+   {
+    "manager": "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F",
+    "owner": "0x1DC45F06F240c0eb792Ec97675845Af09Ad36EAe",
+    "seed_wei": 1000000000000000000
+   },
+   {
+    "manager": "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22",
+    "owner": "0x3beE064fA874964832762A5a7e4Ab9967164B735",
+    "seed_wei": 1000000000000000000
+   }
+  ],
+  "3_fund": {
+   "managers_seeded_wei": 1000000000000000000,
+   "vault_seed_wei": 10000000000000000,
+   "keeper_funded": true
+  },
+  "4_discovery": {
+   "keeper": "0x6B401c3364dFb17fe7D54237fC04aba3f7739dd0",
+   "discovers": [
+    "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+    "0xf6b8c92E37556D372175EE2567A861265dE1Feaf",
+    "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F",
+    "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22"
+   ]
+  },
+  "5_build_list": {
+   "open_listings": {
+    "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f": 0,
+    "0xf6b8c92E37556D372175EE2567A861265dE1Feaf": 7,
+    "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F": 7,
+    "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22": 7
+   },
+   "keeper_stats": {
+    "sent": 3,
+    "mined": 3,
+    "reverted": 0,
+    "replaced": 0,
+    "dropped": 0,
+    "reorged": 0,
+    "skipped_expected": 0,
+    "skipped_loss": 0,
+    "spent_wei": 2766960683467199,
+    "paid_wei": 4139531668870000
+   }
+  },
+  "8_pooled": {
+   "deposit_wei": 1990059613000000000,
+   "listed": 15,
+   "charges_wei": 95118000000000,
+   "holder_claims_wei": 1957459704190719007,
+   "keeper_pay_wei": 2682887986115000,
+   "fully_exited": true,
+   "redemption_reserve_residual": 2
+  },
+  "6_7_outcomes_and_relist": {
+   "receipt": "docs/receipts/unified-selection-rehearsal.json",
+   "outcomes": {
+    "keep": {
+     "resolved": true
+    },
+    "bid": {
+     "relisted_open": 1,
+     "resolved": true
+    },
+    "expiry": {
+     "resolved": true
+    },
+    "forced_keep": {
+     "pending_receipts_at_force": 0,
+     "resolved": true
+    }
+   }
+  },
+  "9_manager_exit": [
+   {
+    "manager": "0xf6b8c92E37556D372175EE2567A861265dE1Feaf",
+    "owner": "0xd3eFCe3EE81F36ca0aed496b23fa0779967EddCf",
+    "funded_wei": 1000000000000000000,
+    "manager_balance_after": 0,
+    "open": 0,
+    "idle": 0,
+    "keeper_pay_wei": 1854028239070000,
+    "exiting": "true"
+   },
+   {
+    "manager": "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F",
+    "owner": "0x1DC45F06F240c0eb792Ec97675845Af09Ad36EAe",
+    "funded_wei": 1000000000000000000,
+    "manager_balance_after": 0,
+    "open": 0,
+    "idle": 0,
+    "keeper_pay_wei": 1845904762655000,
+    "exiting": "true"
+   },
+   {
+    "manager": "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22",
+    "owner": "0x3beE064fA874964832762A5a7e4Ab9967164B735",
+    "funded_wei": 1000000000000000000,
+    "manager_balance_after": 0,
+    "open": 0,
+    "idle": 0,
+    "keeper_pay_wei": 1840657983075000,
+    "exiting": "true"
+   }
+  ],
+  "10_restart": {
+   "index_heads_before": {
+    "index-1-0xf6b8c92e37556d372175ee2567a861265de1feaf-26464504.sqlite": 26464537,
+    "index-1-0x9d0a8f5db3779780dbbfe6652d8625cce3f6097f-26464505.sqlite": 26464537,
+    "index-1-0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f-26464502.sqlite": 26464537,
+    "index-1-0xbb7a7e1dec204ef9633af7ebf285c3b73e340d22-26464506.sqlite": 26464539
+   },
+   "index_heads_after": {
+    "index-1-0xf6b8c92e37556d372175ee2567a861265de1feaf-26464504.sqlite": 26464540,
+    "index-1-0x9d0a8f5db3779780dbbfe6652d8625cce3f6097f-26464505.sqlite": 26464540,
+    "index-1-0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f-26464502.sqlite": 26464540,
+    "index-1-0xbb7a7e1dec204ef9633af7ebf285c3b73e340d22-26464506.sqlite": 26464540
+   },
+   "durable": true,
+   "sent_before": 19,
+   "sent_after": 19
+  },
+  "11_replace_container": {
+   "docker_available": false,
+   "ran_outside_docker": true,
+   "index_heads_preserved": true,
+   "volume": "<tmp>/pack-vault-keeper-9yyv4h0o/data",
+   "image_steps": "see .github/workflows/keeper-image.yml and keeper/test_packaging.py"
+  },
+  "12_backup_keeper": {
+   "backup_keeper": "0x48b3f8242b030c7645007a9Ed8CCA3a1500b2aEE",
+   "own_state_volume": "<tmp>/pack-vault-backup-yu_eoxni/data-backup",
+   "own_nonce_stream": true,
+   "backup_sent_while_primary_stopped": 2,
+   "open_listings_built_by_backup": 3,
+   "primary_contend_sent": 19,
+   "backup_contend_sent": 2,
+   "note": "the backup worker built real packs on its own keystore and volume while the primary was stopped; when both ran, each used its own nonce stream, an already-mined or replaced tx reconciled per keeper by tx.py, no double build"
+  },
+  "16_index_persistence": {
+   "index_files": [
+    "index-1-0xf6b8c92e37556d372175ee2567a861265de1feaf-26464504.sqlite",
+    "index-1-0x9d0a8f5db3779780dbbfe6652d8625cce3f6097f-26464505.sqlite",
+    "index-1-0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f-26464502.sqlite",
+    "index-1-0xbb7a7e1dec204ef9633af7ebf285c3b73e340d22-26464506.sqlite"
+   ],
+   "per_account": true,
+   "heads": {
+    "index-1-0xf6b8c92e37556d372175ee2567a861265de1feaf-26464504.sqlite": 26464551,
+    "index-1-0x9d0a8f5db3779780dbbfe6652d8625cce3f6097f-26464505.sqlite": 26464551,
+    "index-1-0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f-26464502.sqlite": 26464551,
+    "index-1-0xbb7a7e1dec204ef9633af7ebf285c3b73e340d22-26464506.sqlite": 26464551
+   },
+   "stable_across_restart": true
+  },
+  "15_one_account_fails": {
+   "paused_account": "0xf6b8c92E37556D372175EE2567A861265dE1Feaf",
+   "other_accounts": [
+    "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+    "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F",
+    "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22"
+   ],
+   "keeper_completed_pass": true,
+   "note": "per-account error isolation in keeper.run_pass; paused account reports LISTING_PAUSED"
+  },
+  "13_14_17_tx_recovery": {
+   "gap": "no real token claim candidate for transaction recovery"
+  },
+  "reconcile": {
+   "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f": {
+    "account": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+    "pooled": true,
+    "balance": 10059546528319895,
+    "open": 0,
+    "idle": 0,
+    "idle_eth": 5059546528319891,
+    "total_shares": 1000000000000000,
+    "dead_shares": 1000000000000000,
+    "locked_shares": 0,
+    "last_nav": 10059519776839891
+   },
+   "0xf6b8c92E37556D372175EE2567A861265dE1Feaf": {
+    "account": "0xf6b8c92E37556D372175EE2567A861265dE1Feaf",
+    "pooled": false,
+    "balance": 0,
+    "open": 0,
+    "idle": 0,
+    "idle_eth": 0,
+    "winding_down": true
+   },
+   "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F": {
+    "account": "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F",
+    "pooled": false,
+    "balance": 0,
+    "open": 0,
+    "idle": 0,
+    "idle_eth": 0,
+    "winding_down": true
+   },
+   "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22": {
+    "account": "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22",
+    "pooled": false,
+    "balance": 0,
+    "open": 0,
+    "idle": 0,
+    "idle_eth": 0,
+    "winding_down": true
+   },
+   "pool_fully_exited": true,
+   "managers_emptied": true
+  }
+ },
+ "gaps": [],
+ "vault": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+ "factory": "0x321d151f896c205ac5c747c2cff4e9a0e185a27c",
+ "errors": {}
+}

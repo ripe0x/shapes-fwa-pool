@@ -1,58 +1,19 @@
-# Owner acceptance package (unsigned)
+# Owner acceptance: unified candidate
 
-Every open owner decision for the first public deployment, in one place. The machine-readable
-copy is [acceptance.json](acceptance.json); signing its sha256 accepts every item below as written
-and is what `script/deploy.sh` checks before a public broadcast. Nothing is accepted yet.
-Requirement IDs are given with their meaning because "O1" and "O2" mean different things in
-`OWNER-REQUIREMENTS.md` and `asset-flow.json`.
+[acceptance.json](acceptance.json) binds commit `7ad76a0`, the release manifest (`86ef5984…`), the
+mainnet values (`deploy/mainnet.json`, no deposit cap) and the asset-flow outcomes O1–O11. Signing its sha256 accepts the
+items below. It authorizes nothing else: no broadcast, funding, Fly deployment or public offer of
+personal managers.
 
-## A1. Holder return at the canary's 2 ETH size (updated after D75)
+| Item | What you accept | Numbers |
+|---|---|---|
+| U1 Holder return | Small pools have a wide return tail | Formal gate median +70.6%, p10 −55.3%, 5 of 16 years lose; quieter demand median +0.6% (all bid) to +9.8% (all keep), below the 10% hurdle |
+| U2 Recipe | 0.06 ETH packs, direct mint (one 0.05 + one 0.01 Shape) | 2.6 to 5.4× the creator revenue of 0.03 bulk-split; at 1.96 ETH 0.03 bulk-split's median is slightly higher under all-bid (+25.1% vs +22.8%) and observed (+37.5% vs +34.3%) behaviour |
+| U3 Purchaser gas | Fixed 2 gwei bound in the keep incentive | Backing 0.06489617 ETH; keep beats the best bid by 0.0003 ETH after 160,000 gas |
+| U4 Payment receipts | Settlement from FWA's record; kick refunds checked while kicks are possible, up to 32 open listings | Above 32 the check is skipped, never refused; a forced kick refund left unsynced across an exemption restore prices NAV 0.0649 ETH high per kick until sync |
+| U5 Spending | Keeper budgets and checkpoint pay | 0.12 ETH routine in 24 h, then 0.02 ETH a day; essential budget 0 |
+| U6 Asset flow | Outcomes O1–O11 replace the 2026-11-17 signature for this candidate | outcomes sha256 `dbe267c3…` |
+| U7 Coverage limits | What was not shown for real | Image fork rehearsal in CI only; VRF outcomes via coordinator impersonation; mirror lacks the in-sync credit sweep; 6.8 and 50 ETH matched cells as a pilot only; the passing image run had no redemption shortfall for the holder to unwind; local rehearsal fork upstream was Alchemy |
+| U8 Authority | Signing is acceptance only | Broadcast, funding, Fly and the manager product are separate decisions |
 
-Requirement: OWNER-REQUIREMENTS A.3/A.8, B2 O1. After the scan proof (D75), 400 seeds at 0.5 gwei:
-**median +40.5%, mean +62.7%, p10 −62%, 33% of years lose** (0.15 gwei: median +88%, 23.5% lose).
-The gate as defined (median) passes. The loss tail is selection luck at small size, not keeper
-cost. Decision for the owner: accept a third of canary years losing (up to about two thirds of
-principal at p5) as the price of a live test, or start larger (20 ETH, 32 seeds: 3% lose).
-Details: `docs/KEEPER-ECONOMICS.md`.
-
-## A2. O2 construction expense exception (asset-flow O2, "what building costs holders")
-
-Measured 1,919,655 quoted gas per position built and listed against the 1,750,000 target; the
-target is kept, so the outcome fails. Difference 169,655 gas = **0.0000848 ETH per position at the
-0.5 gwei ceiling**. Model builds per year (from paid mints): canary about 46 packs, 0.0039 ETH a
-year; 6.8 ETH about 220 packs, 0.019 ETH; 20 ETH about 465 packs, 0.039 ETH. No supported saving
-was found beyond the completed optimization pass. Accepting this item accepts 1,919,655.
-
-## A3. Raised pay constants (independent review)
-
-`MAX_ROUTINE_RATE` 0.01 → 0.02 ETH a day; `Q_PACK_UNIT` 35,000 → 100,000 (inactive at three-unit
-packs); `Q_SELECTED` 160,000 → 180,000; `Q_REQUIRED_TAIL` 110,000 → 120,000. Each is funded from
-holder NAV and set from measured receipts (`COMPLETE-OPERATING-PASS.md`).
-
-## A4. Spending and owner-key bounds (replaces B3's figures)
-
-Canary routine pay at most 0.04 ETH in the first 24 h, then 0.01 ETH a day. With every bytecode
-maximum set at once, a compromised owner key reaches at most the current budget plus 0.025 ETH a
-day: about 0.055 ETH in the first 24 h. Request-funded checkpoint pay is separate: at most
-0.00074 ETH per 12 h interval at canary settings, only from request charges. The owner key is one
-hot EIP-7702 account, not the multisig or hardware wallet B3 assumed. Since D76 the owner can be
-moved to a hardware wallet or Safe without a new vault, by two-step handover only; one-step
-transfer and renouncing are disabled. It cannot recover a key an attacker has already used.
-
-## A5. Coverage limits
-
-- More than 16 simultaneous own allocations cannot be produced by authentic VRF replay; the bound
-  is enforced by the contract and keeper discovery is proven across 18 real returned packs.
-- The maximal combined sync is a quoted-gas bound (10,576,250 padded), not a receipt.
-- A pure 128-successful journal batch is bounded from the measured mixed batch, not measured.
-- Two live keepers occasionally race; the loser reverts and pays its gas.
-
-## A6. Updated asset-flow outcomes
-
-`asset-flow.json` outcomes are restated for this candidate (current budgets, measured values) and
-are unsigned. The 2026-11-17 signature is kept in `docs/release/history/` for the older candidate.
-
-## A7. Authorization still required after signing
-
-Signing authorizes no transaction. The broadcast itself, keeper funding, Fly deployment and any
-later TVL-cap increase each need the owner's explicit go-ahead.
+Evidence: [RUNBOOK.md](RUNBOOK.md) section 2. Earlier packages: `docs/release/history/`.

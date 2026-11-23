@@ -74,17 +74,21 @@ contract VaultHandler is Test {
         ++calls;
     }
 
-    function restockAndList(uint256 n) external {
+    function build(uint256 n) external {
         n = bound(n, 1, 4);
-        uint256 loose = vault.looseShapeCount();
-        uint256 before = address(vault).balance;
         vm.startPrank(keeper);
-        try vault.restock(3, TestVaultOps.buildProposals(vault, n, 3), 0) {
-            uint256 mints = loose >= 3 * n ? 0 : (3 * n - loose + 9) / 10;
-            mintFeesPaid += mints * 0.001 ether;
-            before;
+        // Build mints and lists at once; each six-unit pack mints two Shapes at 0.001 ETH.
+        try vault.build(6, TestVaultOps.proposals(vault, n, 6), 0) {
+            mintFeesPaid += n * 0.002 ether;
         } catch {}
-        try vault.list(TestVaultOps.proposals(vault, n, 3), 0) {} catch {}
+        vm.stopPrank();
+        ++calls;
+    }
+
+    function relist() external {
+        vm.startPrank(keeper);
+        // Relist whatever idle (returned) packs exist; no mint, so mintFeesPaid is unchanged.
+        try vault.list(TestVaultOps.proposals(vault, 4, 6), 0) {} catch {}
         vm.stopPrank();
         ++calls;
     }
@@ -164,12 +168,12 @@ contract ForkVaultInvariantTest is ForkBase {
     /// INV04: with no selections, value only leaves NAV as Shapes mint fees and keeper gas pay:
     ///        everything paid in equals assets held plus those two expenses, to the wei.
     function invariant_valueConserved() public view {
-        uint256 assets = address(vault).balance + vault.looseShapeCount() * 0.01 ether
-            + TestVaultOps.idle(vault).length * 0.03 ether;
+        // No loose Shapes (direct-mint recipe); each six-unit pack holds 0.06 ETH of value.
+        uint256 assets = address(vault).balance + TestVaultOps.idle(vault).length * (UNITS * 0.01 ether);
         uint256[] memory ids = TestVaultOps.open(vault);
         for (uint256 i; i < ids.length; ++i) {
-            (,, uint128 backing) = TestVaultOps.position(vault, ids[i]);
-            assets += backing + 0.03 ether;
+            (, uint64 units, uint128 backing) = TestVaultOps.position(vault, ids[i]);
+            assets += backing + uint256(units) * 0.01 ether;
         }
         // Paid in: seed, pre-existing dust, holder deposits net of cancels and claims, donations.
         // Tracked as: assets + mint fees == seed + preexisting + net holder inflow + donations.

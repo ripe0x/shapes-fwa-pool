@@ -1,3 +1,11 @@
+> **Current: [docs/UNIFIED-SYSTEM.md](UNIFIED-SYSTEM.md)** and the release package [docs/release/](release/RUNBOOK.md) (2026-11-21). One strategy implementation for the pooled vault and personal managers (D77–D85). Everything below the line is history for earlier candidates.
+
+# Unified system, release candidate (2026-11-21)
+
+Branch `claude/unified-shapes-fwa-system-852d17`, draft PR ripe0x/shapes-fwa-pool#5. Final source verified: 276 fork tests, scale 3/3, reconciler to the wei, 16 asset-flow regimes with outcomes O1–O11, all 17 production rehearsal steps, the keeper image's fork rehearsal in CI, independent review with no critical, high or medium finding. FWA payments are resolved from FWA's own record even when a receipt is missing (D84); pricing cost is bounded (32 allocation entries). Purchaser gas is a fixed 2 gwei bound (D85). The matched recipe comparison keeps 0.06 ETH packs. Formal gate at 0.5 gwei: median +70.6% (1.96 ETH, 5/16 runs lose), +55.9% (6.8 ETH), +37.7% (20 ETH, none lose). Not deployed; acceptance package unsigned (`docs/release/acceptance.json`).
+
+---
+
 > **Current release instructions: [docs/release/RUNBOOK.md](release/RUNBOOK.md)** (2026-11-19). This document is history for the candidate it names; where it gives current instructions, the runbook replaces them.
 
 # Complete operating pass

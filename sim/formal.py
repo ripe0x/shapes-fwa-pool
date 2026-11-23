@@ -41,7 +41,7 @@ WINDOW = 30 * F.DAY
 INTERVAL, BLACKOUT = F.OperatingClock.INTERVAL, F.OperatingClock.BLACKOUT_START
 HURDLE_BPS = 1_000
 SOURCES = ["sim/formal.py", "sim/forward.py", "sim/vault.py", "sim/replay.py", "sim/ingest.py",
-           "keeper/policy.py", "deploy/canary.json", "deploy/mainnet.json"]
+           "keeper/policy.py", "deploy/mainnet.json"]
 
 
 def window(db_path, end):
@@ -118,11 +118,11 @@ def exit_windows(events):
 def scenario(w, events=None, period=None, timing="in-window", exempt=True):
     """Timed replay with purchaser responses drawn from the window's recorded responses.
 
-    A vault pack's bid (0.9 B, with B well above the 0.03 ETH pack) beats keeping it, and the
-    vault reclaims its backing as soon as FWA's settlement window closes, which pays the vault
-    about ten times a bid. A purchaser who wants the bid must therefore answer in time. The formal
-    case ("in-window") treats every responder as bidding, at the recorded delay or just inside the
-    window if the recorded answer was later; silent purchasers stay silent. Diagnostics:
+    Since D80 backing makes keeping the pack the purchaser's best choice, and a keep (or the
+    account's reclaim after FWA's settlement window) pays the account more per cycle than a bid.
+    The formal case ("in-window") is kept unchanged as the conservative gate: every responder
+    bids, at the recorded delay or just inside the window if the recorded answer was later; silent
+    purchasers stay silent (and the account reclaims, a keep). Diagnostics:
     "recorded-timing" keeps late answers late (they then lose to the vault's reclaim) and
     "recorded-choice" also keeps recorded keeps as keeps."""
     responses = w["responses"]
@@ -160,7 +160,7 @@ def bid_outcome(price_gwei, values):
     k = int(F.k_of() * F.E)
     st = F.charge_state(int((price_gwei - values["maxTipWei"] / F.GWEI) * F.GWEI), 0)
     st.gas_ceiling, st.max_tip, st.work_fee = values["gasCeilingWei"], values["maxTipWei"], values["workFeeWei"]
-    backing = F.policy.edge_backing(k, None, int(F.S_FEE * 1e4), 3, values["gasCeilingWei"], values["payMarkupBps"],
+    backing = F.policy.edge_backing(k, None, int(F.S_FEE * 1e4), F.BUILD_UNITS, values["gasCeilingWei"], values["payMarkupBps"],
                                     values["workFeeWei"], price=min(int(price_gwei * F.GWEI), values["gasCeilingWei"]),
                                     mint_fee=F.MINT_FEE, buffer_bps=values["bufferBps"], min_edge_bps=values["minEdgeBps"])
     cycle = F.policy.quote(st, F.policy.CYCLE_GAS, 2)
@@ -212,22 +212,22 @@ def main():
     windows = exit_windows(w["events"])
     days, exit_days = (30, 30) if a.quick else (360, 30)
     seeds = range(1, 2 if a.quick else a.seeds + 1)
-    canary = 1_960_100_000_000_000_000
+    small = 1_960_100_000_000_000_000  # the 1.96 ETH holder cell
     jobs = []
     for price in (0.5, 0.2):
-        for label, config, principal in [("formal", "canary", canary), ("formal", "mainnet", 68 * 10**17),
+        for label, config, principal in [("formal", "mainnet", small), ("formal", "mainnet", 68 * 10**17),
                                          ("formal", "mainnet", 20 * F.E)]:
             jobs += [(w, label, config, principal, price, s, days, exit_days, None, None, {}) for s in seeds]
     # Diagnostics, never the gate: the window's last ten days tiled, and zero demand.
     recent_start = WINDOW - 10 * F.DAY
     recent = flatten([(max(0, r - recent_start), c - recent_start, x) for r, c, x in w["pairs"] if c >= recent_start])
-    jobs += [(w, "recent-10-days", "canary", canary, 0.5, s, days, exit_days, recent, 10 * F.DAY, {}) for s in seeds]
-    jobs += [(w, "zero-demand", "canary", canary, 0.5, 1, days, exit_days, [], WINDOW, {})]
+    jobs += [(w, "recent-10-days", "mainnet", small, 0.5, s, days, exit_days, recent, 10 * F.DAY, {}) for s in seeds]
+    jobs += [(w, "zero-demand", "mainnet", small, 0.5, 1, days, exit_days, [], WINDOW, {})]
     for timing in ("recorded-timing", "recorded-choice"):
-        jobs += [(w, timing, "canary", canary, 0.5, s, days, exit_days, None, None, dict(timing=timing))
+        jobs += [(w, timing, "mainnet", small, 0.5, s, days, exit_days, None, None, dict(timing=timing))
                  for s in seeds]
     # FWA's owner set the pack oracle exemption inside the window and can remove it again.
-    jobs += [(w, "oracle-capped", "canary", canary, 0.5, s, days, exit_days, None, None,
+    jobs += [(w, "oracle-capped", "mainnet", small, 0.5, s, days, exit_days, None, None,
               dict(exempt=False)) for s in seeds]
     print(f"{len(jobs)} runs, {a.workers} workers", flush=True)
     rows = []
@@ -238,18 +238,18 @@ def main():
                   f"claim={r['exit_complete']} net={r['holder_net_realized_wei'] / F.E:+.6f}", flush=True)
     assert frozen == {p: sha(p) for p in SOURCES}, "source changed during the run"
     summary = summarize(rows)
-    values = {c: json.loads((ROOT / f"deploy/{c}.json").read_text()) for c in ("canary", "mainnet")}
-    bids = [bid_outcome(p, values["canary"]) for p in (0.2, 0.5)]
+    values = {c: json.loads((ROOT / f"deploy/{c}.json").read_text()) for c in ("mainnet",)}
+    bids = [bid_outcome(p, values["mainnet"]) for p in (0.2, 0.5)]
     gate = {k: s for k, s in summary.items() if s["label"] == "formal" and s["total_price_gwei"] == 0.5}
     formal = dict(
         hurdle_bps=HURDLE_BPS,
         holder_return=all(s["completed_claims"] == s["runs"] and s["median_return_bps"] is not None
                           and s["median_return_bps"] >= HURDLE_BPS for s in gate.values()),
-        holder_return_at_canary=summary.get(f"formal|canary|{canary}|0.5"),
+        holder_return_at_1_96_eth=summary.get(f"formal|mainnet|{small}|0.5"),
         bid_outcome_positive_at_ceiling=bids[1]["positive"],
         usable_exit_window_every_day=windows["minimum_per_day_met"])
     report = dict(
-        pin=PIN, command=[sys.executable, *sys.argv], source_sha256=frozen,
+        pin=PIN, command=["python3", *sys.argv], source_sha256=frozen,
         database=dict(path="sim/data/fwa.sqlite (generated by sim/ingest.py; not committed)",
                       replay="0 mismatches; acquisition sequences contiguous"),
         window=dict(start=w["start"], end=w["end"], successful=w["successful"], refunded=w["refunded"],
@@ -262,7 +262,7 @@ def main():
         limits=[
             "Which vault listing each recorded request selects is a seeded counterfactual draw; FWA's real VRF words selected foreign listings.",
             "Recorded foreign totalWeight is used per request; the foreign pool does not react to the vault's presence.",
-            "Purchaser responses are sampled from the window's recorded responses to all allocations, not this vault's. The formal case moves recorded late answers just inside the settlement window and treats recorded keeps as bids (value-aware purchasers); recorded-timing and recorded-choice diagnostics show the upside if purchasers behave as recorded.",
+            "Purchaser responses are sampled from the window's recorded responses to all allocations, not this vault's. The formal case moves recorded late answers just inside the settlement window and treats recorded keeps as bids (the conservative lower bound since D80, when a value-aware purchaser keeps); recorded-timing and recorded-choice diagnostics show the upside if purchasers behave as recorded.",
             "Holder deposit, request, claim and checkpoint gas use historical billed receipts at the scenario price; variable unpaid exit work uses its quoted gas.",
             "Gas price is held constant per scenario. Effects are atomic at the modeled read; reverted races and inclusion latency are not charged.",
             "Tokens are valued at zero. Creator mint fees are an expense to holders and reported separately.",

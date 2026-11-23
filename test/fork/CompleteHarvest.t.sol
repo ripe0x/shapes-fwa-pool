@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {ForkBase} from "./ForkBase.sol";
+import {ForkBase, IOwnable, IFwaAdmin} from "./ForkBase.sol";
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
 import {JournalRequests} from "./EfficientJournal.t.sol";
 import {ReceiptFixtureFiller, ReceiptFWA, ReceiptPacks, ReceiptShapes} from "../research/ReceiptIdentity.t.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
+import {StrategyLib} from "../../src/StrategyLib.sol";
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
 /// @notice Real fees from the recorded Chainlink fulfillment. Cash is reduced only to exercise
@@ -17,6 +18,11 @@ contract CompleteHarvestTest is ForkBase {
     uint256 second;
 
     receive() external payable {}
+
+    function seedTwoListings() external {
+        // build mints and lists both 6-unit packs at once; no idle pack remains to relist.
+        TestVaultOps.restock(vault, 2, UNITS, 0);
+    }
 
     function setUp() public override {
         vm.createSelectFork("mainnet", bytes32(0x7a2e33446681244f37d801df737f7017e3e9258d49fa6465e95983f5a3b81a6f));
@@ -28,16 +34,19 @@ contract CompleteHarvestTest is ForkBase {
         }
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
         vm.deal(address(this), 10 ether);
+        // D62: ShapePacks oracle-exempt (the real admin call) so a 0.06 ETH pack lists uncapped.
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         VaultLib.Params memory p = defaultParams();
         p.payMarkupBps = 0; p.workFee = 0; p.reserve = 0; p.gasCeiling = 0.5 gwei;
         (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether);
-        TestVaultOps.restock(vault, 2, 3, 0);
-        TestVaultOps.list(vault, 2, 0);
+        // External self-call: keeps restock/list out of setUp's stack frame (via_ir stack depth).
+        this.seedTwoListings();
         first = vault.openListingAt(0); second = vault.openListingAt(1);
         ReceiptFixtureFiller filler = new ReceiptFixtureFiller{value: 3 ether}(
             ReceiptFWA(address(FWA)), ReceiptPacks(address(PACKS)), ReceiptShapes(address(SHAPES))
         );
-        for (uint256 i; i < 28; ++i) filler.createAndList(B);
+        for (uint256 i; i < 28; ++i) filler.createAndList(B());
         string memory fx = vm.readFile("test/fixtures/selection.json");
         _replay(fx, "req");
         vm.roll(26_417_091); vm.warp(1_794_705_887);
@@ -180,7 +189,7 @@ contract CompleteHarvestTest is ForkBase {
         uint256 pending = FWA.pendingFees(first);
         (uint256 routine,) = vault.budget();
         uint256[] memory ids = new uint256[](1); ids[0] = first;
-        vm.expectRevert(PackVault.Payment.selector);
+        vm.expectRevert(StrategyLib.Payment.selector);
         vault.harvest(ids, 1);
         assertEq(FWA.pendingFees(first), pending);
         uint256 cash = address(vault).balance;
@@ -204,7 +213,7 @@ contract CompleteHarvestTest is ForkBase {
         uint256 debt = vault.position(first).feeDebt;
         uint256 cash = address(vault).balance;
         uint256 keeperCash = address(this).balance;
-        vm.expectRevert(PackVault.Payment.selector);
+        vm.expectRevert(StrategyLib.Payment.selector);
         vault.sync(_ids(), 0, 1);
         uint256 paid = vault.sync(_ids(), 0, 0);
         assertEq(paid, 0, "foreign-only scan is unpaid");
@@ -229,7 +238,7 @@ contract CompleteHarvestTest is ForkBase {
         uint256 firstFees = FWA.pendingFees(first);
         uint256 secondFees = FWA.pendingFees(second);
         uint256 secondDebt = vault.position(second).feeDebt;
-        vm.expectRevert(PackVault.Payment.selector);
+        vm.expectRevert(StrategyLib.Payment.selector);
         vault.sync(_ids(), 0, 1);
         uint256 paid = vault.sync(_ids(), 0, 0);
         assertEq(paid, 0, "foreign-only scan is unpaid");
@@ -249,14 +258,14 @@ contract CompleteHarvestTest is ForkBase {
         // refused either way. (The journal/own-selection funding this guarded is covered there.)
         uint256 snapshot = vm.snapshotState();
         uint256[] memory one = new uint256[](1); one[0] = first;
-        vm.expectRevert(PackVault.Payment.selector);
+        vm.expectRevert(StrategyLib.Payment.selector);
         vault.sync(one, 0, 1);
         uint256 paid = vault.sync(one, 0, 0);
         assertEq(paid, 0, "lone real id earns nothing from a foreign-only scan");
         assertTrue(vm.revertToState(snapshot));
         uint256[] memory padded = new uint256[](16);
         for (uint256 i; i < padded.length; ++i) padded[i] = i % 2 == 0 ? 1e9 + i : first;
-        vm.expectRevert(PackVault.Payment.selector);
+        vm.expectRevert(StrategyLib.Payment.selector);
         vault.sync(padded, 0, 1);
         assertEq(vault.sync(padded, 0, 0), paid, "padded ids neither shrink nor inflate the scan pay");
         assertGt(FWA.pendingFees(second), 0, "no active fee claimed");
@@ -267,7 +276,7 @@ contract CompleteHarvestTest is ForkBase {
         uint256 pending = FWA.pendingFees(first);
         assertEq(vault.sync(_ids(), 0, 0), 0);
         assertEq(FWA.pendingFees(first), pending);
-        vm.expectRevert(VaultLib.Nothing.selector);
+        vm.expectRevert(StrategyLib.Nothing.selector);
         vault.sync(_ids(), 0, 0);
         assertEq(FWA.pendingFees(first), pending);
     }
@@ -281,7 +290,7 @@ contract CompleteHarvestTest is ForkBase {
         uint256 firstFees = FWA.pendingFees(first);
         uint256 secondFees = FWA.pendingFees(second);
         uint256[] memory ids = new uint256[](3); ids[0] = first; ids[1] = first; ids[2] = second;
-        vm.expectRevert(PackVault.Payment.selector);
+        vm.expectRevert(StrategyLib.Payment.selector);
         vault.sync(ids, 0, 1);
         uint256 paid = vault.sync(ids, 0, 0);
         assertEq(paid, 0, "duplicate ids earn nothing from a foreign-only scan");
@@ -343,7 +352,7 @@ contract CompleteCreditTest is SelectionBase {
     receive() external payable {}
 
     function _selected(uint256 price) private {
-        _select(late());
+        _select(primary());
         VaultLib.Params memory p = vault.getParams();
         p.payMarkupBps = 0; p.workFee = 0; p.maxTip = 0;
         vm.prank(vault.owner()); vault.setParams(p);
@@ -358,7 +367,7 @@ contract CompleteCreditTest is SelectionBase {
         assertEq(paid, VaultLib.Q_SYNC + VaultLib.Q_JOURNAL + VaultLib.Q_SELECTED + VaultLib.Q_CREDIT);
         assertEq(FWA.feeCredit(address(vault)), 0);
         assertEq(address(vault).balance, cash + credit - paid);
-        vm.expectRevert(VaultLib.Nothing.selector);
+        vm.expectRevert(StrategyLib.Nothing.selector);
         vault.sync(new uint256[](0), 0, 0);
     }
 
@@ -386,9 +395,14 @@ contract CompleteCreditTest is SelectionBase {
 
     function test_terminalCashPrecedesFeeCollectionAndDustWaitsForCheckpoint() public {
         _selected(0.5 gwei);
+        // This fixture's selection credits enough fee that at the default keeper share the sync would
+        // economically sweep it; lower the share so the keeper is paid purely from the kept terminal
+        // cash and the credit genuinely waits for the checkpoint (the invariant under test).
+        VaultLib.Params memory p = vault.getParams(); p.keeperShareBps = 350;
+        vm.prank(vault.owner()); vault.setParams(p);
         uint256 credit = FWA.feeCredit(address(vault));
-        assertLt(credit * 2500 / 10_000, VaultLib.Q_CREDIT * 0.5 gwei);
-        vm.prank(late().purchaser); IFwaSettle(address(FWA)).keepNFT(selected);
+        assertLt(credit * p.keeperShareBps / 10_000, VaultLib.Q_CREDIT * 0.5 gwei);
+        vm.prank(primary().purchaser); IFwaSettle(address(FWA)).keepNFT(selected);
         uint256 cash = address(vault).balance;
         uint256[] memory ids = new uint256[](1); ids[0] = selected;
         uint256 paid = vault.sync(ids, 0, 1);

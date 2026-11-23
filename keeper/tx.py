@@ -63,7 +63,7 @@ EXPECTED = {  # selector -> name: the vault refused because the work is done, ea
 REFRESH_ERRORS = {"BadWitness", "InvalidBacking", "CatchUpFirst", "PendingReceipts", "NeedsPrune", "SyncFirst"}
 EXPECTED.update({"0x" + keccak(text=f"{name}()").hex()[:8]: name for name in REFRESH_ERRORS})
 
-ADMISSION_WAIT = {"InvalidListing", "EdgeGate", "InvalidBacking"}
+ADMISSION_WAIT = {"InvalidListing", "InvalidBacking", "InsufficientBacking"}
 ADMISSION_EXPECTED = {"0x" + keccak(text=f"{name}()").hex()[:8]: name for name in ADMISSION_WAIT}
 
 
@@ -150,7 +150,7 @@ class TxManager:
         except subprocess.CalledProcessError as e:
             msg = (e.output or "").strip()
             expected = dict(EXPECTED)
-            if args and args[0].split("(")[0] in ("list", "restock"):
+            if args and args[0].split("(")[0] in ("list", "build"):
                 expected.update(ADMISSION_EXPECTED)
             for sel, name in expected.items():
                 if sel in msg or f"{name}()" in msg:  # selector or decoded name, never the bare word

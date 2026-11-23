@@ -10,10 +10,17 @@ interface IFwaExempt {
     function setOracleExemptCollection(address collection, bool exempt) external;
 }
 
-/// @notice Live backing economics with paid mint payback, economic floors, a bounded gas-optimal
-///         target, and the real oracle ceiling. No fixed position count or spare-capital spread.
+/// @notice Live backing economics for the direct-mint recipe. Backing is a linear target
+///         `floor_10000((P - margin) x 10,000 / bid)` where `margin = 0.0003 ETH +
+///         160,000 x PURCHASER_GAS_PRICE` (the purchaser's redeem gas priced at a fixed 2 gwei
+///         bound, not the keeper's gas ceiling) and `bid = max(settlementDiscountBps,
+///         tokenSettlementDiscountBps)`, capped by the oracle only when ShapePacks is not
+///         oracle-exempt. The old sqrt gas-optimum and the 0.03/0.9 cash-bid floor are gone
+///         (VaultLib._backingTerms, direct-mint rewrite), so those assertions are replaced by the
+///         linear-target checks below.
 contract ForkBackingTest is ForkBase {
-    uint256 constant FLOOR = 33_333_333_333_333_334; // ceil(0.03 ETH x 10,000 / 9,000): purchasers prefer the bid
+    // ceil(P x 10,000 / 9,500): a keep never loses at FWA's immutable 5% settlement-fee cap.
+    uint256 constant FLOOR = 63_157_894_736_842_106;
 
     function _exempt(bool on) internal {
         vm.prank(IOwnable(address(FWA)).owner());
@@ -32,32 +39,42 @@ contract ForkBackingTest is ForkBase {
 
     function _setCeiling(uint64 ceiling) internal {
         VaultLib.Params memory p = vault.getParams();
-        (p.gasCeiling, p.maxTip) = (ceiling, ceiling < p.maxTip ? ceiling : p.maxTip);
+        (p.gasCeiling, p.essentialCeiling, p.maxTip) =
+            (ceiling, ceiling, ceiling < p.maxTip ? ceiling : p.maxTip);
         vm.prank(owner);
         vault.setParams(p);
     }
 
-    function _sqrt(uint256 x) private pure returns (uint256) {
-        uint256 low; uint256 high = uint256(1) << 128;
-        while (high - low > 1) {
-            uint256 middle = (low + high) / 2;
-            if (middle <= x / middle) low = middle; else high = middle;
-        }
-        return low;
+    function _bid() internal view returns (uint256) {
+        uint256 a = FWA.settlementDiscountBps();
+        uint256 b = FWA.tokenSettlementDiscountBps();
+        return a > b ? a : b;
     }
 
-    /// An exempt collection uses the live economic target without an oracle ceiling.
-    function test_exemptListsAtFloor() public {
+    /// @dev The exact economic target `edge` posts for an exempt collection (no oracle ceiling).
+    function _target(uint256 units) internal view returns (uint256) {
+        uint256 value = units * 0.01 ether;
+        // Redeem gas is priced at the fixed 2 gwei bound (VaultLib.PURCHASER_GAS_PRICE), not the
+        // keeper's gas ceiling, so the target no longer moves with the ceiling.
+        (, uint256 shapes) = VaultLib.makeup(units);
+        uint256 margin = VaultLib.MIN_KEEP_ADVANTAGE
+            + (VaultLib.Q_PURCHASER_REDEEM_PACK + shapes * VaultLib.Q_PURCHASER_REDEEM_SHAPE) * VaultLib.PURCHASER_GAS_PRICE;
+        if (value <= margin || _bid() == 0) return 0;
+        return (value - margin) * 10_000 / _bid() / 10_000 * 10_000; // floored to 10,000 wei
+    }
+
+    /// An exempt collection lists at the live linear target with no oracle ceiling, above the
+    /// keep-never-loses floor, and building posts exactly that backing.
+    function test_exemptListsAtTarget() public {
         _setCeiling(0.5 gwei);
         _exempt(true);
         _priced(1 ether);
-        (, uint256 backing, bool ok) = vault.edge(3);
+        (, uint256 backing, bool ok) = vault.edge(UNITS);
         assertTrue(ok);
-        assertGe(backing, FLOOR, "cash bid coverage floor");
-        vm.startPrank(keeper);
-        TestVaultOps.restock(vault, 2, 3, 0);
-        TestVaultOps.list(vault, 2, 0);
-        vm.stopPrank();
+        assertEq(backing, _target(UNITS), "edge posts the live linear target");
+        assertGe(backing, FLOOR, "at least ceil(P / 0.95)");
+        vm.prank(keeper);
+        TestVaultOps.restock(vault, 2, UNITS, 0);
         uint256[] memory ids = TestVaultOps.open(vault);
         (,, uint128 posted) = TestVaultOps.position(vault, ids[0]);
         assertGe(posted, FLOOR);
@@ -65,40 +82,33 @@ contract ForkBackingTest is ForkBase {
         assertLt(distance, 30_000, "quantized proposal stays near the economic target");
     }
 
-    /// More available capital does not spread it over a fixed slot count.
+    /// The target depends on economics, not on how much spare capital the vault holds.
     function test_targetIndependentOfPortfolioRoom() public {
         _setCeiling(0.5 gwei);
         _exempt(true);
         _priced(1 ether);
-        (, uint256 before,) = vault.edge(3);
+        (, uint256 before,) = vault.edge(UNITS);
         _priced(5 ether);
-        (, uint256 afterTarget, bool ok) = vault.edge(3);
+        (, uint256 afterTarget, bool ok) = vault.edge(UNITS);
         assertTrue(ok);
         assertEq(before, afterTarget, "target depends on economics, not spare capital slots");
     }
 
-    /// A high routine ceiling raises backing above the floor: fewer cycles, less gas per ETH.
-    function test_gasOptimalAboveFloorAtHighCeiling() public {
-        _setCeiling(1 gwei);
+    /// The purchaser-redeem margin is priced at a fixed 2 gwei bound (PURCHASER_GAS_PRICE), so the
+    /// linear target no longer moves with the keeper's gas ceiling: unlike the retired sqrt optimum
+    /// (which rose with the ceiling) and the earlier gasCeiling-priced margin (which lowered it).
+    function test_ceilingDoesNotMoveBacking() public {
         _exempt(true);
+        _setCeiling(0.5 gwei);
         _priced(1 ether);
-        (uint256 k, uint256 backing, bool ok) = vault.edge(3);
-        assertTrue(ok);
-        // The build repayment target can dominate the gas optimum after gas calibration.
-        assertGt(backing, FLOOR);
-        VaultLib.Params memory p = vault.getParams();
-        uint256 a = k - 1e18;
-        uint256 c = (VaultLib.Q_POSITION_SYNC + VaultLib.Q_LISTED + VaultLib.Q_HARVESTED)
-            * uint256(p.gasCeiling) * (10_000 + p.payMarkupBps) / 10_000 + 2 * p.workFee;
-        uint256 expected = (c + _sqrt(c * c + a * c / 1e18 * 0.03 ether)) * 1e18 / a;
-        uint256 price = block.basefee + p.maxTip;
-        uint256 build = (VaultLib.Q_PACK + VaultLib.Q_MINT * 3 / 10 + VaultLib.Q_LISTED)
-            * price * (10_000 + p.payMarkupBps) / 10_000 + 2 * p.workFee + SHAPES.mintFee() * 3 / 10;
-        uint256 cycle = (VaultLib.Q_POSITION_SYNC + VaultLib.Q_LISTED + VaultLib.Q_HARVESTED)
-            * price * (10_000 + p.payMarkupBps) / 10_000 + 2 * p.workFee;
-        uint256 payback = ((build + cycle) * 1e18 + a - 1) / a;
-        if (payback > expected) expected = payback;
-        if (FLOOR > expected) expected = FLOOR;
-        assertEq(backing, expected, "independent integer optimum and build-payback target");
+        (, uint256 lowCeil, bool ok0) = vault.edge(UNITS);
+        assertTrue(ok0);
+        assertEq(lowCeil, _target(UNITS), "linear target at 0.5 gwei");
+
+        _setCeiling(5 gwei);
+        (, uint256 highCeil, bool ok1) = vault.edge(UNITS);
+        assertTrue(ok1);
+        assertEq(highCeil, _target(UNITS), "linear target at 5 gwei");
+        assertEq(highCeil, lowCeil, "backing is independent of the keeper gas ceiling");
     }
 }
