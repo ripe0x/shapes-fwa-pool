@@ -53,14 +53,16 @@ contract ForkCancellationTimingTest is ForkBase {
         assertEq(vault.requestCharge(), first, "the next requester must fund its own checkpoint");
         uint256 free = vault.freeEth();
         uint256 aliceBefore = alice.balance;
+        uint256 refundableEra = vault.chargeEra();
+        assertGt(refundableEra, 0, "first request opens a distinct charge era");
         vm.prank(alice);
-        vault.claimCheckpointRefund(0);
+        vault.claimCheckpointRefund(refundableEra);
         assertEq(alice.balance - aliceBefore, first, "first payer recovers its exact charge");
         assertEq(vault.chargeRefundReserve(), 0);
         assertEq(vault.freeEth(), free, "refund does not consume strategy capital");
         vm.prank(alice);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.claimCheckpointRefund(0);
+        vault.claimCheckpointRefund(refundableEra);
         emit log_named_uint("first checkpoint charge refunded (wei)", first);
         emit log_named_uint("attacker deposit plus cancel measured gas", bobDepositGas + bobCancelGas);
     }
@@ -91,8 +93,9 @@ contract ForkCancellationTimingTest is ForkBase {
         assertEq(bob.balance - bobBefore, 0.1 ether + bobCharge, "last payer receives its own top-up");
         assertEq(vault.chargeRefundReserve(), aliceCharge);
         uint256 aliceBefore = alice.balance;
+        uint256 refundableEra = vault.chargeEra();
         vm.prank(alice);
-        vault.claimCheckpointRefund(0);
+        vault.claimCheckpointRefund(refundableEra);
         assertEq(alice.balance - aliceBefore, aliceCharge, "first payer recovers its retained charge");
     }
 
@@ -112,7 +115,7 @@ contract ForkCancellationTimingTest is ForkBase {
         checkpoint();
         assertGt(vault.shareBalance(bob), 0);
         assertEq(vault.chargeRefundReserve(), 0);
-        assertFalse(vault.chargeRefundable(0), "a completed checkpoint consumes its charge");
+        assertFalse(vault.chargeRefundable(vault.chargeEra()), "a completed checkpoint consumes its charge");
     }
 
     function test_cancellableEscrowCannotBlockLiquidation() public {

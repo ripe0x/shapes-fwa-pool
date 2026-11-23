@@ -1310,6 +1310,8 @@ remaining contributions move to a protected refund reserve; each payer can call
 existing rule that a sponsor pays when another user's request actually reaches checkpoint. The
 refund reserve is excluded from NAV and from every spend path. The finite 10% allocation bound,
 strategy architecture, keeper pay quote and FWA settlement rules are unchanged.
+The production keeper's plan and status now use the same shortfall rule, including the holder-run
+exit command; otherwise it would still skip the newly permitted liquidation.
 
 The first funded request opens the charge era, keeping its storage write out of checkpoint. The
 full holder-flow sample uses 361,202 gas after this change. At the configured 0.5 gwei ceiling its
