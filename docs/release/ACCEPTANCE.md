@@ -1,6 +1,6 @@
-# Owner acceptance: unified candidate (unsigned)
+# Owner acceptance: unified candidate
 
-[acceptance.json](acceptance.json) binds commit `f6050d1`, the release manifest (`cde32abd…`), the
+[acceptance.json](acceptance.json) binds commit `7ad76a0`, the release manifest (`86ef5984…`), the
 mainnet values (`deploy/mainnet.json`, no deposit cap) and the asset-flow outcomes O1–O11. Signing its sha256 accepts the
 items below. It authorizes nothing else: no broadcast, funding, Fly deployment or public offer of
 personal managers.

@@ -1,8 +1,8 @@
 {
- "name": "Unified shapes FWA system: pooled vault and personal manager factory (unsigned)",
- "commit": "f6050d19c492a6ef98240b174b4a2bfb0f9c23d9",
+ "name": "Unified shapes FWA system: pooled vault and personal manager factory",
+ "commit": "7ad76a0d8d3eea3c99fa1a1e871f6c435683fb72",
  "manifest": "deploy/release-manifest.json",
- "manifest_sha256": "cde32abd57901c88d7d64d4bd968d3fb738aef507300868e7e16b4d5a4d39c91",
+ "manifest_sha256": "86ef59847800ff203ab66f1413a8cbb844377005ff1c1208f902ea9d2ef636bb",
  "deployment_values": "deploy/mainnet.json",
  "deployment_values_sha256": "4f6daca9a77e96f2e52295de3072f0256095aa360a9caf8f8d15da108f02fe79",
  "manager_default_values": "deploy/manager.json",
@@ -17,7 +17,7 @@
  "engineering": {
   "full_suite": "script/verify.sh at 3b4d9b3: 279 fork tests passed, 0 failed, 1 opt-in exporter skipped; scale 3/3; replay 0 mismatches; reconciler to the wei on three paths; release check ok",
   "reconciliations": "full cycle, partial fill and wind-down, scan path: every bucket to the wei",
-  "asset_flow": "16 regimes, outcomes O1-O11 pass; approval absent (unsigned)",
+  "asset_flow": "16 regimes, outcomes O1-O11 pass; owner-signed 2026-11-22; gate PASS",
   "sizes": {
    "PackVault": 16960,
    "VaultLib": 23482,
@@ -156,7 +156,7 @@
   },
   {
    "id": "U6",
-   "item": "Asset-flow outcomes O1-O11 (unsigned) replace the 2026-11-17 signature for this candidate",
+   "item": "Asset-flow outcomes O1-O11, signed 2026-11-22, replace the 2026-11-17 signature for this candidate",
    "outcomes_sha256": "dbe267c39a299f3bf62424e35e52f9eae5d76090ba1e95f4c338c366e1b094f9"
   },
   {
