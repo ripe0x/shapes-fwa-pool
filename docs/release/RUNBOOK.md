@@ -31,7 +31,7 @@ difference. `script/deploy.sh` runs it, and with `--broadcast` also verifies the
 
 | Gate | Result | Receipt |
 |---|---|---|
-| Full candidate run (`script/verify.sh`) | 276 fork tests passed, 1 opt-in exporter skipped; scale 3/3; reconciler to the wei on three paths | [unified-verify/SUMMARY.md](../receipts/unified-verify/SUMMARY.md) |
+| Full candidate run (`script/verify.sh`) | at 3b4d9b3: 279 fork tests passed, 1 opt-in exporter skipped; scale 3/3; reconciler to the wei on three paths | [unified-verify/SUMMARY.md](../receipts/unified-verify/SUMMARY.md) |
 | Asset flow, 16 regimes, outcomes O1-O11 | all pass; unsigned | [asset-flow.json](../../asset-flow.json), `docs/receipts/flow/` |
 | Local production rehearsal (fresh fork) | all 17 steps pass on the final source (one warm fork, upstream Alchemy while Tenderly throttled) | [unified-production-rehearsal.json](../receipts/unified-production-rehearsal.json), [selection](../receipts/unified-selection-rehearsal.json) |
 | Production image on a fresh fork (CI) | pass, vault and one factory manager served together | [ci-44948198556.json](../receipts/image-rehearsal/ci-44948198556.json) |

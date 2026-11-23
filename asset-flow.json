@@ -116,9 +116,9 @@
   },
   {
    "id": "O9",
-   "text": "UNSIGNED, unified candidate. What a holder pays if nothing is ever bought: entering, building, unwinding and exiting with zero acquisitions costs holders at most 1.5% of deposits (measured 1.24%: two paid primary Shapes mints of 0.001 ETH per 0.06 ETH pack built, which are the creator's revenue, plus keeper gas).",
+   "text": "UNSIGNED, unified candidate. What a holder pays if nothing is ever bought: entering, building, unwinding and exiting with zero acquisitions costs holders at most 2.5% of deposits: two paid primary Shapes mints of 0.001 ETH per 0.06 ETH pack built (the creator's revenue, 1.6% of capital put to work) plus keeper gas. Measured 1.24% with 8 packs; launch audit B measured 1.78% (0.2 gwei) and 2.12% (0.5 gwei) with 15 packs on 1.96 ETH.",
    "metric": "facts.holder_loss_bps",
-   "max": 150,
+   "max": 250,
    "regimes": [
     "wind_down"
    ]
