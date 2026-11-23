@@ -131,6 +131,12 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         p.routineRate = uint64(vm.parseJsonUint(v, ".routineRatePerDayWei"));
         p.essentialCap = uint64(vm.parseJsonUint(v, ".essentialCapWei"));
         p.essentialRate = uint64(vm.parseJsonUint(v, ".essentialRatePerDayWei"));
+        p.keepAdvantage = uint64(vm.parseJsonUint(v, ".keepAdvantageWei"));
+        p.purchaserGasPrice = uint64(vm.parseJsonUint(v, ".purchaserGasPriceWei"));
+        p.purchaserRedeemPack = uint64(vm.parseJsonUint(v, ".purchaserRedeemPackGas"));
+        p.purchaserRedeemShape = uint64(vm.parseJsonUint(v, ".purchaserRedeemShapeGas"));
+        p.minDeposit = uint64(vm.parseJsonUint(v, ".minDepositWei"));
+        p.minDistribution = uint64(vm.parseJsonUint(v, ".minDistributionWei"));
     }
 
     function _deploy(uint256 seed, VaultLib.Params memory p) internal {

@@ -80,6 +80,9 @@ contract CompleteForeignJournalTest is SelectionBase {
         p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei; // the 6-unit edge lists at this ceiling
         p.tvlCap = 100 ether; p.routineCap = 0.3 ether; p.routineRate = 0.01 ether;
         p.essentialCap = 0.1 ether; p.essentialRate = 0.005 ether;
+        p.keepAdvantage = 0.0003 ether; p.purchaserGasPrice = 2 gwei;
+        p.purchaserRedeemPack = 100_000; p.purchaserRedeemShape = 30_000;
+        p.minDeposit = 0.01 ether; p.minDistribution = 0.01 ether;
         (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether);
         TestVaultOps.restock(vault, 1, UNITS, 0); // build lists it at once
         selected = vault.openListingAt(0);

@@ -39,12 +39,14 @@ Q = dict(checkpoint=360_000, build=300_000, build_pack=300_000, build_shape=130_
          redeem_shape=35_000, recovery_base=100_000, recovery_shape=35_000,
          recovery_unseal=70_000, harvest=125_000, harvested=80_000,
          sync_credit=40_000, sync_funding=40_000)
-POSITION_VALUE = 1248 * 10**14  # 0.1248 ETH: what deploy/unwind charges are scaled by
-REF_UNITS = 6  # the reference recipe: one 0.05 and one 0.01 Shape, two paid primary mints
+REF_UNITS = 6  # default build recipe: one 0.05 and one 0.01 Shape, two paid primary mints
+REF_SETTLEMENT_DISCOUNT_BPS = 9_150  # VaultLib.REF_SETTLEMENT_DISCOUNT_BPS: backing estimate for positionValue
 MIN_PACK_UNITS, MAX_PACK_UNITS = 3, 30
-MIN_KEEP_ADVANTAGE = 3 * 10**14  # 0.0003 ETH: a keep must beat the best bid by this after redeem gas
-Q_PURCHASER_REDEEM_PACK, Q_PURCHASER_REDEEM_SHAPE = 100_000, 30_000  # ShapePacks.redeem gas: pack + per Shape
-PURCHASER_GAS_PRICE = 2 * 10**9  # the purchaser's redeem gas price bound, independent of the keeper ceiling
+# Defaults of the owner-settable keep-incentive params (VaultLib.Params); the live keeper reads the
+# deployed values into State. A keep must beat FWA's best bid by keepAdvantage after redeem gas.
+MIN_KEEP_ADVANTAGE = 3 * 10**14  # keepAdvantage default, 0.0003 ETH
+Q_PURCHASER_REDEEM_PACK, Q_PURCHASER_REDEEM_SHAPE = 100_000, 30_000  # purchaserRedeemPack/Shape defaults
+PURCHASER_GAS_PRICE = 2 * 10**9  # purchaserGasPrice default, 2 gwei
 Q_POSITION_SYNC = Q["journal"] + Q["selected"] + Q["synced"] + Q["pruned"]
 CYCLE_GAS = Q_POSITION_SYNC + Q["listed"] + Q["harvested"]  # a bid cycle's quoted gas (gates)
 MAX_BATCH = dict(sync=16, journal=128, selected=16, prune=16, harvest=16, list=8, build=8, unlist=16, liquidate=16, tokens=16)
@@ -54,6 +56,24 @@ def shape_count(units):
     """VaultLib.makeup: fewest Shapes for a pack of `units` x 0.01 ETH from the 0.1, 0.05 and 0.01
     denominations. Six units are one 0.05 and one 0.01 Shape (two paid primary mints)."""
     return units // 10 + units % 10 // 5 + units % 5
+
+
+def ref_units(mask):
+    """VaultLib.refUnits: the smallest enabled pack size in packUnitsMask, falling back to the
+    6-unit recipe when the mask enables none (mask 0 = build/list nothing)."""
+    return (mask & -mask).bit_length() - 1 if mask else REF_UNITS
+
+
+def position_value(s):
+    """VaultLib.positionValue: per-position capital (value + reference backing) the deposit and
+    unwind charges are apportioned over, derived from the enabled pack sizes and keep-incentive
+    params at REF_SETTLEMENT_DISCOUNT_BPS (no live FWA read)."""
+    units = ref_units(s.pack_units_mask)
+    value = units * UNIT
+    margin = s.keep_advantage + (s.purchaser_redeem_pack + shape_count(units) * s.purchaser_redeem_shape) \
+        * s.purchaser_gas_price
+    backing = (value - margin) * BPS // REF_SETTLEMENT_DISCOUNT_BPS if value > margin else 0
+    return value + backing
 
 
 @dataclass
@@ -137,6 +157,14 @@ class State:
     essential_cap: int = None  # essentialCap; 0 = exit work unpaid (withdrawers run it)
     pooled: bool = True  # a PackVault (shares, checkpoints); False for a personal PackManager
     settlement_fee_bps: int = 100  # FWA ownerSettlementFeeBps: fee on a keep (B(1-s) is returned)
+    # Owner-settable keep-incentive and minimum params (VaultLib.Params), read from the deployed
+    # vault; defaults equal the former hard-coded constants.
+    keep_advantage: int = MIN_KEEP_ADVANTAGE
+    purchaser_gas_price: int = PURCHASER_GAS_PRICE
+    purchaser_redeem_pack: int = Q_PURCHASER_REDEEM_PACK
+    purchaser_redeem_shape: int = Q_PURCHASER_REDEEM_SHAPE
+    min_deposit: int = 10**16  # 0.01 ETH
+    min_distribution: int = 10**16  # 0.01 ETH
 
 
 def price(s, essential=False):
@@ -163,7 +191,9 @@ def pay_v1(s, gas, units=0, essential=False):
     return min(gas * price(s, essential) + units * s.work_fee, quote(s, gas, units, essential))
 
 def edge_backing(k, cap, s_bps, units, gas_ceiling, markup_bps, work_fee, buffer_bps=0, min_edge_bps=100,
-                 discount_bps=9_150, price=None, mint_fee=10**15):
+                 discount_bps=9_150, price=None, mint_fee=10**15, keep_advantage=MIN_KEEP_ADVANTAGE,
+                 purchaser_gas_price=PURCHASER_GAS_PRICE, purchaser_redeem_pack=Q_PURCHASER_REDEEM_PACK,
+                 purchaser_redeem_shape=Q_PURCHASER_REDEEM_SHAPE):
     """Mirror of VaultLib.edge / _backingTerms (D62): the backing a new listing posts, 0 when it must
     not list. Purchasers are expected to keep, so backing is the largest amount at which keeping the
     pack (the account gets B(1-s) back) still beats taking FWA's best bid (max(ETH, token) x B) by
@@ -172,8 +202,8 @@ def edge_backing(k, cap, s_bps, units, gas_ceiling, markup_bps, work_fee, buffer
     tokenSettlementDiscountBps); `price` the quoted price now (default: the ceiling)."""
     value = units * UNIT
     floor = value + value // 19 + (0 if value % 19 == 0 else 1)  # ceil(value / 0.95)
-    redeem_gas = Q_PURCHASER_REDEEM_PACK + shape_count(units) * Q_PURCHASER_REDEEM_SHAPE
-    margin = MIN_KEEP_ADVANTAGE + redeem_gas * PURCHASER_GAS_PRICE
+    redeem_gas = purchaser_redeem_pack + shape_count(units) * purchaser_redeem_shape
+    margin = keep_advantage + redeem_gas * purchaser_gas_price
     desired = 0
     if discount_bps != 0 and value > margin:
         desired = (value - margin) * BPS // discount_bps // BPS * BPS  # quantized to 10,000 wei
@@ -267,19 +297,21 @@ def request_charge(s):
 
 
 def deploy_charge(s):
-    """VaultLib.deployCharge, per POSITION_VALUE deposited: build and list one REF_UNITS position at
-    the envelope now plus mint fees, never less than the most a builder nets over its own gas."""
-    n = shape_count(REF_UNITS)
+    """VaultLib.deployCharge, per positionValue deposited: build and list one reference position
+    (smallest enabled pack size) at the envelope now plus mint fees, never less than the most a
+    builder nets over its own gas."""
+    units = ref_units(s.pack_units_mask)
+    n = shape_count(units)
     g = Q["build_pack"] + n * Q["build_shape"] + Q["listed"]
     floor = g * (s.gas_ceiling * s.markup_bps + s.max_tip * (BPS + s.markup_bps)) // BPS + 2 * s.work_fee
-    return max(build_cost(s, REF_UNITS), floor)
+    return max(build_cost(s, units), floor)
 
 
 def unwind_charge(s):
-    """VaultLib.unwindCharge, per POSITION_VALUE redeemed; 0 without an essential budget."""
+    """VaultLib.unwindCharge, per positionValue redeemed; 0 without an essential budget."""
     if s.essential_cap == 0:
         return 0
-    n = shape_count(REF_UNITS)
+    n = shape_count(ref_units(s.pack_units_mask))
     return quote(s, Q["unlisted"] + Q["liq_pack"] + n * Q["redeem_shape"], 2, True)
 
 

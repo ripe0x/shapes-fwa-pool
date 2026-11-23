@@ -35,7 +35,9 @@ SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 RPC = "https://mainnet.gateway.tenderly.co"
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 SHAPES = "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0"
-PARAMS_T = "(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint128,uint128)"
+# VaultLib.Params field order: 6 u16, 9 u64, 2 u128, then 6 u64 behaviour-shaping values.
+PARAMS_T = ("(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,"
+            "uint64,uint128,uint128,uint64,uint64,uint64,uint64,uint64,uint64)")
 LISTING_T = "(address,address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint64,uint8)"
 
 
@@ -267,7 +269,7 @@ def read_state(vault, slowdown, burn=False, pooled=True):
     at = lambda to, sig, *args: call(to, sig, *args, block=head)
     p = [num(x) for x in at(vault, f"getParams()({PARAMS_T})").strip("()").split(", ")]
     (min_edge, buf, dist_bps, premium, share, _alloc, mask, ceiling, ess_ceiling, tip, wfee, _rc, _rr, _ec, _er, res,
-     _tvl) = p
+     _tvl, keep_adv, pgp, pr_pack, pr_shape, min_dep, min_dist) = p
     build_units = build_units_for(mask)
     rbud, ebud = lines(at(vault, "budget()(uint256,uint256)"))
     k, backing = "0", "0"  # prospective economics are read after pinned financial hydration
@@ -321,6 +323,8 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         pending_deposits=pending, locked_shares=locked, total_shares=supply, pack_units_mask=mask,
         build_units=build_units, pooled=pooled, settlement_fee_bps=num(at(FWA, "ownerSettlementFeeBps()(uint256)")),
         essential_ceiling=ess_ceiling, essential_cap=_ec, processing_pool=processing_pool,
+        keep_advantage=keep_adv, purchaser_gas_price=pgp, purchaser_redeem_pack=pr_pack,
+        purchaser_redeem_shape=pr_shape, min_deposit=min_dep, min_distribution=min_dist,
         fee_credit=num(at(FWA, "feeCredit(address)(uint256)", vault)),
         open_positions=num(at(vault, "openListingCount()(uint256)")), active_count=total[3], witness_id=witness,
         journal_cursor=num(at(vault, "acquisitionCursor()(uint64)")),

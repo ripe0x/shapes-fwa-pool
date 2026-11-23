@@ -20,5 +20,11 @@
  "routineCapWei": 100000000000000000,
  "routineRatePerDayWei": 20000000000000000,
  "essentialCapWei": 0,
- "essentialRatePerDayWei": 0
+ "essentialRatePerDayWei": 0,
+ "keepAdvantageWei": 300000000000000,
+ "purchaserGasPriceWei": 2000000000,
+ "purchaserRedeemPackGas": 100000,
+ "purchaserRedeemShapeGas": 30000,
+ "minDepositWei": 10000000000000000,
+ "minDistributionWei": 10000000000000000
 }

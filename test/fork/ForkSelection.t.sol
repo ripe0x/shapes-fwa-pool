@@ -125,6 +125,12 @@ abstract contract SelectionBase is Test {
         p.routineRate = 0.01 ether;
         p.essentialCap = 0.1 ether;
         p.essentialRate = 0.005 ether;
+        p.keepAdvantage = 0.0003 ether;
+        p.purchaserGasPrice = 2 gwei;
+        p.purchaserRedeemPack = 100_000;
+        p.purchaserRedeemShape = 30_000;
+        p.minDeposit = 0.01 ether;
+        p.minDistribution = 0.01 ether;
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
         vm.deal(address(this), 10 ether);

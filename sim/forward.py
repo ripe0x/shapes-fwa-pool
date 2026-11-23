@@ -386,7 +386,7 @@ def run(sc, n_target, seed, days=365, values=None):
     st0.gas_ceiling, st0.essential_ceiling, st0.max_tip = ceiling, essential_ceiling, tip
     st0.work_fee, st0.essential_cap = work_fee, values["essentialCapWei"]
     ck0, d0 = policy.request_charge(st0), policy.deploy_charge(st0)
-    v.deposit("h", deposit, ck0, deposit * d0 // (policy.POSITION_VALUE + d0))
+    v.deposit("h", deposit, ck0, deposit * d0 // (policy.position_value(st0) + d0))
     paid_in = deposit + ck0
     exit_all = sc.get("exit_all", False)
     exit_days = sc.get("exit_days", 30) if exit_all else 0
@@ -1047,7 +1047,7 @@ def run(sc, n_target, seed, days=365, values=None):
                 st1.gas_ceiling, st1.essential_ceiling, st1.max_tip = ceiling, essential_ceiling, tip
                 st1.work_fee, st1.essential_cap = work_fee, values["essentialCapWei"]
                 ck = policy.request_charge(st1)
-                unwind = (sh * v.last_nav // v.total_shares) * policy.unwind_charge(st1) // policy.POSITION_VALUE
+                unwind = (sh * v.last_nav // v.total_shares) * policy.unwind_charge(st1) // policy.position_value(st1)
                 v.request_redeem("h", sh, ck, unwind)
                 trace_state("request-redeem", d)
                 paid_in += ck + unwind

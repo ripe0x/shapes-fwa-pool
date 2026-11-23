@@ -38,8 +38,10 @@ contract PackVault is PackAccount {
     uint256 internal constant INTERVAL = 12 hours; // FWA purchase interval
     uint256 internal constant SCALE = 1e36;
     uint256 internal constant OP_CHECKPOINT = 8;
-    uint256 internal constant MIN_DEPOSIT = 0.01 ether;
-    uint256 internal constant MIN_DISTRIBUTION = VaultLib.MIN_DISTRIBUTION;
+    /// @notice First-issuance seed floor, fixed: the seed buys the dead shares, so the share price
+    ///         cannot be inflated against a later first depositor. The ongoing minimum deposit is
+    ///         the owner-set `minDeposit` param; this floor never moves.
+    uint256 internal constant MIN_SEED = 0.01 ether;
     uint256 public constant DEAD_SHARES = VaultLib.DEAD_SHARES;
 
     bool public depositsPaused;
@@ -127,7 +129,7 @@ contract PackVault is PackAccount {
         _initStrategy(owner_, initial, address(policy_));
         // First issuance: the deployer's seed buys dead shares so the share price cannot be
         // inflated against a later first depositor.
-        if (msg.value < MIN_DEPOSIT) revert Amount();
+        if (msg.value < MIN_SEED) revert Amount();
         totalShares = DEAD_SHARES;
         sharesOf[address(0xdead)] = DEAD_SHARES;
         highWaterMark = msg.value * 1e18 / DEAD_SHARES;
@@ -189,10 +191,10 @@ contract PackVault is PackAccount {
         // with this ETH (escrowed with the deposit and refunded on cancel; at pricing it joins the
         // vault's value, which pays for that work, and earns the depositor no shares).
         uint256 ck = requestCharge();
-        if (msg.value < MIN_DEPOSIT + ck) revert Amount();
+        if (msg.value < s.params.minDeposit + ck) revert Amount();
         uint256 amount = msg.value - ck;
         uint256 deploy = deployCharge();
-        uint256 charge = amount * deploy / (VaultLib.POSITION_VALUE + deploy);
+        uint256 charge = amount * deploy / (VaultLib.positionValue(s.params) + deploy);
         if (lastNav + pendingDepositTotal + amount > s.params.tvlCap) revert Amount();
         _settleHolder(msg.sender);
         processingPool += ck;
@@ -231,7 +233,8 @@ contract PackVault is PackAccount {
         // Charges: the checkpoint (to the pool) and unwinding positions worth the shares' value
         // (to the vault, which pays for that work).
         uint256 ck = requestCharge();
-        uint256 charge = ck + M.mulDiv(M.mulDiv(amount, lastNav, totalShares), unwindCharge(), VaultLib.POSITION_VALUE);
+        uint256 charge =
+            ck + M.mulDiv(M.mulDiv(amount, lastNav, totalShares), unwindCharge(), VaultLib.positionValue(s.params));
         if (msg.value < charge) revert Amount();
         processingPool += ck;
         if (msg.value > charge) msg.sender.forceSafeTransferETH(msg.value - charge);
@@ -361,7 +364,7 @@ contract PackVault is PackAccount {
         if (lockedShares == 0 && supply > DEAD_SHARES && perShare > highWaterMark && s.params.distributionBps != 0) {
             uint256 gain = M.mulDiv(perShare - highWaterMark, supply, 1e18);
             distributed = M.min(gain * s.params.distributionBps / BPS, _idle());
-            if (distributed >= MIN_DISTRIBUTION) {
+            if (distributed >= s.params.minDistribution) {
                 // Live shares only: the dead seed shares never claim, so their slice would strand.
                 distPerShare += distributed * 1e18 / (supply - DEAD_SHARES);
                 distributionReserve += distributed;
@@ -413,16 +416,22 @@ contract PackVault is PackAccount {
         return (topUp + 1 gwei - 1) / 1 gwei * 1 gwei;
     }
 
-    /// @notice Deployment charge per VaultLib.POSITION_VALUE deposited: building and listing one
+    /// @notice Deployment charge per VaultLib.positionValue deposited: building and listing one
     ///         reference position at its quote now plus its mint fees, and never less than the
     ///         keeper margin that building it can pay out at any gas price.
     function deployCharge() public view returns (uint256) {
         return VaultLib.deployCharge(s.params, shapes.mintFee());
     }
 
-    /// @notice Unwind charge per VaultLib.POSITION_VALUE redeemed: unlisting and liquidating one position.
+    /// @notice Unwind charge per VaultLib.positionValue redeemed: unlisting and liquidating one position.
     function unwindCharge() public view returns (uint256) {
         return VaultLib.unwindCharge(s.params);
+    }
+
+    /// @notice Per-position capital the deposit and unwind charges are apportioned over (value plus
+    ///         the reference backing), derived from the enabled pack sizes and keep-incentive params.
+    function positionValue() public view returns (uint256) {
+        return VaultLib.positionValue(s.params);
     }
 
     // ------------------------------------------------------------------ owner

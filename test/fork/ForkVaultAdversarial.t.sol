@@ -136,7 +136,7 @@ contract ForkVaultAdversarialTest is ForkBase {
         uint256 nav = vault.lastNav();
         // Alice's claim on NAV equals her escrow less its deployment charge (that charge joins the
         // vault's value, shared by all holders, to pay for building positions with her ETH).
-        uint256 charge = 5 ether * vault.deployCharge() / (VaultLib.POSITION_VALUE + vault.deployCharge());
+        uint256 charge = 5 ether * vault.deployCharge() / (vault.positionValue() + vault.deployCharge());
         assertApproxEqAbs(
             nav * aliceShares / supply, 5 ether - charge + charge * aliceShares / supply, 1e14, "victim keeps her deposit"
         );

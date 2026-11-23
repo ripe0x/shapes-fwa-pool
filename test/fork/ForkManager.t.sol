@@ -42,6 +42,11 @@ function managerParams() pure returns (VaultLib.Params memory p) {
     p.routineRate = 0.01 ether;
     p.essentialCap = 0.03 ether;
     p.essentialRate = 0.005 ether;
+    p.keepAdvantage = 0.0003 ether;
+    p.purchaserGasPrice = 2 gwei;
+    p.purchaserRedeemPack = 100_000;
+    p.purchaserRedeemShape = 30_000;
+    // minDeposit and minDistribution are pool-only; a manager leaves them at 0.
 }
 
 /// @notice Personal managers on the real FWA, Shapes and ShapePacks at the pinned block, beside the
