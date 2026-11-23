@@ -272,7 +272,7 @@ contract ForkKeeperPolicyTest is ForkBase {
         v.deposit{value: gross}();
         (uint96 amount,, uint96 charge,) = v.pendingDeposits(alice);
         uint256 deploy = v.deployCharge();
-        assertEq(charge, uint256(amount) * deploy / (VaultLib.POSITION_VALUE + deploy), "charge stored whole");
+        assertEq(charge, uint256(amount) * deploy / (v.positionValue() + deploy), "charge stored whole");
         assertGt(charge, type(uint64).max, "above the old uint64 width");
         uint256 snap = vm.snapshotState();
         vm.prank(alice);

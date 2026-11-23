@@ -1,5 +1,5 @@
 {
- "comment": "Default PackManagerFactory.create parameters for a personal manager: the pooled vault's keeper pay, the 0.06 ETH recipe, paid exits from the owner's own budget. distributionBps, allocatedBoundBps and tvlCapWei are pool-only and unused by managers.",
+ "comment": "Default PackManagerFactory.create parameters for a personal manager: the pooled vault's keeper pay, the 0.06 ETH recipe, paid exits from the owner's own budget. distributionBps, allocatedBoundBps, tvlCapWei, minDepositWei and minDistributionWei are pool-only and unused by managers.",
  "minEdgeBps": 100,
  "bufferBps": 0,
  "distributionBps": 0,
@@ -16,5 +16,11 @@
  "routineCapWei": 30000000000000000,
  "routineRatePerDayWei": 10000000000000000,
  "essentialCapWei": 10000000000000000,
- "essentialRatePerDayWei": 5000000000000000
+ "essentialRatePerDayWei": 5000000000000000,
+ "keepAdvantageWei": 300000000000000,
+ "purchaserGasPriceWei": 2000000000,
+ "purchaserRedeemPackGas": 100000,
+ "purchaserRedeemShapeGas": 30000,
+ "minDepositWei": 0,
+ "minDistributionWei": 0
 }

@@ -637,7 +637,8 @@ MAX_KEEPER_PREMIUM_BPS (contract change, re-review of the change) or reword the 
 **Why:** gas plus 10% lets anyone run the vault without loss, but at today's gas the absolute
 margin is too small for strangers to bother (a checkpoint earned about 0.000003 ETH). The pool
 balancer pays 0.0001 ETH per call; per call would let a vault keeper earn more by splitting work.
-**Chose:** `workFee` (Params, admin through the delay, bytecode maximum `MAX_WORK_FEE` 0.0001 ETH,
+**Chose:** `workFee` (Params, admin through the delay, bytecode maximum `MAX_WORK_FEE` 0.0001 ETH
+[prose error: the shipped `MAX_WORK_FEE` is 0.00005 ETH; the code is live, see D86],
 canary 0.00002 ETH) paid per unit of work on top of the gas reimbursement: positions listed,
 resolved by sync, activated or unlisted; items liquidated; 1 for a checkpoint that priced flows or
 distributed. restock, harvest and burnTokens earn none. Pay stays capped by `_free()`. The guardian
@@ -1291,3 +1292,86 @@ is now 100,000 + 30,000 per Shape (`Q_PURCHASER_REDEEM_PACK`, `_SHAPE`; `makeup(
 in `keeper/policy.py`. Cold redeems on a fork: 2 Shapes 157,014, 5 Shapes 245,262, 7 Shapes 304,165
 (`ForkDirectMint.t.sol`); 7 is the most any allowed size holds. A 0.06 ETH pack is still 160,000, so
 its backing is unchanged.
+
+## D86. Behaviour-shaping values move into Params; the gas quotes stay (owner, 2026-11-23)
+
+**Owner:** make the behaviour-shaping values adjustable instead of hard-coded, keeping the owner-only,
+immediate pattern (D58, no delays added). Supersedes the hard-coded `MIN_KEEP_ADVANTAGE`,
+`PURCHASER_GAS_PRICE`, `Q_PURCHASER_REDEEM_PACK/_SHAPE`, `MIN_DEPOSIT`, `MIN_DISTRIBUTION`,
+`REF_UNITS` and `POSITION_VALUE` constants.
+
+**Chose (VaultLib.Params, owner-set via `setParams`, immediate, each bounded in `checkBounds`):**
+- `keepAdvantage` (default 0.0003 ETH, ceiling `MAX_KEEP_ADVANTAGE` 0.01 ETH).
+- `purchaserGasPrice` (default 2 gwei, ceiling `MAX_PURCHASER_GAS_PRICE` 100 gwei). Default kept at
+  2 gwei (D85): mainnet basefee is ~5-7 gwei, so a redeem-only purchaser paying up to 2 gwei still
+  prefers keeping the 0.0648-backed 0.06 pack to FWA's best bid; pricing the purchaser's redeem gas
+  at 2 gwei (not the keeper ceiling) keeps the keep incentive and the backing stable across keeper
+  settings. Raising it lowers the backing a listing targets and can stop new listing; it never
+  lowers the keep/bid profitability gates, which read live k and s.
+- `purchaserRedeemPack` (default 100,000, ceiling 200,000) and `purchaserRedeemShape` (default
+  30,000, ceiling 60,000): the explicit, bounded purchaser gas assumption of A4.3/D85, now tunable.
+- `minDeposit` (default 0.01 ETH, ceiling 1 ETH): the ongoing minimum deposit. The first-issuance
+  seed keeps its own fixed floor `MIN_SEED` = 0.01 ETH in the constructor, so the dead-shares
+  inflation protection never depends on the param.
+- `minDistribution` (default 0.01 ETH, ceiling 1 ETH): the smallest distribution a checkpoint pays.
+
+**Worst case at the ceilings (depositor funds).** None of these move held funds. `keepAdvantage`,
+`purchaserGasPrice`, `purchaserRedeemPack/_SHAPE` only lower the backing `edge` targets; every
+listing still clears the P/0.95 floor and the both-outcomes-profitable gate (`_validateBacking`), so
+a hostile value at most pauses new listing (sync, exits, withdrawals untouched; measured in
+`ForkSettings.test_hostileKeepIncentiveCannotHarmDepositors`, where a priced holder's shares, NAV
+and ability to redeem are unchanged). `minDeposit` at 1 ETH only excludes smaller new deposits.
+`minDistribution` at 1 ETH only withholds gains below 1 ETH, which then stay in NAV to holders'
+benefit. The owner-compromise keeper-pay bound (B3) is unchanged: these params do not feed keeper pay.
+
+**Reference position (item 3).** `REF_UNITS` and `POSITION_VALUE` are derived, not fixed: `refUnits`
+is the smallest enabled pack size in `packUnitsMask` (`LibBit.ffs`), and `positionValue` =
+value + a reference backing computed from the keep-incentive params at a fixed
+`REF_SETTLEMENT_DISCOUNT_BPS` = 9,150 (FWA's current token bid rate). This tracks `packUnitsMask`
+and the keep-incentive params, is fair to existing holders because the deposit charge then scales
+with the real per-ETH deploy cost of the smallest pack the account actually builds (a 3-unit pack is
+three 0.01 Shapes, costing more per ETH than a 6-unit's two Shapes, so enabling it raises the charge
+fraction — conservative for existing holders), and uses no live FWA read, so deposits and
+redemptions never depend on FWA economics. For the default 6-unit-only mask `positionValue` is
+0.124896 ETH, matching the former 0.1248 constant.
+
+**Gas quotes stay fixed constants (item 2: least-change alternative, infeasibility measured).** The
+~30 `Q_*` keeper-pay and charge quotes do not become an external replaceable pointer. `VaultLib` is
+24,092 bytes after this change (484 under the 24,576 EIP-170 limit; it was 23,561 with 1,015 free,
+and items 1 and 3 and the two purchaser-redeem params above already spent 531 of that). A pointer to
+an external quotes contract needs a quotes struct, a bounded-gas reader, per-quote ceiling clamps
+for ~30 values, and that struct threaded through `VaultLib`, `StrategyLib` and `ScanLib` — far more
+than 484 bytes, and it would add a new 30-value hostile-read surface feeding the backing math, which
+A4 ("do not add contract layers") and the final simplification pass argue against. It is also
+largely redundant: the **keeper-pay** quotes feed `quote()` only to size pay, which is already
+bounded and tunable per operation by the **replaceable keeper policy** (D57; the policy receives the
+op id and gas allowance and can scale any op's pay) and by the envelope knobs the owner already sets
+(`gasCeiling`, `maxTip`, `payMarkupBps`, `workFee`, budgets); the **charge** quotes size holder
+charges through the same envelope, so the owner scales charges via those knobs. The only quotes not
+otherwise adjustable were the **purchaser-redeem** gas assumption, which drives the backing margin
+and the policy cannot reach — those are the two params added above. Each is bounded by a fixed
+ceiling (2x the measured value), so a compromised owner cannot inflate them; they are storage reads,
+so no gas stipend is needed (the external-pointer stipend requirement does not apply).
+
+**MAX_WORK_FEE reconciliation (item 4, docs only).** The live bytecode maximum is
+`MAX_WORK_FEE` = 0.00005 ETH (source `VaultLib.sol`). D55's prose "bytecode maximum `MAX_WORK_FEE`
+0.0001 ETH" was wrong; the code shipped 0.00005 ETH and is unchanged by this decision. No code change.
+
+**Unchanged.** The `MAX_*` owner caps and rates, work fee, gas ceiling, pay markup, bps ceilings,
+`DEAD_SHARES`, `MIN_PACK_UNITS`, `MAX_PACK_UNITS`, `INTERVAL`, `CROWN_EXIT_WINDOW`, the P/0.95
+backing floor, loop/DoS bounds, `POLICY_GAS`/`ORACLE_GAS`/`LIST_CALL_GAS`, immutable integration
+addresses. No delay is added anywhere (D58).
+
+**ABI change.** `VaultLib.Params` gains six `uint64` fields appended after `tvlCap`
+(`keepAdvantage`, `purchaserGasPrice`, `purchaserRedeemPack`, `purchaserRedeemShape`, `minDeposit`,
+`minDistribution`), so `getParams()`, `setParams(Params)`, the constructor and `initialize` tuples
+change. `PackVault.positionValue()` is a new public view. Off-chain updated in this repo: `keeper`
+(`PARAMS_T`, `State`, `policy.position_value`/`ref_units`), `sim`, `script/Deploy.s.sol`,
+`deploy/mainnet.json`, `deploy/manager.json`. The release manifest hashes must be regenerated. The
+separate UI repo must widen its `Params` ABI and read `positionValue()`/`minDeposit` from the vault.
+
+**Evidence.** `test/fork/ForkSettings.t.sol` (7 tests: bounds, owner-only, immediate backing effect,
+hostile margins leave holder funds intact, immediate `minDeposit`, `minDistribution` withholds a
+small gain, `positionValue` follows the smallest enabled size). Updated suites: `ForkBacking`,
+`ForkKeeperPolicy`, `ForkVaultAdversarial`, the test Params builders. Sizes: PackVault 17,664,
+PackManager 13,404, VaultLib 24,092, StrategyLib 12,758, ScanLib 3,077.

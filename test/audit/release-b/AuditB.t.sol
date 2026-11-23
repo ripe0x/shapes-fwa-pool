@@ -28,6 +28,12 @@ function canary() pure returns (VaultLib.Params memory p) {
     p.routineRate = 0.0008 ether;
     p.essentialCap = 0.01 ether;
     p.essentialRate = 0.0002 ether;
+    p.keepAdvantage = 0.0003 ether;
+    p.purchaserGasPrice = 2 gwei;
+    p.purchaserRedeemPack = 100_000;
+    p.purchaserRedeemShape = 30_000;
+    p.minDeposit = 0.01 ether;
+    p.minDistribution = 0.01 ether;
 }
 
 contract AuditBSelection is SelectionBase {

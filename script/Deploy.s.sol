@@ -41,6 +41,12 @@ contract Deploy is Script {
         p.routineRate = uint64(fit(v, ".routineRatePerDayWei", type(uint64).max));
         p.essentialCap = uint64(fit(v, ".essentialCapWei", type(uint64).max));
         p.essentialRate = uint64(fit(v, ".essentialRatePerDayWei", type(uint64).max));
+        p.keepAdvantage = uint64(fit(v, ".keepAdvantageWei", type(uint64).max));
+        p.purchaserGasPrice = uint64(fit(v, ".purchaserGasPriceWei", type(uint64).max));
+        p.purchaserRedeemPack = uint64(fit(v, ".purchaserRedeemPackGas", type(uint64).max));
+        p.purchaserRedeemShape = uint64(fit(v, ".purchaserRedeemShapeGas", type(uint64).max));
+        p.minDeposit = uint64(fit(v, ".minDepositWei", type(uint64).max));
+        p.minDistribution = uint64(fit(v, ".minDistributionWei", type(uint64).max));
         address owner_ = vm.parseJsonAddress(v, ".owner");
         require(uint160(owner_) > 0xffff, "owner must be a real account, not a placeholder or precompile");
         vm.startBroadcast();

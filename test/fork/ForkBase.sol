@@ -95,6 +95,13 @@ abstract contract ForkBase is Test {
         p.routineRate = 0.01 ether;
         p.essentialCap = 0.1 ether;
         p.essentialRate = 0.005 ether;
+        // Behaviour-shaping params at their defaults (equal to the former hard-coded constants).
+        p.keepAdvantage = 0.0003 ether;
+        p.purchaserGasPrice = 2 gwei;
+        p.purchaserRedeemPack = 100_000;
+        p.purchaserRedeemShape = 30_000;
+        p.minDeposit = 0.01 ether;
+        p.minDistribution = 0.01 ether;
     }
 
     /// @dev Owner sets caps and pay limits (everything else unchanged); the tip follows a lower ceiling.

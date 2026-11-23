@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {FixedPointMathLib as M} from "solady/utils/FixedPointMathLib.sol";
+import {LibBit} from "solady/utils/LibBit.sol";
 import {IKeeperPolicy} from "./KeeperPolicy.sol";
 import {ScanLib} from "./ScanLib.sol";
 import {
@@ -38,7 +39,11 @@ interface ISyncVault is IAccount {
 library VaultLib {
     uint256 internal constant BPS = 10_000;
     uint256 internal constant DEAD_SHARES = 1e15;
-    uint256 internal constant MIN_DISTRIBUTION = 0.01 ether;
+    /// @notice FWA's token settlement discount today (its live bid rate, max(ETH, token) = 9150),
+    ///         used only to size the per-position capital estimate `positionValue` scales the
+    ///         deposit and unwind charges by. A stale value only mis-sizes an approximate charge
+    ///         (bounded by the envelope), never a safety value; it is never read on a money path.
+    uint256 internal constant REF_SETTLEMENT_DISCOUNT_BPS = 9_150;
 
     /// @notice PackVault's governed parameters (moved here so library code can read them by
     ///         storage pointer; EIP-170 size).
@@ -61,6 +66,14 @@ library VaultLib {
         uint64 essentialRate;
         uint128 reserve; // ETH kept idle
         uint128 tvlCap; // deposits refused above this NAV
+        // Behaviour-shaping values, owner-set and immediate like the rest (D58), each bounded in
+        // checkBounds (fixed ceilings below). Defaults equal the former hard-coded constants.
+        uint64 keepAdvantage; // a keep must beat FWA's best bid by this after redeem gas
+        uint64 purchaserGasPrice; // the purchaser's assumed redeem gas price (not the keeper ceiling)
+        uint64 purchaserRedeemPack; // assumed purchaser redeem gas: pack base
+        uint64 purchaserRedeemShape; // assumed purchaser redeem gas: per Shape held
+        uint64 minDeposit; // smallest ongoing deposit (first-issuance seed uses MIN_SEED)
+        uint64 minDistribution; // smallest distribution a checkpoint pays out
     }
 
 
@@ -93,18 +106,21 @@ library VaultLib {
     uint256 internal constant MAX_ESSENTIAL_RATE = 0.005 ether;
     uint256 internal constant MAX_PACK_UNITS = 30; // at most 30 x 0.01 ETH: bounded redemption work
     uint256 internal constant MIN_PACK_UNITS = 3; // ShapePacks' minimum pack value, 0.03 ETH
-    uint256 internal constant REF_UNITS = 6; // the reference recipe: one 0.05 and one 0.01 Shape
 
-    /// Purchaser keep incentive. A selected purchaser keeps the pack when it is worth more than the
-    /// best bid FWA offers (ETH or token bid), after the gas to redeem it, by at least this much.
-    uint256 internal constant MIN_KEEP_ADVANTAGE = 0.0003 ether;
-    /// ShapePacks.redeem gas: a pack plus each Shape it holds. Measured on a fork (execution gas):
-    /// 2 Shapes 157,023, 5 Shapes 245,212, 7 Shapes (the most any allowed size holds) 304,115.
-    uint256 internal constant Q_PURCHASER_REDEEM_PACK = 100_000;
-    uint256 internal constant Q_PURCHASER_REDEEM_SHAPE = 30_000;
-    /// The purchaser's redeem gas is priced at this fixed bound, independent of the keeper's gas
-    /// ceiling: keeping stays the better choice for any purchaser paying up to 2 gwei.
-    uint256 internal constant PURCHASER_GAS_PRICE = 2 gwei;
+    /// Ceilings on the behaviour-shaping Params (defaults in the deploy values equal the former
+    /// constants, named in each comment). A compromised owner setting any of these to its ceiling
+    /// cannot move depositor funds: the keep-incentive terms (keepAdvantage, purchaserGasPrice,
+    /// purchaserRedeem*) only lower the backing a new listing targets, and every listing still
+    /// passes the P/0.95 floor and the both-outcomes-profitable gate (`_validateBacking`), so a
+    /// hostile value at most pauses new listings; sync, exits and withdrawals are untouched. The
+    /// min* ceilings only exclude small deposits / withhold small distributions (gains then stay
+    /// in NAV, to holders' benefit); neither moves held funds.
+    uint256 internal constant MAX_KEEP_ADVANTAGE = 0.01 ether; // default 0.0003 ether
+    uint256 internal constant MAX_PURCHASER_GAS_PRICE = 100 gwei; // default 2 gwei
+    uint256 internal constant MAX_PURCHASER_REDEEM_PACK = 200_000; // default 100,000 (2x measured)
+    uint256 internal constant MAX_PURCHASER_REDEEM_SHAPE = 60_000; // default 30,000 (2x measured)
+    uint256 internal constant MAX_MIN_DEPOSIT = 1 ether; // default 0.01 ether
+    uint256 internal constant MAX_MIN_DISTRIBUTION = 1 ether; // default 0.01 ether
 
     /// Fixed gas quotes from billed receipts (keeper/measure_gas.py, docs/GAS.md). The journal
     /// always consumes its full bounded job; only a required checkpoint can pay for a foreign
@@ -144,8 +160,6 @@ library VaultLib {
     uint256 internal constant Q_FUND = 40_000;
     /// A bid cycle's quoted gas: select and resolve, relist, and the fee claim that funds it.
     uint256 internal constant CYCLE_GAS = Q_POSITION_SYNC + Q_LISTED + Q_HARVESTED;
-    /// A reference position (0.06 ETH pack + ~0.0648 backing): what request charges are scaled by.
-    uint256 internal constant POSITION_VALUE = 0.1248 ether;
 
     uint256 internal constant MAX_BATCH = 16;
     uint256 internal constant MAX_JOURNAL = 128;
@@ -373,6 +387,10 @@ library VaultLib {
                 || p.routineCap > MAX_ROUTINE_CAP || p.routineRate > MAX_ROUTINE_RATE || p.essentialCap > MAX_ESSENTIAL_CAP
                 || p.essentialRate > MAX_ESSENTIAL_RATE
                 || p.packUnitsMask >> (MAX_PACK_UNITS + 1) != 0 || p.packUnitsMask & ((1 << MIN_PACK_UNITS) - 1) != 0
+                || p.keepAdvantage > MAX_KEEP_ADVANTAGE || p.purchaserGasPrice > MAX_PURCHASER_GAS_PRICE
+                || p.purchaserRedeemPack > MAX_PURCHASER_REDEEM_PACK
+                || p.purchaserRedeemShape > MAX_PURCHASER_REDEEM_SHAPE
+                || p.minDeposit > MAX_MIN_DEPOSIT || p.minDistribution > MAX_MIN_DISTRIBUTION
         ) revert OutOfBounds();
     }
 
@@ -403,22 +421,46 @@ library VaultLib {
         return quote(p, Q_CHECKPOINT, 1, true);
     }
 
-    /// @notice Deployment charge per POSITION_VALUE deposited: building and listing one reference
+    /// @notice The reference pack size the request/deploy/unwind charges are scaled by: the smallest
+    ///         enabled pack size in `packUnitsMask`. The keeper builds this size (or the 6-unit
+    ///         recipe when enabled), so charges track the cheapest pack the account actually lists.
+    ///         checkBounds keeps at least one bit set in [MIN_PACK_UNITS, MAX_PACK_UNITS].
+    function refUnits(Params storage p) internal view returns (uint256) {
+        return LibBit.ffs(p.packUnitsMask);
+    }
+
+    /// @notice Per-position capital (value + keep-incentive backing) a deposit or redemption's
+    ///         charge is apportioned over, derived from the enabled pack sizes so it tracks the
+    ///         `packUnitsMask` and the keep-incentive Params. Uses REF_SETTLEMENT_DISCOUNT_BPS for
+    ///         the backing estimate rather than a live FWA read, so deposits and redemptions never
+    ///         depend on FWA economics. An approximation only; the charges it scales are bounded by
+    ///         the envelope.
+    function positionValue(Params storage p) external view returns (uint256) {
+        uint256 units = refUnits(p);
+        uint256 value = units * UNIT;
+        (, uint256 shapes) = makeup(units);
+        uint256 margin = uint256(p.keepAdvantage)
+            + (p.purchaserRedeemPack + shapes * p.purchaserRedeemShape) * p.purchaserGasPrice;
+        uint256 backing = value > margin ? (value - margin) * BPS / REF_SETTLEMENT_DISCOUNT_BPS : 0;
+        return value + backing;
+    }
+
+    /// @notice Deployment charge per `positionValue` deposited: building and listing one reference
     ///         position at its envelope now plus its mint fees, and never less than the most a
     ///         builder can net over its own gas (markup at the ceiling, the tip it is repaid but
     ///         need not pay, and the two work fees).
     function deployCharge(Params storage p, uint256 mintFee) external view returns (uint256) {
-        (, uint256 n) = makeup(REF_UNITS);
+        (, uint256 n) = makeup(refUnits(p));
         uint256 g = buildGas(n) + Q_LISTED;
         return M.max(quote(p, g, 2, false) + mintFee * n,
             g * (p.gasCeiling * p.payMarkupBps + p.maxTip * (BPS + p.payMarkupBps)) / BPS + 2 * p.workFee);
     }
 
-    /// @notice Unwind charge per POSITION_VALUE redeemed: unlisting and liquidating one position.
+    /// @notice Unwind charge per `positionValue` redeemed: unlisting and liquidating one position.
     function unwindCharge(Params storage p) external view returns (uint256) {
         // No essential budget means exit work is unpaid (withdrawers run it): nothing to charge.
         if (p.essentialCap == 0) return 0;
-        (, uint256 n) = makeup(REF_UNITS);
+        (, uint256 n) = makeup(refUnits(p));
         return quote(p, Q_UNLISTED + Q_LIQ_PACK + n * Q_REDEEM_SHAPE, 2, true);
     }
 
@@ -427,7 +469,7 @@ library VaultLib {
     ///         listing expects fees k B before selection. A selected purchaser then keeps the pack
     ///         (the account gets B (1 - s) back) or takes FWA's best bid, max(ETH, token) x B (the
     ///         account keeps the pack and loses B). Backing is the largest amount at which keeping
-    ///         still beats the best bid by MIN_KEEP_ADVANTAGE after the gas to redeem the pack, so
+    ///         still beats the best bid by `keepAdvantage` after the gas to redeem the pack, so
     ///         purchasers keep packs and each keep pays for fresh primary mints. It lists only when
     ///         both outcomes are profitable after the keeper pay of the cycle (`_profitable`), it
     ///         is at least P / 0.95 (a keep never loses at FWA's immutable 5% settlement-fee cap),
@@ -450,8 +492,8 @@ library VaultLib {
         t.floor = t.value + t.value / 19 + (t.value % 19 == 0 ? 0 : 1);
         uint256 bid = M.max(f.settlementDiscountBps(), f.tokenSettlementDiscountBps());
         (, uint256 shapes) = makeup(units);
-        uint256 margin =
-            MIN_KEEP_ADVANTAGE + (Q_PURCHASER_REDEEM_PACK + shapes * Q_PURCHASER_REDEEM_SHAPE) * PURCHASER_GAS_PRICE;
+        uint256 margin = uint256(p.keepAdvantage)
+            + (p.purchaserRedeemPack + shapes * p.purchaserRedeemShape) * p.purchaserGasPrice;
         if (bid != 0 && t.value > margin) t.desired = (t.value - margin) * BPS / bid / BPS * BPS;
         if (t.cap != type(uint256).max) t.desired = M.min(t.desired, t.cap * (BPS - p.bufferBps) / BPS);
         t.cycleCost = quote(p, CYCLE_GAS, 2, false);
@@ -879,7 +921,7 @@ library VaultLib {
         liquid -= p.reserve;
         if (liquid <= cost) return false;
         uint256 gain = M.mulDiv(perShare - high, supply, 1e18);
-        return M.min(gain * p.distributionBps / BPS, liquid - cost) >= MIN_DISTRIBUTION;
+        return M.min(gain * p.distributionBps / BPS, liquid - cost) >= p.minDistribution;
     }
 
     function _unexposed(Book storage b) private view returns (bool) {

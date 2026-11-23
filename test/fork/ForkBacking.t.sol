@@ -54,11 +54,12 @@ contract ForkBackingTest is ForkBase {
     /// @dev The exact economic target `edge` posts for an exempt collection (no oracle ceiling).
     function _target(uint256 units) internal view returns (uint256) {
         uint256 value = units * 0.01 ether;
-        // Redeem gas is priced at the fixed 2 gwei bound (VaultLib.PURCHASER_GAS_PRICE), not the
-        // keeper's gas ceiling, so the target no longer moves with the ceiling.
+        // Redeem gas is priced at the owner-set purchaserGasPrice (default 2 gwei), not the keeper's
+        // gas ceiling, so the target no longer moves with the ceiling.
         (, uint256 shapes) = VaultLib.makeup(units);
-        uint256 margin = VaultLib.MIN_KEEP_ADVANTAGE
-            + (VaultLib.Q_PURCHASER_REDEEM_PACK + shapes * VaultLib.Q_PURCHASER_REDEEM_SHAPE) * VaultLib.PURCHASER_GAS_PRICE;
+        VaultLib.Params memory p = vault.getParams();
+        uint256 margin = uint256(p.keepAdvantage)
+            + (p.purchaserRedeemPack + shapes * p.purchaserRedeemShape) * p.purchaserGasPrice;
         if (value <= margin || _bid() == 0) return 0;
         return (value - margin) * 10_000 / _bid() / 10_000 * 10_000; // floored to 10,000 wei
     }
