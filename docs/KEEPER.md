@@ -20,6 +20,12 @@ claims, contribution pools/refunds and renewal float remain distinct from ordina
 Cash shortage and exhausted spending permission are separate waits. A zero recipe mask never
 falls back to minting; old inventory may relist unless listing is paused.
 
+The production entrypoint accepts `FACTORY` without `VAULT`. For encrypted signing, supply
+existing read-only files through `KEEPER_KEYSTORE_PATH` and `KEEPER_PASSWORD_FILE`.
+It rejects the former secret-materializing environment transport. Existing Fly services and
+secret stores are not changed by preparing this image. `KEEPER_FROM` is only for a loopback
+Anvil on chain 31337; it cannot select an unlocked public-network signer.
+
 Explicit holder-funded exit, using the holder's existing signer and a stated gross spending cap:
 
 ```sh
@@ -41,6 +47,21 @@ payer events; claims never enumerate payers.
 The app applies the same monotonic reservation rule. A user can override fees directly in their
 wallet; the app cannot prevent that external action. It detects a larger replacement, reserves the
 increase and blocks further steps if the stated limit is exceeded, until the user explicitly raises it.
+
+For a personal manager, the current owner uses the same bounded exit mode:
+
+```sh
+python3 keeper/keeper.py <manager> --rpc https://mainnet.gateway.tenderly.co --send --account <existing-owner-keystore> --state <existing-owner-exit-state-path> --caller-funded-exit --exit-spend-limit-wei <accepted-additional-wallet-limit>
+```
+
+It first sets exit mode, then reconciles returns, unlists and redeems inventory, collects final
+FWA fee credit and withdraws all remaining ETH to the owner. A blocked FWA queue is processed
+in batches of 16 only when a real simulation reports progress; otherwise the owner waits for
+authenticated randomness, the request deadline or the crown delay. No keeper payment or new
+mint is assumed. Managers have no checkpoint contribution or share-pricing charge. Factory
+discovery never adds other managers to an explicit caller-funded run. A prior pending growth
+or foreign-account transaction must be resolved separately; exit mode preserves its tracking
+and refuses to sign a replacement for it.
 
 For local rehearsal use fresh checked Anvil-impersonated actors on chain 31337. No secret files are
 created, no mainnet RPC is used for writes, and production keystore transport remains separate

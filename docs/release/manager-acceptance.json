@@ -1,0 +1,14 @@
+{
+  "name": "Main pool individual manager closeout",
+  "deployment_target": "manager",
+  "status": "UNSIGNED_IMPLEMENTATION_IN_PROGRESS",
+  "manifest_sha256": null,
+  "signature": null,
+  "release_ready": false,
+  "authorization": "Manager closeout implementation, isolated validation and draft PR updates only. No public transactions, production mint-fee changes, live cutover or merges.",
+  "shared_vault_open": false,
+  "pooled_vault_return_gate_applied_to_manager": false,
+  "manager_values": "deploy/manager.json",
+  "economic_inputs_approved_for_production": false,
+  "note": "Replace in-progress status with the exact manager-specific evidence after the lead's single focused validation pass. No combined-product acceptance or signature authorizes this package."
+}

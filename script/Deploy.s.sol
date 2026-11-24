@@ -22,6 +22,21 @@ contract Deploy is Script {
 
     function run() external returns (PackVault vault) {
         string memory v = vm.readFile(vm.envString("DEPLOY_VALUES"));
+        string memory target = vm.envOr("DEPLOY_TARGET", string("combined"));
+        IFWAV2 f = IFWAV2(vm.parseJsonAddress(v, ".fwa"));
+        IShapes shapes = IShapes(vm.parseJsonAddress(v, ".shapes"));
+        IShapePacks packs = IShapePacks(vm.parseJsonAddress(v, ".packs"));
+        if (keccak256(bytes(target)) == keccak256("manager")) {
+            require(keccak256(bytes(vm.parseJsonString(v, ".target"))) == keccak256("manager"), "target mismatch");
+            vm.startBroadcast();
+            PackManagerFactory factoryOnly = DeployCore.deployFactory(f, shapes, packs);
+            vm.stopBroadcast();
+            console2.log("PackManagerFactory", address(factoryOnly));
+            console2.log("PackManager implementation", address(factoryOnly.implementation()));
+            console2.log("postflight passed; shared vault not deployed");
+            return PackVault(payable(address(0)));
+        }
+        require(keccak256(bytes(target)) == keccak256("combined"), "unknown deployment target");
         VaultLib.Params memory p;
         p.minEdgeBps = uint16(fit(v, ".minEdgeBps", type(uint16).max));
         p.bufferBps = uint16(fit(v, ".bufferBps", type(uint16).max));
@@ -78,9 +93,9 @@ contract Deploy is Script {
         require(uint160(owner_) > 0xffff, "owner must be a real account, not a placeholder or precompile");
         vm.startBroadcast();
         vault = DeployCore.deploy(
-            IFWAV2(vm.parseJsonAddress(v, ".fwa")),
-            IShapes(vm.parseJsonAddress(v, ".shapes")),
-            IShapePacks(vm.parseJsonAddress(v, ".packs")),
+            f,
+            shapes,
+            packs,
             owner_,
             p,
             vm.parseJsonUint(v, ".seedWei"),

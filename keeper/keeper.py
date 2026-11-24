@@ -23,9 +23,11 @@ import subprocess
 import sys
 import threading
 from dataclasses import replace
+import re
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).parent))
 import policy  # noqa: E402
@@ -277,6 +279,7 @@ def read_state(vault, slowdown, burn=False, pooled=True):
     head, now, base_fee = (quantity(header[k]) for k in ("number", "timestamp", "baseFeePerGas"))
     index = get_index(vault, head, now)
     at = lambda to, sig, *args: call(to, sig, *args, block=head)
+    account_owner = at(vault, 'owner()(address)') if not pooled else None
     p = decode_params(at(vault, f"getParams()({PARAMS_T})"))
     min_edge, buf, dist_bps = (p[k] for k in ('minEdgeBps', 'bufferBps', 'distributionBps'))
     premium, share, mask = (p[k] for k in ('payMarkupBps', 'keeperShareBps', 'packUnitsMask'))
@@ -358,6 +361,7 @@ def read_state(vault, slowdown, burn=False, pooled=True):
     state.renewal_float = renewal[2]
     state.operating_reserve = res
     state.configuration_hash = at(vault, "configurationHash()(bytes32)")
+    state.account_owner = account_owner
     state.request_funding_needed = policy.request_charge(state) if pooled and (pending or locked) else 0
     prospective_parent, future_base_fee = inclusion_context()
     # Financial candidates may come from a canonical ancestor while pricing uses the current
@@ -437,6 +441,14 @@ def to_cast(step, min_pay=0, expected=None, caller_funded=False):
     fn, *args = step
     array = lambda xs: "[" + ",".join(map(str, xs)) + "]"
     expected = expected or "0x" + "00" * 32
+    if fn == 'setExiting':
+        return ['setExiting(bool)', 'true' if args[0] else 'false']
+    if fn == 'withdraw':
+        return ['withdraw(address,uint256)', args[0], args[1]]
+    if fn == 'processAcquisitions':
+        if not caller_funded or args != [16]:
+            raise ValueError('protocol queue progress requires explicit caller funding and a batch of16')
+        return ['processAcquisitions(uint256)', 16]
     if caller_funded:
         if fn == 'checkpoint':
             return ['recoverCheckpoint(uint256)', args[0]]
@@ -486,7 +498,7 @@ def fee_args(base_fee, tip):
 def compensation(vault, args, sender, fees=()):
     """What the vault promises for this exact call now: every paid function returns its payment,
     so simulating it from the keeper's address reads the contract's own quote (0 for burnTokens)."""
-    if args[0].startswith(("burnTokens", "fundCheckpoint", "recover", "requestRedeem", "claim", "cancelDeposit")):
+    if args[0].startswith(("burnTokens", "fundCheckpoint", "recover", "requestRedeem", "claim", "cancelDeposit", "setExiting", "withdraw", "processAcquisitions")):
         return 0
     sig = args[0].replace(")", ")(uint256)", 1) if args[0].endswith(")") else args[0]
     return num(cast("call", vault, sig, *args[1:], "--from", sender, "--block", "pending", *fees))
@@ -534,6 +546,58 @@ def plan_key(step):
     return (step[0], tuple(step[1]), step[2]) if step[0] in ("sync", "syncCheckpoint") else (step[0],)
 
 
+def manager_exit_steps(state, sender, maintenance):
+    """Only the owner starts this flow; final cash stays withdrawable independently of economics."""
+    owner = state.account_owner
+    if not owner or sender.lower() != owner.lower():
+        raise ValueError('caller-funded manager exit requires its current owner')
+    if not state.winding_down:
+        return [('setExiting', True)]
+    if not (state.open_positions or state.idle_packs or state.recovery_packs or state.pending_receipts):
+        if state.fee_credit:
+            return [('harvest', [])]
+        return [('withdraw', owner, state.free)] if state.free else []
+    return [step for step in maintenance if step[0] in ('sync', 'unlist', 'liquidate')]
+
+
+def operation_target(account, step):
+    return FWA if step[0] == 'processAcquisitions' else account
+
+
+def validate_manager_exit_pending(state, account, sender, pending):
+    # A previous ordinary keeper pass may have left growth or another account's call pending.
+    # Preserve that signature and reservation, but never sign its replacement as exit work.
+    manager_exit_steps(state, sender, [])
+    if not pending:
+        return
+    args = pending.get('args', [])
+    uint = lambda value: isinstance(value, str) and value.isdecimal() and int(value) < 2**256
+    def ids(value):
+        if not isinstance(value, str) or not re.fullmatch(r'\[(?:[0-9]+(?:,[0-9]+)*)?\]', value):
+            return False
+        values = value[1:-1].split(',') if value != '[]' else []
+        return len(values) <= 16 and all(uint(x) for x in values)
+    valid = False
+    if pending.get('to', '').lower() == FWA.lower():
+        valid = args == ['processAcquisitions(uint256)', '16']
+    elif pending.get('to', '').lower() == account.lower() and args:
+        fn = args[0]
+        valid = (args == ['setExiting(bool)', 'true']
+            or fn == 'recover(uint256[],uint256)' and len(args) == 3 and ids(args[1]) and uint(args[2])
+            or fn == 'recoverUnlist(uint256[])' and len(args) == 2 and ids(args[1])
+            or fn == 'recoverLiquidate(uint256)' and len(args) == 2 and uint(args[1]) and 0 < int(args[1]) <= 16
+            or args == ['harvest(uint256[],uint256)', '[]', '0']
+            or fn == 'withdraw(address,uint256)' and len(args) == 3 and args[1].lower() == sender.lower()
+                and uint(args[2]) and int(args[2]) > 0)
+    if not valid:
+        raise ValueError('pending transaction is outside this owner-paid manager exit; preserve its state and resolve it separately')
+
+
+def local_actor_rpc(url):
+    parsed = urlparse(url)
+    return parsed.scheme == 'http' and parsed.hostname in ('127.0.0.1', 'localhost', '::1')
+
+
 def run_account(a, tm, account, pooled):
     """One pass over ONE account: settle any in-flight transaction (there is at most one across all
     accounts, on the signer's single nonce stream), then plan, preflight and send one call at a time,
@@ -545,9 +609,15 @@ def run_account(a, tm, account, pooled):
     codes, in_flight = [], False
     for _ in range(a.max_steps):
         state = stable_read_state(account, a.slowdown_volume, a.burn_tokens, pooled)
+        if a.caller_funded_exit and not pooled:
+            validate_manager_exit_pending(state, account, tm.sender if tm else a.sender or state.account_owner,
+                                          tm.state['pending'] if tm else None)
 
         def wanted(p, prio=None, max_fee=None, state=state):
             """Preflight again; on a replacement also re-check profit at the bumped tip."""
+            if a.caller_funded_exit and not pooled:
+                current = stable_read_state(account, a.slowdown_volume, a.burn_tokens, pooled)
+                validate_manager_exit_pending(current, account, tm.sender, p)
             est, _why, _exp = tm.preflight(p["to"], p["args"],
                                          ["--gas-price", str(max_fee), "--priority-gas-price", str(prio)]
                                          if prio is not None else fee_args(state.base_fee, state.max_tip))
@@ -575,6 +645,19 @@ def run_account(a, tm, account, pooled):
         steps = [st for st in policy.plan(state) if plan_key(st) not in skip]
         if a.caller_funded_exit:
             steps = [step for step in steps if step[0] not in ('build', 'list', 'renew', 'burnTokens')]
+            if not pooled:
+                sender = tm.sender if tm else a.sender or state.account_owner
+                steps = manager_exit_steps(state, sender, steps)
+                # A ready foreign queue can prevent this account from unlisting. The owner
+                # explicitly pays that protocol work; no service is assumed to do it for free.
+                if state.winding_down and state.open_positions and not state.queue_drained:
+                    processed = num(call(FWA, 'processAcquisitions(uint256)(uint256)', 16,
+                                         '--from', sender, block='pending', fees=fee_args(state.base_fee, state.max_tip)))
+                    if processed:
+                        steps.append(('processAcquisitions', 16))
+                    else:
+                        state.notes.append('protocol queue waits for an authenticated fulfillment or its real expiry')
+                steps = [step for step in steps if plan_key(step) not in skip]
             if pooled and tm:
                 holder = lines(call(account,'holderState(address)(uint256,uint256,uint256)',tm.sender))
                 shares, holder_locked, holder_claimable = map(num,holder)
@@ -614,10 +697,11 @@ def run_account(a, tm, account, pooled):
             break
         if not a.send:
             for st in steps:
-                print("cast send", account, *map(str, to_cast(st, expected=state.configuration_hash, caller_funded=a.caller_funded_exit)))
+                print("cast send", operation_target(account, st), *map(str, to_cast(st, expected=state.configuration_hash, caller_funded=a.caller_funded_exit)))
             break
         step, args = steps[0], to_cast(steps[0], expected=state.configuration_hash, caller_funded=a.caller_funded_exit)
-        est, why, benign = tm.preflight(account, args, fee_args(state.base_fee, state.max_tip))
+        target = operation_target(account, step)
+        est, why, benign = tm.preflight(target, args, fee_args(state.base_fee, state.max_tip))
         pay = 0
         if est is None:
             if refresh_after_race(step[0], why, benign, refreshed):
@@ -643,7 +727,7 @@ def run_account(a, tm, account, pooled):
         # refresh the quote before send; delayed/racing inclusion remains in fail-rate/loss controls.
         bid = state.base_fee + state.max_tip
         fees = fee_args(state.base_fee, state.max_tip)
-        pay = compensation(account, args, tm.sender, fees)
+        pay = compensation(target, args, tm.sender, fees)
         cost_, need, accepted = profitability_gate(est, bid, pay, a.fail_rate_bps, a.min_return_bps,
                                                   max_loss, billed_ratio(tm, step[0]))
         if a.caller_funded_exit and step[0] not in ('build', 'list', 'renew', 'burnTokens'):
@@ -671,7 +755,7 @@ def run_account(a, tm, account, pooled):
         args = to_cast(step, pay * 8 // 10 if step[0] != "burnTokens" and max_loss == 0 else 0, state.configuration_hash, a.caller_funded_exit)
         # Re-check the exact signed call, minPay included, at the signed fees: a call that would
         # revert is not sent. A state change between this check and inclusion can still revert it.
-        est2, why2, _ = tm.preflight(account, args, fees)
+        est2, why2, _ = tm.preflight(target, args, fees)
         if est2 is None:
             skip.add(plan_key(step))
             tm.state["stats"]["skipped_expected"] += 1
@@ -691,7 +775,7 @@ def run_account(a, tm, account, pooled):
                 declined.append(('EXIT_SPEND_LIMIT', 'action', 'signed call exceeds the accepted wallet spending limit'))
                 continue
         try:
-            tm.submit(step[0], account, args, est2, state.base_fee, state.max_tip, pay, state.pending_parent)
+            tm.submit(step[0], target, args, est2, state.base_fee, state.max_tip, pay, state.pending_parent)
         except txm.SpendLimit as e:
             skip.add(plan_key(step))
             declined.append(('EXIT_SPEND_LIMIT','action',str(e)))
@@ -808,6 +892,8 @@ def resolve_accounts(a):
     """Explicit vault/manager address(es) plus every manager the factory has created, each tagged as
     pool or manager. The explicit addresses keep their given order; discovered managers follow."""
     accounts = [(v, is_pooled(v, a.factory)) for v in a.vaults]
+    if a.caller_funded_exit:
+        return accounts  # Recovery never silently extends to every manager a factory created.
     known = {v.lower() for v in a.vaults}
     for m in discover_managers(a):
         if m.lower() not in known:
@@ -875,6 +961,8 @@ def main():
     a = ap.parse_args()
     if a.caller_funded_exit and (a.exit_spend_limit_wei <= 0 or a.loop):
         ap.error("caller-funded exit requires a positive --exit-spend-limit-wei and a single pass")
+    if a.caller_funded_exit and not a.vaults:
+        ap.error('caller-funded exit requires explicit account addresses')
     print("client " + json.dumps(txm.client_identity([sys.modules[__name__], policy, txm, event_index]), sort_keys=True))
     globals()["RPC"] = a.rpc
     globals()["INDEX_PATH"] = a.index
@@ -888,6 +976,9 @@ def main():
     if a.send and not (a.account or a.keystore or a.sender):
         sys.exit("--send needs --account (a cast keystore name), --keystore with --password-file, "
                  "or --from on an unlocked local node")
+    if a.send and a.sender:
+        if not local_actor_rpc(a.rpc) or quantity(rpc('eth_chainId')) != 31337 or not rpc('web3_clientVersion').lower().startswith('anvil/'):
+            sys.exit('--from is restricted to a loopback Anvil on chain31337; use an existing signer store for other networks')
     tm = None
     if a.send:
         for v in a.vaults:

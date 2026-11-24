@@ -146,18 +146,25 @@ class DropFirstSend(http.server.BaseHTTPRequestHandler):
 class Keeper:
     """One keeper worker: the production container, or the same command as a host process."""
 
-    def __init__(self, name, signer, data, image, rpc=RPC, poll=5, health=8788):
+    def __init__(self, name, signer, data, image, rpc=RPC, poll=5, health=8788, factory_only=False):
         self.name, self.signer, self.data, self.image, self.rpc, self.poll, self.health_port = \
             name, signer, data, image, rpc, poll, health
         self.proc = None
+        self.factory_only = factory_only
 
     def start(self):
-        command = ['python3', 'keeper/keeper.py', VAULT, '--factory', FACTORY, '--send', '--from', self.signer,
+        accounts = [] if self.factory_only else [VAULT]
+        command = ['python3', 'keeper/keeper.py', *accounts, '--factory', FACTORY, '--send', '--from', self.signer,
                    '--rpc', self.rpc, '--state', '/data/keeper-state.json', '--index', '/data',
                    '--loop', str(self.poll), '--confirmations', '2', '--health-port', str(self.health_port)]
         if self.image:
+            environment = ['-e', f'FACTORY={FACTORY}', '-e', f'KEEPER_FROM={self.signer}',
+                           '-e', f'RPC_URL={self.rpc}', '-e', f'POLL_SECONDS={self.poll}',
+                           '-e', f'HEALTH_PORT={self.health_port}']
+            if not self.factory_only:
+                environment += ['-e', f'VAULT={VAULT}']
             sh('docker', 'run', '-d', '--name', self.name, '--network', 'host', '--mount',
-               f'type=volume,source={self.data},target=/data', '--entrypoint', 'python3', self.image, *command[1:])
+               f'type=volume,source={self.data},target=/data', *environment, self.image)
         else:
             Path(self.data).mkdir(parents=True, exist_ok=True)
             command = [a.replace('/data', self.data) for a in command]

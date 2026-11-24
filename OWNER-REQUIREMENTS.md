@@ -273,3 +273,16 @@ backing and the external keeper policy. Full acceptance scope is in
     merges outside this task. Prepare the deployment package unsigned.” Draft PRs are authorized.
 
 No historical asset-flow signature or deployment acceptance authorizes this changed candidate.
+
+## A6. Individual manager closeout (owner, 2026-11-24)
+
+“Go ahead and finish the individual manager: owner-paid exit flow, manager-only deployment
+package, economics and focused validation. Work autonomously, update the draft PRs, and keep the
+shared vault closed. No public transactions or merges.”
+
+Complete the manager's own wallet flow, independently deployable factory/implementation package
+through the existing deployment path, and manager-specific owner/keeper/creator cost accounting.
+The pooled-vault return result and pooled checkpoint uplift gate are not manager evidence. Preserve
+the fixed launch recipe, individually owned managers, common strategy implementation and existing
+community application. Production settings remain provisional; public deployment, production fee
+changes, live cutover, acceptance signing and merges retain their existing separate authority limits.

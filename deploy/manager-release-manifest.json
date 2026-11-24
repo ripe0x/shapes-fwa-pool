@@ -1,0 +1,91 @@
+{
+ "name": "PackManagerFactory mainnet",
+ "deployment_target": "manager",
+ "sources": {
+  "script/DeployCore.sol": "10b61be887f77901151d47525abb0bd7e16116c3569008ab976c511a365cee5b",
+  "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
+  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+  "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879",
+  "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+  "remappings.txt": "638e1bbb5593b0f20280b3c050dc924c319bfe2a0781d3b8372c908f397ad429",
+  "script/verify.sh": "f2d7ef2acdb6fbc59b2a4787666ebd908d766113cc76a00e13262a264690b89e",
+  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+  "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
+  "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
+  "script/Deploy.s.sol": "d14764d15a8acb4006eae58c116085d7587c7f784599e92793cacec478c6b77c",
+  "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+  "script/deploy.sh": "c5b30d187511c553971faf989e66e16aa2638a0e7a808438a4e7988da60256b5",
+  "script/test_release.py": "d247e2d4e17a2a607c6979a60a57a3223ca71336922da00cd548a21eeb74a2d6",
+  "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520",
+  "script/release.py": "69c46e7fb787169d5195942bda836a64ffb668a920ef6b5c61573e01ebcbb39b"
+ },
+ "toolchain": {
+  "solc": "0.8.30",
+  "evm": "cancun",
+  "optimizer_runs": 200,
+  "via_ir": true,
+  "bytecode_hash": "none",
+  "lib_tree": "482e26dfec90bbb4fd986fc4fcadbd97cf16017a",
+  "keeper_image_foundry": "1.8.1"
+ },
+ "build": {
+  "PackManager": {
+   "runtime_bytes": 17742,
+   "runtime_sha256": "2cdf170da53d5237888cb83bd74283f18ff689b820059e597556ccfbcb832d14",
+   "initcode_sha256": "a0eb3e369ce01f7c13d74917d3a428d207bf681d52c27b62b0850669378612d9"
+  },
+  "PackManagerFactory": {
+   "runtime_bytes": 4986,
+   "runtime_sha256": "47da5f67cea62f7bdc8afebd7f4614b520e8b271621d5040acb336a2e601851c",
+   "initcode_sha256": "12be25f31c16cf00560ff4a4628d3a136d7cda2953ce8600489dd7977c0a2ccf"
+  },
+  "StrategyLib": {
+   "runtime_bytes": 18090,
+   "runtime_sha256": "67e0c507a5c7a25e9c4e00bccb0b8d5aa9ac058414d138061dfbb442fcb10c5b",
+   "initcode_sha256": "467aa526c78fadc18e6cf3e6f403c6628a9d2379ff96a5d54ba8d5a293a50601",
+   "create2_address": "0xE899b8ac4712842D6AF7A9F47a7b6951bDA4B519"
+  },
+  "VaultLib": {
+   "runtime_bytes": 22260,
+   "runtime_sha256": "ec089c6dd88e65bf4193fdf1f8245e25c83f9b27c2dac4d53903537008c4364f",
+   "initcode_sha256": "a8f2b15f4d65519ed9929ba4392019be86b9da6fe1df8f2d44a9cb477edc270f",
+   "create2_address": "0x650B28E26586dbfea4d2bE777d3983816D0D1A2f"
+  },
+  "ScanLib": {
+   "runtime_bytes": 22993,
+   "runtime_sha256": "91e913a4af9142dc22adc0b744789d8d983b584f5a2b1631f7b64e234e605735",
+   "initcode_sha256": "1b0c3200420a5bfe07c3252cbbb4fcd1c5204732e2028e7e64041dd97214fc67",
+   "create2_address": "0x4ac701799b22e4c7a0f24301ccc904AD6fB3F005"
+  }
+ },
+ "deployment_values": "deploy/manager-factory.json",
+ "values": {
+  "deploy/manager-factory.json": "fd97965dd0c877125cba42f22b28051c609a4792917c8c5281c127109ce706fa",
+  "deploy/manager.json": "f216770efacfe587770fe3d3821d0f2489d40c4e4f7758a051be77195ac0c026",
+  "deploy/manager-mint-fee-observation.json": "80e537598573fdc2189cf259f60006bdb2699c2440276fe162eebf7d38f13314",
+  "deploy/manager-existing-main-readback.json": "9b57e3729ccf2cf326e76714dc6433b28e02da79daa005a3a596b6be9d4dd2ef"
+ },
+ "keeper": {
+  "keeper/Dockerfile": "54675df4109b6b91f5e750816fdf20fb410942992fbebacb9b14d82dc5211243",
+  "keeper/entrypoint.sh": "0ab01e4338fe6ea851b09ac2679ca0cfa45ab8919ad4865e76f96801e7b2a6f0",
+  "keeper/requirements.txt": "aed414c4157dd12cba962363a8c9f561a2e5dcddbf20ee4c2ea9ff41ad4e913c",
+  "keeper/keeper.py": "5bfe7f9b9965dcab42eeb92e7707e2a791132c5880b03fa2b3b929e2426816a1",
+  "keeper/policy.py": "b56d5b11c6cd387c6c623419a5c31012bbae509680d29f403c2ef5954ac7f107",
+  "keeper/config.py": "39acb35f93fb64916dd4c8c8ab64da76742ec8c8b1c90902c9c1b014a6a22f06",
+  "keeper/tx.py": "23ef4eeb579994c28343ec58612afdaf1972317e5c43110fcdd60fcf139ede3e",
+  "keeper/index.py": "321946551c971b6374cb37c37de93c6a79895e87492e08421956472376d3d96a",
+  "fly.keeper-primary.toml": "d0562149088fff773d7abedd4e643e131c07eb988c5542197d05dfe4d71bde5f",
+  "fly.keeper-backup.toml": "5ad276a78fc08c2fc8badf7b70b4794cb19e0043e3b080081323d9041a57a79b"
+ },
+ "evidence": {
+  "docs/receipts/manager-closeout.json": "d993014803106aa76e8da392a0f63b702ac27da81193caeba5e28a0634f012c4",
+  "docs/receipts/manager-assessment.json": "7ef9738fa09dee4a0be11e229b0da0bf50e5ac5c096b5d43051558a69de5b8df",
+  "docs/receipts/manager-economics.md": "9777015585cad86608d995dfaf10bb4b84151099738d414c3f86c27e4992c414",
+  "docs/receipts/manager-ui.json": "25e91f882c3f98bb49aab76f83da3dceadabe7a6031270969a991c9a532b1420",
+  "docs/receipts/manager-cost-calibration.json": "400faba2c6d1acc5ba3057d75d9517510d99515dfca5feb045d65c08eaca692f",
+  "docs/receipts/manager-reconciliation.json": "af5459be9fab27ae3341bbbf00fd05dbb79f09989a3bcc4040edd432a41a710a",
+  "deploy/manager-create-unsigned.json": "f1e35c4211423ceeaee1b2706dd9f68e8c93708cc1ea82c780d7ebfb3d5d7298",
+  "deploy/manager-unsigned-cutover.json": "075ef47960e6b9c312c692d3ae02d8a2c1c489e48ac5b15799b361cc2125a59d",
+  "deploy/manager-keeper-unsigned.json": "bcfdd540267eace3f469cfe1e3ca03224821adb3af8ece947ce5fa47314786dc"
+ }
+}

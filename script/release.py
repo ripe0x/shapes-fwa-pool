@@ -6,6 +6,10 @@
   script/release.py check <values> --broadcast  also the owner's signature on the acceptance package
   script/release.py postflight <vault> <values> [owner] [factory]  read deployed contracts back against manifest and values
   script/release.py keeper-config <vault> <values> [owner]  postflight, then set VAULT in both Fly configs
+  script/release.py manifest|check <values> --target manager  separate manager-only identity/approval
+  script/release.py postflight-manager <factory> <values> [manager owner fundingWei]
+  script/release.py manager-package <Forge mainnet dry-run.json>  write unsigned manager deployment data
+  script/release.py manager-create <factory> <owner> <fundingWei>  print unsigned creation template
 
 The owner accepts a release by signing the sha256 of docs/release/acceptance.json (which names the
 manifest hash) with the key in deploy/allowed_signers, namespace packvault-release:
@@ -22,12 +26,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "keeper"))
-from config import PARAMS_T, PARAM_FIELDS, GAS_FIELDS, decode_params, configuration_hash
+from config import PARAMS_T, PARAM_FIELDS, GAS_FIELDS, decode_params, configuration_hash, params_values, tuple_arg
 MANIFEST = ROOT / "deploy/release-manifest.json"
 ACCEPTANCE = ROOT / "docs/release/acceptance.json"
 SIGNATURE = ROOT / "deploy/release-acceptance.sig"
 SIGNERS = ROOT / "deploy/allowed_signers"
+MANAGER_MANIFEST = ROOT / "deploy/manager-release-manifest.json"
+MANAGER_ACCEPTANCE = ROOT / "docs/release/manager-acceptance.json"
+MANAGER_SIGNATURE = ROOT / "deploy/manager-release-acceptance.sig"
 RPC = os.environ.get("RPC_URL", "https://mainnet.gateway.tenderly.co")
+READ_BLOCK = None
 CODE_LIMIT = 24_576
 CREATE2_FACTORY = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 CONTRACTS = {"PackVault": "src/PackVault.sol", "PackManager": "src/PackManager.sol",
@@ -48,6 +56,22 @@ EVIDENCE = ["docs/receipts/formal-assessment.json", "docs/receipts/completion-ca
             "deploy/keeper-unsigned.json", "docs/receipts/completion-signed-budget-reorg.json",
             "docs/receipts/completion-image.json",
             "asset-flow.json"]
+MANAGER_VALUES = ["deploy/manager-factory.json", "deploy/manager.json", "deploy/manager-mint-fee-observation.json",
+                  "deploy/manager-existing-main-readback.json"]
+MANAGER_EVIDENCE = ["docs/receipts/manager-closeout.json", "docs/receipts/manager-assessment.json",
+                    "docs/receipts/manager-economics.md", "docs/receipts/manager-independent-review.md",
+                    "docs/receipts/manager-ui.json", "docs/receipts/manager-cost-calibration.json",
+                    "docs/receipts/manager-reconciliation.json", "docs/receipts/manager-verification.md",
+                    "docs/receipts/manager-image.json", "deploy/manager-create-unsigned.json",
+                    "deploy/manager-unsigned-cutover.json", "deploy/manager-keeper-unsigned.json"]
+
+
+def target_files(target):
+    if target == "combined":
+        return MANIFEST, ACCEPTANCE, SIGNATURE, VALUES, EVIDENCE, "deploy/mainnet.json"
+    if target == "manager":
+        return MANAGER_MANIFEST, MANAGER_ACCEPTANCE, MANAGER_SIGNATURE, MANAGER_VALUES, MANAGER_EVIDENCE, "deploy/manager-factory.json"
+    raise ValueError(f"unknown deployment target: {target}")
 
 
 def sha(path):
@@ -129,6 +153,16 @@ def validate_launch_values(values, *, manager=False):
         _unsigned(values["seedWei"], 256, "seedWei")
 
 
+def validate_manager_factory_values(values):
+    required = set(MAIN_DEPENDENCIES) | {"target"}
+    _exact_keys(values, required | ({"comment"} if "comment" in values else set()), "manager factory values")
+    if values["target"] != "manager":
+        raise ValueError("manager factory values must explicitly name target manager")
+    for key, expected in MAIN_DEPENDENCIES.items():
+        if not isinstance(values[key], str) or values[key].lower() != expected.lower():
+            raise ValueError(f"launch {key} must be the selected main-pool dependency {expected}")
+
+
 def _abi_entry(abi, kind, name=None):
     matches = [entry for entry in abi if entry.get("type") == kind and (name is None or entry.get("name") == name)]
     if len(matches) != 1:
@@ -161,6 +195,10 @@ def validate_compiled_launch_abi(vault_abi, factory_abi):
             ("packs_", "address"), ("owner_", "address"), ("initial", "tuple"), ("expected", "bytes32")]:
         raise ValueError("compiled PackVault constructor must have six guarded inputs, without a policy")
     _validate_params_abi(constructor["inputs"][4], "PackVault constructor")
+    _validate_factory_abi(factory_abi)
+
+
+def _validate_factory_abi(factory_abi):
     create = _abi_entry(factory_abi, "function", "create")
     if _abi_fields(create.get("inputs", [])) != [("owner", "address"), ("p", "tuple"), ("expected", "bytes32")]:
         raise ValueError("compiled factory create must be only (owner, p, expected), without a policy")
@@ -168,6 +206,24 @@ def validate_compiled_launch_abi(vault_abi, factory_abi):
     if _abi_fields(_abi_entry(factory_abi, "constructor").get("inputs", [])) != [
             ("fwa", "address"), ("shapes", "address"), ("packs", "address")]:
         raise ValueError("compiled factory constructor must have only the three main dependencies")
+
+
+def validate_compiled_manager_abi(manager_abi, factory_abi):
+    if _abi_fields(_abi_entry(manager_abi, "constructor").get("inputs", [])) != [
+            ("fwa_", "address"), ("shapes_", "address"), ("packs_", "address")]:
+        raise ValueError("compiled manager constructor must have only the three main dependencies")
+    getter = _abi_entry(manager_abi, "function", "getParams")
+    if getter.get("inputs") != [] or len(getter.get("outputs", [])) != 1:
+        raise ValueError("compiled manager getParams must return one Params tuple")
+    _validate_params_abi(getter["outputs"][0], "manager getParams")
+    _validate_factory_abi(factory_abi)
+    initial = _abi_entry(manager_abi, "function", "initialize")
+    if _abi_fields(initial.get("inputs", [])) != [("owner_", "address"), ("p", "tuple")]:
+        raise ValueError("compiled manager initialize must be only (owner_, p)")
+    _validate_params_abi(initial["inputs"][1], "manager initialize")
+    for abi in (manager_abi, factory_abi):
+        if any(e.get("name") in ("keeperPolicy", "policy", "setPolicy") for e in abi):
+            raise ValueError("compiled manager ABI contains retired external policy")
 
 
 def _launch_json(path):
@@ -181,8 +237,14 @@ def _launch_json(path):
     return json.loads(Path(path).read_text(), object_pairs_hook=unique_object)
 
 
-def validate_launch_inputs(values=None):
+def validate_launch_inputs(values=None, target="combined"):
     """Fail before manifest generation/check or any postflight read if launch identity/schema drift."""
+    target_files(target)
+    if target == "manager":
+        validate_manager_factory_values(_launch_json(values or ROOT / "deploy/manager-factory.json"))
+        validate_launch_values(_launch_json(ROOT / "deploy/manager.json"), manager=True)
+        validate_compiled_manager_abi(artifact("PackManager")["abi"], artifact("PackManagerFactory")["abi"])
+        return
     validate_launch_values(_launch_json(values or ROOT / "deploy/mainnet.json"))
     validate_launch_values(_launch_json(ROOT / "deploy/manager.json"), manager=True)
     validate_compiled_launch_abi(artifact("PackVault")["abi"], artifact("PackManagerFactory")["abi"])
@@ -205,9 +267,11 @@ def links(bytecode):
     return [r for lib in bytecode.get("linkReferences", {}).values() for r in lib.values()]
 
 
-def build():
+def build(target="combined"):
     out = {}
     for name in CONTRACTS:
+        if target == "manager" and name == "PackVault":
+            continue
         a = artifact(name)
         runtime = normalized(a["deployedBytecode"]["object"], links(a["deployedBytecode"]),
                              a["deployedBytecode"].get("immutableReferences", {}).values())
@@ -246,32 +310,37 @@ def toolchain():
                 keeper_image_foundry=re.search(r"foundryup --install (\S+)", docker).group(1))
 
 
-def manifest():
-    validate_launch_inputs()
-    m = dict(name="PackVault and PackManagerFactory mainnet", sources=sources(), toolchain=toolchain(), build=build(),
-             deployment_values="deploy/mainnet.json", values={v: sha(v) for v in VALUES},
+def manifest(target="combined"):
+    path, _, _, values, evidence, deployment = target_files(target)
+    validate_launch_inputs(target=target)
+    m = dict(name="PackManagerFactory mainnet" if target == "manager" else "PackVault and PackManagerFactory mainnet",
+             deployment_target=target, sources=sources(), toolchain=toolchain(), build=build(target),
+             deployment_values=deployment, values={v: sha(v) for v in values},
              keeper={k: sha(k) for k in KEEPER},
-             evidence={e: sha(e) for e in EVIDENCE if (ROOT / e).exists()})
+             evidence={e: sha(e) for e in evidence if (ROOT / e).exists()})
     for name, b in m["build"].items():
         assert b["runtime_bytes"] <= CODE_LIMIT, f"{name} runtime {b['runtime_bytes']} exceeds EIP-170"
-    MANIFEST.write_text(json.dumps(m, indent=1) + "\n")
-    print(f"wrote {MANIFEST.relative_to(ROOT)} sha256 {sha(MANIFEST.relative_to(ROOT))}")
+    path.write_text(json.dumps(m, indent=1) + "\n")
+    print(f"wrote {path.relative_to(ROOT)} sha256 {sha(path.relative_to(ROOT))}")
 
 
-def problems(values, broadcast):
+def problems(values, broadcast, target="combined"):
+    path, acceptance, signature, value_paths, _, _ = target_files(target)
     try:
-        validate_launch_inputs(values)
+        validate_launch_inputs(values, target)
     except (ValueError, KeyError, TypeError, OSError) as error:
         return [f"launch inputs invalid: {error}"]
-    if not MANIFEST.exists():
-        return ["no deploy/release-manifest.json"]
-    m = json.loads(MANIFEST.read_text())
+    if not path.exists():
+        return [f"no {path.relative_to(ROOT)}"]
+    m = json.loads(path.read_text())
     out = []
+    if m.get("deployment_target", "combined") != target:
+        out.append("manifest deployment target differs")
     dirty = git("status", "--porcelain", "--", "src", "script", "deploy", "foundry.toml", "remappings.txt", "lib", "keeper")
     if dirty:
         out.append("uncommitted release inputs:\n" + dirty)
-    for key, now in (("sources", sources()), ("toolchain", toolchain()), ("build", build()),
-                     ("keeper", {k: sha(k) for k in KEEPER}), ("values", {v: sha(v) for v in VALUES}),
+    for key, now in (("sources", sources()), ("toolchain", toolchain()), ("build", build(target)),
+                     ("keeper", {k: sha(k) for k in KEEPER}), ("values", {v: sha(v) for v in value_paths}),
                      ("evidence", {e: sha(e) for e in m["evidence"] if (ROOT / e).exists()})):
         if now != m[key]:
             changed = sorted(k for k in set(now) | set(m[key]) if now.get(k) != m[key].get(k))
@@ -279,26 +348,135 @@ def problems(values, broadcast):
     if os.path.relpath(Path(values).resolve(), ROOT) != m["deployment_values"]:
         out.append(f"values {values} are not the release's {m['deployment_values']}")
     if broadcast:
-        if not ACCEPTANCE.exists():
-            out.append("no docs/release/acceptance.json")
-        elif json.loads(ACCEPTANCE.read_text()).get("manifest_sha256") != sha(MANIFEST.relative_to(ROOT)):
+        if not acceptance.exists():
+            out.append(f"no {acceptance.relative_to(ROOT)}")
+        elif target == "manager" and json.loads(acceptance.read_text()).get("deployment_target") != target:
+            out.append("acceptance package names a different deployment target")
+        elif json.loads(acceptance.read_text()).get("manifest_sha256") != sha(path.relative_to(ROOT)):
             out.append("acceptance package names a different manifest")
-        elif not SIGNATURE.exists():
-            out.append("no owner signature: deploy/release-acceptance.sig")
+        elif not signature.exists():
+            out.append(f"no owner signature: {signature.relative_to(ROOT)}")
         else:
             r = subprocess.run(["ssh-keygen", "-Y", "verify", "-f", SIGNERS, "-I", "owner", "-n", "packvault-release",
-                                "-s", SIGNATURE], input=sha(ACCEPTANCE.relative_to(ROOT)).encode(), capture_output=True)
+                                "-s", signature], input=sha(acceptance.relative_to(ROOT)).encode(), capture_output=True)
             if r.returncode:
                 out.append("owner signature does not verify over the acceptance package")
     return out
 
 
 def cast(*args):
-    return subprocess.check_output(["cast", *map(str, args), "--rpc-url", RPC], text=True).strip()
+    pinned = ["--block", str(READ_BLOCK)] if READ_BLOCK is not None and args[0] in ("call", "code", "balance", "nonce") else []
+    return subprocess.check_output(["cast", *map(str, args), *pinned, "--rpc-url", RPC], text=True).strip()
 
 
 def first(raw):
     return raw.split()[0]
+
+
+def _postflight_code(m, deployed, fail, target="combined"):
+    expected = build(target)
+    if m["build"] != expected:
+        fail.append("manifest build differs from the current compiled artifacts")
+    libs = {name: expected[name]["create2_address"] for name in LIBRARIES}
+    check = lambda ok, what: ok or fail.append(what)
+    for name, address in deployed:
+        a = artifact(name)
+        code = cast("code", address)
+        runtime = normalized(code, links(a["deployedBytecode"]), a["deployedBytecode"].get("immutableReferences", {}).values())
+        check(hashlib.sha256(runtime).hexdigest() == m["build"][name]["runtime_sha256"], f"{name} runtime at {address}")
+        # Every linked call must reach the manifest's library, not another one.
+        onchain = bytes.fromhex(code[2:])
+        for libs_ in a["deployedBytecode"].get("linkReferences", {}).values():
+            for lib, rs in libs_.items():
+                for r in rs:
+                    check(onchain[r["start"]:r["start"] + 20].hex() == libs[lib][2:].lower(), f"{name} links another {lib}")
+
+
+def clone_runtime(implementation):
+    # The 44-byte clone used by the pinned Solady LibClone.clone implementation.
+    return "0x3d3d3d3d363d3d37363d73" + implementation.removeprefix("0x").lower() + "5af43d3d93803e602a57fd5bf3"
+
+
+def _address(value, label):
+    if not isinstance(value, str) or not re.fullmatch(r"0x[0-9a-fA-F]{40}", value) or int(value, 16) <= 0xffff:
+        raise ValueError(f"{label} must be a real nonzero account address")
+    return value
+
+
+def _pin_read_block():
+    global READ_BLOCK
+    chain = int(cast("chain-id"))
+    if chain == 1:
+        if RPC != "https://mainnet.gateway.tenderly.co":
+            raise ValueError("Ethereum mainnet reads require https://mainnet.gateway.tenderly.co")
+    elif chain != 31337 or not re.fullmatch(r"http://(?:127\.0\.0\.1|localhost)(?::[0-9]+)?/?", RPC):
+        raise ValueError("manager tooling requires Ethereum mainnet reads or isolated local chain 31337")
+    header = json.loads(cast("block", "latest", "--json"))
+    header = header.get("data", header)
+    READ_BLOCK = int(header["number"], 16)
+    return dict(chainId=chain, block=READ_BLOCK, blockHash=header["hash"], rpc=RPC)
+
+
+def postflight_manager(factory, values, manager=None, owner=None, funding=None, *, emit=True):
+    """Verify the manager product independently, without a vault or holder-pricing assumptions."""
+    validate_launch_inputs(values, "manager")
+    context = _pin_read_block()
+    _address(factory, "factory")
+    m, deps = json.loads(MANAGER_MANIFEST.read_text()), _launch_json(values)
+    if m.get("deployment_target") != "manager":
+        raise ValueError("manager postflight requires a manager-target manifest")
+    fail = []
+    check = lambda ok, what: ok or fail.append(what)
+    implementation = cast("call", factory, "implementation()(address)")
+    libs = {name: m["build"][name]["create2_address"] for name in LIBRARIES}
+    deployed = [("PackManagerFactory", factory), ("PackManager", implementation)] + list(libs.items())
+    _postflight_code(m, deployed, fail, "manager")
+    check(cast("call", implementation, "factory()(address)").lower() == factory.lower(), "implementation factory")
+    check(int(cast("call", implementation, "owner()(address)"), 16) == 0, "implementation has an owner")
+    accounts = [("implementation", implementation)]
+    result = dict(context, deploymentTarget="manager", factory=factory, implementation=implementation,
+                  libraries=libs, managerCount=int(first(cast("call", factory, "managerCount()(uint256)"))),
+                  factoryBalanceWei=int(cast("balance", factory)), implementationBalanceWei=int(cast("balance", implementation)))
+    if manager:
+        _address(manager, "manager")
+        _address(owner, "owner")
+        accounts.append(("manager", manager))
+        check(cast("code", manager).lower() == clone_runtime(implementation), "manager clone runtime/implementation")
+        check(cast("call", factory, "isManager(address)(bool)", manager) == "true", "manager not registered by factory")
+        check(cast("call", manager, "factory()(address)").lower() == factory.lower(), "manager factory")
+        check(cast("call", manager, "owner()(address)").lower() == owner.lower(), "manager owner")
+        v = _launch_json(ROOT / "deploy/manager.json")
+        got = decode_params(cast("call", manager, f"getParams()({PARAMS_T})"))
+        expected = {key: v[key] for key, _ in PARAM_FIELDS} | {"gasSchedule": v["gasSchedule"]}
+        check(got == expected, "manager complete Params/GasSchedule")
+        mint_fee = int(first(cast("call", deps["shapes"], "mintFee()(uint256)")))
+        check(mint_fee <= v["acceptedMintFeeWei"], "live mint fee exceeds manager acceptance")
+        check(cast("call", manager, "configurationHash()(bytes32)").lower() == configuration_hash(v, mint_fee).lower(), "manager configuration hash")
+        flags = {name: cast("call", manager, name + "()(bool)") for name in ("windingDown", "listingPaused")}
+        check(all(value == "false" for value in flags.values()), "new manager pause/exit flags")
+        budget = [int(first(x)) for x in cast("call", manager, "budget()(uint256,uint256)").splitlines()]
+        check(budget == [v["routineCapWei"], v["essentialCapWei"]], "new manager budgets")
+        cash = int(cast("balance", manager))
+        if funding is not None:
+            _unsigned(int(funding), 256, "manager funding")
+            check(cash >= int(funding), "manager initial funding")
+        counts = {name: int(first(cast("call", manager, name + "()(uint256)"))) for name in ("openListingCount", "idlePackCount", "recoveryPackCount")}
+        check(not any(counts.values()), "new manager already has inventory")
+        result["manager"] = dict(address=manager, owner=owner, params=got, budget=budget,
+                                 cashWei=cash, flags=flags, inventory=counts, liveMintFeeWei=mint_fee)
+    for label, address in accounts:
+        for key, expected_address in MAIN_DEPENDENCIES.items():
+            check(cast("call", address, key + "()(address)").lower() == expected_address.lower(), f"{label} {key}")
+        for key in ("rewards", "token"):
+            expected_address = cast("call", deps["fwa"], key + "()(address)")
+            check(cast("code", expected_address) not in ("", "0x"), f"FWA {key} missing")
+            check(cast("call", address, key + "()(address)").lower() == expected_address.lower(), f"{label} {key}")
+    if fail:
+        raise ValueError("manager postflight FAILED: " + "; ".join(fail))
+    if emit:
+        print(json.dumps(result, indent=2))
+        print("manager postflight passed; shared vault not required")
+    return result
 
 
 def postflight(vault, values, owner=None, factory=None):
@@ -316,17 +494,7 @@ def postflight(vault, values, owner=None, factory=None):
         check(int(cast("call", implementation, "owner()(address)"), 16) == 0, "implementation has an owner")
         for k, sig in (("fwa", "fwa()(address)"), ("shapes", "shapes()(address)"), ("packs", "packs()(address)")):
             check(cast("call", implementation, sig).lower() == v[k].lower(), f"implementation {k}")
-    for name, address in deployed:
-        a = artifact(name)
-        code = cast("code", address)
-        runtime = normalized(code, links(a["deployedBytecode"]), a["deployedBytecode"].get("immutableReferences", {}).values())
-        check(hashlib.sha256(runtime).hexdigest() == m["build"][name]["runtime_sha256"], f"{name} runtime at {address}")
-        # Every linked call must reach the manifest's library, not another one.
-        onchain = bytes.fromhex(code[2:])
-        for libs_ in a["deployedBytecode"].get("linkReferences", {}).values():
-            for lib, rs in libs_.items():
-                for r in rs:
-                    check(onchain[r["start"]:r["start"] + 20].hex() == libs[lib][2:].lower(), f"{name} links another {lib}")
+    _postflight_code(m, deployed, fail)
     owner = owner or v["owner"]  # after a D76 handover, pass the current owner
     check(cast("call", vault, "owner()(address)").lower() == owner.lower(), "owner")
     for k, sig in (("fwa", "fwa()(address)"), ("shapes", "shapes()(address)"), ("packs", "packs()(address)")):
@@ -420,9 +588,167 @@ def calibrate(actions, output='docs/receipts/completion-calibration.json'):
 
 
 
-def existing_readback():
+def create_address(sender, nonce):
+    """CREATE address from its RLP(sender, nonce), with Ethereum's 64-bit nonce bound."""
+    from eth_utils import keccak
+    _unsigned(nonce, 64, "creation nonce")
+    address = bytes.fromhex(sender.removeprefix("0x"))
+    if len(address) != 20:
+        raise ValueError("creation sender must have 20 bytes")
+    raw = nonce.to_bytes((nonce.bit_length() + 7) // 8, "big")
+    encoded = raw if len(raw) == 1 and raw[0] < 0x80 else bytes([0x80 + len(raw)]) + raw
+    payload = b"\x94" + address + encoded
+    return "0x" + keccak(bytes([0xc0 + len(payload)]) + payload)[-20:].hex()
+
+
+def validate_manager_transactions(run, values, compiled):
+    """Decode a real Forge dry-run as unsigned manager deployments, not a vault replacement."""
+    validate_manager_factory_values(values)
+    if type(run.get("chain")) is not int or run["chain"] != 1 or run.get("receipts"):
+        raise ValueError("unsigned manager package requires a mainnet dry-run without mined receipts")
+    records, seen, sender, nonce = [], set(), None, None
+    from eth_abi import encode
+    addresses = {name: bytes.fromhex(compiled[name]["create2_address"][2:]) for name in LIBRARIES}
+    rows = run.get("transactions", [])
+    order = [*LIBRARIES, "PackManagerFactory"]
+    last = -1
+    for row in rows:
+        name, tx = row.get("contractName"), row.get("transaction", {})
+        if name not in (*LIBRARIES, "PackManagerFactory") or name in seen or row.get("hash"):
+            raise ValueError("manager package has a duplicate, signed, vault or unknown deployment")
+        seen.add(name)
+        if order.index(name) <= last:
+            raise ValueError("manager deployments are out of linked-library order")
+        last = order.index(name)
+        _address(tx.get("from"), "deployment sender")
+        if sender is not None and tx["from"].lower() != sender:
+            raise ValueError("manager deployment uses more than one sender")
+        sender = tx["from"].lower()
+        current_nonce = int(tx["nonce"], 16)
+        _unsigned(current_nonce, 64, "deployment nonce")
+        if nonce is not None and current_nonce != nonce + 1:
+            raise ValueError("manager deployment nonces are not contiguous")
+        nonce = current_nonce
+        if int(tx["chainId"], 16) != 1 or not 0 < int(tx["gas"], 16) <= 16_777_216:
+            raise ValueError("manager deployment chain/gas limit is invalid")
+        if int(tx.get("value", "0x0"), 16) != 0:
+            raise ValueError("manager factory deployment has no vault seed or attached funding")
+        bytecode = artifact(name)["bytecode"]
+        init = linked(bytecode["object"], bytecode.get("linkReferences", {}), addresses)
+        if name in LIBRARIES:
+            expected = bytes(32) + init
+            if row.get("transactionType") != "CREATE2" or tx.get("to", "").lower() != CREATE2_FACTORY.lower():
+                raise ValueError("library must use the reviewed CREATE2 factory")
+            if row.get("contractAddress", "").lower() != compiled[name]["create2_address"].lower():
+                raise ValueError("library predicted address differs from compiled linkage")
+        else:
+            expected = init + encode(["address"] * 3, [values[k] for k in MAIN_DEPENDENCIES])
+            if row.get("transactionType") != "CREATE" or tx.get("to") not in (None, "", "0x"):
+                raise ValueError("manager factory must use ordinary creation")
+            if row.get("contractAddress", "").lower() != create_address(sender, current_nonce):
+                raise ValueError("manager factory predicted address differs from sender/nonce")
+        if bytes.fromhex(tx["input"].removeprefix("0x")) != expected:
+            raise ValueError(f"{name} calldata differs from compiled bytecode/dependencies")
+        allowed = ("from", "to", "gas", "value", "input", "nonce", "chainId")
+        if set(tx) - set(allowed):
+            raise ValueError("manager package has signed or unreviewed transaction fields")
+        records.append(dict(contract=name, operation=row["transactionType"], predictedAddress=row["contractAddress"],
+                            unsignedTransaction={key: tx[key] for key in allowed if key in tx}))
+    if "PackManagerFactory" not in seen:
+        raise ValueError("manager package is missing its factory deployment")
+    return records, [name for name in LIBRARIES if name not in seen]
+
+
+def manager_package(run_path):
+    validate_launch_inputs(target="manager")
+    m = json.loads(MANAGER_MANIFEST.read_text())
+    if m.get("deployment_target") != "manager" or m["build"] != build("manager"):
+        raise ValueError("manager package requires the current target-bound compiled manifest")
+    values = _launch_json(ROOT / "deploy/manager-factory.json")
+    run = json.loads(Path(run_path).read_text())
+    transactions, reused = validate_manager_transactions(run, values, m["build"])
+    context = _pin_read_block()
+    if context["chainId"] != 1:
+        raise ValueError("unsigned mainnet package readback must use the public mainnet gateway")
+    fail = []
+    if reused:
+        _postflight_code(m, [(name, m["build"][name]["create2_address"]) for name in reused], fail, "manager")
+    if fail:
+        raise ValueError("reused library verification failed: " + "; ".join(fail))
+    first_tx = transactions[0]["unsignedTransaction"]
+    current_nonce = int(cast("nonce", first_tx["from"]))
+    if current_nonce != int(first_tx["nonce"], 16):
+        raise ValueError("deployment nonce changed since the dry-run; repeat the unsigned simulation")
+    factory = next(t["predictedAddress"] for t in transactions if t["contract"] == "PackManagerFactory")
+    package = dict(status="UNSIGNED_NOT_APPROVED_FOR_BROADCAST", deploymentTarget="manager", **context,
+        values="deploy/manager-factory.json", valuesSha256=sha("deploy/manager-factory.json"),
+        managerValues="deploy/manager.json", managerValuesSha256=sha("deploy/manager.json"),
+        sourceSha256=m["sources"], build=m["build"], transactions=transactions, reusedVerifiedLibraries=reused,
+        deployerNonceAtReadback=current_nonce, nonceStillMatchesSimulation=current_nonce == int(first_tx["nonce"],16),
+        predictedImplementationAddress=create_address(factory, 1),
+        sharedVaultDeployed=False, vaultSeedWei=0, publicTransactions=0,
+        refreshBeforeSigning=["Recheck chain, signer nonce/balance, live mint fee and dependency/library code.",
+          "Re-simulate the same target-manager production path and independently postflight before manager creation.",
+          "No signature, production cutover or launch approval is included. Never reuse a combined-product approval."])
+    (ROOT / "deploy/manager-unsigned-cutover.json").write_text(json.dumps(package, indent=2) + "\n")
+    keeper = dict(status="UNSIGNED_ADDRESS_DATA_NOT_LIVE_CONFIGURATION", deploymentTarget="manager",
+                  chainId=1, rpc="https://mainnet.gateway.tenderly.co", factory=factory, vault=None,
+                  environment=dict(FACTORY=factory, RPC_URL="https://mainnet.gateway.tenderly.co",
+                      KEEPER_KEYSTORE_PATH="<existing read-only keystore mount path>",
+                      KEEPER_PASSWORD_FILE="<existing read-only password mount path>"),
+                  discoveryFromBlock="set to the separately authorized factory deployment receipt block",
+                  command=["python3", "keeper/keeper.py", "--factory", factory],
+                  signer="existing separately selected external keystore; no secret is included",
+                  sharedVaultOpen=False)
+    (ROOT / "deploy/manager-keeper-unsigned.json").write_text(json.dumps(keeper, indent=2) + "\n")
+    print("wrote unsigned manager-only deployment and keeper address data; no vault or seed")
+
+
+def manager_create(factory, owner, funding):
+    validate_launch_inputs(target="manager")
+    _address(factory, "factory")
+    _address(owner, "owner")
+    if owner.lower() == factory.lower():
+        raise ValueError("factory cannot own an individual manager")
+    funding = int(funding)
+    _unsigned(funding, 256, "manager funding")
+    context = _pin_read_block()
+    deployed = cast("code", factory) not in ("", "0x")
+    if deployed:
+        context = {k: v for k, v in postflight_manager(factory, ROOT / "deploy/manager-factory.json", emit=False).items()
+                   if k in ("chainId", "block", "blockHash", "rpc")}
+    p = _launch_json(ROOT / "deploy/manager.json")
+    fee = int(first(cast("call", MAIN_DEPENDENCIES["shapes"], "mintFee()(uint256)")))
+    if fee > p["acceptedMintFeeWei"]:
+        raise ValueError("live mint fee exceeds the owner's accepted maximum")
+    expected = configuration_hash(p, fee)
+    if deployed and cast("call", factory, f"configHashFor({PARAMS_T})(bytes32)", tuple_arg(p)).lower() != expected.lower():
+        raise ValueError("factory configuration hash disagrees with the reviewed encoding")
+    from eth_abi import encode
+    from eth_utils import keccak
+    signature = f"create(address,{PARAMS_T},bytes32)"
+    data = keccak(text=signature)[:4] + encode(["address", PARAMS_T, "bytes32"],
+                   [owner, params_values(p), bytes.fromhex(expected[2:])])
+    result = dict(status="UNSIGNED_MANAGER_CREATION_TEMPLATE", **context, factoryAlreadyDeployed=deployed,
+                  unsignedTransaction=dict(chainId=hex(context["chainId"]), **{"from": owner}, to=factory,
+                                           value=hex(funding), input="0x" + data.hex()),
+                  reviewedOwner=owner, reviewedFundingWei=funding, reviewedLiveMintFeeWei=fee,
+                  fixtureExpectedMintFeeWei=p["expectedMintFeeWei"],
+                  mintFeeChangedSinceFixture=fee != p["expectedMintFeeWei"],
+                  acceptedMintFeeWei=p["acceptedMintFeeWei"], expectedConfigurationHash=expected,
+                  managerValuesSha256=sha("deploy/manager.json"), params=p,
+                  conditions=["Refresh preview and estimate exact calldata before signing.",
+                    "After factory deployment, independently verify its runtime, dependencies and links.",
+                    "Creating an idle manager does not establish productive funding or positive returns.",
+                    "No factory or administrator can change this manager's owner/settings after creation."])
+    print(json.dumps(result, indent=2))
+    return result
+
+
+def existing_readback(target="combined"):
     """Refresh the existing MAIN deployment at one latest public-mainnet block; send nothing."""
-    path=ROOT/'deploy/existing-main-readback.json';previous=json.loads(path.read_text())
+    previous=json.loads((ROOT/'deploy/existing-main-readback.json').read_text())
+    path=ROOT/('deploy/manager-existing-main-readback.json' if target == 'manager' else 'deploy/existing-main-readback.json')
     rpc='https://mainnet.gateway.tenderly.co'
     def run(*args):
         return subprocess.run(['cast',*map(str,args),'--rpc-url',rpc],capture_output=True,text=True)
@@ -451,28 +777,58 @@ def existing_readback():
 
 
 
+def parse_target(arguments):
+    args = list(arguments)
+    if args.count("--target") > 1:
+        raise ValueError("supply exactly one deployment target")
+    target = "combined"
+    if "--target" in args:
+        at = args.index("--target")
+        if at + 1 >= len(args):
+            raise ValueError("--target needs combined or manager")
+        target = args[at + 1]
+        del args[at:at + 2]
+    target_files(target)
+    return target, args
+
+
 def main():
     cmd, args = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
+    target, args = parse_target(args)
     if cmd == "existing-readback":
-        existing_readback()
+        existing_readback(target)
     elif cmd == "calibrate" and args:
         calibrate(args[0])
     elif cmd == "manifest":
-        manifest()
+        manifest(target)
     elif cmd == "check" and args:
-        found = problems(args[0], "--broadcast" in args)
+        found = problems(args[0], "--broadcast" in args, target)
         for p in found:
             print("release check:", p)
         if found:
             sys.exit(1)
         print("release check passed" + (" with owner signature" if "--broadcast" in args else " (no signature checked)"))
-    elif cmd == "postflight" and len(args) in (2, 3, 4):
-        postflight(*args)
-    elif cmd == "keeper-config" and len(args) in (2, 3):
+    elif cmd == "postflight-manager" and len(args) in (2, 4, 5):
+        postflight_manager(*args)
+    elif cmd == "manager-package" and len(args) == 1:
+        manager_package(args[0])
+    elif cmd == "manager-create" and len(args) == 3:
+        manager_create(*args)
+    elif cmd == "postflight" and len(args) in (2, 3, 4, 5):
+        if target == "manager":
+            postflight_manager(*args)
+        elif len(args) in (2, 3, 4):
+            postflight(*args)
+        else:
+            sys.exit(__doc__)
+    elif cmd == "keeper-config" and len(args) in (2, 3) and target == "combined":
         keeper_config(*args)
     else:
         sys.exit(__doc__)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (ValueError, KeyError) as error:
+        sys.exit(str(error))

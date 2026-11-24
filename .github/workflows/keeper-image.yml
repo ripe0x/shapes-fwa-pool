@@ -10,6 +10,12 @@ on:
     branches: [claude/unified-shapes-fwa-system-852d17]
     paths: [keeper/**, .github/workflows/keeper-image.yml]
   workflow_dispatch:
+    inputs:
+      target:
+        description: Isolated fork rehearsal target
+        type: choice
+        options: [combined, manager]
+        default: combined
 
 permissions:
   contents: read
@@ -40,7 +46,14 @@ jobs:
       - name: Image against a fresh fork
         if: github.event_name == 'workflow_dispatch'
         shell: bash  # pipefail: a failed rehearsal fails the job despite tee
-        run: CANDIDATE_RUN=1 python3 keeper/rehearse_image.py --image packvault-keeper:${{ github.sha }} | tee image-rehearsal.json
+        env:
+          REHEARSAL_TARGET: ${{ inputs.target }}
+        run: |
+          if [ "$REHEARSAL_TARGET" = manager ]; then
+            CANDIDATE_RUN=1 python3 keeper/rehearse_manager.py --image packvault-keeper:${{ github.sha }} | tee image-rehearsal.json
+          else
+            CANDIDATE_RUN=1 python3 keeper/rehearse_image.py --image packvault-keeper:${{ github.sha }} | tee image-rehearsal.json
+          fi
       - uses: actions/upload-artifact@v4
         if: always() && github.event_name == 'workflow_dispatch'
         with:

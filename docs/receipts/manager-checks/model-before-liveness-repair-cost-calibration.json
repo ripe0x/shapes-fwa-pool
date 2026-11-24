@@ -1,0 +1,254 @@
+{
+ "method": "Actual billed isolated-fork receipt gas units; conservative model floors combined with work-size quote allowances",
+ "source_sha256": {
+  "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
+  "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+  "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
+  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+  "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+  "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
+  "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+ },
+ "contract_source_sha256": {
+  "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
+  "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+  "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
+  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+  "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+  "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
+  "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+ },
+ "unmeasured_operations": [
+  "renew",
+  "standalone-harvest"
+ ],
+ "receipts": "docs/receipts/manager-closeout.json",
+ "receipts_sha256": "d993014803106aa76e8da392a0f63b702ac27da81193caeba5e28a0634f012c4",
+ "gas_proxy": {
+  "create": 606172,
+  "setExiting": 53214,
+  "withdraw": 38904,
+  "unlist": 1085668,
+  "liquidate": 593594,
+  "recover_sync": 199047,
+  "processAcquisitions": 115941,
+  "build": 4403674,
+  "harvest": 300000
+ },
+ "measurements": {
+  "deployment": [
+   {
+    "actor": "deployer",
+    "gasUsed": 5032914,
+    "effectiveGasPrice": 150032487,
+    "gasCostWei": 755100604277118,
+    "hash": "0xb15e914237b78583da60f06e306e9ec3cfa2f5d5ff68eaf9e9479a5df62d1776"
+   },
+   {
+    "actor": "deployer",
+    "gasUsed": 4875283,
+    "effectiveGasPrice": 142531927,
+    "gasCostWei": 694883480660341,
+    "hash": "0xdac08b1afa96533d84f8e06a6cbeceb84360aa8792f3f9d1ee2acad5d421aa86"
+   },
+   {
+    "actor": "deployer",
+    "gasUsed": 3972819,
+    "effectiveGasPrice": 135071708,
+    "gasCostWei": 536615447904852,
+    "hash": "0x389a11ea4fbcd61a162364223400dfe0e05e2b169fbf969adf25523ebd9d87d0"
+   },
+   {
+    "actor": "deployer",
+    "gasUsed": 5035708,
+    "effectiveGasPrice": 126186076,
+    "gasCostWei": 635436232401808,
+    "hash": "0xbd4cf9cb054db96fb48848b8d4efc913542a9850c8708f2a50f989b4cb271e65"
+   }
+  ],
+  "create": [
+   {
+    "actor": "ui-owner",
+    "gasUsed": 606172,
+    "effectiveGasPrice": 1119850691,
+    "gasCostWei": 678822133064852,
+    "hash": "0x3287c29e558e635b88b06bd77187b5b5bd8624b2d55eda670e84138e2861c719"
+   },
+   {
+    "actor": "cli-owner",
+    "gasUsed": 589072,
+    "effectiveGasPrice": 116850266,
+    "gasCostWei": 68833219893152,
+    "hash": "0x8a0fe582fc016518ec052ce47456dc6a2252aa8ebe0d1ff198bd21b2432659da"
+   }
+  ],
+  "setListingPaused": [
+   {
+    "actor": "ui-owner",
+    "gasUsed": 50704,
+    "effectiveGasPrice": 1105951926,
+    "gasCostWei": 56076186455904,
+    "hash": "0x9380142097d5699e812f0fca7c119410b3a87c9851096cb413d411beaf42bf0a"
+   },
+   {
+    "actor": "ui-owner",
+    "gasUsed": 28792,
+    "effectiveGasPrice": 1092787988,
+    "gasCostWei": 31463551750496,
+    "hash": "0xa787e651518b0feb84f92152afd71b86fa1174cf27224495db37f662d6cb8ef0"
+   }
+  ],
+  "build": [
+   {
+    "actor": "keeper",
+    "gasUsed": 4399057,
+    "effectiveGasPrice": 131229299,
+    "gasCostWei": 577285166371043,
+    "hash": "0xb71f265d2ff698d7a47534af97572ee717b98831b065ee2f3be2bc21d9492ac4"
+   },
+   {
+    "actor": "keeper",
+    "gasUsed": 4403674,
+    "effectiveGasPrice": 50386719,
+    "gasCostWei": 221886684405606,
+    "hash": "0x71f739e184618a66a5c62e7abed353830cba4d2ab0991957261108d394219c4e"
+   }
+  ],
+  "acquire": [
+   {
+    "actor": "purchaser",
+    "gasUsed": 478455,
+    "effectiveGasPrice": 109080785,
+    "gasCostWei": 52190246987175,
+    "hash": "0x3b4924cbf2dea7634c8dde32131b1fd0c2e1acf7190da921c0a8f5186c945f26"
+   },
+   {
+    "actor": "purchaser",
+    "gasUsed": 461355,
+    "effectiveGasPrice": 50318861,
+    "gasCostWei": 23214858116655,
+    "hash": "0x0defa223bdba8f8c7b93222bc266d42ae7512c804111e373501b4bb5cfb6e9dc"
+   }
+  ],
+  "setParams": [
+   {
+    "actor": "ui-owner",
+    "gasUsed": 105876,
+    "effectiveGasPrice": 1052116906,
+    "gasCostWei": 111393929539656,
+    "hash": "0x6c20051229c1c8325c4d3be92a54b0b9bb9482b2d2c64e8644de12eaee8a754b"
+   },
+   {
+    "actor": "cli-owner",
+    "gasUsed": 105876,
+    "effectiveGasPrice": 50363756,
+    "gasCostWei": 5332313030256,
+    "hash": "0xcffc1f3650f8e0f9aebc1dce4fff88bd8fd4ffa94e0119c799bab11368aa7237"
+   }
+  ],
+  "setExiting": [
+   {
+    "actor": "ui-owner",
+    "gasUsed": 53214,
+    "effectiveGasPrice": 1045684517,
+    "gasCostWei": 55645055887638,
+    "hash": "0x283e97a4f8cbd51983902bb8841b228f0a416a71265b3c2cfb7f4ae3bf9fd3f1"
+   },
+   {
+    "actor": "cli-owner",
+    "gasUsed": 53214,
+    "effectiveGasPrice": 50281196,
+    "gasCostWei": 2675663563944,
+    "hash": "0x41888db7dec9b03d8ecd05b7edd6096646e4dd7d52afdba6a75708e635665869"
+   }
+  ],
+  "processAcquisitions": [
+   {
+    "actor": "ui-owner",
+    "gasUsed": 115941,
+    "effectiveGasPrice": 1000728475,
+    "gasCostWei": 116025460119975,
+    "hash": "0x52896576e5acb92b27e02a32f6eac99ba1e8a89366a7d8fc47e1e861206425de"
+   },
+   {
+    "actor": "cli-owner",
+    "gasUsed": 82993,
+    "effectiveGasPrice": 50003927,
+    "gasCostWei": 4149975913511,
+    "hash": "0x64a54f853d8c17b7676dc95db9d9c00399b74486f2a744a209f80cef3dd78b1e"
+   }
+  ],
+  "recover": [
+   {
+    "actor": "ui-owner",
+    "gasUsed": 199047,
+    "effectiveGasPrice": 1000638675,
+    "gasCostWei": 199174126342725,
+    "hash": "0x314c5ff76e11281ea3d89af11b49f927f27e355077de4b73032e5df3dc54b84b"
+   }
+  ],
+  "recoverUnlist": [
+   {
+    "actor": "ui-owner",
+    "gasUsed": 1085668,
+    "effectiveGasPrice": 1000560735,
+    "gasCostWei": 1086276772045980,
+    "hash": "0x4f72eb6bdbf014359ff0157482ad1b9fe8c779bda8eb0b1ca1e6136a38f3dda1"
+   },
+   {
+    "actor": "cli-owner",
+    "gasUsed": 1085668,
+    "effectiveGasPrice": 50003441,
+    "gasCostWei": 54287135783588,
+    "hash": "0xe7d7b3611dc21b8884b7f5741002c748478512c42f5b8298f9944844c2695c6f"
+   }
+  ],
+  "recoverLiquidate": [
+   {
+    "actor": "ui-owner",
+    "gasUsed": 593594,
+    "effectiveGasPrice": 1000499715,
+    "gasCostWei": 593890627825710,
+    "hash": "0xfc46b47ede913f8c81742b8fbd9244fd495a48e954456d6e437fb2fbef45585c"
+   },
+   {
+    "actor": "cli-owner",
+    "gasUsed": 593594,
+    "effectiveGasPrice": 50003067,
+    "gasCostWei": 29681520552798,
+    "hash": "0xa39d26114a0369b1d58f2ff8a9d1cdc96526e730e0bf31081decabd6fc1c09bd"
+   }
+  ],
+  "withdraw": [
+   {
+    "actor": "ui-owner",
+    "gasUsed": 38904,
+    "effectiveGasPrice": 1000441671,
+    "gasCostWei": 38921182768584,
+    "hash": "0xd6d4f2d21b23eec59ea12bc6a3f2c110d7fd57e38ad60e511c0db79d0fe4bddb"
+   },
+   {
+    "actor": "cli-owner",
+    "gasUsed": 38904,
+    "effectiveGasPrice": 50002711,
+    "gasCostWei": 1945305468744,
+    "hash": "0x764456dbfd13b0194b7e35c3709290b4891518ab9152f13dd5e1ed61b4ab455b"
+   }
+  ]
+ },
+ "unmeasured": {
+  "harvest": {
+   "gas": 300000,
+   "method": "Explicit conservative unmeasured allowance; Forge genuine-credit path proves functionality, not a billed standalone harvest receipt"
+  },
+  "renew": "No billed authentic-VRF renewal receipt; keeper margin uses configured work allowances, separately flagged unmeasured"
+ },
+ "limits": [
+  "Unlist/liquidate/build samples contain3packs; the model uses these as conservative floors and takes the larger verified-work allowance for larger batches. They are not single-pack measurements.",
+  "processAcquisitions samples expire one genuine pending request each. Counterfactual exit processing charges every pending record a full single-request sample, records ceil(records/16) bounded calls, and retains archived readiness times.",
+  "One-time factory/library deployment is separate startup cost; individual owners pay actual clone creation gas.",
+  "No aggregate Forge test gas is used as a receipt."
+ ]
+}
