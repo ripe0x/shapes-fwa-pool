@@ -1,0 +1,49 @@
+ASSET FLOW GATE: INCOMPLETE   regimes init, max_load, inactive_short, inactive_long, gas_spike, oracle_change, keeper_delay, withdrawals, settled_unclaimed, distributions, wind_down, acquire_bid, acquire_keep, acquire_silent, staged_activation, tokens   (scorecards NOT regenerated)
+export SOURCE_HASH=b2bc7a7dc81ad30d093e24021468dbf698d75aa78671d227e95c54939a18c23d
+review: none recorded for the current source
+approval hash: 4570130bba284e2efffc0732ba67299c37ef8dc2f6f15a7c33c24f1bc4850b96
+owner signs it (2 commands), pastes /tmp/af.txt.sig into approval.signature:
+  printf %s 4570130bba284e2efffc0732ba67299c37ef8dc2f6f15a7c33c24f1bc4850b96 > /tmp/af.txt
+  ssh-keygen -Y sign -f <your-key> -n asset-flow /tmp/af.txt
+AGENT: before asking the owner to sign, show a table: the decision, each option, its tradeoffs, the measured numbers, your recommendation and why.
+allowed_signers entry, one line: owner <public key>   (e.g. owner ssh-ed25519 AAAA...)
+
+OUTCOMES (each must hold in every regime listed for it)
+  O1: UNSIGNED local candidate. A bid transfers the separate 0.21 ETH backing to the purchaser and FWA; the account receives the 0.03 ETH pack. FreshAfterAcquisition retires that acquired return once and pays for three fresh primary mints and one replacement listing when cash and permission permit. 70,000 bps backing is an evaluation input, not an approved production value.  [at most 0.22 ETH; only in acquire_bid, staged_activation]
+      worst 0.0648 ETH in acquire_bid   OK
+  O2: UNSIGNED local candidate. Verified work is paid by the account GasSchedule at min(basefee + configured priority, class ceiling), routine markup on routine gas, plus workFee per service unit. One calculation supplies quote, compensation and relevant charges. Receipt gas is measured separately. The existing 1.75M per-position batch quote comparison remains visible; it does not prove keeper profitability or economic acceptance.  [at most 1750000; only in max_load]
+      worst 1617857 in max_load   OK
+  O3: UNSIGNED local candidate. A successful checkpoint prices holder flows once. Redemptions fill pro rata using free cash and actually committing gross deposits. Caller-funded bounded work and funded checkpoints support complete exits. Every liability, including contribution refunds, stays excluded from free cash.  [at most 0; only in wind_down]
+      worst 0 in wind_down   OK
+  O4: UNSIGNED local candidate. After complete wind-down the residual belongs only to dead shares and independently attributed rounding reserves; no holder, contribution refund or claim is treated as investable residual. The historical 0.012 ETH comparison is preserved for measurement, not reused approval.  [at most 12000000000000000; only in wind_down]
+      worst 10630990561712353 in wind_down   OK
+  O5: UNSIGNED local candidate. Gross pending deposits, redemption/distribution reserves, claimables, processing contributions and finalized contribution refunds are protected liabilities. Pricing work debits its explicit source; contribution cash is never temporarily general free ETH.  [at most 0; only in settled_unclaimed]
+      worst 0 in settled_unclaimed   OK
+  O6: UNSIGNED local candidate. Numerical gas calibration is immediately adjustable. Ordinary sync uses routine permissions; requested pricing scans/tails may use explicit sponsorship; checkpoint debits that era even when it completes the final redemption. Unpaid recovery is caller funded under a stated wallet cap. Raising an allowance creates no cash.  [at most 200000000000000; only in gas_spike]
+      worst 1020000000000000 in gas_spike   FAIL in gas_spike
+  O7: UNSIGNED, unified candidate. FWA token rewards (D43): claimed and burned, never sold. Supply falls by exactly the claimed amount and the burn pays the caller no ETH, so holders pay no gas and get no token value.  [at most 0; only in tokens]
+      worst 0 in tokens   OK
+  O8: UNSIGNED, unified candidate. Oracle failure cannot trap assets (D34): with FWA's floor oracle repointed so no quote can be read, nothing new lists unless FWA exempts the collection from its oracle (then no cap applies, D62), yet the kicked pack is back in inventory and a holder redeeming everything is paid (measured 0.9975 ETH of a 1 ETH deposit).  [at least 950000000000000000; only in oracle_change]
+      worst 989803436154721521 in oracle_change   OK
+  O9: UNSIGNED local candidate. Zero-acquisition loss includes three actual 0.001 ETH paid primary mint fees per fresh 0.03 ETH pack, actual keeper compensation once, construction/checkpoint/exit charges and wallet gas. Existing 250 bps comparison is retained as a measurement target, not a claim that the new candidate meets it.  [at most 250; only in wind_down]
+      worst 89 in wind_down   OK
+  O10: UNSIGNED, unified candidate. A listing made while FWA's queue is busy would be staged and earn nothing. The vault refuses to list while the queue is busy (D62, audit B), so nothing it lists is staged; once the queue drains the relist goes in active.  [at least 1; only in staged_activation]
+      worst 1 in staged_activation   OK
+  O11: UNSIGNED local candidate. A keep transfers the actual 0.03 ETH pack to the purchaser and returns backing less the live settlement fee to the account: 0.2079 ETH at 1% on the local 0.21 ETH backing. Three replacement mints pay the actual live primary fee. Zero-fee maximum B-P is stored incrementally as unresolved keep uplift; local checkpoint bound25bps is provisional.  [at most 0.011 ETH; only in acquire_keep, acquire_silent]
+      worst 0.0006 ETH in acquire_keep   OK
+
+DESTINATIONS (% of inflow; largest 7 rows; only the like-for-like regimes: inactive_short, inactive_long)
+  name                                             inactive_shor inactive_long
+  held in backing held by FWA (active listings) (c         63.0%         63.0%
+  held in vault free ETH (reserve + idle) (change)         27.0%         27.0%
+  held in pack value in FWA custody (listed) (chan          9.0%          9.0%
+  Shapes mint fees                                          0.9%          0.9%
+  paid to keepers (gas + premium)                           0.1%          0.1%
+
+GAPS AND FAILURES
+  INCOMPLETE: approval: hash absent or does not match the approved settings
+  INCOMPLETE: regime init: stale source_hash (rerun tests with SOURCE_HASH=b2bc7a7dc81a...)
+  INCOMPLETE: regime max_load: stale source_hash (rerun tests with SOURCE_HASH=b2bc7a7dc81a...)
+  INCOMPLETE: regime inactive_short: stale source_hash (rerun tests with SOURCE_HASH=b2bc7a7dc81a...)
+  INCOMPLETE: regime inactive_long: stale source_hash (rerun tests with SOURCE_HASH=b2bc7a7dc81a...)
+  INCOMPLETE: regime gas_spike: stale source_hash (rerun tests with SOURCE_HASH=b2bc7a7dc81a...)
