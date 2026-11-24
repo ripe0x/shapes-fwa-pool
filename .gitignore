@@ -11,5 +11,14 @@ keeper/state-*.json.lock
 keeper/state-*.json.tmp
 keeper/index-*.sqlite*
 
+# Durable simulation rows are delivered compressed; local writers keep raw journals.
+/sim/out/manager-monte-carlo-adverse/paths.jsonl
+/sim/out/manager-monte-carlo-adverse/writer.lock
+/sim/out/manager-standard-backing/paths.jsonl
+/sim/out/manager-standard-backing/writer.lock
+/sim/out/manager-monte-carlo/paths.jsonl
+/sim/out/manager-monte-carlo/writer.lock
+/sim/out/manager-monte-carlo/rejected-inputs/
+
 # Local-only audit prompt (kept out of the repository)
 docs/AUDIT-PROMPT.md

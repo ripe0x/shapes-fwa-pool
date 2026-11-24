@@ -1,5 +1,9 @@
 # Personal manager economics
 
+**Historical small-sample diagnostic.** The two-draw recorded-month medians in this file cannot
+establish expected returns. The larger [paired return study](manager-monte-carlo.md) is running;
+its numerical results remain pending. Original values, inputs and evidence below are preserved.
+
 **Candidate evaluation, not a production recommendation or realized return.** Recipe: three paid 0.01 ETH Shapes per 0.03 ETH pack; backing 0.21 ETH. No personal-manager return hurdle has been approved.
 
 Current mint fee: **0.0005 ETH** at block **26486686**. The 0.001 ETH cells are the historical higher-fee comparison. Activity remains the separately pinned 30-day study ending at block 26484850. No public fee transaction was sent.

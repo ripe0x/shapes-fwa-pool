@@ -1,0 +1,26 @@
+{
+  "status": "REJECTED_DESIGN",
+  "exit_status": 130,
+  "rows_preserved": 676,
+  "outcomes_inspected": false,
+  "reason": "Fixed one-hour response censoring changed buyer stress and removed later purchaser bids despite continued protocol rights. Rejected before reviewing returns; original adverse responder definition will be restored in separate output namespace.",
+  "preserved_source_files": [
+    "sim/manager_monte_carlo.py",
+    "sim/test_manager_monte_carlo.py",
+    "sim/forward.py",
+    "sim/manager.py",
+    "sim/vault.py",
+    "sim/formal.py",
+    "sim/replay.py",
+    "keeper/policy.py",
+    "keeper/config.py",
+    "keeper/keeper.py",
+    "deploy/manager.json",
+    "deploy/mint-fee-observation.json",
+    "docs/receipts/manager-cost-calibration.json",
+    "docs/receipts/manager-monte-carlo-reconciliation.json",
+    "docs/receipts/manager-mc-live-observation.json",
+    "docs/receipts/manager-closeout.json"
+  ],
+  "replacement_output": "sim/out/manager-monte-carlo-adverse"
+}

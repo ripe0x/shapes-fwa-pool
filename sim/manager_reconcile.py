@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Replay actual manager fork operations through the shared book and personal-account adapter."""
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -123,6 +124,9 @@ def replay(path):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output', default='docs/receipts/manager-reconciliation.json')
+    args = parser.parse_args()
     traces=[ROOT/'sim/out/manager-fresh-trace.jsonl',ROOT/'sim/out/manager-reuse-trace.jsonl'];results=[replay(path) for path in traces]
     status='PASS' if all(row['status']=='PASS' for row in results) else 'FAIL'
     sources=['sim/manager.py','sim/vault.py','sim/forward.py','keeper/policy.py','keeper/config.py','sim/manager_reconcile.py']
@@ -131,7 +135,7 @@ def main():
         limits=['Actual historical fee0.001 traces; current publicfee is separately observed0.0005.',
                 'Fork state transitions and quoted payments, not billed wallet gas; owner wallet costs use the separate receipt calibration.',
                 'One authenticated allocation and complete reinvestment/exit in each mode; repeated and conditional funding mechanisms have separate contract coverage.'])
-    (ROOT/'docs/receipts/manager-reconciliation.json').write_text(json.dumps(report,indent=1)+'\n')
+    (ROOT/args.output).write_text(json.dumps(report,indent=1)+'\n')
     print(json.dumps(report,indent=1));return 0 if status=='PASS' else 1
 
 

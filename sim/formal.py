@@ -63,7 +63,7 @@ def window(db_path, end):
         requested_at, weight = request[a["requestId"]]
         # A request made before the window opens is placed at the opening so the queue balances.
         events.append((max(requested_at, start) - start, ts - start, (status == 2, weight)))
-    assert set(statuses) <= {2, 4}, statuses  # 2 settled, 4 refunded (slippage)
+    assert set(statuses) <= {2, 3, 4}, statuses  # Fulfilled, Expired (deadline refund), Refunded.
     responses, kinds = [], {}
     first = {}
     for ts, ev, a in db.execute("SELECT ts, event, args FROM logs WHERE event IN ('DepositorBidAccepted',"
@@ -80,7 +80,7 @@ def window(db_path, end):
     successful = statuses.get(2, 0)
     daily = np.bincount([int(at // F.DAY) for at, k, p in events if k == "acquisition" and p[0]], minlength=30)[:30]
     return dict(start=start, end=end, archive_top_block=top, events=events, pairs=pairs, successful=successful,
-                refunded=statuses.get(4, 0), successful_per_day=successful / 30, daily_successful=daily.tolist(),
+                refunded=statuses.get(3, 0)+statuses.get(4, 0), successful_per_day=successful / 30, daily_successful=daily.tolist(),
                 responses=responses, response_kinds=kinds)
 
 

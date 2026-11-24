@@ -1,0 +1,1054 @@
+{
+  "schema": 1,
+  "paths_per_cell": 8192,
+  "cells": [
+    {
+      "id": "b10000-g0.2",
+      "backing_bps": 10000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "b10000-g0.5",
+      "backing_bps": 10000,
+      "total_gas_gwei": 0.5
+    }
+  ],
+  "windows": [
+    {
+      "id": "w1792929275",
+      "start": 1790337275,
+      "end": 1792929275,
+      "successful": 47553,
+      "refunded": 6,
+      "response_kinds": {
+        "DepositorBidAccepted": 33592,
+        "NFTKept": 6039,
+        "silent": 1212,
+        "DepositorBidAcceptedAsTokens": 6710
+      },
+      "archive_top_block": 26484807,
+      "events_sha256": "7f909f02bb0eedcad92492707711e2e68e4f6080b6d5c340b10fa77716b317ad",
+      "responses_sha256": "518520dd7a5fcc736505074d600e5815232ce3882f07a17efee67db25d9bf3b5",
+      "response_cohort": {
+        "method": "original-formal-eventual-response-adverse-v1",
+        "observed_until": 1795520759,
+        "allocations_in_window": 47553,
+        "sampled_allocations": 47553,
+        "responsive_allocations": 46341,
+        "unresolved_at_archive_cutoff": 1212,
+        "allocations_excluded": 0,
+        "responsive_after3600_seconds": 1121,
+        "responsive_delays_clamped_to3480": 1168,
+        "responses_observed_after_window_end": 0,
+        "allocation_followup_seconds": {
+          "minimum": 2592012,
+          "median": 4415808,
+          "maximum": 5183064
+        },
+        "unresolved_allocation_followup_seconds": {
+          "minimum": 2600064,
+          "median": 4638498.0,
+          "maximum": 5182176
+        },
+        "cohort_sha256": "c827a09e3d593f9a3be28eb96cdcd905b9d96275e9a2576060bb2ab0afb27e05",
+        "responses_sha256": "518520dd7a5fcc736505074d600e5815232ce3882f07a17efee67db25d9bf3b5"
+      },
+      "gap_from_last_archived_event_seconds": 0,
+      "paths": 4096,
+      "seed_start": 100000,
+      "seed_end_exclusive": 104096
+    },
+    {
+      "id": "w1795521275",
+      "start": 1792929275,
+      "end": 1795521275,
+      "successful": 9856,
+      "refunded": 5090,
+      "response_kinds": {
+        "DepositorBidAcceptedAsTokens": 961,
+        "NFTKept": 2062,
+        "DepositorBidAccepted": 6661,
+        "silent": 172
+      },
+      "archive_top_block": 26484807,
+      "events_sha256": "16c8618f954e6cba72bb7fd10542e3105aab112a2aeeae227f1031822a6ecc6d",
+      "responses_sha256": "0f82f409d834e5b6560e4b5b0c29d8c512110dbfd0e3199fae31c0c5154b93db",
+      "response_cohort": {
+        "method": "original-formal-eventual-response-adverse-v1",
+        "observed_until": 1795520759,
+        "allocations_in_window": 9856,
+        "sampled_allocations": 9856,
+        "responsive_allocations": 9684,
+        "unresolved_at_archive_cutoff": 172,
+        "allocations_excluded": 0,
+        "responsive_after3600_seconds": 3089,
+        "responsive_delays_clamped_to3480": 3096,
+        "responses_observed_after_window_end": 0,
+        "allocation_followup_seconds": {
+          "minimum": 5016,
+          "median": 2107044.0,
+          "maximum": 2589252
+        },
+        "unresolved_allocation_followup_seconds": {
+          "minimum": 359952,
+          "median": 2097594.0,
+          "maximum": 2554392
+        },
+        "cohort_sha256": "2eb725399636a78c164696d09317da48e98341d49f148b6f9b6efc8f44be5671",
+        "responses_sha256": "0f82f409d834e5b6560e4b5b0c29d8c512110dbfd0e3199fae31c0c5154b93db"
+      },
+      "gap_from_last_archived_event_seconds": 516,
+      "paths": 4096,
+      "seed_start": 104096,
+      "seed_end_exclusive": 108192
+    }
+  ],
+  "archive": "sim/data/fwa.sqlite",
+  "source_sha256": {
+    "sim/manager_monte_carlo.py": "833c28dac609e99c92363de7a5d0e5c04e180f3f195c001ecf33ca89fdec9289",
+    "sim/test_manager_monte_carlo.py": "165d708846ba1203cd9be3d76d251c2c82c6f67b4fe37214255af3416224b739",
+    "sim/forward.py": "2466fbaf8a6647d53c3aaa35cfde169591cb7106edb2950d5b60f7813365a3c7",
+    "sim/manager.py": "901e776456b46b501af574562b41ac4f1b0e94f0e8edd3e6d5464e0a62a34a01",
+    "sim/vault.py": "b8545f3f17e1e2766a344aa45abf0ee421854d0e55bfec493ac2985e92e4dd66",
+    "sim/formal.py": "c682cbb515c0487c51ef0b2e6f68b3b0a5d6e3683cbbdcd22c3ed661ed13c4dc",
+    "sim/replay.py": "2d1f0227026e7fe7690229717ff31b7ac37a056ad197bb85687939a128879262",
+    "keeper/policy.py": "b56d5b11c6cd387c6c623419a5c31012bbae509680d29f403c2ef5954ac7f107",
+    "keeper/config.py": "39acb35f93fb64916dd4c8c8ab64da76742ec8c8b1c90902c9c1b014a6a22f06",
+    "keeper/keeper.py": "5bfe7f9b9965dcab42eeb92e7707e2a791132c5880b03fa2b3b929e2426816a1",
+    "deploy/manager.json": "f216770efacfe587770fe3d3821d0f2489d40c4e4f7758a051be77195ac0c026",
+    "deploy/mint-fee-observation.json": "feb7d12387928144de212966dd3e431c4f2ba5b648ad3ea409f9ba61620ac29b",
+    "docs/receipts/manager-cost-calibration.json": "400faba2c6d1acc5ba3057d75d9517510d99515dfca5feb045d65c08eaca692f",
+    "docs/receipts/manager-monte-carlo-reconciliation.json": "d6923188d833d05c96abf47a8fb1214160d9df33b10c57b6d85ebe557d2dc1a6",
+    "sim/data/fwa.sqlite": "9f05929e7d333f3b43d5c85ef3e8b03f0498523c1a7ab60a0267c87749cd019c",
+    "docs/receipts/manager-mc-live-observation.json": "fc01739d94e37f42134ab9dbc1c66de9c4305f7f129f48be305eca10bdbf29c8",
+    "docs/receipts/manager-closeout.json": "d993014803106aa76e8da392a0f63b702ac27da81193caeba5e28a0634f012c4",
+    "sim/out/manager-monte-carlo-adverse/manifest.json": "bafa22a1e23e71efb276eae9be0fc68ebd8d30420a24dab560a23d34f5d715c9",
+    "sim/manager_standard_backing.py": "d73ce077fe38f5234c692547ad454c6f13cb78e11df1c95ea1bb78a9775160c6",
+    "sim/test_manager_standard_backing.py": "15266b77ee161d487ba5bf8396fe8792471a657b43d1f8fc47b11e4ffa27a8f9",
+    "docs/receipts/manager-standard-min-backing-observation.json": "d09339b3212113da29708dd6dc2ac26adb822472ac4b2878793c2c0fcf9c17fe"
+  },
+  "contract_source_sha256": {
+    "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
+    "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+    "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+    "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
+    "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+    "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+    "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
+    "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+  },
+  "archive_coverage": {
+    "first_timestamp": 1789014107,
+    "last_timestamp": 1795520759,
+    "top_block": 26484807
+  },
+  "manager_values": {
+    "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
+    "minEdgeBps": 100,
+    "bufferBps": 0,
+    "distributionBps": 0,
+    "payMarkupBps": 0,
+    "keeperShareBps": 2500,
+    "packUnitsMask": 8,
+    "gasCeilingWei": 500000000,
+    "essentialCeilingWei": 500000000,
+    "maxTipWei": 50000000,
+    "workFeeWei": 20000000000000,
+    "reserveWei": 5000000000000000,
+    "tvlCapWei": 0,
+    "routineCapWei": 30000000000000000,
+    "routineRatePerDayWei": 10000000000000000,
+    "essentialCapWei": 10000000000000000,
+    "essentialRatePerDayWei": 5000000000000000,
+    "upliftBoundBps": 25,
+    "backingRatioBps": 70000,
+    "renewalMode": 0,
+    "renewalFloatCount": 1,
+    "acceptedMintFeeWei": 1000000000000000,
+    "minDepositWei": 10000000000000000,
+    "minDistributionWei": 10000000000000000,
+    "gasSchedule": {
+      "checkpoint": 500000,
+      "allocationEntry": 6000,
+      "allocationRead": 30000,
+      "build": 360000,
+      "buildPack": 300000,
+      "buildShape": 130000,
+      "list": 280000,
+      "listed": 825000,
+      "sync": 125000,
+      "requiredTail": 120000,
+      "distributionProof": 80000,
+      "journal": 22000,
+      "scan": 30000,
+      "selected": 180000,
+      "synced": 120000,
+      "pruned": 45000,
+      "unlist": 340000,
+      "unlisted": 285000,
+      "liquidate": 75000,
+      "liquidatePack": 80000,
+      "redeemShape": 35000,
+      "recoveryBase": 100000,
+      "recoveryShape": 35000,
+      "recoveryUnseal": 70000,
+      "harvest": 125000,
+      "harvested": 80000,
+      "credit": 40000,
+      "fund": 40000
+    },
+    "expectedMintFeeWei": 1000000000000000
+  },
+  "mint_fee_wei": 500000000000000,
+  "mint_fee_observation": {
+    "block": 26487484,
+    "blockHash": "0x14287488e917363ddef2ae8693a71053ca435828f2a2dc4375c947b594fa7939",
+    "timestamp": 1795552991,
+    "rpc": "https://mainnet.gateway.tenderly.co",
+    "readOnly": true,
+    "mintFeeWei": 500000000000000,
+    "protocol": {
+      "totalWeight": 52918485163442081987189,
+      "weightedBackingTotal": 2559999999999999999883966035229199543000,
+      "acquisitionFee": 50795104805021200,
+      "ownerAcquisitionFeeBps": 100,
+      "topListingShareBps": 10,
+      "ownerSettlementFeeBps": 100,
+      "settlementDiscountBps": 9000,
+      "tokenSettlementDiscountBps": 9150,
+      "settlementWindow": 3600,
+      "inferredGrossMultiplier1e18": 1038460499999999998
+    },
+    "oracleExempt": true
+  },
+  "verified_model_protocol_constants": {
+    "ownerAcquisitionFeeBps": 100,
+    "topListingShareBps": 10,
+    "ownerSettlementFeeBps": 100,
+    "settlementDiscountBps": 9000,
+    "settlementWindow": 3600
+  },
+  "model_gross_multiplier_1e18": 1038460500000000000,
+  "gas_proxy": {
+    "create": 606172,
+    "setExiting": 53214,
+    "withdraw": 38904,
+    "unlist": 604066,
+    "liquidate": 303433,
+    "recover_sync": 199047,
+    "processAcquisitions": 115941,
+    "build": 1921138,
+    "harvest": 300000
+  },
+  "unmeasured_operations": [
+    "renew",
+    "harvest"
+  ],
+  "randomness": "request_randomness v1: request ordinal includes refunded/repeated events; paired across cells",
+  "inference": {
+    "sample_size": "Fixed in advance; no outcome-dependent stopping or sample-size change",
+    "probability_precision": "4096 paths/window gives maximum Wilson95 halfwidth about1.53percentage points;8192 pooled iid paths would give1.083points, but the two-window mixture uses simultaneous stratum bounds instead",
+    "mean_interval": "Normal-approximation conditional Monte Carlo CI, stratified across archive windows",
+    "paired_interval": "Two gas-level backing contrasts, each two-sided97.5%; Bonferroni family95%",
+    "probability_interval": "Wilson95% per window; simultaneous conservative bounds for fixed mixture",
+    "standard_comparisons": "Four standard-minus-parent contrasts (.15/.21 at two gas levels), each two-sided98.75%; Bonferroni family95%"
+  },
+  "assumptions": [
+    "30 operating days, at most7 exit days, .5ETH owner funding, FreshAfterAcquisition, mask8.",
+    "Response samples are the exact original formal.window tables: first archived ETH bid/token bid/keep after each window allocation, through the common archive cutoff. No allocation or late response is excluded.",
+    "Every observed responder is forced to take the depositor bid with delay min(observed delay,3480seconds), including responses observed after3600seconds. Unresolved allocations at the archive cutoff remain None. This restores the original adverse stress, not empirical buyer-choice or timing replay.",
+    "The older month has longer available follow-up; unresolved responses are right-censored at the archive cutoff. Per-window follow-up horizons and late/clamped counts are disclosed. Silence frequencies are not comparable empirical behavior estimates or forecasts.",
+    "Archive request times/outcomes/foreign weights are fixed; no competitive or behavioral market response to the manager.",
+    "Fresh observed protocol fee/crown/settlement rules are applied to historical arrivals and weights; historical per-event fee configurations are not replayed.",
+    "The30day archive repeats during the exit tail, including later requests; this is an explicit continuation assumption.",
+    "Owner and keeper gas are receipt-calibrated proxies, including declared unmeasured operations; creator fees are gross accrual, not creator net profit.",
+    "Cash-short probability is ever observed at planner reads; full-period duration is unavailable.",
+    "Incomplete exits retain realized cash net so far and unresolved assets separately; future recovery gas is unknown, so that cash figure is not a guaranteed final-return lower bound.",
+    "Intervals measure conditional simulation noise, not future market uncertainty. No APR or personal-manager production return hurdle is inferred.",
+    "Not deployable through current manager contracts; no claim of fork integration for relaxed admission.",
+    "Uses manager-batched wallet/keeper gas proxies, not receipts proving a manual operator can reproduce these costs.",
+    "Forced responsive bids are not a worst-case buyer choice at .03backing: keep is worse by .0003ETH per-cycle before gas. Bid and keep screens are both reported.",
+    "The same .5ETH funding supports different position counts at each backing; this changes selection exposure and cash use, not just loss per acquisition.",
+    "Finite cash and spending permission can prevent construction or renewal; no hidden topup or positive-return filter is added."
+  ],
+  "parent_campaign_hash": "13b63560ec6ddf116c68077e09be57212971265634747fbaafa1f9e2775e1f5a",
+  "parent_manifest": "sim/out/manager-monte-carlo-adverse/manifest.json",
+  "parent_manifest_sha256": "bafa22a1e23e71efb276eae9be0fc68ebd8d30420a24dab560a23d34f5d715c9",
+  "standard_backing_regime": {
+    "label": "RELAXED_ADMISSION_FORCED_BID_REFERENCE_NOT_CURRENT_CONTRACT",
+    "protocol_minimum": {
+      "value_wei": 25000000000000000,
+      "block": 25944617,
+      "log_index": 384,
+      "method": "Latest archived actual FWA ConfigSet key22; not a fresh public-state read",
+      "live_confirmation": {
+        "readOnly": true,
+        "rpc": "https://mainnet.gateway.tenderly.co",
+        "fromBlock": 26484808,
+        "toBlock": 26487484,
+        "blockHash": "0x14287488e917363ddef2ae8693a71053ca435828f2a2dc4375c947b594fa7939",
+        "configKey": 22,
+        "archiveLastChange": {
+          "block": 25944617,
+          "valueWei": 25000000000000000
+        },
+        "subsequentLogs": [],
+        "retainedToProtocol": true
+      }
+    },
+    "overrides": [
+      "policy.edge_backing: requested ratio, positive protocol minimum/cap and quantization retained; manager coverage/profit admission omitted",
+      "keeper.proposal_limits: protocol minimum/cap, quantization and valid settlement/discount inputs retained; manager coverage/profit floors omitted",
+      "policy.build_net: permit negative-edge ordinary construction when otherwise funded"
+    ],
+    "unchanged": [
+      "Actual protocol k, fees and settlement outcomes",
+      "Three paid primary mints, recipe and fresh renewal",
+      "Canonical integer account ledger, funding/reserves, budget/permission, payment and gas-cost logic",
+      "Canonical bounded planner, unique backing proposals, request tape, buyer stress, actor and owner-paid exit behavior"
+    ],
+    "parent_interpretation": "Only .03backing is hypothetical. Parent .15/.21 results retain unmodified manager admission.",
+    "limits": [
+      "Not deployable through current manager contracts; no claim of fork integration for relaxed admission.",
+      "Uses manager-batched wallet/keeper gas proxies, not receipts proving a manual operator can reproduce these costs.",
+      "Forced responsive bids are not a worst-case buyer choice at .03backing: keep is worse by .0003ETH per-cycle before gas. Bid and keep screens are both reported.",
+      "The same .5ETH funding supports different position counts at each backing; this changes selection exposure and cash use, not just loss per acquisition.",
+      "Finite cash and spending permission can prevent construction or renewal; no hidden topup or positive-return filter is added."
+    ]
+  },
+  "unmodified_admission_diagnostic": {
+    "kind": "Unmodified current manager admission and per-outcome quoted single-cycle screens",
+    "rows": [
+      {
+        "backing_wei": 30000000000000000,
+        "pack_principal_wei": 30000000000000000,
+        "mint_count": 3,
+        "mint_fee_per_shape_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "k_1e18": 1038460499999999998,
+        "bid_cycle_gross_wei": 1153814999999999,
+        "keep_cycle_gross_after_face_wei": 853814999999999,
+        "primary_mint_fees_wei": 1500000000000000,
+        "construction_quote_wei": 415000000000000,
+        "bid_maintenance_and_retirement_quote_wei": 222400000000000,
+        "keep_maintenance_quote_wei": 150400000000000,
+        "canonical_admission_conservative_cost_wei": 2137400000000000,
+        "bid_cycle_quoted_cost_wei": 2137400000000000,
+        "keep_cycle_quoted_cost_wei": 2065400000000000,
+        "bid_cycle_net_after_quoted_cost_wei": -983585000000001,
+        "keep_cycle_net_after_quoted_cost_wei": -1211585000000001,
+        "quote_gas_components": {
+          "construction": {
+            "build": 360000,
+            "pack": 300000,
+            "three_shapes": 390000,
+            "listed": 825000
+          },
+          "maintenance": {
+            "sync": 125000,
+            "journal": 22000,
+            "selected": 180000,
+            "synced": 120000,
+            "pruned": 45000,
+            "sync_funding": 40000,
+            "harvested": 80000,
+            "sync_credit": 40000
+          },
+          "retirement": {
+            "liquidate": 75000,
+            "pack": 80000,
+            "three_shapes": 105000
+          }
+        },
+        "work_units": {
+          "construction": 2,
+          "bid_maintenance_and_retirement": 2,
+          "keep_maintenance": 1
+        },
+        "conditional_collection_included_once": [
+          "sync_funding",
+          "harvested",
+          "sync_credit"
+        ],
+        "canonical_admission_backing_wei": 0,
+        "canonical_rejection_reasons": [
+          "IMMUTABLE_95PCT_FACE_COVERAGE",
+          "BID_CYCLE_NOT_PROFITABLE",
+          "KEEP_CYCLE_NOT_PROFITABLE"
+        ],
+        "canonical_minimum_backing_quantized_wei": 55573900495320000,
+        "initial_pack_and_backing_capital_wei": 60000000000000000,
+        "first_productive_account_funding_wei": 101042500000000000,
+        "own_selection_weight_1e18": 33333333333333333333,
+        "selection_probability_against_same_live_foreign_pool": 0.0006295030894050073
+      },
+      {
+        "backing_wei": 150000000000000000,
+        "pack_principal_wei": 30000000000000000,
+        "mint_count": 3,
+        "mint_fee_per_shape_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "k_1e18": 1038460499999999998,
+        "bid_cycle_gross_wei": 5769074999999999,
+        "keep_cycle_gross_after_face_wei": 124269074999999999,
+        "primary_mint_fees_wei": 1500000000000000,
+        "construction_quote_wei": 415000000000000,
+        "bid_maintenance_and_retirement_quote_wei": 222400000000000,
+        "keep_maintenance_quote_wei": 150400000000000,
+        "canonical_admission_conservative_cost_wei": 2137400000000000,
+        "bid_cycle_quoted_cost_wei": 2137400000000000,
+        "keep_cycle_quoted_cost_wei": 2065400000000000,
+        "bid_cycle_net_after_quoted_cost_wei": 3631674999999999,
+        "keep_cycle_net_after_quoted_cost_wei": 122203674999999999,
+        "quote_gas_components": {
+          "construction": {
+            "build": 360000,
+            "pack": 300000,
+            "three_shapes": 390000,
+            "listed": 825000
+          },
+          "maintenance": {
+            "sync": 125000,
+            "journal": 22000,
+            "selected": 180000,
+            "synced": 120000,
+            "pruned": 45000,
+            "sync_funding": 40000,
+            "harvested": 80000,
+            "sync_credit": 40000
+          },
+          "retirement": {
+            "liquidate": 75000,
+            "pack": 80000,
+            "three_shapes": 105000
+          }
+        },
+        "work_units": {
+          "construction": 2,
+          "bid_maintenance_and_retirement": 2,
+          "keep_maintenance": 1
+        },
+        "conditional_collection_included_once": [
+          "sync_funding",
+          "harvested",
+          "sync_credit"
+        ],
+        "canonical_admission_backing_wei": 150000000000000000,
+        "canonical_rejection_reasons": [],
+        "canonical_minimum_backing_quantized_wei": 55573900495320000,
+        "initial_pack_and_backing_capital_wei": 180000000000000000,
+        "first_productive_account_funding_wei": 341042500000000000,
+        "own_selection_weight_1e18": 6666666666666666666,
+        "selection_probability_against_same_live_foreign_pool": 0.00012596405368976282
+      },
+      {
+        "backing_wei": 210000000000000000,
+        "pack_principal_wei": 30000000000000000,
+        "mint_count": 3,
+        "mint_fee_per_shape_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "k_1e18": 1038460499999999998,
+        "bid_cycle_gross_wei": 8076704999999999,
+        "keep_cycle_gross_after_face_wei": 185976704999999999,
+        "primary_mint_fees_wei": 1500000000000000,
+        "construction_quote_wei": 415000000000000,
+        "bid_maintenance_and_retirement_quote_wei": 222400000000000,
+        "keep_maintenance_quote_wei": 150400000000000,
+        "canonical_admission_conservative_cost_wei": 2137400000000000,
+        "bid_cycle_quoted_cost_wei": 2137400000000000,
+        "keep_cycle_quoted_cost_wei": 2065400000000000,
+        "bid_cycle_net_after_quoted_cost_wei": 5939304999999999,
+        "keep_cycle_net_after_quoted_cost_wei": 183911304999999999,
+        "quote_gas_components": {
+          "construction": {
+            "build": 360000,
+            "pack": 300000,
+            "three_shapes": 390000,
+            "listed": 825000
+          },
+          "maintenance": {
+            "sync": 125000,
+            "journal": 22000,
+            "selected": 180000,
+            "synced": 120000,
+            "pruned": 45000,
+            "sync_funding": 40000,
+            "harvested": 80000,
+            "sync_credit": 40000
+          },
+          "retirement": {
+            "liquidate": 75000,
+            "pack": 80000,
+            "three_shapes": 105000
+          }
+        },
+        "work_units": {
+          "construction": 2,
+          "bid_maintenance_and_retirement": 2,
+          "keep_maintenance": 1
+        },
+        "conditional_collection_included_once": [
+          "sync_funding",
+          "harvested",
+          "sync_credit"
+        ],
+        "canonical_admission_backing_wei": 210000000000000000,
+        "canonical_rejection_reasons": [],
+        "canonical_minimum_backing_quantized_wei": 55573900495320000,
+        "initial_pack_and_backing_capital_wei": 240000000000000000,
+        "first_productive_account_funding_wei": 461042500000000000,
+        "own_selection_weight_1e18": 4761904761904761904,
+        "selection_probability_against_same_live_foreign_pool": 8.997756233225701e-05
+      },
+      {
+        "backing_wei": 30000000000000000,
+        "pack_principal_wei": 30000000000000000,
+        "mint_count": 3,
+        "mint_fee_per_shape_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "k_1e18": 1038460499999999998,
+        "bid_cycle_gross_wei": 1153814999999999,
+        "keep_cycle_gross_after_face_wei": 853814999999999,
+        "primary_mint_fees_wei": 1500000000000000,
+        "construction_quote_wei": 977500000000000,
+        "bid_maintenance_and_retirement_quote_wei": 496000000000000,
+        "keep_maintenance_quote_wei": 346000000000000,
+        "canonical_admission_conservative_cost_wei": 2973500000000000,
+        "bid_cycle_quoted_cost_wei": 2973500000000000,
+        "keep_cycle_quoted_cost_wei": 2823500000000000,
+        "bid_cycle_net_after_quoted_cost_wei": -1819685000000001,
+        "keep_cycle_net_after_quoted_cost_wei": -1969685000000001,
+        "quote_gas_components": {
+          "construction": {
+            "build": 360000,
+            "pack": 300000,
+            "three_shapes": 390000,
+            "listed": 825000
+          },
+          "maintenance": {
+            "sync": 125000,
+            "journal": 22000,
+            "selected": 180000,
+            "synced": 120000,
+            "pruned": 45000,
+            "sync_funding": 40000,
+            "harvested": 80000,
+            "sync_credit": 40000
+          },
+          "retirement": {
+            "liquidate": 75000,
+            "pack": 80000,
+            "three_shapes": 105000
+          }
+        },
+        "work_units": {
+          "construction": 2,
+          "bid_maintenance_and_retirement": 2,
+          "keep_maintenance": 1
+        },
+        "conditional_collection_included_once": [
+          "sync_funding",
+          "harvested",
+          "sync_credit"
+        ],
+        "canonical_admission_backing_wei": 0,
+        "canonical_rejection_reasons": [
+          "IMMUTABLE_95PCT_FACE_COVERAGE",
+          "BID_CYCLE_NOT_PROFITABLE",
+          "KEEP_CYCLE_NOT_PROFITABLE"
+        ],
+        "canonical_minimum_backing_quantized_wei": 77313087453370000,
+        "initial_pack_and_backing_capital_wei": 60000000000000000,
+        "first_productive_account_funding_wei": 101605000000000000,
+        "own_selection_weight_1e18": 33333333333333333333,
+        "selection_probability_against_same_live_foreign_pool": 0.0006295030894050073
+      },
+      {
+        "backing_wei": 150000000000000000,
+        "pack_principal_wei": 30000000000000000,
+        "mint_count": 3,
+        "mint_fee_per_shape_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "k_1e18": 1038460499999999998,
+        "bid_cycle_gross_wei": 5769074999999999,
+        "keep_cycle_gross_after_face_wei": 124269074999999999,
+        "primary_mint_fees_wei": 1500000000000000,
+        "construction_quote_wei": 977500000000000,
+        "bid_maintenance_and_retirement_quote_wei": 496000000000000,
+        "keep_maintenance_quote_wei": 346000000000000,
+        "canonical_admission_conservative_cost_wei": 2973500000000000,
+        "bid_cycle_quoted_cost_wei": 2973500000000000,
+        "keep_cycle_quoted_cost_wei": 2823500000000000,
+        "bid_cycle_net_after_quoted_cost_wei": 2795574999999999,
+        "keep_cycle_net_after_quoted_cost_wei": 121445574999999999,
+        "quote_gas_components": {
+          "construction": {
+            "build": 360000,
+            "pack": 300000,
+            "three_shapes": 390000,
+            "listed": 825000
+          },
+          "maintenance": {
+            "sync": 125000,
+            "journal": 22000,
+            "selected": 180000,
+            "synced": 120000,
+            "pruned": 45000,
+            "sync_funding": 40000,
+            "harvested": 80000,
+            "sync_credit": 40000
+          },
+          "retirement": {
+            "liquidate": 75000,
+            "pack": 80000,
+            "three_shapes": 105000
+          }
+        },
+        "work_units": {
+          "construction": 2,
+          "bid_maintenance_and_retirement": 2,
+          "keep_maintenance": 1
+        },
+        "conditional_collection_included_once": [
+          "sync_funding",
+          "harvested",
+          "sync_credit"
+        ],
+        "canonical_admission_backing_wei": 150000000000000000,
+        "canonical_rejection_reasons": [],
+        "canonical_minimum_backing_quantized_wei": 77313087453370000,
+        "initial_pack_and_backing_capital_wei": 180000000000000000,
+        "first_productive_account_funding_wei": 341605000000000000,
+        "own_selection_weight_1e18": 6666666666666666666,
+        "selection_probability_against_same_live_foreign_pool": 0.00012596405368976282
+      },
+      {
+        "backing_wei": 210000000000000000,
+        "pack_principal_wei": 30000000000000000,
+        "mint_count": 3,
+        "mint_fee_per_shape_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "k_1e18": 1038460499999999998,
+        "bid_cycle_gross_wei": 8076704999999999,
+        "keep_cycle_gross_after_face_wei": 185976704999999999,
+        "primary_mint_fees_wei": 1500000000000000,
+        "construction_quote_wei": 977500000000000,
+        "bid_maintenance_and_retirement_quote_wei": 496000000000000,
+        "keep_maintenance_quote_wei": 346000000000000,
+        "canonical_admission_conservative_cost_wei": 2973500000000000,
+        "bid_cycle_quoted_cost_wei": 2973500000000000,
+        "keep_cycle_quoted_cost_wei": 2823500000000000,
+        "bid_cycle_net_after_quoted_cost_wei": 5103204999999999,
+        "keep_cycle_net_after_quoted_cost_wei": 183153204999999999,
+        "quote_gas_components": {
+          "construction": {
+            "build": 360000,
+            "pack": 300000,
+            "three_shapes": 390000,
+            "listed": 825000
+          },
+          "maintenance": {
+            "sync": 125000,
+            "journal": 22000,
+            "selected": 180000,
+            "synced": 120000,
+            "pruned": 45000,
+            "sync_funding": 40000,
+            "harvested": 80000,
+            "sync_credit": 40000
+          },
+          "retirement": {
+            "liquidate": 75000,
+            "pack": 80000,
+            "three_shapes": 105000
+          }
+        },
+        "work_units": {
+          "construction": 2,
+          "bid_maintenance_and_retirement": 2,
+          "keep_maintenance": 1
+        },
+        "conditional_collection_included_once": [
+          "sync_funding",
+          "harvested",
+          "sync_credit"
+        ],
+        "canonical_admission_backing_wei": 210000000000000000,
+        "canonical_rejection_reasons": [],
+        "canonical_minimum_backing_quantized_wei": 77313087453370000,
+        "initial_pack_and_backing_capital_wei": 240000000000000000,
+        "first_productive_account_funding_wei": 461605000000000000,
+        "own_selection_weight_1e18": 4761904761904761904,
+        "selection_probability_against_same_live_foreign_pool": 8.997756233225701e-05
+      },
+      {
+        "backing_wei": 30000000000000000,
+        "pack_principal_wei": 30000000000000000,
+        "mint_count": 3,
+        "mint_fee_per_shape_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "k_1e18": 1038460499999999998,
+        "bid_cycle_gross_wei": 1153814999999999,
+        "keep_cycle_gross_after_face_wei": 853814999999999,
+        "primary_mint_fees_wei": 3000000000000000,
+        "construction_quote_wei": 415000000000000,
+        "bid_maintenance_and_retirement_quote_wei": 222400000000000,
+        "keep_maintenance_quote_wei": 150400000000000,
+        "canonical_admission_conservative_cost_wei": 3637400000000000,
+        "bid_cycle_quoted_cost_wei": 3637400000000000,
+        "keep_cycle_quoted_cost_wei": 3565400000000000,
+        "bid_cycle_net_after_quoted_cost_wei": -2483585000000001,
+        "keep_cycle_net_after_quoted_cost_wei": -2711585000000001,
+        "quote_gas_components": {
+          "construction": {
+            "build": 360000,
+            "pack": 300000,
+            "three_shapes": 390000,
+            "listed": 825000
+          },
+          "maintenance": {
+            "sync": 125000,
+            "journal": 22000,
+            "selected": 180000,
+            "synced": 120000,
+            "pruned": 45000,
+            "sync_funding": 40000,
+            "harvested": 80000,
+            "sync_credit": 40000
+          },
+          "retirement": {
+            "liquidate": 75000,
+            "pack": 80000,
+            "three_shapes": 105000
+          }
+        },
+        "work_units": {
+          "construction": 2,
+          "bid_maintenance_and_retirement": 2,
+          "keep_maintenance": 1
+        },
+        "conditional_collection_included_once": [
+          "sync_funding",
+          "harvested",
+          "sync_credit"
+        ],
+        "canonical_admission_backing_wei": 0,
+        "canonical_rejection_reasons": [
+          "IMMUTABLE_95PCT_FACE_COVERAGE",
+          "BID_CYCLE_NOT_PROFITABLE",
+          "KEEP_CYCLE_NOT_PROFITABLE"
+        ],
+        "canonical_minimum_backing_quantized_wei": 94574953523750000,
+        "initial_pack_and_backing_capital_wei": 60000000000000000,
+        "first_productive_account_funding_wei": 102542500000000000,
+        "own_selection_weight_1e18": 33333333333333333333,
+        "selection_probability_against_same_live_foreign_pool": 0.0006295030894050073
+      },
+      {
+        "backing_wei": 150000000000000000,
+        "pack_principal_wei": 30000000000000000,
+        "mint_count": 3,
+        "mint_fee_per_shape_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "k_1e18": 1038460499999999998,
+        "bid_cycle_gross_wei": 5769074999999999,
+        "keep_cycle_gross_after_face_wei": 124269074999999999,
+        "primary_mint_fees_wei": 3000000000000000,
+        "construction_quote_wei": 415000000000000,
+        "bid_maintenance_and_retirement_quote_wei": 222400000000000,
+        "keep_maintenance_quote_wei": 150400000000000,
+        "canonical_admission_conservative_cost_wei": 3637400000000000,
+        "bid_cycle_quoted_cost_wei": 3637400000000000,
+        "keep_cycle_quoted_cost_wei": 3565400000000000,
+        "bid_cycle_net_after_quoted_cost_wei": 2131674999999999,
+        "keep_cycle_net_after_quoted_cost_wei": 120703674999999999,
+        "quote_gas_components": {
+          "construction": {
+            "build": 360000,
+            "pack": 300000,
+            "three_shapes": 390000,
+            "listed": 825000
+          },
+          "maintenance": {
+            "sync": 125000,
+            "journal": 22000,
+            "selected": 180000,
+            "synced": 120000,
+            "pruned": 45000,
+            "sync_funding": 40000,
+            "harvested": 80000,
+            "sync_credit": 40000
+          },
+          "retirement": {
+            "liquidate": 75000,
+            "pack": 80000,
+            "three_shapes": 105000
+          }
+        },
+        "work_units": {
+          "construction": 2,
+          "bid_maintenance_and_retirement": 2,
+          "keep_maintenance": 1
+        },
+        "conditional_collection_included_once": [
+          "sync_funding",
+          "harvested",
+          "sync_credit"
+        ],
+        "canonical_admission_backing_wei": 150000000000000000,
+        "canonical_rejection_reasons": [],
+        "canonical_minimum_backing_quantized_wei": 94574953523750000,
+        "initial_pack_and_backing_capital_wei": 180000000000000000,
+        "first_productive_account_funding_wei": 342542500000000000,
+        "own_selection_weight_1e18": 6666666666666666666,
+        "selection_probability_against_same_live_foreign_pool": 0.00012596405368976282
+      },
+      {
+        "backing_wei": 210000000000000000,
+        "pack_principal_wei": 30000000000000000,
+        "mint_count": 3,
+        "mint_fee_per_shape_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "k_1e18": 1038460499999999998,
+        "bid_cycle_gross_wei": 8076704999999999,
+        "keep_cycle_gross_after_face_wei": 185976704999999999,
+        "primary_mint_fees_wei": 3000000000000000,
+        "construction_quote_wei": 415000000000000,
+        "bid_maintenance_and_retirement_quote_wei": 222400000000000,
+        "keep_maintenance_quote_wei": 150400000000000,
+        "canonical_admission_conservative_cost_wei": 3637400000000000,
+        "bid_cycle_quoted_cost_wei": 3637400000000000,
+        "keep_cycle_quoted_cost_wei": 3565400000000000,
+        "bid_cycle_net_after_quoted_cost_wei": 4439304999999999,
+        "keep_cycle_net_after_quoted_cost_wei": 182411304999999999,
+        "quote_gas_components": {
+          "construction": {
+            "build": 360000,
+            "pack": 300000,
+            "three_shapes": 390000,
+            "listed": 825000
+          },
+          "maintenance": {
+            "sync": 125000,
+            "journal": 22000,
+            "selected": 180000,
+            "synced": 120000,
+            "pruned": 45000,
+            "sync_funding": 40000,
+            "harvested": 80000,
+            "sync_credit": 40000
+          },
+          "retirement": {
+            "liquidate": 75000,
+            "pack": 80000,
+            "three_shapes": 105000
+          }
+        },
+        "work_units": {
+          "construction": 2,
+          "bid_maintenance_and_retirement": 2,
+          "keep_maintenance": 1
+        },
+        "conditional_collection_included_once": [
+          "sync_funding",
+          "harvested",
+          "sync_credit"
+        ],
+        "canonical_admission_backing_wei": 210000000000000000,
+        "canonical_rejection_reasons": [],
+        "canonical_minimum_backing_quantized_wei": 94574953523750000,
+        "initial_pack_and_backing_capital_wei": 240000000000000000,
+        "first_productive_account_funding_wei": 462542500000000000,
+        "own_selection_weight_1e18": 4761904761904761904,
+        "selection_probability_against_same_live_foreign_pool": 8.997756233225701e-05
+      },
+      {
+        "backing_wei": 30000000000000000,
+        "pack_principal_wei": 30000000000000000,
+        "mint_count": 3,
+        "mint_fee_per_shape_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "k_1e18": 1038460499999999998,
+        "bid_cycle_gross_wei": 1153814999999999,
+        "keep_cycle_gross_after_face_wei": 853814999999999,
+        "primary_mint_fees_wei": 3000000000000000,
+        "construction_quote_wei": 977500000000000,
+        "bid_maintenance_and_retirement_quote_wei": 496000000000000,
+        "keep_maintenance_quote_wei": 346000000000000,
+        "canonical_admission_conservative_cost_wei": 4473500000000000,
+        "bid_cycle_quoted_cost_wei": 4473500000000000,
+        "keep_cycle_quoted_cost_wei": 4323500000000000,
+        "bid_cycle_net_after_quoted_cost_wei": -3319685000000001,
+        "keep_cycle_net_after_quoted_cost_wei": -3469685000000001,
+        "quote_gas_components": {
+          "construction": {
+            "build": 360000,
+            "pack": 300000,
+            "three_shapes": 390000,
+            "listed": 825000
+          },
+          "maintenance": {
+            "sync": 125000,
+            "journal": 22000,
+            "selected": 180000,
+            "synced": 120000,
+            "pruned": 45000,
+            "sync_funding": 40000,
+            "harvested": 80000,
+            "sync_credit": 40000
+          },
+          "retirement": {
+            "liquidate": 75000,
+            "pack": 80000,
+            "three_shapes": 105000
+          }
+        },
+        "work_units": {
+          "construction": 2,
+          "bid_maintenance_and_retirement": 2,
+          "keep_maintenance": 1
+        },
+        "conditional_collection_included_once": [
+          "sync_funding",
+          "harvested",
+          "sync_credit"
+        ],
+        "canonical_admission_backing_wei": 0,
+        "canonical_rejection_reasons": [
+          "IMMUTABLE_95PCT_FACE_COVERAGE",
+          "BID_CYCLE_NOT_PROFITABLE",
+          "KEEP_CYCLE_NOT_PROFITABLE"
+        ],
+        "canonical_minimum_backing_quantized_wei": 116314140481800000,
+        "initial_pack_and_backing_capital_wei": 60000000000000000,
+        "first_productive_account_funding_wei": 103105000000000000,
+        "own_selection_weight_1e18": 33333333333333333333,
+        "selection_probability_against_same_live_foreign_pool": 0.0006295030894050073
+      },
+      {
+        "backing_wei": 150000000000000000,
+        "pack_principal_wei": 30000000000000000,
+        "mint_count": 3,
+        "mint_fee_per_shape_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "k_1e18": 1038460499999999998,
+        "bid_cycle_gross_wei": 5769074999999999,
+        "keep_cycle_gross_after_face_wei": 124269074999999999,
+        "primary_mint_fees_wei": 3000000000000000,
+        "construction_quote_wei": 977500000000000,
+        "bid_maintenance_and_retirement_quote_wei": 496000000000000,
+        "keep_maintenance_quote_wei": 346000000000000,
+        "canonical_admission_conservative_cost_wei": 4473500000000000,
+        "bid_cycle_quoted_cost_wei": 4473500000000000,
+        "keep_cycle_quoted_cost_wei": 4323500000000000,
+        "bid_cycle_net_after_quoted_cost_wei": 1295574999999999,
+        "keep_cycle_net_after_quoted_cost_wei": 119945574999999999,
+        "quote_gas_components": {
+          "construction": {
+            "build": 360000,
+            "pack": 300000,
+            "three_shapes": 390000,
+            "listed": 825000
+          },
+          "maintenance": {
+            "sync": 125000,
+            "journal": 22000,
+            "selected": 180000,
+            "synced": 120000,
+            "pruned": 45000,
+            "sync_funding": 40000,
+            "harvested": 80000,
+            "sync_credit": 40000
+          },
+          "retirement": {
+            "liquidate": 75000,
+            "pack": 80000,
+            "three_shapes": 105000
+          }
+        },
+        "work_units": {
+          "construction": 2,
+          "bid_maintenance_and_retirement": 2,
+          "keep_maintenance": 1
+        },
+        "conditional_collection_included_once": [
+          "sync_funding",
+          "harvested",
+          "sync_credit"
+        ],
+        "canonical_admission_backing_wei": 150000000000000000,
+        "canonical_rejection_reasons": [],
+        "canonical_minimum_backing_quantized_wei": 116314140481800000,
+        "initial_pack_and_backing_capital_wei": 180000000000000000,
+        "first_productive_account_funding_wei": 343105000000000000,
+        "own_selection_weight_1e18": 6666666666666666666,
+        "selection_probability_against_same_live_foreign_pool": 0.00012596405368976282
+      },
+      {
+        "backing_wei": 210000000000000000,
+        "pack_principal_wei": 30000000000000000,
+        "mint_count": 3,
+        "mint_fee_per_shape_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "k_1e18": 1038460499999999998,
+        "bid_cycle_gross_wei": 8076704999999999,
+        "keep_cycle_gross_after_face_wei": 185976704999999999,
+        "primary_mint_fees_wei": 3000000000000000,
+        "construction_quote_wei": 977500000000000,
+        "bid_maintenance_and_retirement_quote_wei": 496000000000000,
+        "keep_maintenance_quote_wei": 346000000000000,
+        "canonical_admission_conservative_cost_wei": 4473500000000000,
+        "bid_cycle_quoted_cost_wei": 4473500000000000,
+        "keep_cycle_quoted_cost_wei": 4323500000000000,
+        "bid_cycle_net_after_quoted_cost_wei": 3603204999999999,
+        "keep_cycle_net_after_quoted_cost_wei": 181653204999999999,
+        "quote_gas_components": {
+          "construction": {
+            "build": 360000,
+            "pack": 300000,
+            "three_shapes": 390000,
+            "listed": 825000
+          },
+          "maintenance": {
+            "sync": 125000,
+            "journal": 22000,
+            "selected": 180000,
+            "synced": 120000,
+            "pruned": 45000,
+            "sync_funding": 40000,
+            "harvested": 80000,
+            "sync_credit": 40000
+          },
+          "retirement": {
+            "liquidate": 75000,
+            "pack": 80000,
+            "three_shapes": 105000
+          }
+        },
+        "work_units": {
+          "construction": 2,
+          "bid_maintenance_and_retirement": 2,
+          "keep_maintenance": 1
+        },
+        "conditional_collection_included_once": [
+          "sync_funding",
+          "harvested",
+          "sync_credit"
+        ],
+        "canonical_admission_backing_wei": 210000000000000000,
+        "canonical_rejection_reasons": [],
+        "canonical_minimum_backing_quantized_wei": 116314140481800000,
+        "initial_pack_and_backing_capital_wei": 240000000000000000,
+        "first_productive_account_funding_wei": 463105000000000000,
+        "own_selection_weight_1e18": 4761904761904761904,
+        "selection_probability_against_same_live_foreign_pool": 8.997756233225701e-05
+      }
+    ],
+    "limitations": [
+      "Both outcome screens count one fresh construction/listing and three paid mints. Bid maintenance includes returned-pack retirement and four total service units; keep has no retirement and three total service units. The canonical admission screen separately retains the conservative bid/retirement cost for both outcome guards.",
+      "Conditional fee collection is included once as a conservative allowance, not a claim it occurs every cycle. These are quoted cost screens, not billed actual costs; per-path canonical calls remain the operating cost source.",
+      "This screen is not a full-period return. Initial startup and final exit wallet gas are counted by the operating simulation, not invented from this single-cycle screen.",
+      "Selection probabilities use one listing against the same observed live foreign weight; operating position counts and selection probabilities vary with cash and archived request weights."
+    ]
+  }
+}

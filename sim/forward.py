@@ -20,6 +20,7 @@ import json
 import copy
 import functools
 import heapq
+import hashlib
 from itertools import islice
 from fractions import Fraction
 from collections import deque
@@ -318,6 +319,13 @@ class OperatingClock:
         self.push(days * DAY, "cutoff")
         for day, fraction in sc.get("redeem", []):
             self.push(day * DAY, "redemption", fraction)
+        self.request_draws = None
+        if sc.get('request_randomness'):
+            acquisitions = [(at, payload) for at, _, serial, kind, payload in sorted(self.events) if kind == 'acquisition']
+            self.request_events_sha256 = hashlib.sha256(json.dumps(acquisitions,separators=(',',':')).encode()).hexdigest()
+            # Independent pre-generated domains keep conditional account choices out of later requests.
+            self.request_draws = np.column_stack([np.random.default_rng(np.random.SeedSequence([seed,domain])).random(len(acquisitions))
+                                                  for domain in (0x53454C,0x525350,0x4B4545)])
 
     def push(self, at, kind, payload=None):
         if at > self.end:
@@ -390,6 +398,28 @@ def run(sc, n_target, seed, days=365, values=None):
     ceiling, tip = values["gasCeilingWei"], values["maxTipWei"]
     essential_ceiling = values["essentialCeilingWei"]
     work_fee, mint_fee = values["workFeeWei"], int(sc.get("mint_fee_wei", MINT_FEE))
+    schedule = gas_schedule(values)
+    cached_economics = sc.get('cache_economics', True)
+    from keeper import proposal_limits as canonical_proposal_limits
+    limits_cache, edge_cache = {}, {}
+    def proposal_limits(state,value,settlement,discount,cap,build=False,units=policy.REF_UNITS,retirement_shapes=None):
+        key=(state.k,state.base_fee,value,settlement,discount,cap,build,units,retirement_shapes)
+        if not cached_economics or key not in limits_cache:
+            result=canonical_proposal_limits(state,value,settlement,discount,cap,build,units,retirement_shapes)
+            if not cached_economics:return result
+            limits_cache[key]=result
+        return limits_cache[key]
+    def edge_for(units,newly_built=True,retirement_shapes=None):
+        limit=None if sc.get('exempt',True) else cap
+        key=(k,gas,limit,units,newly_built,retirement_shapes)
+        if not cached_economics or key not in edge_cache:
+            result=policy.edge_backing(k,limit,int(S_FEE*10_000),units,ceiling,values['payMarkupBps'],work_fee,
+                price=min(gas+tip,ceiling),mint_fee=mint_fee,buffer_bps=values['bufferBps'],min_edge_bps=values['minEdgeBps'],
+                backing_ratio_bps=values['backingRatioBps'],gas_schedule=schedule,renewal_mode=values['renewalMode'],
+                newly_built=newly_built,reference_units=build_units,retirement_shapes=retirement_shapes)
+            if not cached_economics:return result
+            edge_cache[key]=result
+        return edge_cache[key]
     build_units = next((u for u in range(policy.MIN_PACK_UNITS, policy.MAX_PACK_UNITS + 1) if (values['packUnitsMask'] >> u) & 1), policy.REF_UNITS)
     face_value = build_units * policy.UNIT
     opening = configured_state(int((g_of(0) if callable(g_of) else g_of) * GWEI), values)
@@ -420,7 +450,7 @@ def run(sc, n_target, seed, days=365, values=None):
     st0.gas_ceiling, st0.essential_ceiling, st0.max_tip = ceiling, essential_ceiling, tip
     st0.work_fee, st0.essential_cap = work_fee, values["essentialCapWei"]
     st0.mint_fee = mint_fee
-    st0.gas_schedule = gas_schedule(values)
+    st0.gas_schedule = schedule
     st0.build_units, st0.pack_units_mask = build_units, values["packUnitsMask"]
     st0.backing_ratio_bps = values['backingRatioBps']
     st0.renewal_mode, st0.accepted_mint_fee = values['renewalMode'], values['acceptedMintFeeWei']
@@ -453,6 +483,11 @@ def run(sc, n_target, seed, days=365, values=None):
     trace = sc.get("trace_sink")
     timed = sc.get("timed", False)
     clock = OperatingClock(sc, seed, days, exit_days) if timed else None
+    keyed_randomness = bool(sc.get('request_randomness'))
+    if keyed_randomness and (not timed or ('response_sampler' in sc and 'request_response_sampler' not in sc)):
+        raise ValueError('request_randomness requires timed mode and request_response_sampler(U) in place of response_sampler(rng)')
+    request_ordinal = 0
+    response_draws = {}
     now = absolute_now = 0
     event_kind = "day"
     market_pending = last_checkpoint_interval = 0
@@ -570,22 +605,18 @@ def run(sc, n_target, seed, days=365, values=None):
                         v.kicked(i)
         cap = int(ask * (1 + PREMIUM) * E)
         k = int(k_of(crown) * E)
-        backing = policy.edge_backing(k, None if sc.get("exempt", True) else cap, int(S_FEE * 1e4), build_units,
-                                      ceiling, values["payMarkupBps"], work_fee,
-                                      price=min(gas + tip, ceiling), mint_fee=mint_fee,
-                                      buffer_bps=values["bufferBps"], min_edge_bps=values["minEdgeBps"],
-                                      backing_ratio_bps=values["backingRatioBps"], gas_schedule=gas_schedule(values), renewal_mode=values["renewalMode"])
-
-        relist_backing = policy.edge_backing(k,None if sc.get('exempt',True) else cap,int(S_FEE*1e4),build_units,
-            ceiling,values['payMarkupBps'],work_fee,price=min(gas+tip,ceiling),mint_fee=mint_fee,
-            buffer_bps=values['bufferBps'],min_edge_bps=values['minEdgeBps'],backing_ratio_bps=values['backingRatioBps'],
-            gas_schedule=gas_schedule(values),renewal_mode=values['renewalMode'],newly_built=False,reference_units=build_units)
+        backing = edge_for(build_units)
+        relist_backing = edge_for(build_units,False)
 
         if timed:
             A = 0
             if event_kind == "request":
                 market_pending += 1
             elif event_kind == "acquisition":
+                draws=clock.request_draws[request_ordinal] if keyed_randomness else None
+                if keyed_randomness and sc.get('randomness_sink') is not None:
+                    sc['randomness_sink'].append((request_ordinal,*map(float,draws)))
+                request_ordinal+=1
                 market_pending -= 1
                 assert market_pending >= 0
                 # A replayed acquisition carries its recorded foreign totalWeight (1/ETH).
@@ -598,7 +629,7 @@ def run(sc, n_target, seed, days=365, values=None):
                     W = foreign_weight + sum(weights)
                     expected_selections += sum(weights) / W
                     # Conditional counterfactual selection, not replay of a real VRF word.
-                    draw = rng.random() * W
+                    draw = (draws[0] if keyed_randomness else rng.random()) * W
                     for i, weight in zip(act, weights):
                         draw -= weight
                         if draw < 0:
@@ -619,8 +650,14 @@ def run(sc, n_target, seed, days=365, values=None):
                         trace_state("selection", d)
                         if trace is not None:
                             trace[-1]["listing_id"] = chosen
+                            if keyed_randomness:trace[-1]['request_ordinal']=request_ordinal-1
                         delay, kept = clock.response_delay, None
-                        if "response_sampler" in sc:
+                        if keyed_randomness:
+                            response_draws[chosen]=draws[2]
+                            if 'request_response_sampler' in sc:
+                                delay,kept=sc['request_response_sampler'](float(draws[1]))
+                                response_keep[chosen]=kept
+                        elif "response_sampler" in sc:
                             # Empirical purchaser behaviour: (seconds or None for silence, kept).
                             delay, kept = sc["response_sampler"](rng)
                             response_keep[chosen] = kept
@@ -634,7 +671,8 @@ def run(sc, n_target, seed, days=365, values=None):
                 if p and p.status == ALLOCATED:
                     late_purchaser_returns += int(absolute_now >= selected_times[payload] + clock.SETTLEMENT)
                     kept = response_keep.pop(payload, None)
-                    if kept if kept is not None else rng.random() < sc.get("keep", KEEP_DEFAULT):
+                    keep_draw=response_draws.pop(payload,None) if keyed_randomness else None
+                    if kept if kept is not None else (keep_draw if keyed_randomness else rng.random()) < sc.get("keep", KEEP_DEFAULT):
                         v.record_keep(payload, v.settlement_fee_bps)
                     else:
                         v.bid_settled(payload)
@@ -743,7 +781,7 @@ def run(sc, n_target, seed, days=365, values=None):
                     recent_volume=float(np.mean(vol_hist[max(0, d - 6):d + 1] if timed else vol_hist[-7:])), work_fee=work_fee,
                     slowdown_volume=sc.get("slowdown", 0.0), essential_ceiling=essential_ceiling,
                     pack_units_mask=values["packUnitsMask"], build_units=build_units,
-                    gas_schedule=gas_schedule(values), backing_ratio_bps=values['backingRatioBps'],
+                    gas_schedule=schedule, backing_ratio_bps=values['backingRatioBps'],
                     renewal_mode=values['renewalMode'], accepted_mint_fee=values['acceptedMintFeeWei'],
                     renewal_float=v.renewal_float_needed() if manager else v.renewal_float, operating_reserve=v.reserve,
                     renewal_eligible=len(v.renewal_eligible) + v.kept_replacements,
@@ -756,7 +794,6 @@ def run(sc, n_target, seed, days=365, values=None):
                     own_journal_pending=any(v.positions[i].state == ACTIVE and v.positions[i].status in (ALLOCATED, SETTLED)
                                             for i in hydrated))
                 if backing or relist_backing:
-                    from keeper import proposal_limits
                     maximum = 2**256-1 if sc.get('exempt',True) else cap*(10_000-values['bufferBps'])//10_000
                     minimum, maximum = proposal_limits(st,face_value,int(S_FEE*10_000),int(BID_RATE*10_000),maximum,units=build_units)
                     # Speed only: with no idle pack and idle ETH below one backing, the planner can
@@ -767,11 +804,7 @@ def run(sc, n_target, seed, days=365, values=None):
                             if len(chosen) == policy.MAX_BATCH['list'] or (values['renewalMode'] == 0 and acquired):
                                 break
                             old_units = value // policy.UNIT
-                            target = policy.edge_backing(k, None if sc.get('exempt',True) else cap, int(S_FEE*10_000), old_units,
-                                ceiling, values['payMarkupBps'], work_fee, price=min(gas+tip,ceiling), mint_fee=mint_fee,
-                                buffer_bps=values['bufferBps'], min_edge_bps=values['minEdgeBps'], backing_ratio_bps=values['backingRatioBps'],
-                                gas_schedule=gas_schedule(values), renewal_mode=values['renewalMode'], newly_built=False,
-                                reference_units=build_units, retirement_shapes=old_shapes)
+                            target = edge_for(old_units,False,old_shapes)
                             lo, hi = proposal_limits(st,value,int(S_FEE*10_000),int(BID_RATE*10_000),maximum,
                                                      units=old_units,retirement_shapes=old_shapes)
                             proposal = list(_proposals(target, frozenset(p.backing for p in v.positions.values() if p.state != OWED) | frozenset(chosen), lo, hi, 1))
@@ -1309,6 +1342,7 @@ def run(sc, n_target, seed, days=365, values=None):
         result['owner_calls_harvest']+=owner_harvest_calls
         result['owner_calls_withdraw']=owner_withdraw_calls
         result['owner_calls_setExiting']=int(exit_requested)
+        if keyed_randomness:result.update(randomness_mode='request-keyed-v1',request_events_sha256=clock.request_events_sha256,requests_seen=request_ordinal)
         return result
 
     end_nav = economic_nav(v, credit)
@@ -1424,6 +1458,7 @@ def run(sc, n_target, seed, days=365, values=None):
         result[f"keeper_paid_{name}_wei"] = op_paid[name]
         result[f"keeper_calls_{name}"] = op_calls[name]
         result[f"holder_calls_{name}"] = holder_calls[name]
+    if keyed_randomness:result.update(randomness_mode='request-keyed-v1',request_events_sha256=clock.request_events_sha256,requests_seen=request_ordinal)
     return result
 
 

@@ -1,0 +1,262 @@
+{
+  "schema": 1,
+  "paths_per_cell": 8192,
+  "cells": [
+    {
+      "id": "b70000-g0.2",
+      "backing_bps": 70000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "b70000-g0.5",
+      "backing_bps": 70000,
+      "total_gas_gwei": 0.5
+    },
+    {
+      "id": "b50000-g0.2",
+      "backing_bps": 50000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "b50000-g0.5",
+      "backing_bps": 50000,
+      "total_gas_gwei": 0.5
+    }
+  ],
+  "windows": [
+    {
+      "id": "w1792929275",
+      "start": 1790337275,
+      "end": 1792929275,
+      "successful": 47553,
+      "refunded": 6,
+      "response_kinds": {
+        "DepositorBidAccepted": 33078,
+        "NFTKept": 5468,
+        "silent_by_deadline": 2333,
+        "DepositorBidAcceptedAsTokens": 6656
+      },
+      "archive_top_block": 26484807,
+      "events_sha256": "7f909f02bb0eedcad92492707711e2e68e4f6080b6d5c340b10fa77716b317ad",
+      "responses_sha256": "30a7bc0d07fd3c3d4161cf94763e55e58266a2441f8a17f0ef1219abe3b0f22a",
+      "response_cohort": {
+        "method": "fixed-3600s-followup-v1",
+        "followup_seconds": 3600,
+        "observed_until": 1792929275,
+        "allocations_in_window": 47553,
+        "eligible_allocations": 47535,
+        "censored_allocations_excluded": 18,
+        "late_first_responses_excluded": 1121,
+        "responsive_delays_clamped_to3480": 47,
+        "response_kinds": {
+          "DepositorBidAccepted": 33078,
+          "NFTKept": 5468,
+          "silent_by_deadline": 2333,
+          "DepositorBidAcceptedAsTokens": 6656
+        },
+        "cohort_sha256": "0330cdf9a0af94c250d292c74622065c6fad9b641d3a9b51a564f4f96340d401",
+        "responses_sha256": "30a7bc0d07fd3c3d4161cf94763e55e58266a2441f8a17f0ef1219abe3b0f22a"
+      },
+      "gap_from_last_archived_event_seconds": 0,
+      "paths": 4096,
+      "seed_start": 100000,
+      "seed_end_exclusive": 104096
+    },
+    {
+      "id": "w1795521275",
+      "start": 1792929275,
+      "end": 1795521275,
+      "successful": 9856,
+      "refunded": 5090,
+      "response_kinds": {
+        "DepositorBidAcceptedAsTokens": 960,
+        "NFTKept": 1276,
+        "DepositorBidAccepted": 4359,
+        "silent_by_deadline": 3261
+      },
+      "archive_top_block": 26484807,
+      "events_sha256": "16c8618f954e6cba72bb7fd10542e3105aab112a2aeeae227f1031822a6ecc6d",
+      "responses_sha256": "325d17bf500023ae75caf16d9b9f33b2dd88e2fc194a76a67b627356cd06dafd",
+      "response_cohort": {
+        "method": "fixed-3600s-followup-v1",
+        "followup_seconds": 3600,
+        "observed_until": 1795520759,
+        "allocations_in_window": 9856,
+        "eligible_allocations": 9856,
+        "censored_allocations_excluded": 0,
+        "late_first_responses_excluded": 3089,
+        "responsive_delays_clamped_to3480": 7,
+        "response_kinds": {
+          "DepositorBidAcceptedAsTokens": 960,
+          "NFTKept": 1276,
+          "DepositorBidAccepted": 4359,
+          "silent_by_deadline": 3261
+        },
+        "cohort_sha256": "621e8595fa46eaba101b5a4c415a2e09b0623990a71dd4712776bdefe57234fb",
+        "responses_sha256": "325d17bf500023ae75caf16d9b9f33b2dd88e2fc194a76a67b627356cd06dafd"
+      },
+      "gap_from_last_archived_event_seconds": 516,
+      "paths": 4096,
+      "seed_start": 104096,
+      "seed_end_exclusive": 108192
+    }
+  ],
+  "archive": "sim/data/fwa.sqlite",
+  "source_sha256": {
+    "sim/manager_monte_carlo.py": "310b7e52b73b1b30db79f4c9d3bbb8d653d8f39ddc66591c86e983ea8bd174c1",
+    "sim/test_manager_monte_carlo.py": "aee08b0bfda32a453ed7a3f478a116499498933ae13021056873d1726a58dade",
+    "sim/forward.py": "2466fbaf8a6647d53c3aaa35cfde169591cb7106edb2950d5b60f7813365a3c7",
+    "sim/manager.py": "901e776456b46b501af574562b41ac4f1b0e94f0e8edd3e6d5464e0a62a34a01",
+    "sim/vault.py": "b8545f3f17e1e2766a344aa45abf0ee421854d0e55bfec493ac2985e92e4dd66",
+    "sim/formal.py": "c682cbb515c0487c51ef0b2e6f68b3b0a5d6e3683cbbdcd22c3ed661ed13c4dc",
+    "sim/replay.py": "2d1f0227026e7fe7690229717ff31b7ac37a056ad197bb85687939a128879262",
+    "keeper/policy.py": "b56d5b11c6cd387c6c623419a5c31012bbae509680d29f403c2ef5954ac7f107",
+    "keeper/config.py": "39acb35f93fb64916dd4c8c8ab64da76742ec8c8b1c90902c9c1b014a6a22f06",
+    "keeper/keeper.py": "5bfe7f9b9965dcab42eeb92e7707e2a791132c5880b03fa2b3b929e2426816a1",
+    "deploy/manager.json": "f216770efacfe587770fe3d3821d0f2489d40c4e4f7758a051be77195ac0c026",
+    "deploy/mint-fee-observation.json": "feb7d12387928144de212966dd3e431c4f2ba5b648ad3ea409f9ba61620ac29b",
+    "docs/receipts/manager-cost-calibration.json": "400faba2c6d1acc5ba3057d75d9517510d99515dfca5feb045d65c08eaca692f",
+    "docs/receipts/manager-monte-carlo-reconciliation.json": "d6923188d833d05c96abf47a8fb1214160d9df33b10c57b6d85ebe557d2dc1a6",
+    "sim/data/fwa.sqlite": "9f05929e7d333f3b43d5c85ef3e8b03f0498523c1a7ab60a0267c87749cd019c",
+    "docs/receipts/manager-mc-live-observation.json": "fc01739d94e37f42134ab9dbc1c66de9c4305f7f129f48be305eca10bdbf29c8",
+    "docs/receipts/manager-closeout.json": "d993014803106aa76e8da392a0f63b702ac27da81193caeba5e28a0634f012c4"
+  },
+  "contract_source_sha256": {
+    "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
+    "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+    "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+    "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
+    "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+    "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+    "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
+    "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+  },
+  "archive_coverage": {
+    "first_timestamp": 1789014107,
+    "last_timestamp": 1795520759,
+    "top_block": 26484807
+  },
+  "manager_values": {
+    "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
+    "minEdgeBps": 100,
+    "bufferBps": 0,
+    "distributionBps": 0,
+    "payMarkupBps": 0,
+    "keeperShareBps": 2500,
+    "packUnitsMask": 8,
+    "gasCeilingWei": 500000000,
+    "essentialCeilingWei": 500000000,
+    "maxTipWei": 50000000,
+    "workFeeWei": 20000000000000,
+    "reserveWei": 5000000000000000,
+    "tvlCapWei": 0,
+    "routineCapWei": 30000000000000000,
+    "routineRatePerDayWei": 10000000000000000,
+    "essentialCapWei": 10000000000000000,
+    "essentialRatePerDayWei": 5000000000000000,
+    "upliftBoundBps": 25,
+    "backingRatioBps": 70000,
+    "renewalMode": 0,
+    "renewalFloatCount": 1,
+    "acceptedMintFeeWei": 1000000000000000,
+    "minDepositWei": 10000000000000000,
+    "minDistributionWei": 10000000000000000,
+    "gasSchedule": {
+      "checkpoint": 500000,
+      "allocationEntry": 6000,
+      "allocationRead": 30000,
+      "build": 360000,
+      "buildPack": 300000,
+      "buildShape": 130000,
+      "list": 280000,
+      "listed": 825000,
+      "sync": 125000,
+      "requiredTail": 120000,
+      "distributionProof": 80000,
+      "journal": 22000,
+      "scan": 30000,
+      "selected": 180000,
+      "synced": 120000,
+      "pruned": 45000,
+      "unlist": 340000,
+      "unlisted": 285000,
+      "liquidate": 75000,
+      "liquidatePack": 80000,
+      "redeemShape": 35000,
+      "recoveryBase": 100000,
+      "recoveryShape": 35000,
+      "recoveryUnseal": 70000,
+      "harvest": 125000,
+      "harvested": 80000,
+      "credit": 40000,
+      "fund": 40000
+    },
+    "expectedMintFeeWei": 1000000000000000
+  },
+  "mint_fee_wei": 500000000000000,
+  "mint_fee_observation": {
+    "block": 26487484,
+    "blockHash": "0x14287488e917363ddef2ae8693a71053ca435828f2a2dc4375c947b594fa7939",
+    "timestamp": 1795552991,
+    "rpc": "https://mainnet.gateway.tenderly.co",
+    "readOnly": true,
+    "mintFeeWei": 500000000000000,
+    "protocol": {
+      "totalWeight": 52918485163442081987189,
+      "weightedBackingTotal": 2559999999999999999883966035229199543000,
+      "acquisitionFee": 50795104805021200,
+      "ownerAcquisitionFeeBps": 100,
+      "topListingShareBps": 10,
+      "ownerSettlementFeeBps": 100,
+      "settlementDiscountBps": 9000,
+      "tokenSettlementDiscountBps": 9150,
+      "settlementWindow": 3600,
+      "inferredGrossMultiplier1e18": 1038460499999999998
+    },
+    "oracleExempt": true
+  },
+  "verified_model_protocol_constants": {
+    "ownerAcquisitionFeeBps": 100,
+    "topListingShareBps": 10,
+    "ownerSettlementFeeBps": 100,
+    "settlementDiscountBps": 9000,
+    "settlementWindow": 3600
+  },
+  "model_gross_multiplier_1e18": 1038460500000000000,
+  "gas_proxy": {
+    "create": 606172,
+    "setExiting": 53214,
+    "withdraw": 38904,
+    "unlist": 604066,
+    "liquidate": 303433,
+    "recover_sync": 199047,
+    "processAcquisitions": 115941,
+    "build": 1921138,
+    "harvest": 300000
+  },
+  "unmeasured_operations": [
+    "renew",
+    "harvest"
+  ],
+  "randomness": "request_randomness v1: request ordinal includes refunded/repeated events; paired across cells",
+  "inference": {
+    "sample_size": "Fixed in advance; no outcome-dependent stopping or sample-size change",
+    "probability_precision": "4096 paths/window gives maximum Wilson95 halfwidth about1.53percentage points;8192 pooled iid paths would give1.083points, but the two-window mixture uses simultaneous stratum bounds instead",
+    "mean_interval": "Normal-approximation conditional Monte Carlo CI, stratified across archive windows",
+    "paired_interval": "Two gas-level backing contrasts, each two-sided97.5%; Bonferroni family95%",
+    "probability_interval": "Wilson95% per window; simultaneous conservative bounds for fixed mixture"
+  },
+  "assumptions": [
+    "30 operating days, at most7 exit days, .5ETH owner funding, FreshAfterAcquisition, mask8.",
+    "Response samples require a complete3600second follow-up by min(window end,last archived event); the first ETH bid/token bid/keep within that hour is responsive, otherwise silent by deadline. Censored allocations and late replies are excluded and counted.",
+    "All responsive buyers take the depositor bid; one-hour silence probability is retained. This is a stress counterfactual, not empirical buyer-choice replay.",
+    "Eligible responsive delay is clamped to3480seconds as an explicit timing stress; responses after3600seconds are not moved before expiry.",
+    "Archive request times/outcomes/foreign weights are fixed; no competitive or behavioral market response to the manager.",
+    "Fresh observed protocol fee/crown/settlement rules are applied to historical arrivals and weights; historical per-event fee configurations are not replayed.",
+    "The30day archive repeats during the exit tail, including later requests; this is an explicit continuation assumption.",
+    "Owner and keeper gas are receipt-calibrated proxies, including declared unmeasured operations; creator fees are gross accrual, not creator net profit.",
+    "Cash-short probability is ever observed at planner reads; full-period duration is unavailable.",
+    "Incomplete exits retain realized cash net so far and unresolved assets separately; future recovery gas is unknown, so that cash figure is not a guaranteed final-return lower bound.",
+    "Intervals measure conditional simulation noise, not future market uncertainty. No APR or personal-manager production return hurdle is inferred."
+  ]
+}

@@ -5,6 +5,14 @@ Candidate implementation `8463c52476246a6a669ae82a8346d36355347c83`, app `6425e7
 The shared vault and both public app switches remain closed. No public transaction, production
 fee change, live cutover, merge or acceptance signature was performed.
 
+**Return-study follow-up is running.** The two-draw −28.5% figure below is a historical diagnostic,
+not a usable expected-return estimate. The [paired comparison](receipts/manager-monte-carlo.md)
+uses 8,192 path IDs across two recorded months, three backing levels and two gas prices.
+The 0.03 ETH backing reference is hypothetical under the current manager's admission guards;
+[actual MAIN FWA fork receipts](receipts/manager-standard-backing-fork.json) separately prove that
+the protocol accepts it and returns its principal on an unselected exit. Numerical results and
+final result review remain pending. No production configuration was changed.
+
 Owner-paid app and CLI exits now stop reinvestment, handle bounded recovery and real FWA queue
 progress, unlist/redeem and withdraw actual ETH. Both local managers fully exit with keeper
 permission set to zero, no exit topups, and explicit wallet caps. The manager-only deployment
