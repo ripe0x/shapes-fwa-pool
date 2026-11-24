@@ -1,179 +1,24 @@
 {
- "name": "Unified shapes FWA system: pooled vault and personal manager factory",
- "commit": "7ad76a0d8d3eea3c99fa1a1e871f6c435683fb72",
- "manifest": "deploy/release-manifest.json",
- "manifest_sha256": "86ef59847800ff203ab66f1413a8cbb844377005ff1c1208f902ea9d2ef636bb",
- "deployment_values": "deploy/mainnet.json",
- "deployment_values_sha256": "4f6daca9a77e96f2e52295de3072f0256095aa360a9caf8f8d15da108f02fe79",
- "manager_default_values": "deploy/manager.json",
- "asset_flow": "asset-flow.json",
- "asset_flow_outcomes_sha256": "dbe267c39a299f3bf62424e35e52f9eae5d76090ba1e95f4c338c366e1b094f9",
- "keeper_image": {
-  "inputs": "manifest field keeper (Dockerfile, entrypoint, requirements, keeper.py, policy.py, tx.py, index.py, Fly configs)",
-  "ci_fork_rehearsal": "run 44948198556 at 02c0a74, PASS: pooled vault and one factory-created manager served by one signer; docs/receipts/image-rehearsal/ci-44948198556.json"
- },
- "signing": "printf %s <sha256 of this file> | ssh-keygen -Y sign -f <owner key> -n packvault-release > deploy/release-acceptance.sig",
- "signature": null,
- "engineering": {
-  "full_suite": "script/verify.sh at 3b4d9b3: 279 fork tests passed, 0 failed, 1 opt-in exporter skipped; scale 3/3; replay 0 mismatches; reconciler to the wei on three paths; release check ok",
-  "reconciliations": "full cycle, partial fill and wind-down, scan path: every bucket to the wei",
-  "asset_flow": "16 regimes, outcomes O1-O11 pass; owner-signed 2026-11-22; gate PASS",
-  "sizes": {
-   "PackVault": 16960,
-   "VaultLib": 23482,
-   "PackManager": 12494,
-   "PackManager_clone": 44,
-   "PackManagerFactory": 1365,
-   "KeeperPolicyV1": 216,
-   "limit": 24576,
-   "libraries": "manifest"
+  "name": "Main pool three paid Shape completion candidate",
+  "status": "UNSIGNED_IMPLEMENTATION_IN_PROGRESS",
+  "historical_baseline": "e94fd99c072448bbbbb090c60d4f1e9b51df56ed",
+  "historical_acceptance": "docs/release/history/e94fd99/acceptance.json",
+  "authorization": "No public transactions, production mint fee changes, live application cutover or merges.",
+  "economic_candidate": {
+    "packValueWei": 30000000000000000,
+    "mintCount": 3,
+    "backingRatioBps": 70000,
+    "upliftBoundBps": 25,
+    "renewalMode": "FreshAfterAcquisition",
+    "renewalFloatCount": 1,
+    "operatingReserveWei": 5000000000000000,
+    "approvedProductionDefaults": false
   },
-  "deployment_gas": {
-   "total": 16070106,
-   "ScanLib": 719323,
-   "VaultLib": 5157757,
-   "StrategyLib": 2817411,
-   "KeeperPolicyV1": 100155,
-   "PackVault": 4144141,
-   "PackManagerFactory": 3131319
+  "signature": null,
+  "engineering": {
+    "status": "pending combined candidate verification"
   },
-  "manager_create_gas": 474175,
-  "fwa_push_receive_gas": {
-   "keep_payment": 52363,
-   "cold_kick_refund": 35148,
-   "stipend": 100000
-  },
-  "allocation_proof": {
-   "max_entries": 32,
-   "gas_at_bound": 188361,
-   "quote_at_bound": 222000,
-   "refusal_gas_any_history": 34519,
-   "kick_check": "while the ShapePacks oracle exemption is lifted: every open listing, at most 32, else CatchUpFirst at no more than 39,766 gas; two open listings cost 41,043 gas against a 72,000 quote"
-  },
-  "largest_batch_gas_padded": 13000000,
-  "tx_cap": 16777216,
-  "payment_recovery": "ForkReceiptRecovery.t.sol: forced keep, forced default and forced kick (manager and pool) resolve once; pool pricing refused until synced, matching the recorded path; without the kick check the unsynced pool kick priced NAV one backing too high; low-gas sweep never forces an unrecorded payment",
-  "rehearsal": {
-   "receipt": "docs/receipts/unified-production-rehearsal.json",
-   "fork_block": 26463991,
-   "result": "all 17 steps pass on one warm fork at 02c0a74 (upstream Alchemy via REHEARSAL_FORK_RPC while Tenderly's gateway rate-limited; URL scrubbed from records)",
-   "also": "docs/receipts/unified-production-rehearsal-26464497.json (earlier source)",
-   "outcomes": "docs/receipts/unified-selection-rehearsal.json"
-  },
-  "independent_review": "docs/receipts/unified-review.md: no critical, high or medium; S1 low fixed after the review of e755307 (D84)",
-  "exposure_monitoring": "keeper counts every open listing from each account's event index (no cap, reorg-repaired), failed accounts included; EXPOSURE_INCOMPLETE when an account has no index"
- },
- "economic": {
-  "formal_gate": {
-   "receipt": "docs/receipts/formal-assessment.json",
-   "hurdle": "10% a year net",
-   "window_successful_per_day": 356.7,
-   "holder_1_96_eth": {
-    "median_pct": 70.6,
-    "p10_pct": -55.3,
-    "worst_pct": -61.5,
-    "losing_runs": "5/16",
-    "creator_mint_fees_eth_per_year": 0.079
-   },
-   "pool_6_8_eth": {
-    "median_pct": 55.9,
-    "p10_pct": 9.3,
-    "worst_pct": -26.4,
-    "losing_runs": "1/16",
-    "creator_mint_fees_eth_per_year": 0.24
-   },
-   "pool_20_eth": {
-    "median_pct": 37.7,
-    "p10_pct": 22.0,
-    "worst_pct": 6.0,
-    "losing_runs": "0/16",
-    "creator_mint_fees_eth_per_year": 0.62
-   },
-   "result": "passes on the median at every size"
-  },
-  "recipe_comparison": {
-   "receipt": "docs/receipts/recipe-comparison.json",
-   "decision": "0.06 direct mint",
-   "creator_fees_ratio_vs_0_03_bulk_split": "2.6x to 5.4x in every cell",
-   "holder_1_96_eth_0_06_median_pct": {
-    "all_bid": 22.8,
-    "observed": 34.3,
-    "keep_50": 80.7,
-    "all_keep": 136.8
-   },
-   "holder_1_96_eth_0_03_bulk_split_median_pct": {
-    "all_bid": 25.1,
-    "observed": 37.5,
-    "keep_50": 65.4,
-    "all_keep": 122.2
-   },
-   "pool_20_eth_0_06_median_pct": {
-    "all_bid": 39.3,
-    "observed": 45.9,
-    "keep_50": 69.4,
-    "all_keep": 88.2
-   },
-   "quieter_demand_1_96_eth_0_06_median_pct": {
-    "all_bid": 0.6,
-    "all_keep": 9.8
-   },
-   "zero_demand_1_96_eth_pct": -2.3,
-   "0_03_direct": "never lists"
+  "economic": {
+    "status": "unvalidated; historical APR is not evidence for this configuration"
   }
- },
- "decisions": [
-  {
-   "id": "U1",
-   "item": "Holder return (mainnet values, no deposit cap)",
-   "facts": "formal gate median +70.6% but 5 of 16 years lose (p10 -55.3%); with the last 10 days' quieter demand the 1.96 ETH median is +0.6% (all bid) to +9.8% (all keep), below the hurdle",
-   "recommendation": "small pools carry a wide loss tail (5 of 16 modeled years lose at 1.96 ETH); none lose at 20 ETH"
-  },
-  {
-   "id": "U2",
-   "item": "Recipe: 0.06 direct mint",
-   "facts": "2.6-5.4x the creator revenue of 0.03 bulk-split; higher return at 20 ETH; at 1.96 ETH 0.03 bulk-split's median is slightly higher under all-bid and observed behaviour with a milder tail"
-  },
-  {
-   "id": "U3",
-   "item": "Purchaser gas bound PURCHASER_GAS_PRICE = 2 gwei (D85)",
-   "facts": "backing 0.06489617486338 ETH; keep advantage +0.0003 ETH at any assumption; keeper ceiling no longer affects listing"
-  },
-  {
-   "id": "U4",
-   "item": "FWA payment receipts (D84)",
-   "facts": "settlement from FWA's record; pricing gated and bounded at 32 allocation entries; while kicks are possible (exemption lifted) every open listing is checked, at most 32",
-   "residual": "if FWA lifts the exemption, a kick refund is force-sent with no receipt, and FWA restores the exemption before sync, pricing counts the refund beside the position: NAV high by 0.0649 ETH per such kick until the permissionless sync",
-   "above_32_listings": "the kick check is skipped above 32 open listings, so pricing never waits on FWA's exemption; an unrecorded kick refund there (receive above FWA's 100,000 gas stipend) would price one backing high until sync"
-  },
-  {
-   "id": "U5",
-   "item": "Spending (mainnet values)",
-   "routine_first_24h_eth": 0.12,
-   "routine_daily_eth": 0.02,
-   "essential_budget_eth": 0,
-   "checkpoint": "from request charges only, at most once per 12 h: 360,000 gas + 6,000 per allocation entry or open listing read + 30,000 per FWA read at 2 gwei + one work fee",
-   "owner_key": "accepted risk B3, no numeric bound (owner, 2026-11-22)"
-  },
-  {
-   "id": "U6",
-   "item": "Asset-flow outcomes O1-O11, signed 2026-11-22, replace the 2026-11-17 signature for this candidate",
-   "outcomes_sha256": "dbe267c39a299f3bf62424e35e52f9eae5d76090ba1e95f4c338c366e1b094f9"
-  },
-  {
-   "id": "U7",
-   "item": "Coverage limits",
-   "text": "the production image's fork rehearsal runs in CI (no Docker on the build Mac); the rehearsal's real-VRF outcomes impersonate the coordinator (real request and word, proof check skipped); the Python mirror does not model the in-sync fee-credit sweep at the default keeper share, so the reconcile fork run uses a share at which the credit waits; matched 6.8 and 50 ETH recipe cells ran only as a 2-seed pilot; the holder-run unlist in the image rehearsal was exercised in CI run 44946918814 (which then failed on liquidate timing, fixed) but the passing run 44948198556 had no shortfall to unwind; the local rehearsal fork used Alchemy, not Tenderly"
-  },
-  {
-   "id": "U8",
-   "item": "Authority",
-   "text": "signing authorizes no broadcast, funding, Fly deployment or public offer of personal managers; each is a separate owner decision"
-  }
- ],
- "human_readable": "docs/release/ACCEPTANCE.md",
- "runbook": "docs/release/RUNBOOK.md",
- "history": [
-  "docs/release/history/acceptance-pr2-candidate-unsigned.json",
-  "docs/release/history/asset-flow-signed-2026-11-17.json"
- ]
 }

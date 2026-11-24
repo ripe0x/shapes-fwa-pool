@@ -1,0 +1,31 @@
+{
+  "method": "asset_gate.py tracked source_paths and evidence_paths path-NUL-content-NUL SHA256",
+  "sourceHash": "bf148279857b04c8249528401507d38765dbd81b901d6b22cf588ce173aebcf2",
+  "contractSourceSetSha256": "d85c926518a689c73c6575937fd7d3dcde0d1a484d5abfe6de6faa22a4ca8e39",
+  "files": {
+    "deploy/allowed_signers": "535ae1e2c035ff31284820c3e93d9b0b1019a34ea5e818d792bc320e45f268de",
+    "deploy/mainnet.json": "e9a5ca7b80c8e67cb2d0bfef5be4d2539129fcf078da488e52253cd9a2aaefd0",
+    "deploy/manager.json": "f216770efacfe587770fe3d3821d0f2489d40c4e4f7758a051be77195ac0c026",
+    "deploy/release-manifest.json": "86ef59847800ff203ab66f1413a8cbb844377005ff1c1208f902ea9d2ef636bb",
+    "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520",
+    "script/Deploy.s.sol": "608bc36c5566fafe35de3989ed13105542edcd2aaf5242a11f7f2a6936f26b0d",
+    "script/DeployCore.sol": "10b61be887f77901151d47525abb0bd7e16116c3569008ab976c511a365cee5b",
+    "script/deploy.sh": "7a2dbb28ca6f685b2506e286cb356f21844647e1bdf4f8454c36e309b694b6eb",
+    "script/release.py": "72d600fd27ff0ce2b4746bfeb3f2b5d1f356d653b039eb9ec5e073a2efcb2fac",
+    "script/verify.sh": "f2d7ef2acdb6fbc59b2a4787666ebd908d766113cc76a00e13262a264690b89e",
+    "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
+    "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+    "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+    "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
+    "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+    "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+    "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
+    "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879",
+    "test/fork/ForkBase.sol": "2c2376a1d9a4e4fa855c1a15a48bdb95baaf8277796ec8403c0ae4ff6418277a",
+    "test/fork/ForkSelection.t.sol": "b082afc6d35c9974cefab1cc10867f453f7c0fd40e24fde6d21f727f6392a8ba",
+    "test/scenario/VaultFlow.t.sol": "40caeba7c0e42f2020bddf3801d7256b269ab4296f7d606a02792b16b83b24a6",
+    "test/utils/FlowBreakdown.sol": "b117b2f334f99676f99b1b582f48a9f0a9f1b22c8bc0da44b31326633969cd3c",
+    "test/utils/TestVaultOps.sol": "b59c471132a76666aa07dc5577538927c33e352f849acbc730e6164dc96e3ef4"
+  },
+  "limitation": "Unsigned gate was inadvertently invoked without --no-run, reran its configured flow suite, then failed on explained metadata schema. This hash records those newly generated receipts; the explicitly logged 17-case final-R run remains the test pass evidence."
+}

@@ -1,0 +1,12 @@
+{
+  "command": [
+    "bash",
+    "script/deploy.sh",
+    "deploy/mainnet.json"
+  ],
+  "rpc": "https://mainnet.gateway.tenderly.co",
+  "sender": "0xCB43078C32423F5348Cab5885911C3B5faE217F9",
+  "broadcast": false,
+  "exit_status": 0,
+  "log": "/tmp/shapes-completion-unsigned-mainnet-simulation.log"
+}

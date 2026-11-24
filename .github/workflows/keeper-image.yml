@@ -3,7 +3,7 @@ name: Keeper image rehearsal
 # On a keeper change: build the production keeper image (keeper/Dockerfile, the image Fly deploys) and
 # smoke it (entrypoint, pinned toolchain, shared volume). Minutes, no fork.
 # On manual dispatch (release candidates only): also run it against a fresh local mainnet fork with
-# encrypted disposable keystores, primary and backup workers, container replacement on the same
+# fresh unlocked local actors, primary and backup workers, container replacement on the same
 # volume and a lost RPC response. Local simulated funds only.
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
           python3 -m pip install --no-cache-dir -r keeper/requirements.txt
       - name: Build contracts
         if: github.event_name == 'workflow_dispatch'
-        run: forge build --skip test
+        run: CANDIDATE_RUN=1 forge build --skip test
       - name: Build production image
         run: docker build --platform linux/amd64 -f keeper/Dockerfile -t packvault-keeper:${{ github.sha }} .
       - name: Image smoke and shared volume
@@ -40,7 +40,7 @@ jobs:
       - name: Image against a fresh fork
         if: github.event_name == 'workflow_dispatch'
         shell: bash  # pipefail: a failed rehearsal fails the job despite tee
-        run: python3 keeper/rehearse_image.py --image packvault-keeper:${{ github.sha }} | tee image-rehearsal.json
+        run: CANDIDATE_RUN=1 python3 keeper/rehearse_image.py --image packvault-keeper:${{ github.sha }} | tee image-rehearsal.json
       - uses: actions/upload-artifact@v4
         if: always() && github.event_name == 'workflow_dispatch'
         with:

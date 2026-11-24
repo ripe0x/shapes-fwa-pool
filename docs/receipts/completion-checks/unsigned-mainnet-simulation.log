@@ -1,0 +1,791 @@
+No files changed, compilation skipped
+note[unsafe-cheatcode]: usage of unsafe cheatcodes that can perform dangerous operations
+   ╭▸ script/Deploy.s.sol:24:30
+   │
+24 │         string memory v = vm.readFile(vm.envString("DEPLOY_VALUES"));
+   │                              ━━━━━━━━
+   │
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-cheatcode
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:26:24
+   │
+26 │         p.minEdgeBps = uint16(fit(v, ".minEdgeBps", type(uint16).max));
+   │                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint16' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:27:23
+   │
+27 │         p.bufferBps = uint16(fit(v, ".bufferBps", type(uint16).max));
+   │                       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint16' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:28:29
+   │
+28 │         p.distributionBps = uint16(fit(v, ".distributionBps", type(uint16).max));
+   │                             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint16' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:29:26
+   │
+29 │         p.payMarkupBps = uint16(fit(v, ".payMarkupBps", type(uint16).max));
+   │                          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint16' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:30:28
+   │
+30 │         p.keeperShareBps = uint16(fit(v, ".keeperShareBps", type(uint16).max));
+   │                            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint16' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:31:28
+   │
+31 │         p.upliftBoundBps = uint16(fit(v, ".upliftBoundBps", type(uint16).max));
+   │                            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint16' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:32:27
+   │
+32 │         p.packUnitsMask = uint64(fit(v, ".packUnitsMask", type(uint64).max));
+   │                           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint64' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:33:24
+   │
+33 │         p.gasCeiling = uint64(fit(v, ".gasCeilingWei", type(uint64).max));
+   │                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint64' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:34:30
+   │
+34 │         p.essentialCeiling = uint64(fit(v, ".essentialCeilingWei", type(uint64).max));
+   │                              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint64' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:35:20
+   │
+35 │         p.maxTip = uint64(fit(v, ".maxTipWei", type(uint64).max));
+   │                    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint64' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:36:21
+   │
+36 │         p.workFee = uint64(fit(v, ".workFeeWei", type(uint64).max));
+   │                     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint64' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:37:24
+   │
+37 │         p.routineCap = uint64(fit(v, ".routineCapWei", type(uint64).max));
+   │                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint64' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:38:25
+   │
+38 │         p.routineRate = uint64(fit(v, ".routineRatePerDayWei", type(uint64).max));
+   │                         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint64' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:39:26
+   │
+39 │         p.essentialCap = uint64(fit(v, ".essentialCapWei", type(uint64).max));
+   │                          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint64' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:40:27
+   │
+40 │         p.essentialRate = uint64(fit(v, ".essentialRatePerDayWei", type(uint64).max));
+   │                           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint64' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:41:21
+   │
+41 │         p.reserve = uint128(fit(v, ".reserveWei", type(uint128).max));
+   │                     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint128' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:42:20
+   │
+42 │         p.tvlCap = uint128(fit(v, ".tvlCapWei", type(uint128).max));
+   │                    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint128' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:43:29
+   │
+43 │         p.backingRatioBps = uint32(fit(v, ".backingRatioBps", type(uint32).max));
+   │                             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:45:31
+   │
+45 │         p.renewalFloatCount = uint16(fit(v, ".renewalFloatCount", type(uint16).max));
+   │                               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint16' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:46:29
+   │
+46 │         p.acceptedMintFee = uint64(fit(v, ".acceptedMintFeeWei", type(uint64).max));
+   │                             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint64' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:47:24
+   │
+47 │         p.minDeposit = uint64(fit(v, ".minDepositWei", type(uint64).max));
+   │                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint64' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:48:29
+   │
+48 │         p.minDistribution = uint64(fit(v, ".minDistributionWei", type(uint64).max));
+   │                             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint64' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:49:36
+   │
+49 │         p.gasSchedule.checkpoint = uint32(fit(v, ".gasSchedule.checkpoint", type(uint32).max));
+   │                                    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:50:41
+   │
+50 │         p.gasSchedule.allocationEntry = uint32(fit(v, ".gasSchedule.allocationEntry", type(uint32).max));
+   │                                         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:51:40
+   │
+51 │         p.gasSchedule.allocationRead = uint32(fit(v, ".gasSchedule.allocationRead", type(uint32).max));
+   │                                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:52:31
+   │
+52 │         p.gasSchedule.build = uint32(fit(v, ".gasSchedule.build", type(uint32).max));
+   │                               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:53:35
+   │
+53 │         p.gasSchedule.buildPack = uint32(fit(v, ".gasSchedule.buildPack", type(uint32).max));
+   │                                   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:54:36
+   │
+54 │         p.gasSchedule.buildShape = uint32(fit(v, ".gasSchedule.buildShape", type(uint32).max));
+   │                                    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:55:30
+   │
+55 │         p.gasSchedule.list = uint32(fit(v, ".gasSchedule.list", type(uint32).max));
+   │                              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:56:32
+   │
+56 │         p.gasSchedule.listed = uint32(fit(v, ".gasSchedule.listed", type(uint32).max));
+   │                                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:57:30
+   │
+57 │         p.gasSchedule.sync = uint32(fit(v, ".gasSchedule.sync", type(uint32).max));
+   │                              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:58:38
+   │
+58 │         p.gasSchedule.requiredTail = uint32(fit(v, ".gasSchedule.requiredTail", type(uint32).max));
+   │                                      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:59:43
+   │
+59 │         p.gasSchedule.distributionProof = uint32(fit(v, ".gasSchedule.distributionProof", type(uint32).max));
+   │                                           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:60:33
+   │
+60 │         p.gasSchedule.journal = uint32(fit(v, ".gasSchedule.journal", type(uint32).max));
+   │                                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:61:30
+   │
+61 │         p.gasSchedule.scan = uint32(fit(v, ".gasSchedule.scan", type(uint32).max));
+   │                              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:62:34
+   │
+62 │         p.gasSchedule.selected = uint32(fit(v, ".gasSchedule.selected", type(uint32).max));
+   │                                  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:63:32
+   │
+63 │         p.gasSchedule.synced = uint32(fit(v, ".gasSchedule.synced", type(uint32).max));
+   │                                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:64:32
+   │
+64 │         p.gasSchedule.pruned = uint32(fit(v, ".gasSchedule.pruned", type(uint32).max));
+   │                                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:65:32
+   │
+65 │         p.gasSchedule.unlist = uint32(fit(v, ".gasSchedule.unlist", type(uint32).max));
+   │                                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:66:34
+   │
+66 │         p.gasSchedule.unlisted = uint32(fit(v, ".gasSchedule.unlisted", type(uint32).max));
+   │                                  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:67:35
+   │
+67 │         p.gasSchedule.liquidate = uint32(fit(v, ".gasSchedule.liquidate", type(uint32).max));
+   │                                   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:68:39
+   │
+68 │         p.gasSchedule.liquidatePack = uint32(fit(v, ".gasSchedule.liquidatePack", type(uint32).max));
+   │                                       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:69:37
+   │
+69 │         p.gasSchedule.redeemShape = uint32(fit(v, ".gasSchedule.redeemShape", type(uint32).max));
+   │                                     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:70:38
+   │
+70 │         p.gasSchedule.recoveryBase = uint32(fit(v, ".gasSchedule.recoveryBase", type(uint32).max));
+   │                                      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:71:39
+   │
+71 │         p.gasSchedule.recoveryShape = uint32(fit(v, ".gasSchedule.recoveryShape", type(uint32).max));
+   │                                       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:72:40
+   │
+72 │         p.gasSchedule.recoveryUnseal = uint32(fit(v, ".gasSchedule.recoveryUnseal", type(uint32).max));
+   │                                        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:73:33
+   │
+73 │         p.gasSchedule.harvest = uint32(fit(v, ".gasSchedule.harvest", type(uint32).max));
+   │                                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:74:35
+   │
+74 │         p.gasSchedule.harvested = uint32(fit(v, ".gasSchedule.harvested", type(uint32).max));
+   │                                   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:75:32
+   │
+75 │         p.gasSchedule.credit = uint32(fit(v, ".gasSchedule.credit", type(uint32).max));
+   │                                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+warning[unsafe-typecast]: typecasts that can truncate values should be checked
+   ╭▸ script/Deploy.s.sol:76:30
+   │
+76 │         p.gasSchedule.fund = uint32(fit(v, ".gasSchedule.fund", type(uint32).max));
+   │                              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   │
+   ├ note: consider disabling this lint if you're certain the cast is safe
+   │       
+   │       // casting to 'uint32' is safe because [explain why]
+   │       // forge-lint: disable-next-line(unsafe-typecast)
+   │       
+   │       
+   ╰ help: https://getfoundry.sh/forge/linting/unsafe-typecast
+
+release check: uncommitted release inputs:
+M deploy/mainnet.json
+ M deploy/manager.json
+ D deploy/release-acceptance.sig
+ M keeper/keeper.py
+ M keeper/policy.py
+ M keeper/rehearsal_batch.py
+ M keeper/rehearse_image.py
+ D keeper/rehearse_selection.py
+ M keeper/rehearse_unified.py
+ M keeper/rehearse_unified_steps.py
+ M keeper/test_index.py
+ M keeper/test_policy.py
+ M keeper/test_tx.py
+ M keeper/tx.py
+ M script/Deploy.s.sol
+ M script/DeployCore.sol
+ M script/deploy.sh
+ M script/release.py
+ M script/verify.sh
+ D src/KeeperPolicy.sol
+ M src/PackAccount.sol
+ M src/PackManager.sol
+ M src/PackManagerFactory.sol
+ M src/PackVault.sol
+ M src/ScanLib.sol
+ M src/StrategyLib.sol
+ M src/VaultLib.sol
+?? deploy/existing-main-readback.json
+?? deploy/mint-fee-observation.json
+?? keeper/calibrate_tails.py
+?? keeper/completion_calibration.py
+?? keeper/config.py
+?? keeper/test_config.py
+?? keeper/test_value_reorg.py
+?? script/test_release.py
+release check: sources differs from the manifest: ['script/Deploy.s.sol', 'script/DeployCore.sol', 'script/deploy.sh', 'script/release.py', 'script/test_release.py', 'script/verify.sh', 'src/KeeperPolicy.sol', 'src/PackAccount.sol', 'src/PackManager.sol', 'src/PackManagerFactory.sol', 'src/PackVault.sol', 'src/ScanLib.sol', 'src/StrategyLib.sol', 'src/VaultLib.sol']
+release check: build differs from the manifest: ['KeeperPolicyV1', 'PackManager', 'PackManagerFactory', 'PackVault', 'ScanLib', 'StrategyLib', 'VaultLib']
+release check: keeper differs from the manifest: ['keeper/config.py', 'keeper/keeper.py', 'keeper/policy.py', 'keeper/tx.py']
+release check: values differs from the manifest: ['deploy/existing-main-readback.json', 'deploy/mainnet.json', 'deploy/manager.json', 'deploy/mint-fee-observation.json']
+release check: evidence differs from the manifest: ['asset-flow.json', 'docs/receipts/unified-production-rehearsal.json']
+release check failed (reported only: simulation or local Anvil)
+chain 1, values deploy/mainnet.json, simulation only
+No files changed, compilation skipped
+Warning: Detected artifacts built from source files that no longer exist. Run `forge clean` to make sure builds are in sync with project files.
+ - /Users/dd/CascadeProjects/shapes-fwa-pool-completion/foundry-pp/DeployHelper50.sol
+ - /Users/dd/CascadeProjects/shapes-fwa-pool-completion/foundry-pp/DeployHelper49.sol
+ - /Users/dd/CascadeProjects/shapes-fwa-pool-completion/foundry-pp/DeployHelper48.sol
+ - /Users/dd/CascadeProjects/shapes-fwa-pool-completion/foundry-pp/DeployHelper47.sol
+Script ran successfully.
+
+== Return ==
+vault: contract PackVault 0x26213d3f0DfbcC864d21820DB6783e89fFcbf2E4
+
+== Logs ==
+  PackVault 0x26213d3f0DfbcC864d21820DB6783e89fFcbf2E4
+  PackManagerFactory 0xB574DC3fA2398013eA4512D5261cf982f5D5c8fC
+  PackManager implementation 0x670E326620950A96b42C9e9750a3052099D0D274
+  postflight passed
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 1
+
+Estimated max fee per gas: 0.661617151 gwei
+Estimated base fee per gas: 0.330771148 gwei
+Estimated max priority fee per gas: 0.000074855 gwei
+
+Estimated total gas used for script: 34438435
+
+Estimated amount required: 0.022785059249598685 ETH
+
+==========================
+
+SIMULATION COMPLETE. To broadcast these transactions, add --broadcast and wallet configuration(s) to the previous command. See forge script --help for more.
+
+Transactions saved to: /Users/dd/CascadeProjects/shapes-fwa-pool-completion/broadcast/Deploy.s.sol/1/dry-run/run-latest.json
+
+Sensitive values saved to: /Users/dd/CascadeProjects/shapes-fwa-pool-completion/cache/Deploy.s.sol/1/dry-run/run-latest.json
+

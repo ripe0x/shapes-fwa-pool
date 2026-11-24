@@ -1,4 +1,41 @@
-> **Current: [docs/UNIFIED-SYSTEM.md](UNIFIED-SYSTEM.md)** and the release package [docs/release/](release/RUNBOOK.md) (2026-11-21). One strategy implementation for the pooled vault and personal managers (D77–D85). Everything below the line is history for earlier candidates.
+# Main pool completion, 2026-11-24
+
+**Engineering candidate implemented; production remains unsigned and economically unaccepted.**
+The launch recipe is three paid 0.01 ETH Shape mints in each 0.03 ETH pack, mask 8. Shared vault and
+individually owned managers retain shared linked-library logic. The external keeper policy and
+compulsory buyer-keep backing rule are removed. Account owners control immediate numerical
+calibration, backing, renewal mode, accepted mint fee and funding settings.
+
+Contribution eras/refunds use canonical wei accounting; gross deposits are charged at commitment.
+Fresh renewal requires single-use verified acquisition eligibility and actual returned assets.
+Bounded fee collection can fund a genuine renewal; cash and permission shortages remain distinct.
+Caller-funded CLI and app exits handle actual unlisting, redemption, checkpointing, claims and refunds.
+Community contracts, deployment selection and legacy routes are preserved. The main live app gate
+remains closed.
+
+- [Verification and limits](receipts/completion-verification.md): final source identities, exact
+  commands, real-counterparty forks, 103 billed calibration receipts, reconciliation and failures.
+- [Economic scorecard](receipts/completion-economics.md): holder, keeper and gross creator fee
+  results under the same bounded scenarios. This is not demonstrated APR.
+- [Independent combined review](receipts/completion-independent-review.md): repaired findings and
+  bounded review scope.
+- [Settings inventory](release/SETTINGS.md) and [unsigned deployment runbook](release/RUNBOOK.md).
+  Five unsigned deployment transactions and separate predicted keeper address data are prepared.
+
+The 0.001 ETH mint fee was observed again at mainnet block 26485757. No public transaction,
+production fee change, live cutover, merge or new acceptance signature was made. Backing 70,000 bps,
+uplift 25 bps, one renewal float and 0.005 ETH reserve remain local evaluation values. The existing
+10% net holder-return requirement and historical 0.0002 ETH checkpoint comparison were not relaxed.
+
+Things that don't make sense: creator fee accrual can coexist with holder losses; one float cannot
+fund repeated early acquisitions; a small pool can wait for unresolved allocations at 25 bps;
+the configured required checkpoint can exceed the historical expense target. See the scorecard
+for the resulting recommendation and narrow remaining production decisions.
+
+---
+
+Everything below is historical evidence for its named revision. Its “current” labels, proposed
+next steps, measurements and approvals do not apply to this completion candidate.
 
 # Unified system, release candidate (2026-11-21)
 

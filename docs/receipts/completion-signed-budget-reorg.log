@@ -1,0 +1,7 @@
+loaded recovery client {"test_tx": {"source_sha256_at_import": "6c4113089531dfcbc6d15d5ea87e74c5624629d03a24b1397c992295f85e98cd", "loaded_code_sha256": "585b6af8082f5dccafcaeb9ed237530c805136cef2260aaa5385f5951bfbee62"}, "keeper": {"source_sha256_at_import": "7343ef02c19f656bf9b92e2933c9f791a19603b23d8bcc39825b5cd238bd99b9", "loaded_code_sha256": "fe6b60dc1dbf3aa514e5c7d06e337f65ef69d78257b367f9108fc25937335079"}, "tx": {"source_sha256_at_import": "23ef4eeb579994c28343ec58612afdaf1972317e5c43110fcdd60fcf139ede3e", "loaded_code_sha256": "d7e250176095deb4890c9be9e1e7cf5783b4e10949e7ccb27a33465f599ab360"}, "__main__": {"source_sha256_at_import": null, "loaded_code_sha256": "4083914a5b48c223edfb9d776f9dd40cd545ca8aa1b2590e2cd1470230a0c823"}}
+sent fundCheckpoint nonce 20 hash 0x8aaea11c2657320ddf2752c379971c57532883032eec533645259299e2abca4f
+REVERTED fundCheckpoint gas 67238 (est 200000) cost 3365960906248 pay 0 net -3365960906248 wei
+error: fundCheckpoint reverted on chain: 0x8aaea11c2657320ddf2752c379971c57532883032eec533645259299e2abca4f
+error: reorg: fundCheckpoint 0x8aaea11c2657320ddf2752c379971c57532883032eec533645259299e2abca4f no longer in block 26484912; chain state is re-read
+reorg moved fundCheckpoint 0x8aaea11c2657320ddf2752c379971c57532883032eec533645259299e2abca4f to block 26484915; recounted
+error: reorg: fundCheckpoint 0x8aaea11c2657320ddf2752c379971c57532883032eec533645259299e2abca4f no longer in block 26484915; chain state is re-read

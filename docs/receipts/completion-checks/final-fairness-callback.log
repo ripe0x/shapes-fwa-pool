@@ -1,0 +1,104 @@
+Compiling 3 files with Solc 0.8.30
+Solc 0.8.30 finished in 15.82s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:253:35:
+    |
+253 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:653:5:
+    |
+653 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (8760): This declaration has the same name as another declaration.
+   --> src/VaultLib.sol:388:69:
+    |
+388 |     function renewalFundingGas(Params storage p, uint256 feeClaims, bool withdrawCredit)
+    |                                                                     ^^^^^^^^^^^^^^^^^^^
+Note: The other declaration is here:
+   --> src/VaultLib.sol:999:5:
+    |
+999 |     function withdrawCredit(Book storage b, IFWAV2 f) external { _withdrawCredit(b, f); }
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:15:9:
+   |
+15 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (3149): The result type of the shift operation is equal to the type of the first operand (uint64) ignoring the (larger) type of the second operand (uint256) which might be unexpected. Silence this warning by either converting the first or the second operand to the type of the other.
+  --> test/fork/ForkBase.sol:93:27:
+   |
+93 |         p.packUnitsMask = uint64(1) << UNITS;
+   |                           ^^^^^^^^^^^^^^^^^^
+
+Warning (3149): The result type of the shift operation is equal to the type of the first operand (uint64) ignoring the (larger) type of the second operand (uint256) which might be unexpected. Silence this warning by either converting the first or the second operand to the type of the other.
+   --> test/fork/ForkSelection.t.sol:124:27:
+    |
+124 |         p.packUnitsMask = uint64(1) << UNITS;
+    |                           ^^^^^^^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to pure
+   --> src/ScanLib.sol:329:5:
+    |
+329 |     function encodedParams(VaultLib.Params storage p) external view returns (bytes memory) {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to pure
+   --> src/ScanLib.sol:334:5:
+    |
+334 |     function configurationHash(VaultLib.Params storage p, uint256 liveMintFee, bool paused, bool windingDown)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Ran 1 test for test/fork/ForkManager.t.sol:ForkManagerTest
+[PASS] test_coldKickRefundIdentifiedUnderStipend() (gas: 5762845)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.57s (49.69ms CPU time)
+
+Ran 1 test for test/fork/ForkReceiptRecovery.t.sol:ForkReceiptRecoveryManagerTest
+[PASS] test_recordedKickRefund_resolvesAndOwnerExits() (gas: 6085034)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.63s (64.64ms CPU time)
+
+Warning: the following cheatcode(s) are deprecated and will be removed in future versions:
+  lastCallGas(): replaced by `lastFrameGas`
+Ran 1 test for test/fork/CompleteHarvest.t.sol:CompleteHarvestTest
+[PASS] test_profileRefundedRequiredSingletonAfterFundingGate() (gas: 1070739)
+Logs:
+  contribution-funded required refunded singleton isolated billed gas: 130797
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 6.31s (3.73ms CPU time)
+
+Ran 1 test for test/fork/ForkManager.t.sol:ForkManagerSelectionTest
+[PASS] test_keep_replacementMintsFreshShapes() (gas: 47782734)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 6.31s (5.90s CPU time)
+
+Ran 3 tests for test/fork/ForkReceiptRecovery.t.sol:ForkReceiptRecoveryVaultTest
+[PASS] test_defaultFinalizationUsesRealReceiverAndResolves() (gas: 46537124)
+[PASS] test_lowGasKeepNeverForcesAnUnrecordedPayment() (gas: 62277717)
+Logs:
+  keep gas limits that reverted: 65
+  keep gas limits that completed and recorded: 26
+
+[PASS] test_recordedKeepResolvesExactlyOnceAndStrangerCannotFabricateReceipt() (gas: 46743775)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 6.32s (13.48s CPU time)
+
+Ran 3 tests for test/fork/ForkMainCheckpointFairness.t.sol:ForkMainCheckpointFairnessTest
+[PASS] test_lateAllocationCannotUseMissedWindowAndRecoversThroughRealSettlement() (gas: 46911631)
+[PASS] test_liveIncumbentAndEntrantKeepOrderingAt25bpsCompleteBothExits() (gas: 25789337)
+Logs:
+  incumbent wealth effect keep after vs before pricing (wei, before wallet gas): -2377394133252854
+  entrant wealth effect keep after vs before pricing (wei, before wallet gas): 2370543496979275
+  entrant full exit result keep after pricing (wei, before wallet gas): -11591967591048566
+
+[PASS] test_multipleRealAllocationsNear25bpsCompleteBothHolderExits() (gas: 104674434)
+Logs:
+  incumbent wealth effect keep after vs before pricing (wei, before wallet gas): -2393508309942320
+  entrant wealth effect keep after vs before pricing (wei, before wallet gas): 2379284175813841
+  entrant full exit result keep after pricing (wei, before wallet gas): -11676106130900297
+
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 8.29s (11.46s CPU time)
+
+Ran 6 test suites in 8.74s (30.45s CPU time): 10 tests passed, 0 failed, 0 skipped (10 total tests)

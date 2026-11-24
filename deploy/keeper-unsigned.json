@@ -1,0 +1,22 @@
+{
+  "status": "UNSIGNED_SIMULATION_ADDRESSES_ONLY_NOT_LIVE_CONFIG",
+  "chainId": 1,
+  "rpcUrl": "https://mainnet.gateway.tenderly.co",
+  "vault": "0x26213d3f0dfbcc864d21820db6783e89ffcbf2e4",
+  "factory": "0xb574dc3fa2398013ea4512d5261cf982f5d5c8fc",
+  "libraries": {
+    "ScanLib": "0x4ac701799b22e4c7a0f24301ccc904ad6fb3f005",
+    "VaultLib": "0x650b28e26586dbfea4d2be777d3983816d0d1a2f",
+    "StrategyLib": "0xe899b8ac4712842d6af7a9f47a7b6951bda4b519"
+  },
+  "values": "deploy/mainnet.json",
+  "managerValues": "deploy/manager.json",
+  "sourceSetSha256": "d85c926518a689c73c6575937fd7d3dcde0d1a484d5abfe6de6faa22a4ca8e39",
+  "deploymentPackageSha256": "85f01bd10e348bbc8a907442126c89c896310968884dd4d9d1438bb1b0edc049",
+  "requirements": [
+    "Predicted CREATE addresses depend on the current signer nonce. Refresh and independently postflight before use.",
+    "Use existing external keystores and explicitly supplied state/index paths; no signer secrets belong in configuration.",
+    "Do not apply this data to production Fly configs or live app selection without separate cutover authority.",
+    "After authorized deployment run script/release.py postflight before keeper-config; preserve prior services and manager ownership."
+  ]
+}

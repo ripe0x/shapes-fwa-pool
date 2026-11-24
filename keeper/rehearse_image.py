@@ -11,6 +11,7 @@ import re
 import os
 import shutil
 import socketserver
+import socket
 import subprocess
 import sys
 import tempfile
@@ -25,9 +26,8 @@ from eth_utils import keccak, to_checksum_address
 ROOT = Path(__file__).resolve().parent.parent
 PORT, PROXY_PORT = 8581, 8582
 RPC = f"http://127.0.0.1:{PORT}"
-# Tenderly's public gateway by default. REHEARSAL_FORK_RPC (environment only) can name another
-# upstream for the fork; its URL can carry an API key, so scrub() removes it from every record.
-FORK_RPC = os.environ.get("REHEARSAL_FORK_RPC") or "https://mainnet.gateway.tenderly.co"
+# Ethereum mainnet reads use the required public gateway.
+FORK_RPC = "https://mainnet.gateway.tenderly.co"
 
 
 def scrub(text):
@@ -79,7 +79,7 @@ def holder_unwind(holder, log):
     nothing is owed. Each call the vault refuses (nothing to do yet or any more) is logged, not sent."""
     n = min(8, call("openListingCount()(uint256)"))
     ids = "[" + ",".join(str(call("openListingAt(uint256)(uint256)", i)) for i in range(n)) + "]"
-    for sig, args in (("unlist(uint256[],uint256)", (ids, 0)), ("liquidate(uint256,uint256)", (8, 0))):
+    for sig, args in (("recoverUnlist(uint256[])", (ids,)), ("recoverLiquidate(uint256)", (8,))):
         try:
             send(holder, VAULT, sig, *args)
             log.append(dict(call=sig.split("(")[0], block=num(cast("block-number"))))
@@ -127,8 +127,10 @@ class DropFirstSend(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers["Content-Length"]))
         reply = urllib.request.urlopen(urllib.request.Request(RPC, body, {"Content-Type": "application/json"})).read()
-        if not DropFirstSend.dropped and b"eth_sendRawTransaction" in body:
-            DropFirstSend.dropped.append(json.loads(reply).get("result"))
+        method=json.loads(body).get('method')
+        accepted=json.loads(reply).get('result')
+        if not DropFirstSend.dropped and method in ('eth_sendRawTransaction','eth_sendTransaction') and accepted:
+            DropFirstSend.dropped.append(accepted)
             self.close_connection = True  # forwarded and accepted by the node; the answer is lost
             return
         self.send_response(200)
@@ -206,6 +208,9 @@ def main():
     ap.add_argument("--image")
     ap.add_argument("--fork-block", type=int, default=26_484_850)
     a = ap.parse_args()
+    for port in (PORT,PROXY_PORT):
+        with socket.socket() as available:
+            available.bind(('127.0.0.1',port))  # Refuse occupied surfaces; never reuse or stop them.
     work = Path(tempfile.mkdtemp(prefix="pack-vault-image-"))
     node = subprocess.Popen(["anvil", "--host", "127.0.0.1", "--port", str(PORT), "--accounts", "0", "--silent",
                              "--fork-url", FORK_RPC, "--fork-block-number", str(a.fork_block), "--retries", "30",
@@ -257,18 +262,18 @@ def main():
         deposit = call("requestCharge()(uint256)") + 2 * 10**18  # a 2 ETH holder deposit
         send(holder, VAULT, "deposit()", value=deposit)
         expire_queue()
-        volume = lambda n: n if a.image else str(work / n)  # noqa: E731
+        volume = lambda n: work.name+'-'+n if a.image else str(work / n)  # noqa: E731
         if a.image:
             for n in ("primary-data", "backup-data"):
-                sh("docker", "volume", "create", n)
-        primary = Keeper("primary", keys["primary"], volume("primary-data"), a.image)
+                sh("docker", "volume", "create", volume(n))
+        primary = Keeper(work.name+"-primary", keys["primary"], volume("primary-data"), a.image)
         # Fly runs each worker on its own machine; sharing this host needs separate health ports.
-        backup = Keeper("backup", keys["backup"], volume("backup-data"), a.image, poll=30, health=8789)
+        backup = Keeper(work.name+"-backup", keys["backup"], volume("backup-data"), a.image, poll=30, health=8789)
         keepers = [primary, backup]
         primary.start()
         backup.start()
         warp_to(42_360)
-        wait_for("primary prices the deposit at the blackout", lambda: call("lastNav()(uint256)") > 0)
+        wait_for("primary prices the deposit at the blackout", lambda: call("pendingDepositTotal()(uint256)") == 0 and call("shareBalance(address)(uint256)",holder) > 0)
         warp_to(60)
         expire_queue()
         wait_for("keepers build and list", lambda: call("openListingCount()(uint256)") > 0)
@@ -288,14 +293,15 @@ def main():
         DropFirstSend.dropped.clear()
         server = socketserver.ThreadingTCPServer(("127.0.0.1", PROXY_PORT), DropFirstSend)
         threading.Thread(target=server.serve_forever, daemon=True).start()
-        replacement = Keeper("primary-replacement", keys["primary"], volume("primary-data"), a.image,
+        replacement = Keeper(work.name+"-primary-replacement", keys["primary"], volume("primary-data"), a.image,
                              rpc=f"http://127.0.0.1:{PROXY_PORT}")
         keepers[0] = replacement
         replacement.start()
         # The charge is quoted at the basefee when the call runs; a build in between can raise it.
         # Pay double, as a holder should: the excess comes straight back.
-        send(holder, VAULT, "requestRedeem(uint256)", call("shareBalance(address)(uint256)", holder) // 4,
-             value=2 * call("requestCharge()(uint256)"))
+        shares=call("shareBalance(address)(uint256)",holder)//4
+        unwind_charge=shares*call("lastNav()(uint256)")//call("totalShares()(uint256)")*call("unwindCharge()(uint256)")//call("referencePositionValue()(uint256)")
+        send(holder, VAULT, "requestRedeem(uint256)",shares,value=2*(call("requestCharge()(uint256)")+unwind_charge))
         warp_to(42_360)
         expire_queue()
         unwind = evidence["holder_unwind"] = []
@@ -310,7 +316,7 @@ def main():
         dropped = rpc("eth_getTransactionReceipt", DropFirstSend.dropped[0])
         evidence["dropped_transaction_status"] = dropped and int(dropped["status"], 16)
         assert after["stats"]["mined"] >= before["stats"]["mined"] and after["head"] >= before["head"], "state or index lost"
-        backup = Keeper("backup-restarted", keys["backup"], volume("backup-data"), a.image, poll=30, health=8789)
+        backup = Keeper(work.name+"-backup-restarted", keys["backup"], volume("backup-data"), a.image, poll=30, health=8789)
         keepers[1] = backup
         backup.start()  # same volume: the backup resumes its own saved state beside the replacement
         # The backup polls slowly and may find nothing to send; it must still complete clean passes.
@@ -330,7 +336,7 @@ def main():
                     assert won, f"a keeper transaction reverted without a race: {e}"
                     races.append(dict(lost=e, won=won[0]))
         evidence["lost_races"] = races
-        keeper_nonce = num(cast("nonce", keys["primary"][2]))
+        keeper_nonce = num(cast("nonce", keys["primary"]))
         evidence["primary_nonce"] = keeper_nonce
         evidence["primary_sends_counted"] = after["stats"]["sent"]
         evidence["result"] = "PASS"
@@ -344,8 +350,9 @@ def main():
         node.terminate()
         for f in cleanup:
             f.unlink(missing_ok=True)
+        # Keep this invocation's logs and public state for diagnosis; never erase evidence.
+        evidence['retained_work_directory']=str(work)
         print(scrub(json.dumps(evidence, indent=1, default=str)))
-        shutil.rmtree(work, ignore_errors=True)
 
 
 if __name__ == "__main__":

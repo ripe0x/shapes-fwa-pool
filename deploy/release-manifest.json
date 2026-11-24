@@ -1,22 +1,22 @@
 {
  "name": "PackVault and PackManagerFactory mainnet",
  "sources": {
-  "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520",
-  "remappings.txt": "638e1bbb5593b0f20280b3c050dc924c319bfe2a0781d3b8372c908f397ad429",
-  "script/Deploy.s.sol": "bafcb0fd986f4057c0fee52458faa323d2e9be10b33610b2ef30a3c56452c9cc",
-  "script/DeployCore.sol": "0384d93f6eaacf3af92df9371771206fff2c250da9bc83108331380c9a014d44",
-  "script/deploy.sh": "550f2fb54abb3cded6345b1e371b222b3803dead7b9c1a82ac0ab7ce74b7d176",
-  "script/verify.sh": "495c26a23684dc3d161c3ffa37c6f7d1075418e32321dc18adf7a9374c97fe53",
-  "src/KeeperPolicy.sol": "612d2ccce98e642e89586372eeecfd31e6ceb7d0ecdf9df8c77899afc9010929",
-  "src/PackAccount.sol": "2b99de55291a50a136f8308064a5e00c2f7fa0fc73d6e076b8e33708f4c1e91d",
-  "src/PackManager.sol": "27ef869bf3b05e9870d954051489ab099a85076942161911bbf418a561347412",
-  "src/PackManagerFactory.sol": "1ccb79b02252ae741770a77906f9ed7a6bb0507a10427c2e285466b72834ffc3",
-  "src/PackVault.sol": "3f4d8c42ed51b390739f099e544014219efab1fda4a730d0526565cfb00517d6",
-  "src/ScanLib.sol": "46a09b2c0ce714154ec20902c418184e72da6b3756f527b8e19b80e8f8328b35",
-  "src/StrategyLib.sol": "af84cbab21da0215b63c2b4cd306b6ab7c89b48951d34c0742f8fa911cd8cb40",
-  "src/VaultLib.sol": "84d53c2eb2e8d8993852405b09cb360ca6aba8b80c7fdfb87cdbcb1e6e336681",
+  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+  "script/deploy.sh": "7a2dbb28ca6f685b2506e286cb356f21844647e1bdf4f8454c36e309b694b6eb",
+  "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
   "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879",
-  "script/release.py": "d659f26047c69684d0218820e1618ef1a3d4ed905efa0e314f7beae5c5c86162"
+  "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
+  "script/DeployCore.sol": "10b61be887f77901151d47525abb0bd7e16116c3569008ab976c511a365cee5b",
+  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+  "script/Deploy.s.sol": "608bc36c5566fafe35de3989ed13105542edcd2aaf5242a11f7f2a6936f26b0d",
+  "remappings.txt": "638e1bbb5593b0f20280b3c050dc924c319bfe2a0781d3b8372c908f397ad429",
+  "script/test_release.py": "a21e4ffed877bed3ad909815e9e24e97f8ef57460d9d135ebb42de1719144c54",
+  "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
+  "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520",
+  "script/verify.sh": "f2d7ef2acdb6fbc59b2a4787666ebd908d766113cc76a00e13262a264690b89e",
+  "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+  "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+  "script/release.py": "72d600fd27ff0ce2b4746bfeb3f2b5d1f356d653b039eb9ec5e073a2efcb2fac"
  },
  "toolchain": {
   "solc": "0.8.30",
@@ -29,67 +29,68 @@
  },
  "build": {
   "PackVault": {
-   "runtime_bytes": 16960,
-   "runtime_sha256": "fe92bafe180c3cd64d52cd179af2b052bac388e9d170bf25327b0cc91b9c88cf",
-   "initcode_sha256": "8de91907254f30e87f680d9a5b55c0726e590e9023c57de6e0c6050ee0c2c7f2"
+   "runtime_bytes": 24095,
+   "runtime_sha256": "a32f93cb6dc57991543e18842e2225309419a63a0afc77d4f47c7f440c1ae71e",
+   "initcode_sha256": "abb5535deb27b2592939c85acb870095d4add574accc5d044094ab8f304d7a37"
   },
   "PackManager": {
-   "runtime_bytes": 12494,
-   "runtime_sha256": "865d3ab4614dafb1ae9d073f8ac996d79867087677b088fa89a2d7b3bec424c6",
-   "initcode_sha256": "0dd6d40aa1653577a6f685d9a627d4b34d6ad50564b19813750039aef8cfff2c"
+   "runtime_bytes": 17742,
+   "runtime_sha256": "2cdf170da53d5237888cb83bd74283f18ff689b820059e597556ccfbcb832d14",
+   "initcode_sha256": "a0eb3e369ce01f7c13d74917d3a428d207bf681d52c27b62b0850669378612d9"
   },
   "PackManagerFactory": {
-   "runtime_bytes": 1365,
-   "runtime_sha256": "3d4db29c61fb6a9b380514c4c74b69d1c582b265f1f42be34753725bd45a89e4",
-   "initcode_sha256": "8bfda936b2214b576b0ba2e52a4998c7c3e933102d8f22ff564758d373ebfdad"
+   "runtime_bytes": 4986,
+   "runtime_sha256": "47da5f67cea62f7bdc8afebd7f4614b520e8b271621d5040acb336a2e601851c",
+   "initcode_sha256": "12be25f31c16cf00560ff4a4628d3a136d7cda2953ce8600489dd7977c0a2ccf"
   },
   "StrategyLib": {
-   "runtime_bytes": 12758,
-   "runtime_sha256": "bccb4518186ee1475e06bf6137fef2e03903a99d9a9a715d020e78c9c5893c38",
-   "initcode_sha256": "9dc8aeb045a7cb3075779cd4c213722267b71357fa3a12dd492b6471e83b1ca6",
-   "create2_address": "0x6F4511eB3CE77Ac27505A60cC934359b3Fc1a83f"
+   "runtime_bytes": 18090,
+   "runtime_sha256": "67e0c507a5c7a25e9c4e00bccb0b8d5aa9ac058414d138061dfbb442fcb10c5b",
+   "initcode_sha256": "467aa526c78fadc18e6cf3e6f403c6628a9d2379ff96a5d54ba8d5a293a50601",
+   "create2_address": "0xE899b8ac4712842D6AF7A9F47a7b6951bDA4B519"
   },
   "VaultLib": {
-   "runtime_bytes": 23561,
-   "runtime_sha256": "6ec7c5a8f14e34507ddfd59971075f6160eb05e898e832d9c0193cb42de1c15a",
-   "initcode_sha256": "b4aeebd1c6ed644d852a67a77a56cda454a97804b0401e2de4366992ec0dbf92",
-   "create2_address": "0x8E75a868C17c1e101a26837a2ABC7EE6E185b69c"
+   "runtime_bytes": 22260,
+   "runtime_sha256": "ec089c6dd88e65bf4193fdf1f8245e25c83f9b27c2dac4d53903537008c4364f",
+   "initcode_sha256": "a8f2b15f4d65519ed9929ba4392019be86b9da6fe1df8f2d44a9cb477edc270f",
+   "create2_address": "0x650B28E26586dbfea4d2bE777d3983816D0D1A2f"
   },
   "ScanLib": {
-   "runtime_bytes": 3077,
-   "runtime_sha256": "436a07716925de25ae668abdad6b7ccacd03ef9baf15f68f22e1f3ab1b4d8e24",
-   "initcode_sha256": "b33a82e8c08257bcd5be7d2812e9d7f51fe55300bf8eb7bc3aa59be292608666",
-   "create2_address": "0x5d42A8D00C2f320247771e0A76E0D525454a9E8A"
-  },
-  "KeeperPolicyV1": {
-   "runtime_bytes": 216,
-   "runtime_sha256": "d8f3f70dfb224ca9923e6e2b0be70ba2cd35c27255b590427af3c7b95dc54410",
-   "initcode_sha256": "bc250c40cc4ddd7728ee14de982638b83e92f42fe9a3abb4c6a4d22a33884da9"
+   "runtime_bytes": 22993,
+   "runtime_sha256": "91e913a4af9142dc22adc0b744789d8d983b584f5a2b1631f7b64e234e605735",
+   "initcode_sha256": "1b0c3200420a5bfe07c3252cbbb4fcd1c5204732e2028e7e64041dd97214fc67",
+   "create2_address": "0x4ac701799b22e4c7a0f24301ccc904AD6fB3F005"
   }
  },
  "deployment_values": "deploy/mainnet.json",
  "values": {
-  "deploy/mainnet.json": "2c863450d8b2640ba956960f375a0f56e08b460410ef20f43da528eccb9e7dc6"
+  "deploy/mainnet.json": "e9a5ca7b80c8e67cb2d0bfef5be4d2539129fcf078da488e52253cd9a2aaefd0",
+  "deploy/manager.json": "f216770efacfe587770fe3d3821d0f2489d40c4e4f7758a051be77195ac0c026",
+  "deploy/mint-fee-observation.json": "feb7d12387928144de212966dd3e431c4f2ba5b648ad3ea409f9ba61620ac29b",
+  "deploy/existing-main-readback.json": "33933ee2fe77ee0a76ce38c5b5f0e89b29a6868d6f02e814681dfb19a6304f8f"
  },
  "keeper": {
   "keeper/Dockerfile": "54675df4109b6b91f5e750816fdf20fb410942992fbebacb9b14d82dc5211243",
   "keeper/entrypoint.sh": "07e21998a23f57ea944ccd972d6e9ddc2b9cb1c6e4c5d47c079b5468c06d58c9",
   "keeper/requirements.txt": "aed414c4157dd12cba962363a8c9f561a2e5dcddbf20ee4c2ea9ff41ad4e913c",
-  "keeper/keeper.py": "32ed8f82817c8b9d9050c1e10b15df19f2499a117ba5e87d6d228cf1b3284b9c",
-  "keeper/policy.py": "84b699cd1f4cbbc1a3f22079b4eea22948e258ecc5ac8ae1dff284f76b9e15a1",
-  "keeper/tx.py": "4778e14b08c09e28d518fa180c61be7a41880fcd14d3879b05a86a6769e77421",
+  "keeper/keeper.py": "7343ef02c19f656bf9b92e2933c9f791a19603b23d8bcc39825b5cd238bd99b9",
+  "keeper/policy.py": "b56d5b11c6cd387c6c623419a5c31012bbae509680d29f403c2ef5954ac7f107",
+  "keeper/config.py": "39acb35f93fb64916dd4c8c8ab64da76742ec8c8b1c90902c9c1b014a6a22f06",
+  "keeper/tx.py": "23ef4eeb579994c28343ec58612afdaf1972317e5c43110fcdd60fcf139ede3e",
   "keeper/index.py": "321946551c971b6374cb37c37de93c6a79895e87492e08421956472376d3d96a",
   "fly.keeper-primary.toml": "d0562149088fff773d7abedd4e643e131c07eb988c5542197d05dfe4d71bde5f",
   "fly.keeper-backup.toml": "5ad276a78fc08c2fc8badf7b70b4794cb19e0043e3b080081323d9041a57a79b"
  },
  "evidence": {
   "docs/receipts/formal-assessment.json": "36ed0c7ef5685d6f0adcad540f961041fffd1a63675b7258c2ae68830fec1e2b",
-  "docs/receipts/recipe-comparison.json": "619174dbc9034424070fc62c1eb94175480bbf0c8549f3c92f2c0a2066d48cc0",
-  "docs/receipts/unified-production-rehearsal.json": "9dc106fdb04401957b9b813829088b03c856e54c729f8bcfaf0a10932347b0db",
-  "docs/receipts/unified-selection-rehearsal.json": "8662f2f36b14f0c6cc1133cc44951f2dd0d72c5d571038e07ba20ae75ae883c4",
-  "docs/receipts/image-rehearsal/ci-44948198556.json": "0441331af0c353a778d2b113b84eb8b7353431d43c9f418a55d2f896af47a3db",
-  "docs/receipts/unified-review.md": "89768f880339f579250e482c8f94f995a19855b12ea04e5d11bd9730b35dd949",
-  "docs/receipts/unified-verify/SUMMARY.md": "d47e4ece0eb8d95c717f1ee09df48217da4414382da12e736d5c7b0c5febecd6",
-  "asset-flow.json": "42758ed893fde63ad0d931d61a78994a0099ce2e1ee213a594b3463b53b0c824"
+  "docs/receipts/completion-calibration.json": "4b4c3605323c22b9611a8ff517613879f28e2da239ee31adbdb9fd99afa8fcff",
+  "docs/receipts/unified-production-rehearsal.json": "0ddb1e2660ed8ddf0dfd85ba69a0450bf138d766a96bc143d08741c98bc5f075",
+  "docs/receipts/completion-verification.md": "c5cfa7ad7f3281c631f170853ef77cfbb893718a7b5a0f1ee2be83ebf49bf508",
+  "docs/receipts/completion-app.json": "61220915fab227352c31e8575e9b7831b6794a15d85904525e48860d08bae107",
+  "docs/receipts/completion-checks/input-manifest.json": "b17e6627083c6d62b4eada345b401f49d3b98e2d3af944b9df537861f6a1db7f",
+  "deploy/unsigned-cutover.json": "85f01bd10e348bbc8a907442126c89c896310968884dd4d9d1438bb1b0edc049",
+  "deploy/keeper-unsigned.json": "b11f1654f476952ef1235bcf748dbdc74a82fd1c79c22153c71ee336162ca130",
+  "docs/receipts/completion-signed-budget-reorg.json": "4e5c93d6f4720d7e6e0855f2113498468767ac09fa4af5f17d35e6bacbd54a9d",
+  "asset-flow.json": "b47d373601ef5671090bb6d83bf038b48f4d63b1770f066d12275110e5d5beef"
  }
 }

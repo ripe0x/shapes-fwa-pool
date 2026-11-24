@@ -1,0 +1,194 @@
+Compiling 21 files with Solc 0.8.30
+Solc 0.8.30 finished in 43.95s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:253:35:
+    |
+253 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:653:5:
+    |
+653 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (8760): This declaration has the same name as another declaration.
+   --> src/VaultLib.sol:388:69:
+    |
+388 |     function renewalFundingGas(Params storage p, uint256 feeClaims, bool withdrawCredit)
+    |                                                                     ^^^^^^^^^^^^^^^^^^^
+Note: The other declaration is here:
+   --> src/VaultLib.sol:999:5:
+    |
+999 |     function withdrawCredit(Book storage b, IFWAV2 f) external { _withdrawCredit(b, f); }
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:15:9:
+   |
+15 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (3149): The result type of the shift operation is equal to the type of the first operand (uint64) ignoring the (larger) type of the second operand (uint256) which might be unexpected. Silence this warning by either converting the first or the second operand to the type of the other.
+  --> test/fork/ForkBase.sol:93:27:
+   |
+93 |         p.packUnitsMask = uint64(1) << UNITS;
+   |                           ^^^^^^^^^^^^^^^^^^
+
+Warning (3149): The result type of the shift operation is equal to the type of the first operand (uint64) ignoring the (larger) type of the second operand (uint256) which might be unexpected. Silence this warning by either converting the first or the second operand to the type of the other.
+   --> test/fork/ForkSelection.t.sol:124:27:
+    |
+124 |         p.packUnitsMask = uint64(1) << UNITS;
+    |                           ^^^^^^^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to pure
+   --> src/ScanLib.sol:329:5:
+    |
+329 |     function encodedParams(VaultLib.Params storage p) external view returns (bytes memory) {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to pure
+   --> src/ScanLib.sol:334:5:
+    |
+334 |     function configurationHash(VaultLib.Params storage p, uint256 liveMintFee, bool paused, bool windingDown)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/EfficientJournal.t.sol:20:5:
+   |
+20 |     function assertEnvironment() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkCompletionAccounting.t.sol:36:5:
+   |
+36 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkIncrementalProduction.t.sol:38:5:
+   |
+38 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+   --> test/fork/ForkIncrementalProduction.t.sol:836:5:
+    |
+836 |     function assertStagingGasContext() external {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Ran 2 tests for test/fork/ForkUnwindCharge.t.sol:ForkUnwindChargeTest
+[PASS] test_largeLegacyRecipeChargesEveryRequiredLiquidationBase() (gas: 15530630)
+[PASS] test_mixedLifoRecipesCannotUseGroupedBatchUnderestimate() (gas: 23580642)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 774.81ms (70.44ms CPU time)
+
+Ran 1 test for test/fork/ForkIncrementalProduction.t.sol:ForkProductionReceiptsTest
+[PASS] test_oversizedKeptGiftRecoversInBoundedChunksWithoutBlockingNormalInventory() (gas: 54551281)
+Logs:
+  production vault runtime bytes: 24095
+  recovery thirty Shapes complete gas: 1167025
+  recovery thirty Shapes pay wei: 259000000000000
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.19s (765.55ms CPU time)
+
+Ran 1 test for test/fork/CompleteHarvest.t.sol:CompleteHarvestTest
+[PASS] test_distributionTailProvesTheFullCollectionCostBeforePayingIt() (gas: 3437828)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 7.15s (6.45ms CPU time)
+
+Ran 17 tests for test/fork/ForkKeeperPay.t.sol:ForkKeeperPayTest
+[PASS] test_budgetsBoundSpendingOverTime() (gas: 8503136)
+[PASS] test_cancelKeepsPoolForOtherFlows() (gas: 805456)
+[PASS] test_dustDepositCannotManufacturePay() (gas: 1590108)
+[PASS] test_essentialCeilingPaysExitsInSpikes() (gas: 4713521)
+[PASS] test_manufacturedCycleLosesAtMaxima() (gas: 46130325)
+Logs:
+  attacker net after its own gas (wei): -48487168904179502
+
+[PASS] test_minPayIsAllOrNothing() (gas: 4678422)
+[PASS] test_newRoutineRateCeilingOnlyRefillsPermission() (gas: 633929)
+[PASS] test_payIgnoresCallerGasAndTip() (gas: 8524998)
+[PASS] test_payNeverUsesLiabilities() (gas: 3974508)
+[PASS] test_repeatedWorkPaysNothing() (gas: 5645822)
+[PASS] test_requestChargeTopsUpOnce() (gas: 1148393)
+[PASS] test_routineCannotDrainEssential() (gas: 8290275)
+[PASS] test_selfServeExitWithoutEssentialBudget() (gas: 7163078)
+[PASS] test_splittingDoesNotPay() (gas: 9522065)
+Logs:
+  batch three complete gross gas: 4097976
+  three singleton complete gross gas: 5021697
+  batch three pay wei: 1023000000000000
+  three singleton pay wei: 1167000000000000
+
+[PASS] test_splittingDoesNotPayAtMaximumMarkup() (gas: 9709840)
+Logs:
+  batch three complete gross gas: 4095176
+  three singleton complete gross gas: 5018897
+  batch three pay wei: 1113300000000000
+  three singleton pay wei: 1271700000000000
+
+[PASS] test_tinyRedemptionCannotManufacturePay() (gas: 1699495)
+[PASS] test_unpaidWorkWhenBudgetsAreEmpty() (gas: 9299310)
+Suite result: ok. 17 passed; 0 failed; 0 skipped; finished in 8.73s (7.60s CPU time)
+
+Ran 10 tests for test/fork/ForkCompletionAccounting.t.sol:ForkCompletionAccountingTest
+[PASS] test_callerFundedCheckpointPreservesEscrowWhenLiveMintFeeExceedsAcceptedMaximum() (gas: 5418808)
+[PASS] test_cancellableEscrowCannotSuppressPreparatoryLiquidation() (gas: 5931807)
+[PASS] test_constructionIsPricedAtCommitAndIssuanceHasNoOrphanShares() (gas: 1871679)
+[PASS] test_explicitTopupReturnsExcessAndPartialFillFinalizesEra() (gas: 5193258)
+[PASS] test_onlyActuallyCommittingDepositsFundAtomicMatchedRedemptions() (gas: 5148809)
+[PASS] test_reconcileContributionErasEveryWei() (gas: 11486562)
+[PASS] test_recoveryPreservesUndistributedGainsForRemainingHolders() (gas: 2207502)
+[PASS] test_stalePreviewCannotCommitEscrowOrCheckpoint() (gas: 935110)
+[PASS] test_unpaidRecoveryCannotConsumePendingDepositsCheckpointWindow() (gas: 1909769)
+[PASS] test_zeroQuoteRestoredQuoteCancellationsPreserveActualPayers() (gas: 1845253)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 8.80s (35.26s CPU time)
+
+Ran 14 tests for test/fork/ForkMainConfiguration.t.sol:ForkMainConfigurationTest
+[PASS] test_disabledFreshMintsStillRelistsUnselectedOldInventory() (gas: 4719981)
+[PASS] test_feeIncreaseNeedsExplicitAcceptanceAndDecreasePaysActualFee() (gas: 4884820)
+[PASS] test_freshBuildLimitIsIndependentOfListingAndEconomicLimits() (gas: 861695)
+[PASS] test_gasScheduleBuildCoefficientsReachCostAndPayment() (gas: 2728871)
+[PASS] test_launchManagerPaysThreePrimaryMintFeesAndConsistentMarkup() (gas: 2669358)
+[PASS] test_legacyOneMintPackPricesCurrentThreeMintReplacementBeforeRelisting() (gas: 5095391)
+[PASS] test_managerEconomicSettingsRemainOnlyItsOwners() (gas: 842727)
+[PASS] test_moreThan300RealPositionsUseJournalEvenWhenScanPriceIsZero() (gas: 377056974)
+[PASS] test_oldRateAccrualAndCapacityIncreaseNeverRefillSpentBudget() (gas: 2889814)
+[PASS] test_ownerBackingFloorPreservesUnresolvedFaceCoverage() (gas: 4562781)
+[PASS] test_paidExitMinimumCanBeFundedByActualBackingAndPrincipalProceeds() (gas: 3449366)
+[PASS] test_reuseRejectsLosingInitialBuildButRelistsRealExistingInventory() (gas: 4885859)
+[PASS] test_staleConfigurationFailsBeforeAnyMintOrCapitalCommitment() (gas: 1021506)
+[PASS] test_unrelatedSettingsCannotChangeAcceptedMintFee() (gas: 845309)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 8.80s (784.41ms CPU time)
+
+Ran 16 tests for test/fork/ForkVaultLifecycle.t.sol:ForkVaultLifecycleTest
+[PASS] test_builtPackCostsAndMints() (gas: 4821750)
+[PASS] test_cancelDepositBeforePricing() (gas: 631789)
+[PASS] test_depositListRedeem_roundTrip() (gas: 20804925)
+Logs:
+  complete holder round-trip keeper pay wei: 4979000000000000
+
+[PASS] test_edgeGateStopsListingWhenCrownShareRaised() (gas: 5080568)
+[PASS] test_edgeMatchesLiveFwa() (gas: 164722)
+[PASS] test_kickReturnsFullBackingAndPack() (gas: 4879176)
+[PASS] test_ownerHandoverOnly() (gas: 435497)
+[PASS] test_ownerStopsCannotMoveAssets() (gas: 4037586)
+[PASS] test_paddedSyncPaysOnlyForWorkDone() (gas: 5358657)
+[PASS] test_paramsBoundsAppliedAtOnce() (gas: 488079)
+[PASS] test_proRataRedemptionAcrossCheckpoints() (gas: 28617926)
+[PASS] test_staleQuoteDoesNotUnlockUnlisting() (gas: 4128184)
+[PASS] test_staleQuoteStopsListing() (gas: 281734)
+[PASS] test_windDownCompletesWithNoAcquisitions() (gas: 15692078)
+[PASS] test_windDownSurvivesBrokenOracle() (gas: 7469575)
+[PASS] test_zeroOwnerRejectedAtDeploy() (gas: 15344)
+Suite result: ok. 16 passed; 0 failed; 0 skipped; finished in 8.80s (14.37s CPU time)
+
+Ran 5 tests for test/fork/ForkMainRenewal.t.sol:ForkMainRenewalTest
+[PASS] test_exitInventoryNeverCreatesFreshReplacement() (gas: 40722915)
+[PASS] test_launchVaultBidRetiresAndMintsThreePaidReplacementsExactlyOnce() (gas: 51202009)
+[PASS] test_managerKeepCreatesOnlyOnePaidReplacementPermission() (gas: 42148000)
+[PASS] test_managerRenewalCollectsRealCreditOnlyWhenCashNeedsItAndPermissionAllows() (gas: 97339289)
+[PASS] test_managerReuseModeRelistsReturnedPackWithoutPaidFreshMints() (gas: 41652099)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 10.50s (39.14s CPU time)
+
+Ran 8 test suites in 10.91s (54.73s CPU time): 66 tests passed, 0 failed, 0 skipped (66 total tests)

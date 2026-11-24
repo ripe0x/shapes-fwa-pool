@@ -1,0 +1,906 @@
+{
+ "method": "Billed isolated-fork receipts; prospective costs remain estimates",
+ "source_sha256": {
+  "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
+  "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+  "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
+  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+  "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+  "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
+  "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+ },
+ "actions_sha256": "2970c43a94c194f78fcf96a2b9fd9bfefd75b3df7c756ec93ec4672170288fe3",
+ "excluded_prior_candidate_source_hashes": [
+  "4630a2f503fe2c459c49670359528a9b63f6cfd71433d7beaed85f1e20f70b39",
+  "5ec50b7ae12068d99066157606b937e2d002abced77b4668d24b352ecba8a793"
+ ],
+ "transactions": [
+  {
+   "operation": "create",
+   "hash": "0x875c4707a70d9d9cd688d7e67310bc8ae9ca80eab2d185164239c6937981d7d6",
+   "gasUsed": 606172,
+   "effectiveGasPrice": 136442256,
+   "status": 1,
+   "valueWei": 1000000000000000000
+  },
+  {
+   "operation": "create",
+   "hash": "0x0dd53078c41d33a39da2de0bc9f862a8caa2500e210b1045682602134dcadd92",
+   "gasUsed": 589072,
+   "effectiveGasPrice": 125855303,
+   "status": 1,
+   "valueWei": 1000000000000000000
+  },
+  {
+   "operation": "create",
+   "hash": "0xdb162d37afc3dfca2794305f41bde2f10453a620de846eeca4707226037d45eb",
+   "gasUsed": 589072,
+   "effectiveGasPrice": 116559575,
+   "status": 1,
+   "valueWei": 1000000000000000000
+  },
+  {
+   "operation": "",
+   "hash": "0x982de63b03582a33fcf9d012b076521cd8a0f08195e86addb405baf7382b78d6",
+   "gasUsed": 23762,
+   "effectiveGasPrice": 108402997,
+   "status": 1,
+   "valueWei": 8800000000000000000
+  },
+  {
+   "operation": "",
+   "hash": "0x6c45e666ba7126b531a8a00cdbe1c0c0899bc064e8a864dc7bd31568f4eaa74c",
+   "gasUsed": 23762,
+   "effectiveGasPrice": 101108405,
+   "status": 1,
+   "valueWei": 9500000000000000000
+  },
+  {
+   "operation": "",
+   "hash": "0xe7df0e62ab63d6d79d8c6ce92366cde69ea27ddaabac2388259ad3d9cf7240ef",
+   "gasUsed": 23762,
+   "effectiveGasPrice": 94724915,
+   "status": 1,
+   "valueWei": 5700000000000000000
+  },
+  {
+   "operation": "build",
+   "hash": "0x26adbc15699db8c60715e95b7f1a3882a3b666378191672a2e4a890b465a37d6",
+   "gasUsed": 1873267,
+   "effectiveGasPrice": 200000000,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0x7fae9c1a0faccba8e6908aa183c1ba0faea179556d784ca218489615d7f28d5f",
+   "gasUsed": 1873168,
+   "effectiveGasPrice": 500000000,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "setMintFee",
+   "hash": "0xe33cedeb6ccd6c938cb004ccb7423a827f845cdbbb32287f98354045b7a97a1a",
+   "gasUsed": 35058,
+   "effectiveGasPrice": 89138729,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0x9c15663651d452acd3da3b9c2da5e787124de6a2df5e5491c3ebbf835c77ff81",
+   "gasUsed": 1873190,
+   "effectiveGasPrice": 200000000,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0x391e35877dd606ce6dc08534868981a3daafdf7863ec055645259188b3565d9b",
+   "gasUsed": 1873146,
+   "effectiveGasPrice": 500000000,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "setParams",
+   "hash": "0xe768383ac66bc4ae34f68c46234435d74553e2027ed2ff6bcf3cdb735b1205dd",
+   "gasUsed": 110140,
+   "effectiveGasPrice": 89138729,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0x5d59fd7b79f38f674338acf143820ff075438e4eafcd6af0f3b886a980342a5f",
+   "gasUsed": 7707907,
+   "effectiveGasPrice": 200000000,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0xcf5bf44e93d9fdbc7102796a2ef50eb4ec6f61114241a7c964434da9ba459328",
+   "gasUsed": 5638168,
+   "effectiveGasPrice": 200000000,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0x181978912595fcc456318c5e6ab9de8e17e56b988ecabbdc508b47af9b087902",
+   "gasUsed": 5638552,
+   "effectiveGasPrice": 84264350,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0x10f697c2154d40e50f414ca66f0b98801014235849ec9da2954c29e2be421844",
+   "gasUsed": 5436463,
+   "effectiveGasPrice": 80786312,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0xbb177cc9e6642169cc8daa5b63af21d803f30d625e4f9c68bdffd6570959d948",
+   "gasUsed": 5516728,
+   "effectiveGasPrice": 77635393,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0x835dbb1efbdf9e309c4a89fe90d22ab8c364d52bb2624c259f25cae2489975a3",
+   "gasUsed": 5499427,
+   "effectiveGasPrice": 74816207,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "setExiting",
+   "hash": "0xc98551e21904f3e49fe99a1293209fa79b408029119d0153d9f233dfc7f70f0f",
+   "gasUsed": 53214,
+   "effectiveGasPrice": 72282827,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "unlist",
+   "hash": "0x629bb005381bc895ee210465088dce87c2f40b299ed10beb7a9b2a846040ecc5",
+   "gasUsed": 4429675,
+   "effectiveGasPrice": 200000000,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "liquidate",
+   "hash": "0xd33f488908035fb35a869561d8b2da836406636327b70d6e7b9328a8f1f136ab",
+   "gasUsed": 2819156,
+   "effectiveGasPrice": 200000000,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0x268a2eb940c6ea7df3ca6c092d23040a0cc501c85decaef8f7b2e9b321c4bcb8",
+   "gasUsed": 4398973,
+   "effectiveGasPrice": 108402997,
+   "status": 1,
+   "keeperPayWei": 651716700285000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0x3b9cbabb914fc57c4287a49d7d84804b5255adfd6a76857b29d499c98f040866",
+   "gasUsed": 4403723,
+   "effectiveGasPrice": 102173095,
+   "status": 1,
+   "keeperPayWei": 621159030975000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0xb20d51405cd745520ad2cb11ccdec1482e3e7a5dccbbf213ccc904edff03980d",
+   "gasUsed": 4431000,
+   "effectiveGasPrice": 96608775,
+   "status": 1,
+   "keeperPayWei": 593866041375000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "deposit",
+   "hash": "0xcf9a14a9e273a7d31e38c232658370f6fbfbe2a5497a8e785e5adfbee1ca9e1b",
+   "gasUsed": 299193,
+   "effectiveGasPrice": 91643193,
+   "status": 1,
+   "valueWei": 2000065821596500000
+  },
+  {
+   "operation": "checkpoint",
+   "hash": "0x3c9117086239cdddbb76686d78811174fd7261589ef4781344879674ff36bed7",
+   "gasUsed": 415691,
+   "effectiveGasPrice": 81928495,
+   "status": 1,
+   "keeperPayWei": 60964247500000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0x53dce903ab8b373a66510f1ffaa75470b63aeef3879e34252bb7a2b1562cfb1e",
+   "gasUsed": 5674671,
+   "effectiveGasPrice": 77992735,
+   "status": 1,
+   "keeperPayWei": 660713358700000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0xeddb55656a4482e5cd5e1bba96f08a8eb9442ee79e78c051733d609a9bbef473",
+   "gasUsed": 4265990,
+   "effectiveGasPrice": 75155517,
+   "status": 1,
+   "keeperPayWei": 488637810885000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "requestRedeem",
+   "hash": "0xae707a811786e75a43233b1fb30450382ef1ca58ccf394c12fba13098a51b021",
+   "gasUsed": 303463,
+   "effectiveGasPrice": 69650939,
+   "status": 1,
+   "valueWei": 54825469500000
+  },
+  {
+   "operation": "unlist",
+   "hash": "0x163d61ee79845cc151c1c68eb07752880d6e44a7ba34265a83731a95a7da39e2",
+   "gasUsed": 1193920,
+   "effectiveGasPrice": 67219419,
+   "status": 1,
+   "keeperPayWei": 0,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "liquidate",
+   "hash": "0xb7f3f2c6aa4594ffea2d39f8567a409c75d3329f71e139bf156cad8ab0235079",
+   "gasUsed": 641627,
+   "effectiveGasPrice": 65152653,
+   "status": 1,
+   "keeperPayWei": 0,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "checkpoint",
+   "hash": "0xa48cf30a05684f381c066b5593293fb0e31715fab23a894e9a961abeb0e4e7aa",
+   "gasUsed": 343834,
+   "effectiveGasPrice": 60182110,
+   "status": 1,
+   "keeperPayWei": 50091055000000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "requestRedeem",
+   "hash": "0x8b23adf4ec2f1400bd81f09a9b65001f52b503507d86a95c5fa3c6357129cdad",
+   "gasUsed": 312173,
+   "effectiveGasPrice": 58923934,
+   "status": 1,
+   "valueWei": 49461967000000
+  },
+  {
+   "operation": "claim",
+   "hash": "0x82836e56569a6148ec12b1a5c8c61b0a9ce5d7b58b1188c3c7f45a7ff50f4f1c",
+   "gasUsed": 56576,
+   "effectiveGasPrice": 57820050,
+   "status": 1,
+   "keeperPayWei": 0,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "recoverUnlist",
+   "hash": "0xf3b686a1197a775f6f8bc29d3803f12257776fdbd074d167129d4e08e2a6175e",
+   "gasUsed": 1351041,
+   "effectiveGasPrice": 56844388,
+   "status": 1,
+   "keeperPayWei": 0,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "recoverLiquidate",
+   "hash": "0x6e60cc847002231c58f304b5bf30c5c3ca2009b4f3080cac5ace47f52922172c",
+   "gasUsed": 787106,
+   "effectiveGasPrice": 56027369,
+   "status": 1,
+   "keeperPayWei": 0,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "recoverCheckpoint",
+   "hash": "0x438351a0af0a2ed6ad00d1669cb2d2b04b273a5aa588adb83f8f0ccb590f4fcb",
+   "gasUsed": 207013,
+   "effectiveGasPrice": 55293716,
+   "status": 1,
+   "keeperPayWei": 0,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "claim",
+   "hash": "0xa7bef10fbf940ab2dc91f36b422120fdc3eb83114b34449946ca6b230af8f189",
+   "gasUsed": 90786,
+   "effectiveGasPrice": 54636568,
+   "status": 1,
+   "keeperPayWei": 0,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "setExiting",
+   "hash": "0x5dff74f03189f912a062e21cdbae46e5834edec919070b5d563c40c64d49633a",
+   "gasUsed": 53214,
+   "effectiveGasPrice": 53551408,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "unlist",
+   "hash": "0x4576011ecf18e6c8929699123e970d9ed5126a7078ef1e908f9fefea328700f3",
+   "gasUsed": 1140718,
+   "effectiveGasPrice": 53108270,
+   "status": 1,
+   "keeperPayWei": 123464382650000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "liquidate",
+   "hash": "0x855b87822b1353e2bbb9aa6b0487d8e0edfa6355df31cc6e59feb48d1bb5cad2",
+   "gasUsed": 635077,
+   "effectiveGasPrice": 52734510,
+   "status": 1,
+   "keeperPayWei": 93222741300000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "withdraw",
+   "hash": "0x8256dd8fe7a918b20a83b6db7acc54f98e6f60b14297f9253804dcb5212f518a",
+   "gasUsed": 38904,
+   "effectiveGasPrice": 52399933,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "setExiting",
+   "hash": "0x4b5ff899e0f337a839c6422f0f25bbd22318088eaad35bd819558e2f15dc23ab",
+   "gasUsed": 53214,
+   "effectiveGasPrice": 52100331,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "unlist",
+   "hash": "0xb88af5c6ac5fd1317c2854c45cd62fabc41072bf01520c66b5ca4716ffae0e37",
+   "gasUsed": 1145518,
+   "effectiveGasPrice": 51838256,
+   "status": 1,
+   "keeperPayWei": 121946715920000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "liquidate",
+   "hash": "0xf33b750b1c28ba148fcdaaa23369b66ff2525349af6e2963e7871ea17910decc",
+   "gasUsed": 635077,
+   "effectiveGasPrice": 51617248,
+   "status": 1,
+   "keeperPayWei": 92518866240000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "withdraw",
+   "hash": "0x2677578b628b0d1c2f743f5c9087a48cfb3607e24bb050eecc10776e6e4ba847",
+   "gasUsed": 38904,
+   "effectiveGasPrice": 51419372,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "setExiting",
+   "hash": "0x700c01b5a49be8b7af418a0e9fa76bacd0987c86f9cee99d6004a5f89bcefa96",
+   "gasUsed": 53214,
+   "effectiveGasPrice": 51242181,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "unlist",
+   "hash": "0x08652538d9cc2a1f25d1d63acf5b7a86f89a5f091cf616a736777765e5909671",
+   "gasUsed": 1107118,
+   "effectiveGasPrice": 51087184,
+   "status": 1,
+   "keeperPayWei": 121049184880000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "liquidate",
+   "hash": "0xa66b08c23b8d7e124890bc490182e56885fb12c9f516efeeedb61a8e869b111f",
+   "gasUsed": 635077,
+   "effectiveGasPrice": 50956302,
+   "status": 1,
+   "keeperPayWei": 92102470260000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "withdraw",
+   "hash": "0xb582e8fe7a9185b0681b4ef311905c5b4e72f6d947b934bdfcd18ec63ad22597",
+   "gasUsed": 38904,
+   "effectiveGasPrice": 50839295,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "deposit",
+   "hash": "0xd4934042704267f4b7e1e9fdd833244690874f74fc4c739cea1ec00472724492",
+   "gasUsed": 262193,
+   "effectiveGasPrice": 50734520,
+   "status": 1,
+   "valueWei": 500045367260000000
+  },
+  {
+   "operation": "checkpoint",
+   "hash": "0xc83275211e154c24db67cfcab3812fdc7bc0d4dd833ca766e7b20023248db3c6",
+   "gasUsed": 330179,
+   "effectiveGasPrice": 50563070,
+   "status": 1,
+   "keeperPayWei": 45281535000000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0xe8933493b2b5b45e9d1cecd7fc1c7622d4506df2f4f3965231b73693d523a683",
+   "gasUsed": 1921138,
+   "effectiveGasPrice": 50493461,
+   "status": 1,
+   "keeperPayWei": 134675239375000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "requestRedeem",
+   "hash": "0x170fa1e9ad7814b0b2804803d05bfe6b9b16bdfa9722ece95801caf1eedf6011",
+   "gasUsed": 266451,
+   "effectiveGasPrice": 50381263,
+   "status": 1,
+   "valueWei": 45190631500000
+  },
+  {
+   "operation": "unlist",
+   "hash": "0x6863cdb2ca9d12dc969de7fde640835bdb7da508078bd5894f772e9d8383e07d",
+   "gasUsed": 604066,
+   "effectiveGasPrice": 50334029,
+   "status": 1,
+   "keeperPayWei": 0,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "liquidate",
+   "hash": "0x8d718aeaa7bad81dc88a03c5ece319e464fe70013756956038b55ef4f6807f49",
+   "gasUsed": 303433,
+   "effectiveGasPrice": 50293117,
+   "status": 1,
+   "keeperPayWei": 0,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "checkpoint",
+   "hash": "0x6e58d3274334b80416839719c372ccb20296f756040b624333d3fc1535140481",
+   "gasUsed": 262525,
+   "effectiveGasPrice": 50224742,
+   "status": 1,
+   "keeperPayWei": 45112371000000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "setListingPaused",
+   "hash": "0xc12708ae940b0ae827be73427d915a03bb2251cfbb562259355c6040e81d9aa2",
+   "gasUsed": 30804,
+   "effectiveGasPrice": 50196896,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "setListingPaused",
+   "hash": "0x091859fa308101237e420f79e067ceda04c73a7e2b870f34c694a7d2c4b135e3",
+   "gasUsed": 33592,
+   "effectiveGasPrice": 50172310,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "deposit",
+   "hash": "0x8c68cbe4d6b934cc08c08bf3c3df6908e0414f89164954c6a2747a8539572f59",
+   "gasUsed": 317405,
+   "effectiveGasPrice": 50150796,
+   "status": 1,
+   "valueWei": 800045075398000000
+  },
+  {
+   "operation": "checkpoint",
+   "hash": "0x4ae5c82c5c30ed8f04ef499c2f04f6f766673ec2a6435efaef8cf77ce2184117",
+   "gasUsed": 330179,
+   "effectiveGasPrice": 50115628,
+   "status": 1,
+   "keeperPayWei": 45057814000000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0x5ffb127b53e0799ccd22c167a96eec400bd1f16ba5fd30ede5f53f06c22b6377",
+   "gasUsed": 3190812,
+   "effectiveGasPrice": 50101334,
+   "status": 1,
+   "keeperPayWei": 249843522260000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "payoutFees",
+   "hash": "0x2320bcb83608e9d86d8369ac45ddf52d0d94c15406b699599b1dae4167e948b8",
+   "gasUsed": 62161,
+   "effectiveGasPrice": 50078764,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "buyback",
+   "hash": "0x2919ccd3445c51d2e07b9b047f88c7591f1f6245e8e0db33fa9dd996f1ef4a4e",
+   "gasUsed": 258184,
+   "effectiveGasPrice": 50068939,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "requestRedeem",
+   "hash": "0x152ddb10a31a03da6a03c3b9e7e821621243296a9eb21554d564c8963de192c7",
+   "gasUsed": 273429,
+   "effectiveGasPrice": 50060396,
+   "status": 1,
+   "valueWei": 90060396000000
+  },
+  {
+   "operation": "checkpoint",
+   "hash": "0xda97ac1816793d7053aad32160fb93c20d239b31a61b6fc33463fd31137e3ae3",
+   "gasUsed": 309854,
+   "effectiveGasPrice": 50046302,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "requestRedeem",
+   "hash": "0x481c53286af2994d3f1b98ffbe9a2026ab1242b3dc0e1fa50ef05a51b7d31f3f",
+   "gasUsed": 266463,
+   "effectiveGasPrice": 50060396,
+   "status": 1,
+   "valueWei": 45030198000000
+  },
+  {
+   "operation": "unlist",
+   "hash": "0x7368a3741c7975c68387c556b74dd10230c4deac2b326a3f07fbe9898b701b33",
+   "gasUsed": 904112,
+   "effectiveGasPrice": 50052914,
+   "status": 1,
+   "keeperPayWei": 0,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "liquidate",
+   "hash": "0x80a082479d8d844c0ed956e6d85ecf3f7104a8422bc26d0d4d9cef0872ff82a8",
+   "gasUsed": 473650,
+   "effectiveGasPrice": 50046500,
+   "status": 1,
+   "keeperPayWei": 0,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "checkpoint",
+   "hash": "0x5fee09b9d61b63ef9732ec1af3f5f684c73ac1bae1f1debff84abffda082b0ab",
+   "gasUsed": 262525,
+   "effectiveGasPrice": 50035683,
+   "status": 1,
+   "keeperPayWei": 45017841500000,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "claim",
+   "hash": "0x18587d922ec2973271c7a4efd9b16983700f6c39456496eae26715ac27bd354f",
+   "gasUsed": 66882,
+   "effectiveGasPrice": 50031262,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "claimCheckpointRefund",
+   "hash": "0x91c95b2e26a7284c758663f148c7b5752f9316a3c35549cd595858c1b3d5ff70",
+   "gasUsed": 316146,
+   "effectiveGasPrice": 50027363,
+   "status": 1,
+   "keeperPayWei": 0,
+   "valueWei": 0,
+   "contributionWei": 0
+  },
+  {
+   "operation": "deposit",
+   "hash": "0x954264c5aec1674c5cdeaa0835ce42900befd23c95bb7a80e794d594af52a12f",
+   "gasUsed": 301993,
+   "effectiveGasPrice": 50020982,
+   "status": 1,
+   "valueWei": 2000045010491000000
+  },
+  {
+   "operation": "checkpoint",
+   "hash": "0x0c347425ccd099a461d9793d6491ba14cc07d186c63c75d7bd20e57bd35d79f4",
+   "gasUsed": 347219,
+   "effectiveGasPrice": 50016088,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "build",
+   "hash": "0xd7922f1abef6515fb4a0472340f6ff80d41cc9f396cd7f5d732e0a39c2ef17d5",
+   "gasUsed": 5636865,
+   "effectiveGasPrice": 50012339,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "deposit",
+   "hash": "0x1348110c89862a216271874441e36024ecf9ad851977c719d508b08ceef913d9",
+   "gasUsed": 282810,
+   "effectiveGasPrice": 50011087,
+   "status": 1,
+   "valueWei": 100045005543500000
+  },
+  {
+   "operation": "acquire",
+   "hash": "0x4212e0fb932625bb89df7a40176714dbbc946c57d5a8ecb79ad9aa5ca5699c64",
+   "gasUsed": 478455,
+   "effectiveGasPrice": 50009715,
+   "status": 1,
+   "valueWei": 51070909946441608
+  },
+  {
+   "operation": "processAcquisitions",
+   "hash": "0xe312d3c7053102461c3d1b1c40defe3b56f99fcd1dc4212e0f23d87c5ac85caf",
+   "gasUsed": 115941,
+   "effectiveGasPrice": 50000140,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "withdrawAcquisitionRefund",
+   "hash": "0xf504b867f7aab9f91fab1f3d8be076083feba2c9e0ab58b4e721f6d40c835da9",
+   "gasUsed": 36616,
+   "effectiveGasPrice": 50000123,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "fundCheckpoint",
+   "hash": "0x185532a7cabe3eec423745a2fd98401b7e14eb5e995fc94cc55032fe55fafdaf",
+   "gasUsed": 190051,
+   "effectiveGasPrice": 200000000,
+   "status": 1,
+   "valueWei": 74994456500000
+  },
+  {
+   "operation": "syncCheckpoint",
+   "hash": "0x4d1a2c2d12864b49c5852ec0eaff5c98c17856a0019efcdb37a40c0335564ad7",
+   "gasUsed": 135585,
+   "effectiveGasPrice": 200000000,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "recover",
+   "hash": "0x542f9290db57887333c410b72f153113bc35ec84e514c483d588d64551e70429",
+   "gasUsed": 90338,
+   "effectiveGasPrice": 200000000,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "acquire",
+   "hash": "0x1eea581f4a41d54d00a47d72863ce9d358bd59e3ab51055ed06dd705897e0d93",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50008520,
+   "status": 1,
+   "valueWei": 51070908703641608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0xfadc3b77bb1ebeff122ad8108b4decff6b90e8b0a8b858471112fade69185c6c",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50007469,
+   "status": 1,
+   "valueWei": 51070907610601608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0x68ae085c369539df5d7bbda888d70d6a23a91eb24cbc9a612c0ebc137f329907",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50006548,
+   "status": 1,
+   "valueWei": 51070906652761608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0x644d812fceb6771a7bc1a8e9d10f0a5d20a627391a20111f40d1661cc557133b",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50005741,
+   "status": 1,
+   "valueWei": 51070905813481608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0xef4957c6bed6ca6f82e002021b4cfefd883da2d8af23d6d07e94e03af507f602",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50005033,
+   "status": 1,
+   "valueWei": 51070905077161608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0x2b95ca446f8c84441ed56818eeae040e7a92066e1be21d2f3d9644d025cc257f",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50004413,
+   "status": 1,
+   "valueWei": 51070904432361608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0xe8edeb50e65104aac0dcfee15234b1c717a9b5858a69265ce06e93fada591136",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50003869,
+   "status": 1,
+   "valueWei": 51070903866601608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0x3a3e177e628e94bfd151b4df1fec82b85739effdb3539515da51187b9792a6ae",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50003392,
+   "status": 1,
+   "valueWei": 51070903370521608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0x3c270de3818ffa2eb9f3e212e6f8da5f905a3626a2cc638fe7ac5903cc236800",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50002974,
+   "status": 1,
+   "valueWei": 51070902935801608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0x785950030edf2f1b576cf6b805b716938a73726e61d85e1f752128718e3c393f",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50002608,
+   "status": 1,
+   "valueWei": 51070902555161608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0xab1050495bedfbe6a35373be69493b79b5cd5aab102176d6319c4e5ac8c93a49",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50002287,
+   "status": 1,
+   "valueWei": 51070902221321608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0xa96cd4909bba5d46487c4c22310bbf7a57a132c552a5c83fa6777e6ad85c29f7",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50002005,
+   "status": 1,
+   "valueWei": 51070901928041608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0xda72a3fecfa2b9eb6e4f0f394781b50f19191525c4d927ac722eb45a79bc9189",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50001758,
+   "status": 1,
+   "valueWei": 51070901671161608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0xd98ee4060426c2c600451afc7b1dd8ca798691b4620a489044ed2e0a60d9c9a1",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50001542,
+   "status": 1,
+   "valueWei": 51070901446521608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0x3244f775d01300da31918221d6fa71ddde9b347d928d3862928ce25c754dc03f",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50001352,
+   "status": 1,
+   "valueWei": 51070901248921608
+  },
+  {
+   "operation": "acquire",
+   "hash": "0x9ccfd4b0360f46049303f6230ceb25682e8fd76cfc111986777c56a712ce060f",
+   "gasUsed": 392575,
+   "effectiveGasPrice": 50001186,
+   "status": 1,
+   "valueWei": 51070901076281608
+  },
+  {
+   "operation": "processAcquisitions",
+   "hash": "0x55ca47e6d9726cdc31dd19929ef9d5ab134681ceb03fbc9ac13e0382f25011a5",
+   "gasUsed": 661206,
+   "effectiveGasPrice": 50000022,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "processAcquisitions",
+   "hash": "0x656b1102d7a636b7078bd7559495ff7605a72b2c4970e576d558c5d69146f3f7",
+   "gasUsed": 82993,
+   "effectiveGasPrice": 50000020,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "withdrawAcquisitionRefund",
+   "hash": "0xbfe88724e8afd2023aab180945f4858eb8b58df4d96ea377dc85e0d146cbf725",
+   "gasUsed": 36616,
+   "effectiveGasPrice": 50000018,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "syncCheckpoint",
+   "hash": "0x13c5c3f9451e5fae51408ba4fa33d6f86aaad6f34bc459e87726b980f94f56a8",
+   "gasUsed": 234147,
+   "effectiveGasPrice": 200000000,
+   "status": 1,
+   "valueWei": 0
+  },
+  {
+   "operation": "recover",
+   "hash": "0x029de1daf77d80276e508f9e1cebac0753671398f9a8804470a6391e41b2031c",
+   "gasUsed": 188900,
+   "effectiveGasPrice": 200000000,
+   "status": 1,
+   "valueWei": 0
+  }
+ ]
+}

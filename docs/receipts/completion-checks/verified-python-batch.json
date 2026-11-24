@@ -1,0 +1,56 @@
+[
+  {
+    "name": "keeper-policy",
+    "command": [
+      "/tmp/shapes-completion-python/bin/python",
+      "keeper/test_policy.py"
+    ],
+    "exit_status": 1,
+    "log": "/tmp/shapes-completion-verified-keeper-policy.log"
+  },
+  {
+    "name": "keeper-config",
+    "command": [
+      "/tmp/shapes-completion-python/bin/python",
+      "keeper/test_config.py"
+    ],
+    "exit_status": 0,
+    "log": "/tmp/shapes-completion-verified-keeper-config.log"
+  },
+  {
+    "name": "model-vault",
+    "command": [
+      "/tmp/shapes-completion-python/bin/python",
+      "sim/test_vault.py"
+    ],
+    "exit_status": 0,
+    "log": "/tmp/shapes-completion-verified-model-vault.log"
+  },
+  {
+    "name": "model-completion",
+    "command": [
+      "/tmp/shapes-completion-python/bin/python",
+      "sim/test_completion.py"
+    ],
+    "exit_status": 0,
+    "log": "/tmp/shapes-completion-verified-model-completion.log"
+  },
+  {
+    "name": "model-forward",
+    "command": [
+      "/tmp/shapes-completion-python/bin/python",
+      "sim/test_forward.py"
+    ],
+    "exit_status": 0,
+    "log": "/tmp/shapes-completion-verified-model-forward.log"
+  },
+  {
+    "name": "release-validation",
+    "command": [
+      "/tmp/shapes-completion-python/bin/python",
+      "script/test_release.py"
+    ],
+    "exit_status": 0,
+    "log": "/tmp/shapes-completion-verified-release-validation.log"
+  }
+]
