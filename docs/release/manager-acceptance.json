@@ -2,7 +2,7 @@
  "name": "Main pool individual manager closeout",
  "deployment_target": "manager",
  "status": "UNSIGNED_IMPLEMENTATION_COMPLETE",
- "manifest_sha256": "825ad7f627e630e2822152983efd0b70f4d14ef0d49f563b27c032805afb9c70",
+ "manifest_sha256": "9192ba6ae69fb70b8d9f625e3106900553a4d973549da67f2000d9cddf495086",
  "signature": null,
  "release_ready": false,
  "authorization": "Manager closeout implementation, isolated validation and draft PR updates only. No public transactions, production mint-fee changes, live cutover or merges.",

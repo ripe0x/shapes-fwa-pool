@@ -1,0 +1,22 @@
+{
+ "checked_revision": "c83a429",
+ "runtime_revision": "8463c52476246a6a669ae82a8346d36355347c83",
+ "observed_checks": [
+  {
+   "command": "python3 script/release.py check deploy/manager-factory.json --target manager",
+   "exit_status": 0,
+   "result": "release check passed (no signature checked)"
+  },
+  {
+   "command": "python3 script/release.py check deploy/manager-factory.json --target manager --broadcast",
+   "exit_status": 1,
+   "result": "no owner signature: deploy/manager-release-acceptance.sig; no broadcast attempted"
+  },
+  {
+   "command": "git diff --check 8463c52 HEAD -- . :(exclude)docs/receipts/manager-checks/*.log",
+   "exit_status": 0,
+   "result": "source/document diff check passes; original raw tool-log whitespace retained"
+  }
+ ],
+ "public_transactions": 0
+}
