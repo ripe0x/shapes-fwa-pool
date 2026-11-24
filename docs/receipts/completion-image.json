@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "runUrl": "https://github.com/ripe0x/shapes-fwa-pool/actions/runs/45427099371",
+  "revision": "49da8105ab50e45ca27957eb2604acd15737978c",
+  "contractSourceSetSha256": "d85c926518a689c73c6575937fd7d3dcde0d1a484d5abfe6de6faa22a4ca8e39",
+  "command": [
+    "gh",
+    "workflow",
+    "run",
+    "keeper-image.yml",
+    "--repo",
+    "ripe0x/shapes-fwa-pool",
+    "--ref",
+    "codex/main-pool-completion"
+  ],
+  "scope": [
+    "Production Docker build",
+    "Image smoke and separate containers sharing persistent volume",
+    "Real isolated31337 mainnet fork deployment and independent postflight",
+    "Shared vault checkpoint/build and individual manager build",
+    "Primary/backup concurrency and health",
+    "Container replacement using preserved state/index and real lost RPC submission response",
+    "Holder-funded bounded unlisting and partial redemption checkpoint"
+  ],
+  "firstFailedRun": "https://github.com/ripe0x/shapes-fwa-pool/actions/runs/45426207512",
+  "artifact": "completion-checks/image-ci-final-artifact.json",
+  "artifactSha256": "eaa0b2090e63bbd33fdb2f80695c8d141c49b91f30f8bfbfc35add502cbe7c45",
+  "limitations": [
+    "Unlocked fresh checked local actors; production encrypted-keystore/hardware-wallet transport not exercised.",
+    "No authenticated VRF renewal receipt is supplied by this container run.",
+    "Full final holder/manager exit proof is in the separate local production-path and actual UI campaigns, not inferred from this image partial-redemption check."
+  ]
+}

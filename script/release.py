@@ -46,6 +46,7 @@ EVIDENCE = ["docs/receipts/formal-assessment.json", "docs/receipts/completion-ca
             "docs/receipts/completion-independent-review.md", "docs/receipts/completion-app.json",
             "docs/receipts/completion-checks/input-manifest.json", "deploy/unsigned-cutover.json",
             "deploy/keeper-unsigned.json", "docs/receipts/completion-signed-budget-reorg.json",
+            "docs/receipts/completion-image.json",
             "asset-flow.json"]
 
 

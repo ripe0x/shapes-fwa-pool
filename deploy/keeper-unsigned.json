@@ -12,7 +12,7 @@
   "values": "deploy/mainnet.json",
   "managerValues": "deploy/manager.json",
   "sourceSetSha256": "d85c926518a689c73c6575937fd7d3dcde0d1a484d5abfe6de6faa22a4ca8e39",
-  "deploymentPackageSha256": "85f01bd10e348bbc8a907442126c89c896310968884dd4d9d1438bb1b0edc049",
+  "deploymentPackageSha256": "75d5ed81a87b3fab82dec9711db41dabd7cb98e37ce643d81c58384f277ad572",
   "requirements": [
     "Predicted CREATE addresses depend on the current signer nonce. Refresh and independently postflight before use.",
     "Use existing external keystores and explicitly supplied state/index paths; no signer secrets belong in configuration.",

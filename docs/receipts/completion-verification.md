@@ -18,7 +18,7 @@ Authentic recorded requests and Chainlink proofs drive contract acquisition test
 counterparty, receiver code substitution or coordinator impersonation supplies integration evidence.
 
 The live fee was 0.001 ETH per Shape at study block 26484850. The pre-plan readback at block
-26485757 confirms the same fee, old vault balance 0.01 ETH, no pending/locked/claim/processing
+26485995 confirms the same fee, old vault balance 0.01 ETH, no pending/locked/claim/processing
 liabilities exposed by its supported views, and factory manager count zero. Unsupported new refund
 selectors are recorded as unsupported, not interpreted as zero. See `deploy/existing-main-readback.json`.
 The 0.0005 ETH fee exists only in isolated fork sensitivities.
@@ -39,10 +39,13 @@ represented as passing final runs. The dedicated Python interpreter is
 | Scale | Real 301-position checkpoint and two 301/1,000/10,000 model-book cases passed in `forge-repairs-scale-v2.log`; its three unrelated failures remain visible. Final source also passes the real >300-position zero-priced-scan case in the 66-case pass |
 | Python | Config, policy after failing-only fixture repair, 18 vault, 12 completion, two forward and 13 independent deployment-input cases passed; exact commands/exits in `verified-python-batch.json` and repair logs |
 | Canonical replay | 876,437 earnings events, zero accumulator mismatches; refreshed archive through study block 26484850. Archive is local input, not committed |
+| Bounded economic campaign | Exit 0; 89/89 modeled exits across 23 cells. Both median conventions fail the preserved return gate; all raw rows, means and standard medians independently checked |
 | Six-group reconciliation | Every account, position, contribution, issuance and permission bucket matches to the wei; `final-reconcile.log` and committed `sim/out/reconcile-*-trace.jsonl` |
 | Local production-path rehearsal | Exit 0, errors `{}`, pooled full exit and three manager exits; `unified-production-rehearsal.json` |
+| CI production image | Run 45427099371 passed on 49da810: Docker build, image smoke/shared-volume replacement, actual isolated fork, vault/manager work and lost-response recovery; `completion-image.json` |
 | Billed gas | 103 successful final-source transaction receipts in `completion-calibration.json`; aggregate Forge test gas is not used as a receipt |
 | Unsigned deployment simulation | Exit 0, five transactions, simulated independent postflight passed; no `--broadcast`, no signature. `deploy/unsigned-cutover.json` includes filtered public unsigned calldata |
+| App integration | Commit c83cf8f, draft PR 37: freshness/typecheck/build passed, 51 tests passed, 10 opt-in service cases skipped, 16 actual UI wallet transactions and all tested refunds completed; `completion-app.json` |
 
 The 17-case command is:
 
@@ -65,6 +68,9 @@ approval and the retained O6 failure. The regenerated flow files use the gate's 
 `bf148279857b04c8249528401507d38765dbd81b901d6b22cf588ce173aebcf2`; `asset-gate-source.json`
 maps it to the same final contract source. The earlier explicit 17-case command/log remains the
 passing test record. This extra regeneration was unnecessary; no broad rerun is needed to relabel it.
+Subsequent metadata, manifest and tracked-file additions change the gate's composite source hash.
+Its scorecards are therefore not represented as a fresh gate pass for the final package. The exact
+runtime source and executed input maps remain independently recorded; release acceptance is unsigned.
 
 ## Receipt measurements and protection
 
@@ -114,8 +120,9 @@ Known evidence limits:
 - No billed production-path authentic-VRF renewal transaction. Local deployment changes the
   request block hash needed by a historical proof. Forge exercises actual coordinator verification;
   receipt-calibrated gas proxies are labelled separately in the economic model.
-- No Docker executable on this host. The rehearsal ran outside Docker; production image and
-  production keystore transport are not claimed tested here.
+- No Docker executable on this host. The local full-exit rehearsal ran outside Docker; the existing
+  remote CI image/fork workflow passed after its first failure was preserved and its local chain
+  identity pin repaired. Production encrypted-keystore transport remains untested.
 - Main ShapePacks normally returns to these accepting accounts synchronously. A genuine owed-return
   failure could not be reached without faking a relied-on counterparty. Recovery code preserves
   eligibility, but that forced integration branch remains untested.

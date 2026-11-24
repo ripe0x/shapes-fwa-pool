@@ -1,0 +1,291 @@
+{
+ "steps": [
+  {
+   "step": "primary prices the deposit at the blackout",
+   "at_block": 26484886
+  },
+  {
+   "step": "keepers build and list",
+   "at_block": 26484890
+  },
+  {
+   "step": "primary builds and lists for the manager",
+   "at_block": 26484896
+  },
+  {
+   "step": "primary /health serves the vault and the manager",
+   "at_block": 26484896
+  },
+  {
+   "step": "replacement prices the redemption through a lost RPC response",
+   "at_block": 26484901
+  },
+  {
+   "step": "replacement /health serves the vault and the manager",
+   "at_block": 26484902
+  },
+  {
+   "step": "backup completes a clean pass",
+   "at_block": 26484904
+  }
+ ],
+ "chain_id": 31337,
+ "fork_block": 26484850,
+ "fork_hash": "0xb74960f39c4f4971c0e3732837afb49ecdfd20153c3d9d0631796f1d6e086f7c",
+ "image": "packvault-keeper:49da8105ab50e45ca27957eb2604acd15737978c",
+ "foundry": "cast Version: 1.8.1",
+ "signing": "unlocked fresh actors on owned isolated Anvil; production keystore transport untested",
+ "vault": "0xf1554e2a90cdee24250f7fc00c8ef3eb5e883163",
+ "factory": "0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461",
+ "postflight": "account balances and claims: {\"cash\": 10000000000000000, \"chargeRefundReserve\": 0, \"claimableTotal\": 0, \"distributionReserve\": 0, \"pendingDepositTotal\": 0, \"processingPool\": 0, \"redemptionReserve\": 0}\npostflight passed: 0xf1554e2a90cdee24250f7fc00c8ef3eb5e883163 libraries {'ScanLib': '0x4ac701799b22e4c7a0f24301ccc904AD6fB3F005', 'VaultLib': '0x650B28E26586dbfea4d2bE777d3983816D0D1A2f', 'StrategyLib': '0xE899b8ac4712842D6AF7A9F47a7b6951bDA4B519'} owner 0x7683eaAFbF5f8d94004a703bF0c85248C0B1AcCa factory 0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461\nverification commands (Etherscan; ETHERSCAN_API_KEY from your environment):\n  forge verify-contract 0x4ac701799b22e4c7a0f24301ccc904AD6fB3F005 src/ScanLib.sol:ScanLib --chain mainnet --watch\n  forge verify-contract 0x650B28E26586dbfea4d2bE777d3983816D0D1A2f src/VaultLib.sol:VaultLib --chain mainnet --libraries src/ScanLib.sol:ScanLib:0x4ac701799b22e4c7a0f24301ccc904AD6fB3F005 --watch\n  forge verify-contract 0xE899b8ac4712842D6AF7A9F47a7b6951bDA4B519 src/StrategyLib.sol:StrategyLib --chain mainnet --libraries src/VaultLib.sol:VaultLib:0x650B28E26586dbfea4d2bE777d3983816D0D1A2f --watch\n  forge verify-contract 0xf1554e2a90cdee24250f7fc00c8ef3eb5e883163 src/PackVault.sol:PackVault --chain mainnet --guess-constructor-args --libraries src/ScanLib.sol:ScanLib:0x4ac701799b22e4c7a0f24301ccc904AD6fB3F005 --libraries src/VaultLib.sol:VaultLib:0x650B28E26586dbfea4d2bE777d3983816D0D1A2f --libraries src/StrategyLib.sol:StrategyLib:0xE899b8ac4712842D6AF7A9F47a7b6951bDA4B519 --watch\n  forge verify-contract 0xbc0cf5f9dce8100deeaff20c81271d6d38f7d461 src/PackManagerFactory.sol:PackManagerFactory --chain mainnet --guess-constructor-args --libraries src/ScanLib.sol:ScanLib:0x4ac701799b22e4c7a0f24301ccc904AD6fB3F005 --libraries src/VaultLib.sol:VaultLib:0x650B28E26586dbfea4d2bE777d3983816D0D1A2f --libraries src/StrategyLib.sol:StrategyLib:0xE899b8ac4712842D6AF7A9F47a7b6951bDA4B519 --watch\n  forge verify-contract 0x4Cd8C8426b344E85574F446be9fc2Db4142C223c src/PackManager.sol:PackManager --chain mainnet --guess-constructor-args --libraries src/ScanLib.sol:ScanLib:0x4ac701799b22e4c7a0f24301ccc904AD6fB3F005 --libraries src/VaultLib.sol:VaultLib:0x650B28E26586dbfea4d2bE777d3983816D0D1A2f --libraries src/StrategyLib.sol:StrategyLib:0xE899b8ac4712842D6AF7A9F47a7b6951bDA4B519 --watch",
+ "manager": "0x316F4c5A71eDdC69828f111B90d48ac27223486f",
+ "manager_open": 1,
+ "before_replacement": {
+  "stats": {
+   "sent": 4,
+   "mined": 3,
+   "reverted": 0,
+   "replaced": 0,
+   "dropped": 0,
+   "reorged": 0,
+   "skipped_expected": 0,
+   "skipped_loss": 0,
+   "spent_wei": 525804876023839,
+   "paid_wei": 904927305325000,
+   "value_sent_wei": 0,
+   "checkpoint_contributed_wei": 0,
+   "checkpoint_refunded_wei": 0
+  },
+  "pending": {
+   "label": "build",
+   "to": "0x316F4c5A71eDdC69828f111B90d48ac27223486f",
+   "args": [
+    "build(uint256,uint256[],uint256,bytes32)",
+    "3",
+    "[210000000000000000]",
+    "107995305500000",
+    "0xd5f1091e06b62fddb2f60175184449a9fb51f30bee3303dbd07308752c72c245"
+   ],
+   "nonce": 3,
+   "gas": 2634028,
+   "est": 2107222,
+   "prio": 50000000,
+   "max_fee": 51327074,
+   "sent_block": 26484895,
+   "replacements": 0,
+   "hashes": [
+    "0x4940baa3cc07bfbdfecc38256ddee9514fe93b934608af4b94434f4beee82630"
+   ],
+   "expected_pay": 134994131875000,
+   "submitted": 1795534682
+  },
+  "counted": [
+   {
+    "label": "checkpoint",
+    "block": 26484886,
+    "status": 1,
+    "gas_used": 415679,
+    "pay": 46065861000000
+   },
+   {
+    "label": "build",
+    "block": 26484890,
+    "status": 1,
+    "gas_used": 5640603,
+    "pay": 489079082080000
+   },
+   {
+    "label": "build",
+    "block": 26484893,
+    "status": 1,
+    "gas_used": 4222101,
+    "pay": 369782362245000
+   }
+  ],
+  "head": 26484894
+ },
+ "holder_unwind": [
+  {
+   "call": "recoverUnlist",
+   "block": 26484899
+  },
+  {
+   "refused": [
+    "recoverLiquidate",
+    " to estimate gas: server returned an error response: error code 3: execution reverted: custom error 0xf9820cc1, data: \\\"0xf9820cc1\\\": Nothing\"}],\"warnings\":[]}\n"
+   ]
+  },
+  {
+   "refused": [
+    "recoverUnlist",
+    "ate gas: server returned an error response: error code 3: execution reverted: custom error 0x93a2df34, data: \\\"0x93a2df34\\\": UnlistNotAllowed\"}],\"warnings\":[]}\n"
+   ]
+  },
+  {
+   "refused": [
+    "recoverLiquidate",
+    " to estimate gas: server returned an error response: error code 3: execution reverted: custom error 0xf9820cc1, data: \\\"0xf9820cc1\\\": Nothing\"}],\"warnings\":[]}\n"
+   ]
+  }
+ ],
+ "after_replacement": {
+  "stats": {
+   "sent": 4,
+   "mined": 5,
+   "reverted": 0,
+   "replaced": 0,
+   "dropped": 0,
+   "reorged": 0,
+   "skipped_expected": 0,
+   "skipped_loss": 0,
+   "spent_wei": 639776632984664,
+   "paid_wei": 1085099881200000,
+   "value_sent_wei": 0,
+   "checkpoint_contributed_wei": 0,
+   "checkpoint_refunded_wei": 0
+  },
+  "pending": null,
+  "counted": [
+   {
+    "label": "checkpoint",
+    "block": 26484886,
+    "status": 1,
+    "gas_used": 415679,
+    "pay": 46065861000000
+   },
+   {
+    "label": "build",
+    "block": 26484890,
+    "status": 1,
+    "gas_used": 5640603,
+    "pay": 489079082080000
+   },
+   {
+    "label": "build",
+    "block": 26484893,
+    "status": 1,
+    "gas_used": 4222101,
+    "pay": 369782362245000
+   },
+   {
+    "label": "build",
+    "block": 26484896,
+    "status": 1,
+    "gas_used": 1907769,
+    "pay": 134994131875000
+   },
+   {
+    "label": "checkpoint",
+    "block": 26484901,
+    "status": 1,
+    "gas_used": 343894,
+    "pay": 45178444000000
+   }
+  ],
+  "head": 26484895
+ },
+ "replacement_health_accounts": [
+  "0x316F4c5A71eDdC69828f111B90d48ac27223486f",
+  "0xf1554e2a90cdee24250f7fc00c8ef3eb5e883163"
+ ],
+ "dropped_transaction": "0xb806b9fbaff7351057219848cd4e61c4a92d9b413348a25f8c257c175f085f8f",
+ "dropped_transaction_status": 1,
+ "backup": {
+  "stored": {
+   "stats": {
+    "sent": 0,
+    "mined": 0,
+    "reverted": 0,
+    "replaced": 0,
+    "dropped": 0,
+    "reorged": 0,
+    "skipped_expected": 0,
+    "skipped_loss": 0,
+    "spent_wei": 0,
+    "paid_wei": 0
+   },
+   "pending": null,
+   "counted": [],
+   "head": 26484903
+  },
+  "health": {
+   "last_pass": 1795534696,
+   "block": 26484903,
+   "status": [
+    [
+     "RESERVE_BELOW_NEED",
+     "info",
+     "reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH"
+    ],
+    [
+     "RESERVE_BELOW_NEED",
+     "info",
+     "reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH"
+    ],
+    [
+     "EXPOSURE_UNAVAILABLE",
+     "info",
+     "aggregate share is not calculated in bounded routine passes"
+    ]
+   ],
+   "accounts": {
+    "0xf1554e2a90cdee24250f7fc00c8ef3eb5e883163": {
+     "pooled": true,
+     "status": [
+      [
+       "RESERVE_BELOW_NEED",
+       "info",
+       "reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH"
+      ]
+     ]
+    },
+    "0x316F4c5A71eDdC69828f111B90d48ac27223486f": {
+     "pooled": false,
+     "status": [
+      [
+       "RESERVE_BELOW_NEED",
+       "info",
+       "reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH"
+      ]
+     ]
+    }
+   },
+   "exposure": [
+    [
+     "EXPOSURE_UNAVAILABLE",
+     "info",
+     "aggregate share is not calculated in bounded routine passes"
+    ]
+   ],
+   "policy_count": 2,
+   "pending": null,
+   "stats": {
+    "sent": 0,
+    "mined": 0,
+    "reverted": 0,
+    "replaced": 0,
+    "dropped": 0,
+    "reorged": 0,
+    "skipped_expected": 0,
+    "skipped_loss": 0,
+    "spent_wei": 0,
+    "paid_wei": 0
+   },
+   "errors": [],
+   "pass_errors": 0,
+   "signed_upper_wei": 0,
+   "ok": true,
+   "fresh": true,
+   "attention": []
+  }
+ },
+ "lost_races": [],
+ "primary_nonce": 5,
+ "primary_sends_counted": 4,
+ "result": "PASS",
+ "worker_log_tails": {
+  "pack-vault-image-8yzaxsal-primary-replacement": "",
+  "pack-vault-image-8yzaxsal-backup-restarted": ""
+ },
+ "retained_work_directory": "/tmp/pack-vault-image-8yzaxsal"
+}

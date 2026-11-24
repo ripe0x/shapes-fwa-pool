@@ -22,7 +22,7 @@ remains closed.
 - [Settings inventory](release/SETTINGS.md) and [unsigned deployment runbook](release/RUNBOOK.md).
   Five unsigned deployment transactions and separate predicted keeper address data are prepared.
 
-The 0.001 ETH mint fee was observed again at mainnet block 26485757. No public transaction,
+The 0.001 ETH mint fee was observed again at mainnet block 26485995. No public transaction,
 production fee change, live cutover, merge or new acceptance signature was made. Backing 70,000 bps,
 uplift 25 bps, one renewal float and 0.005 ETH reserve remain local evaluation values. The existing
 10% net holder-return requirement and historical 0.0002 ETH checkpoint comparison were not relaxed.

@@ -1,22 +1,22 @@
 {
  "name": "PackVault and PackManagerFactory mainnet",
  "sources": {
-  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
-  "script/deploy.sh": "7a2dbb28ca6f685b2506e286cb356f21844647e1bdf4f8454c36e309b694b6eb",
-  "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
-  "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879",
-  "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
   "script/DeployCore.sol": "10b61be887f77901151d47525abb0bd7e16116c3569008ab976c511a365cee5b",
-  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
-  "script/Deploy.s.sol": "608bc36c5566fafe35de3989ed13105542edcd2aaf5242a11f7f2a6936f26b0d",
-  "remappings.txt": "638e1bbb5593b0f20280b3c050dc924c319bfe2a0781d3b8372c908f397ad429",
+  "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520",
   "script/test_release.py": "a21e4ffed877bed3ad909815e9e24e97f8ef57460d9d135ebb42de1719144c54",
   "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
-  "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520",
+  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+  "script/deploy.sh": "7a2dbb28ca6f685b2506e286cb356f21844647e1bdf4f8454c36e309b694b6eb",
+  "script/Deploy.s.sol": "608bc36c5566fafe35de3989ed13105542edcd2aaf5242a11f7f2a6936f26b0d",
+  "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
   "script/verify.sh": "f2d7ef2acdb6fbc59b2a4787666ebd908d766113cc76a00e13262a264690b89e",
-  "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+  "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
+  "remappings.txt": "638e1bbb5593b0f20280b3c050dc924c319bfe2a0781d3b8372c908f397ad429",
   "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
-  "script/release.py": "72d600fd27ff0ce2b4746bfeb3f2b5d1f356d653b039eb9ec5e073a2efcb2fac"
+  "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879",
+  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+  "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+  "script/release.py": "96a049e5c53abc02641ae690d2b6aac7c6c9b2b26eb13972c7595026d9eea092"
  },
  "toolchain": {
   "solc": "0.8.30",
@@ -67,7 +67,7 @@
   "deploy/mainnet.json": "e9a5ca7b80c8e67cb2d0bfef5be4d2539129fcf078da488e52253cd9a2aaefd0",
   "deploy/manager.json": "f216770efacfe587770fe3d3821d0f2489d40c4e4f7758a051be77195ac0c026",
   "deploy/mint-fee-observation.json": "feb7d12387928144de212966dd3e431c4f2ba5b648ad3ea409f9ba61620ac29b",
-  "deploy/existing-main-readback.json": "33933ee2fe77ee0a76ce38c5b5f0e89b29a6868d6f02e814681dfb19a6304f8f"
+  "deploy/existing-main-readback.json": "8449ab7126ad8dc5fa2c1a2e3a353d3137e5923e1188576d59d555338d64e3b6"
  },
  "keeper": {
   "keeper/Dockerfile": "54675df4109b6b91f5e750816fdf20fb410942992fbebacb9b14d82dc5211243",
@@ -82,15 +82,18 @@
   "fly.keeper-backup.toml": "5ad276a78fc08c2fc8badf7b70b4794cb19e0043e3b080081323d9041a57a79b"
  },
  "evidence": {
-  "docs/receipts/formal-assessment.json": "36ed0c7ef5685d6f0adcad540f961041fffd1a63675b7258c2ae68830fec1e2b",
+  "docs/receipts/formal-assessment.json": "04ccde6add7f8e43c597b0549b47d5681ce113ccaff15ffe86bfd3e91e47fd62",
   "docs/receipts/completion-calibration.json": "4b4c3605323c22b9611a8ff517613879f28e2da239ee31adbdb9fd99afa8fcff",
   "docs/receipts/unified-production-rehearsal.json": "0ddb1e2660ed8ddf0dfd85ba69a0450bf138d766a96bc143d08741c98bc5f075",
-  "docs/receipts/completion-verification.md": "c5cfa7ad7f3281c631f170853ef77cfbb893718a7b5a0f1ee2be83ebf49bf508",
+  "docs/receipts/completion-verification.md": "af29aaee3544334bfb8248aeb9a91546954a2d96eba8d3b5b55f2e45b72b1878",
+  "docs/receipts/completion-economics.md": "3cddc64c084056108821bd4a04b50adc2d43aa01e317b14f10662b3bed6d113a",
+  "docs/receipts/completion-independent-review.md": "5e6f942d03cc6cd48b1b447880fc054c0e9debbc81c45affb58b68e37bda8769",
   "docs/receipts/completion-app.json": "61220915fab227352c31e8575e9b7831b6794a15d85904525e48860d08bae107",
-  "docs/receipts/completion-checks/input-manifest.json": "b17e6627083c6d62b4eada345b401f49d3b98e2d3af944b9df537861f6a1db7f",
-  "deploy/unsigned-cutover.json": "85f01bd10e348bbc8a907442126c89c896310968884dd4d9d1438bb1b0edc049",
-  "deploy/keeper-unsigned.json": "b11f1654f476952ef1235bcf748dbdc74a82fd1c79c22153c71ee336162ca130",
+  "docs/receipts/completion-checks/input-manifest.json": "495ce1cb7e656704fd50ca5818d48ef3b5846e4aae52d43670cb9f0e97488c35",
+  "deploy/unsigned-cutover.json": "75d5ed81a87b3fab82dec9711db41dabd7cb98e37ce643d81c58384f277ad572",
+  "deploy/keeper-unsigned.json": "cd92670b596ac63a6b872dcef2f95de1a3bade12cc9d35a476e38270eb685a77",
   "docs/receipts/completion-signed-budget-reorg.json": "4e5c93d6f4720d7e6e0855f2113498468767ac09fa4af5f17d35e6bacbd54a9d",
+  "docs/receipts/completion-image.json": "e474e370ba382b1858b5ff085d107676da6518b05cbd0bebc2951229bc186621",
   "asset-flow.json": "b47d373601ef5671090bb6d83bf038b48f4d63b1770f066d12275110e5d5beef"
  }
 }
