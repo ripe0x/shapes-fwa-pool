@@ -1,0 +1,18 @@
+Error: contract 0x63d6951a4185873df84d68473fd520df86dee8d7 does not have any code
+Traceback (most recent call last):
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/script/release.py", line 829, in <module>
+    main()
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/script/release.py", line 809, in main
+    postflight_manager(*args)
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/script/release.py", line 428, in postflight_manager
+    implementation = cast("call", factory, "implementation()(address)")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/script/release.py", line 367, in cast
+    return subprocess.check_output(["cast", *map(str, args), *pinned, "--rpc-url", RPC], text=True).strip()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.pyenv/versions/3.11.8/lib/python3.11/subprocess.py", line 466, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.pyenv/versions/3.11.8/lib/python3.11/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['cast', 'call', '0x63d6951a4185873df84d68473fd520df86dee8d7', 'implementation()(address)', '--block', '26486715', '--rpc-url', 'https://mainnet.gateway.tenderly.co']' returned non-zero exit status 1.

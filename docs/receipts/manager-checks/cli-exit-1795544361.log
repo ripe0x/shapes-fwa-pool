@@ -1,0 +1,13 @@
+Error: server returned an error response: error code 3: execution reverted, data: "0x"
+client {"__main__": {"loaded_code_sha256": "cf61e57c5d33a9a4385b642f5e55c39bfc79725751187fcbf24873cbce977ebe", "source_sha256_at_import": "5bfe7f9b9965dcab42eeb92e7707e2a791132c5880b03fa2b3b929e2426816a1"}, "index": {"loaded_code_sha256": "d62be2e9d0dafba4d321d2737f03d22236689dfacf2b3f04f344ce0aeab3369e", "source_sha256_at_import": "321946551c971b6374cb37c37de93c6a79895e87492e08421956472376d3d96a"}, "policy": {"loaded_code_sha256": "837f58590e77b4e99b7f0e67b942e7a3ceea3ee5dad85eaf766e485c7adee547", "source_sha256_at_import": "b56d5b11c6cd387c6c623419a5c31012bbae509680d29f403c2ef5954ac7f107"}, "tx": {"loaded_code_sha256": "f5fc4655be2cb92f33d5a648f85ec1dfabec8cc561a186b9bd62a1adfc96d7b9", "source_sha256_at_import": "23ef4eeb579994c28343ec58612afdaf1972317e5c43110fcdd60fcf139ede3e"}}
+account 0x5f4947f78D9f7b5c633Ee37027b99f6b33F2547f (manager) configuration 0x7e8dbf5c361810cb1eddddc793192bb9885952a8e84228dd268a0ffbb8010e80
+gas 0.050 gwei, 3 open, 0 idle packs, idle 0.0560 ETH, cycle net 7.991 mETH, 7d volume 151/day
+status ROUTINE_BUDGET_EMPTY [wait] strategy work is unpaid until the routine budget refills
+status RESERVE_BELOW_NEED [info] reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH
+skip setExiting: signed maximum reservation exceeds the wallet spending limit
+account 0x5f4947f78D9f7b5c633Ee37027b99f6b33F2547f (manager) configuration 0x7e8dbf5c361810cb1eddddc793192bb9885952a8e84228dd268a0ffbb8010e80
+gas 0.050 gwei, 3 open, 0 idle packs, idle 0.0560 ETH, cycle net 7.991 mETH, 7d volume 151/day
+status ROUTINE_BUDGET_EMPTY [wait] strategy work is unpaid until the routine budget refills
+status RESERVE_BELOW_NEED [info] reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH
+nothing to do
+exposure EXPOSURE_UNAVAILABLE [info] aggregate share is not calculated in bounded routine passes

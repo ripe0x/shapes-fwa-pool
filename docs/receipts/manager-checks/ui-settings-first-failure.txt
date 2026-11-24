@@ -1,0 +1,49 @@
+Shapes on FWA
+Community pools
+Main pool
+How it works
+Local dev account
+Connect wallet
+
+VITE_FACTORY is not set. See app/.env.example.
+
+No manager yet. Nothing is sent until you create it and confirm in your wallet.
+Create a personal manager
+
+It runs the shared vault's strategy with only your ETH. You own it from the moment it is created; the factory keeps no control and charges no fee.
+
+Provisional local candidate: 0.03 ETH packs, 70,000 bps backing, fresh paid replacements, one renewal float, 25 bps uplift limit.
+
+Conditional opening funding estimate
+Shapes principal per pack
+0.03 ETH
+FWA backing per pack
+0.21 ETH
+Fresh mint fees per pack
+0.0015 ETH
+Renewal float
+0.2141 ETH
+Maintenance reserve
+0.005 ETH
+Live / accepted mint fee per Shape
+0.0005 / 0.001 ETH
+
+Funding estimate includes quoted initial keeper work. FWA admission and live economics are checked on the created manager. Creation starts idle; wallet creation gas is additional.
+
+Use 0.0005 ETH as this manager's accepted mint fee maximum
+Before you start
+About 0.46 ETH funds this one-pack estimate
+
+With few packs, individual acquisition outcomes have a large effect. Returns are not guaranteed.
+
+Fund it with
+ETH
+Estimated packs if admitted
+3
+To create
+Creation gas varies
+Fee
+None
+Connect wallet
+
+One confirmation.

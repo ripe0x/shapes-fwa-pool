@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/test_manager_exit.py", line 5, in <module>
+    from keeper import FWA, local_actor_rpc, manager_exit_steps, operation_target, to_cast
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/keeper.py", line 34, in <module>
+    import tx as txm  # noqa: E402
+    ^^^^^^^^^^^^^^^^
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/tx.py", line 28, in <module>
+    from eth_utils import keccak
+ModuleNotFoundError: No module named 'eth_utils'

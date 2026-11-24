@@ -1,0 +1,46 @@
+FFF...
+======================================================================
+FAIL: test_both_products_still_reach_parser (__main__.EntrypointTests.test_both_products_still_reach_parser)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/test_entrypoint.py", line 25, in test_both_products_still_reach_parser
+    self.assertEqual(launch(VAULT=ACTOR, FACTORY=ACTOR, KEEPER_FROM=ACTOR).returncode, 0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+======================================================================
+FAIL: test_existing_mount_paths_are_forwarded_without_reading_or_creating_signing_material (__main__.EntrypointTests.test_existing_mount_paths_are_forwarded_without_reading_or_creating_signing_material)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/test_entrypoint.py", line 31, in test_existing_mount_paths_are_forwarded_without_reading_or_creating_signing_material
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Traceback (most recent call last):
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/keeper.py", line 34, in <module>
+    import tx as txm  # noqa: E402
+    ^^^^^^^^^^^^^^^^
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/tx.py", line 28, in <module>
+    from eth_utils import keccak
+ModuleNotFoundError: No module named 'eth_utils'
+
+
+======================================================================
+FAIL: test_factory_alone_reaches_real_argument_parser (__main__.EntrypointTests.test_factory_alone_reaches_real_argument_parser)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/test_entrypoint.py", line 21, in test_factory_alone_reaches_real_argument_parser
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : Traceback (most recent call last):
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/keeper.py", line 34, in <module>
+    import tx as txm  # noqa: E402
+    ^^^^^^^^^^^^^^^^
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/tx.py", line 28, in <module>
+    from eth_utils import keccak
+ModuleNotFoundError: No module named 'eth_utils'
+
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.257s
+
+FAILED (failures=3)

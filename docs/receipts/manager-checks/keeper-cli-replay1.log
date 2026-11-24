@@ -1,0 +1,7 @@
+client {"__main__": {"loaded_code_sha256": "a5f59d2ce5d6d2769ed6e986ae43b6caa4c70a5762a58517a28c249b794e9316", "source_sha256_at_import": "b38b50cfccda01cf0af6365018334ff5b07c27dc3c3bc46831e78d38a46b3ff8"}, "index": {"loaded_code_sha256": "d62be2e9d0dafba4d321d2737f03d22236689dfacf2b3f04f344ce0aeab3369e", "source_sha256_at_import": "321946551c971b6374cb37c37de93c6a79895e87492e08421956472376d3d96a"}, "policy": {"loaded_code_sha256": "837f58590e77b4e99b7f0e67b942e7a3ceea3ee5dad85eaf766e485c7adee547", "source_sha256_at_import": "b56d5b11c6cd387c6c623419a5c31012bbae509680d29f403c2ef5954ac7f107"}, "tx": {"loaded_code_sha256": "f5fc4655be2cb92f33d5a648f85ec1dfabec8cc561a186b9bd62a1adfc96d7b9", "source_sha256_at_import": "23ef4eeb579994c28343ec58612afdaf1972317e5c43110fcdd60fcf139ede3e"}}
+account 0xed1362EcFdE410735dfB70153D60FCFD20d38E74 (manager) configuration 0xe10f77eda52b41c412653b4c58121fe0cabe29c586c6e338441e9b481c459fa4
+gas 0.109 gwei, 3 open, 0 idle packs, idle 0.0556 ETH, cycle net 7.937 mETH, 7d volume 171/day
+status RESERVE_BELOW_NEED [info] reserve 0.0050 ETH; maximum listing and sync batches quote 0.0054 ETH
+nothing to do
+account 0x5f4947f78D9f7b5c633Ee37027b99f6b33F2547f waits: event index at block 26452482; target 26486696; next pass resumes bounded replay
+exposure EXPOSURE_UNAVAILABLE [info] aggregate share is not calculated in bounded routine passes

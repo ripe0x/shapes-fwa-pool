@@ -1,0 +1,41 @@
+KeeperPaid ABI [{'name': 'keeper', 'type': 'address', 'indexed': True, 'internalType': 'address'}, {'name': 'amount', 'type': 'uint256', 'indexed': False, 'internalType': 'uint256'}] actual pay 1130826568290000
+{
+ "owner": {
+  "ui-owner": {
+   "fundedWei": 1000000000000000000,
+   "withdrawnWei": 994736320288405000,
+   "walletGasWei": 2967689025801520,
+   "netWei": -8231368737396520,
+   "netReturnBps": -82.3136873739652,
+   "transactionCount": 10,
+   "gasUnits": 2877912
+  },
+  "cli-owner": {
+   "fundedWei": 1000000000000000000,
+   "withdrawnWei": 995132853143305000,
+   "walletGasWei": 166905134205993,
+   "netWei": -5034051990900993,
+   "netReturnBps": -50.34051990900993,
+   "transactionCount": 7,
+   "gasUnits": 2549321
+  }
+ },
+ "keeper": {
+  "compensationWei": 1130826568290000,
+  "walletGasWei": 799171850776649,
+  "netWei": 331654717513351
+ },
+ "gas_proxy": {
+  "create": 606172,
+  "setExiting": 53214,
+  "withdraw": 38904,
+  "unlist": 1085668,
+  "liquidate": 593594,
+  "recover_sync": 199047,
+  "processAcquisitions": 115941,
+  "build": 4403674,
+  "harvest": 300000
+ },
+ "creator": 9000000000000000,
+ "startup": 2622035765244119
+}

@@ -1,0 +1,65 @@
+[
+ {
+  "command": [
+   "python3",
+   "script/test_release.py"
+  ],
+  "exit_status": 0,
+  "seconds": 0.34,
+  "log": "/tmp/shapes-manager-closeout-run/test_release-runtime.log"
+ },
+ {
+  "command": [
+   "python3",
+   "keeper/test_manager_exit.py"
+  ],
+  "exit_status": 0,
+  "seconds": 0.19,
+  "log": "/tmp/shapes-manager-closeout-run/test_manager_exit-runtime.log"
+ },
+ {
+  "command": [
+   "python3",
+   "keeper/test_entrypoint.py"
+  ],
+  "exit_status": 0,
+  "seconds": 0.61,
+  "log": "/tmp/shapes-manager-closeout-run/test_entrypoint-runtime.log"
+ },
+ {
+  "command": [
+   "python3",
+   "keeper/test_config.py"
+  ],
+  "exit_status": 0,
+  "seconds": 0.19,
+  "log": "/tmp/shapes-manager-closeout-run/test_config-runtime.log"
+ },
+ {
+  "command": [
+   "python3",
+   "sim/test_manager.py"
+  ],
+  "exit_status": 0,
+  "seconds": 0.35,
+  "log": "/tmp/shapes-manager-closeout-run/test_manager-runtime.log"
+ },
+ {
+  "command": [
+   "python3",
+   "sim/test_forward.py"
+  ],
+  "exit_status": 0,
+  "seconds": 0.23,
+  "log": "/tmp/shapes-manager-closeout-run/test_forward-runtime.log"
+ },
+ {
+  "command": [
+   "python3",
+   "sim/test_vault.py"
+  ],
+  "exit_status": 0,
+  "seconds": 0.04,
+  "log": "/tmp/shapes-manager-closeout-run/test_vault-runtime.log"
+ }
+]

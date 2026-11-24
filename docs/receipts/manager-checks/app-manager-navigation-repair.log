@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /Users/dd/CascadeProjects/shapes-pool-app-completion
+
+ ✓ app/src/main-pool.test.ts (23 tests) 4ms
+ ✓ app/src/chain.test.ts (4 tests | 3 skipped) 346ms
+   ✓ explains the failure when there is no browser wallet to read through  345ms
+
+ Test Files  2 passed (2)
+      Tests  24 passed | 3 skipped (27)
+   Start at  13:16:26
+   Duration  626ms (transform 99ms, setup 0ms, collect 251ms, tests 349ms, environment 0ms, prepare 58ms)
+

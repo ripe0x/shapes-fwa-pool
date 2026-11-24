@@ -1,4 +1,41 @@
-# Main pool completion, 2026-11-24
+# Individual manager closeout, 2026-11-24
+
+**Manager engineering complete; unsigned and not recommended for production on this evidence.**
+Candidate implementation `8463c52476246a6a669ae82a8346d36355347c83`, app `6425e78`.
+The shared vault and both public app switches remain closed. No public transaction, production
+fee change, live cutover, merge or acceptance signature was performed.
+
+Owner-paid app and CLI exits now stop reinvestment, handle bounded recovery and real FWA queue
+progress, unlist/redeem and withdraw actual ETH. Both local managers fully exit with keeper
+permission set to zero, no exit topups, and explicit wallet caps. The manager-only deployment
+path prepares libraries plus factory/implementation without PackVault or a vault seed. Factory
+ownership over existing managers remains absent.
+
+Focused validation passes: six real-counterparty contract cases; 32 exact accounting trace steps;
+app tests and real Chromium interactions; 48/48 counterfactual exits; and the production Docker
+image, persistence/lost-response handling and owner CLI exit in [run45460887589](https://github.com/ripe0x/shapes-fwa-pool/actions/runs/45460887589).
+The keeper entrypoint supports FACTORY without VAULT and uses existing read-only signer mounts.
+It rejects the old secret-materializing environment transport; live services/stores are unchanged.
+
+The live mint fee is now **0.0005 ETH**, observed at block 26,486,686; its change was external to this
+task. The accepted maximum remains 0.001 ETH. Historical 0.001 evidence is preserved. At current
+fee and 0.2/0.5 gwei, the two-draw recorded-month Fresh medians are −28.48%/−28.85% on 0.5 ETH
+and−20.79%/−21.39% on 2 ETH. No manager return hurdle is approved. These conditional results do
+not justify a production recommendation; favorable one-draw synthetic bursts are not APR.
+The pooled −53.68% result and 72 ETH pricing threshold do not measure a personal manager.
+
+- [Focused verification and one-screen scorecard](receipts/manager-verification.md).
+- [Same-scenario owner, keeper and creator economics](receipts/manager-economics.md).
+- [Independent manager review](receipts/manager-independent-review.md).
+- [Unsigned manager-only runbook](release/MANAGER-RUNBOOK.md), [settings](release/SETTINGS.md)
+  and [acceptance status](release/manager-acceptance.json).
+
+Remaining release conditions are production economic acceptance, signer transport and the
+explicitly unmeasured billed renewal/harvest/variable paid-operation gas. The task's unsigned
+package grants no authority for release. Things that don't make sense: creator fees remain
+positive while owner returns can be substantially negative; permission creates no cash.
+
+## Prior combined implementation evidence
 
 **Engineering candidate implemented; production remains unsigned and economically unaccepted.**
 The launch recipe is three paid 0.01 ETH Shape mints in each 0.03 ETH pack, mask 8. Shared vault and

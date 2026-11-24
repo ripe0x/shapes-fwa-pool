@@ -1,0 +1,6 @@
+file:///private/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/manager-abi-negative-sulph2k2/scripts/export-main-pool-abi.mjs:52
+    if (readFileSync(file, 'utf8') !== expected) throw new Error(`Stale main integration output: ${file}; regenerate from the reviewed main build`);
+                                                       ^
+
+Error: Stale main integration output: shared/main-pool-abi.ts; regenerate from the reviewed main build
+    at file:///private/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/m

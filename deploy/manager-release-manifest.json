@@ -2,21 +2,21 @@
  "name": "PackManagerFactory mainnet",
  "deployment_target": "manager",
  "sources": {
-  "script/DeployCore.sol": "10b61be887f77901151d47525abb0bd7e16116c3569008ab976c511a365cee5b",
-  "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
-  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
-  "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879",
-  "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
-  "remappings.txt": "638e1bbb5593b0f20280b3c050dc924c319bfe2a0781d3b8372c908f397ad429",
-  "script/verify.sh": "f2d7ef2acdb6fbc59b2a4787666ebd908d766113cc76a00e13262a264690b89e",
-  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
-  "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
   "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
-  "script/Deploy.s.sol": "d14764d15a8acb4006eae58c116085d7587c7f784599e92793cacec478c6b77c",
+  "script/verify.sh": "f2d7ef2acdb6fbc59b2a4787666ebd908d766113cc76a00e13262a264690b89e",
+  "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
   "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+  "remappings.txt": "638e1bbb5593b0f20280b3c050dc924c319bfe2a0781d3b8372c908f397ad429",
+  "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
   "script/deploy.sh": "c5b30d187511c553971faf989e66e16aa2638a0e7a808438a4e7988da60256b5",
   "script/test_release.py": "d247e2d4e17a2a607c6979a60a57a3223ca71336922da00cd548a21eeb74a2d6",
+  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
   "foundry.toml": "dc88290ce366e5f71de0e2715dd819a94d4b90fce1d979ede7517ca158c99520",
+  "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879",
+  "script/Deploy.s.sol": "d14764d15a8acb4006eae58c116085d7587c7f784599e92793cacec478c6b77c",
+  "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
+  "script/DeployCore.sol": "10b61be887f77901151d47525abb0bd7e16116c3569008ab976c511a365cee5b",
   "script/release.py": "69c46e7fb787169d5195942bda836a64ffb668a920ef6b5c61573e01ebcbb39b"
  },
  "toolchain": {
@@ -63,7 +63,7 @@
   "deploy/manager-factory.json": "fd97965dd0c877125cba42f22b28051c609a4792917c8c5281c127109ce706fa",
   "deploy/manager.json": "f216770efacfe587770fe3d3821d0f2489d40c4e4f7758a051be77195ac0c026",
   "deploy/manager-mint-fee-observation.json": "80e537598573fdc2189cf259f60006bdb2699c2440276fe162eebf7d38f13314",
-  "deploy/manager-existing-main-readback.json": "9b57e3729ccf2cf326e76714dc6433b28e02da79daa005a3a596b6be9d4dd2ef"
+  "deploy/manager-existing-main-readback.json": "3c8e42a4722a5b6ad5bdc7b407e97be758a9d22c217ea0f196890ebf6d95fac9"
  },
  "keeper": {
   "keeper/Dockerfile": "54675df4109b6b91f5e750816fdf20fb410942992fbebacb9b14d82dc5211243",
@@ -80,12 +80,15 @@
  "evidence": {
   "docs/receipts/manager-closeout.json": "d993014803106aa76e8da392a0f63b702ac27da81193caeba5e28a0634f012c4",
   "docs/receipts/manager-assessment.json": "7ef9738fa09dee4a0be11e229b0da0bf50e5ac5c096b5d43051558a69de5b8df",
-  "docs/receipts/manager-economics.md": "9777015585cad86608d995dfaf10bb4b84151099738d414c3f86c27e4992c414",
+  "docs/receipts/manager-economics.md": "0218704751555c87df4b1a8ffe7199b93ccd594d0592b994a6efea103ff9b5ec",
+  "docs/receipts/manager-independent-review.md": "5f3781f140a6eb4a1f802fbcad8d5c6041de18765279d23961be3af73c43ad46",
   "docs/receipts/manager-ui.json": "25e91f882c3f98bb49aab76f83da3dceadabe7a6031270969a991c9a532b1420",
   "docs/receipts/manager-cost-calibration.json": "400faba2c6d1acc5ba3057d75d9517510d99515dfca5feb045d65c08eaca692f",
   "docs/receipts/manager-reconciliation.json": "af5459be9fab27ae3341bbbf00fd05dbb79f09989a3bcc4040edd432a41a710a",
-  "deploy/manager-create-unsigned.json": "f1e35c4211423ceeaee1b2706dd9f68e8c93708cc1ea82c780d7ebfb3d5d7298",
-  "deploy/manager-unsigned-cutover.json": "075ef47960e6b9c312c692d3ae02d8a2c1c489e48ac5b15799b361cc2125a59d",
+  "docs/receipts/manager-verification.md": "1fa88882c0968c1e99ea8e834ea99b746d4a5d4851a7e666176cd19bcc382367",
+  "docs/receipts/manager-image.json": "5f4fd2d54752158dbd48e3317b7442e3063275fb83356e025c737befa0f7559f",
+  "deploy/manager-create-unsigned.json": "4cb9724a7947dbe971ac33c400e0bb1f13780202af36104ad68083db9cb682b0",
+  "deploy/manager-unsigned-cutover.json": "dc4607b0ebee2ef5dd179529b803ec0ac7e68a1735195ffb26e3a71ced743abb",
   "deploy/manager-keeper-unsigned.json": "bcfdd540267eace3f469cfe1e3ca03224821adb3af8ece947ce5fa47314786dc"
  }
 }

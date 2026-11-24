@@ -1,0 +1,92 @@
+{
+  "chainId": 31337,
+  "block": 26486693,
+  "blockHash": "0x9fba7c05fdfe8243eb184cf60d418bfde6518cb31f2ee7511c013bb6d920f4f8",
+  "rpc": "http://127.0.0.1:18661",
+  "deploymentTarget": "manager",
+  "factory": "0x63d6951a4185873df84d68473fd520df86dee8d7",
+  "implementation": "0x671573aAf2d5BF8b8eB73c8E39E7398d350f052B",
+  "libraries": {
+    "ScanLib": "0x4ac701799b22e4c7a0f24301ccc904AD6fB3F005",
+    "VaultLib": "0x650B28E26586dbfea4d2bE777d3983816D0D1A2f",
+    "StrategyLib": "0xE899b8ac4712842D6AF7A9F47a7b6951bDA4B519"
+  },
+  "managerCount": 1,
+  "factoryBalanceWei": 0,
+  "implementationBalanceWei": 0,
+  "manager": {
+    "address": "0xed1362EcFdE410735dfB70153D60FCFD20d38E74",
+    "owner": "0x847bB5811963ee7Faf9626171fBeBcA81f745e3D",
+    "params": {
+      "minEdgeBps": 100,
+      "bufferBps": 0,
+      "distributionBps": 0,
+      "payMarkupBps": 0,
+      "keeperShareBps": 2500,
+      "upliftBoundBps": 25,
+      "packUnitsMask": 8,
+      "gasCeilingWei": 500000000,
+      "essentialCeilingWei": 500000000,
+      "maxTipWei": 50000000,
+      "workFeeWei": 20000000000000,
+      "routineCapWei": 30000000000000000,
+      "routineRatePerDayWei": 10000000000000000,
+      "essentialCapWei": 10000000000000000,
+      "essentialRatePerDayWei": 5000000000000000,
+      "reserveWei": 5000000000000000,
+      "tvlCapWei": 0,
+      "backingRatioBps": 70000,
+      "renewalMode": 0,
+      "renewalFloatCount": 1,
+      "acceptedMintFeeWei": 1000000000000000,
+      "minDepositWei": 10000000000000000,
+      "minDistributionWei": 10000000000000000,
+      "gasSchedule": {
+        "checkpoint": 500000,
+        "allocationEntry": 6000,
+        "allocationRead": 30000,
+        "build": 360000,
+        "buildPack": 300000,
+        "buildShape": 130000,
+        "list": 280000,
+        "listed": 825000,
+        "sync": 125000,
+        "requiredTail": 120000,
+        "distributionProof": 80000,
+        "journal": 22000,
+        "scan": 30000,
+        "selected": 180000,
+        "synced": 120000,
+        "pruned": 45000,
+        "unlist": 340000,
+        "unlisted": 285000,
+        "liquidate": 75000,
+        "liquidatePack": 80000,
+        "redeemShape": 35000,
+        "recoveryBase": 100000,
+        "recoveryShape": 35000,
+        "recoveryUnseal": 70000,
+        "harvest": 125000,
+        "harvested": 80000,
+        "credit": 40000,
+        "fund": 40000
+      }
+    },
+    "budget": [
+      30000000000000000,
+      10000000000000000
+    ],
+    "cashWei": 1000000000000000000,
+    "flags": {
+      "windingDown": "false",
+      "listingPaused": "false"
+    },
+    "inventory": {
+      "openListingCount": 0,
+      "idlePackCount": 0,
+      "recoveryPackCount": 0
+    },
+    "liveMintFeeWei": 500000000000000
+  }
+}
+manager postflight passed; shared vault not required

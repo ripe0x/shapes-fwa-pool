@@ -1,0 +1,12 @@
+{
+  "stage": "settings",
+  "manager": "0xed1362EcFdE410735dfB70153D60FCFD20d38E74",
+  "checks": [
+    "Stable expected owner connected on31337 beforeanymanageraction",
+    "Manager-only navigation with shared vault closed and unset, no community-factory warning",
+    "Actual reviewed settings setallfourkeepercapacity/refillfieldsto0"
+  ],
+  "writes": 1,
+  "errors": [],
+  "afterBlock": 26486698
+}
