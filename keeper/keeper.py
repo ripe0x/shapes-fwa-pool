@@ -22,12 +22,14 @@ import hashlib
 import subprocess
 import sys
 import threading
+from dataclasses import replace
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import policy  # noqa: E402
+from config import PARAMS_T, decode_params, gas_schedule
 import tx as txm  # noqa: E402
 import index as event_index  # noqa: E402
 
@@ -35,7 +37,6 @@ SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 RPC = "https://mainnet.gateway.tenderly.co"
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 SHAPES = "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0"
-PARAMS_T = "(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint128,uint128)"
 LISTING_T = "(address,address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint64,uint8)"
 
 
@@ -226,7 +227,7 @@ def build_units_for(mask):
     if (mask >> policy.REF_UNITS) & 1:
         return policy.REF_UNITS
     return next((u for u in range(policy.MIN_PACK_UNITS, policy.MAX_PACK_UNITS + 1) if (mask >> u) & 1),
-                policy.REF_UNITS)
+                0)
 
 
 def read_tokens(vault, candidate_ids, block):
@@ -240,7 +241,7 @@ def read_tokens(vault, candidate_ids, block):
                 token_held=num(call(token, "balanceOf(address)(uint256)", vault, block=block)))
 
 
-def proposal_limits(s, value, settlement_fee, discount, cap, build=False, units=policy.REF_UNITS):
+def proposal_limits(s, value, settlement_fee, discount, cap, build=False, units=policy.REF_UNITS, retirement_shapes=None):
     """VaultLib._profitable floors for a listing near the edge's desired backing; production preflight
     authenticates each one. A listing clears the bid outcome B(k-1) > cycle and the keep outcome
     B(k-s) >= value + cycle (+ the build when newly built); a build repays from the keep outcome, not
@@ -248,12 +249,23 @@ def proposal_limits(s, value, settlement_fee, discount, cap, build=False, units=
     if s.k <= 10**18 or not 0 < discount <= 10_000 or not 0 <= settlement_fee < 10_000:
         return 1, 0
     up = lambda a, b: -(-a // b)
-    cycle = policy.quote(s, policy.CYCLE_GAS, 2)
-    extra = policy.build_cost(s, units) if build else 0
-    minimum = max(up(value * 10_000, 9500),                          # VaultLib floor: P / 0.95
-                  cycle * 10**18 // (s.k - 10**18) + 1,              # bid outcome: B(k-1) > cycle
+    pricing = replace(s, build_units=units)
+    if build and s.renewal_mode == 1:
+        q = s.gas_schedule
+        common = sum(q[k] for k in ('sync','journal','selected','synced','pruned','sync_funding','harvested','sync_credit'))
+        cycle = policy.quote(pricing, common, 1)
+    else:
+        cycle = policy.quote(pricing, policy.cycle_gas(pricing, retirement_shapes), 2)
+    extra = policy.build_cost(s, units if build else (s.build_units or policy.REF_UNITS)) if build or s.renewal_mode == 0 else 0
+    minimum = max(up(value * 10_000, 9500),  # NAV face coverage at the maximum settlement fee
+                  (cycle + extra) * 10**18 // (s.k - 10**18) + 1,              # bid outcome: B(k-1) > cycle
                   up((value + cycle + extra) * 10**18, s.k - settlement_fee * 10**14))  # keep outcome
     return minimum, cap
+
+
+def validate_configuration_context(pinned, prospective):
+    if pinned.lower() != prospective.lower():
+        raise txm.StaleContext('configuration or mint fee changed after pinned hydration; refresh before planning')
 
 
 def read_state(vault, slowdown, burn=False, pooled=True):
@@ -265,10 +277,16 @@ def read_state(vault, slowdown, burn=False, pooled=True):
     head, now, base_fee = (quantity(header[k]) for k in ("number", "timestamp", "baseFeePerGas"))
     index = get_index(vault, head, now)
     at = lambda to, sig, *args: call(to, sig, *args, block=head)
-    p = [num(x) for x in at(vault, f"getParams()({PARAMS_T})").strip("()").split(", ")]
-    (min_edge, buf, dist_bps, premium, share, _alloc, mask, ceiling, ess_ceiling, tip, wfee, _rc, _rr, _ec, _er, res,
-     _tvl) = p
+    p = decode_params(at(vault, f"getParams()({PARAMS_T})"))
+    min_edge, buf, dist_bps = (p[k] for k in ('minEdgeBps', 'bufferBps', 'distributionBps'))
+    premium, share, mask = (p[k] for k in ('payMarkupBps', 'keeperShareBps', 'packUnitsMask'))
+    ceiling, ess_ceiling, tip, wfee, res = (p[k] for k in ('gasCeilingWei', 'essentialCeilingWei', 'maxTipWei', 'workFeeWei', 'reserveWei'))
+    _ec = p['essentialCapWei']
     build_units = build_units_for(mask)
+    idle_count = num(at(vault, 'idlePackCount()(uint256)'))
+    idle_ids = [num(at(vault, 'idlePackAt(uint256)(uint256)', idle_count-1-i)) for i in range(min(idle_count, policy.MAX_BATCH['list']))]
+    idle_candidates = [(i, num(at(vault, 'idleValueOf(uint256)(uint256)', i))) for i in idle_ids]
+    quote_units = build_units or (idle_candidates[0][1] // policy.UNIT if idle_candidates else policy.REF_UNITS)
     rbud, ebud = lines(at(vault, "budget()(uint256,uint256)"))
     k, backing = "0", "0"  # prospective economics are read after pinned financial hydration
     window = num(at(FWA, "settlementWindow()(uint256)"))
@@ -300,7 +318,7 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         pending = num(at(vault, "pendingDepositTotal()(uint256)"))
         processing_pool = num(at(vault, "processingPool()(uint256)"))
         reserves = pending + num(at(vault, "redemptionReserve()(uint256)")) + \
-            num(at(vault, "distributionReserve()(uint256)")) + num(at(vault, "claimableTotal()(uint256)")) + processing_pool
+            num(at(vault, "distributionReserve()(uint256)")) + num(at(vault, "claimableTotal()(uint256)")) + processing_pool + num(at(vault, "chargeRefundReserve()(uint256)"))
         locked = num(at(vault, "lockedShares()(uint256)"))
         supply = num(at(vault, "totalShares()(uint256)"))
         if locked:
@@ -321,6 +339,8 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         pending_deposits=pending, locked_shares=locked, total_shares=supply, pack_units_mask=mask,
         build_units=build_units, pooled=pooled, settlement_fee_bps=num(at(FWA, "ownerSettlementFeeBps()(uint256)")),
         essential_ceiling=ess_ceiling, essential_cap=_ec, processing_pool=processing_pool,
+        gas_schedule=gas_schedule(p), backing_ratio_bps=p["backingRatioBps"], renewal_mode=p["renewalMode"],
+        accepted_mint_fee=p["acceptedMintFeeWei"],
         fee_credit=num(at(FWA, "feeCredit(address)(uint256)", vault)),
         open_positions=num(at(vault, "openListingCount()(uint256)")), active_count=total[3], witness_id=witness,
         journal_cursor=num(at(vault, "acquisitionCursor()(uint64)")),
@@ -332,6 +352,13 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         recent_volume=index.recent_volume(now), slowdown_volume=slowdown, burn_tokens=burn,
         reserve=res, work_fee=wfee, routine_budget=num(rbud), essential_budget=num(ebud), **tokens,
     )
+    renewal = [num(x) for x in lines(at(vault, "renewalState()(uint256,uint256,uint256,uint256)"))]
+    state.keeper_cash = num(at(vault, "keeperCash()(uint256)"))
+    state.renewal_eligible = renewal[0] + renewal[1]
+    state.renewal_float = renewal[2]
+    state.operating_reserve = res
+    state.configuration_hash = at(vault, "configurationHash()(bytes32)")
+    state.request_funding_needed = policy.request_charge(state) if pooled and (pending or locked) else 0
     prospective_parent, future_base_fee = inclusion_context()
     # Financial candidates may come from a canonical ancestor while pricing uses the current
     # pending block. The full pending call authenticates capital, eligibility and payment.
@@ -340,18 +367,22 @@ def read_state(vault, slowdown, burn=False, pooled=True):
     state.pending_parent = prospective_parent["hash"]
     prospective = lambda to, sig, *args: call(to, sig, *args, block="pending", fees=fee_args(future_base_fee, tip))
     try:
-        future_k, future_backing, _ = lines(prospective(vault, "edge(uint256)(uint256,uint256,bool)", build_units))
+        future_k, future_backing, _ = lines(prospective(vault, "edge(uint256)(uint256,uint256,bool)", quote_units))
         state.k, state.backing = num(future_k), num(future_backing)
     except subprocess.CalledProcessError:
         state.k, state.backing = 0, 0
+    pending_configuration = prospective(vault, "configurationHash()(bytes32)")
+    validate_configuration_context(state.configuration_hash, pending_configuration)
+    if pooled and (pending or locked):
+        state.request_funding_needed = num(prospective(vault, 'requestCharge()(uint256)'))
     # A distribution-only checkpoint is due when this exact pinned simulation succeeds (pool only).
     if pooled and dist_bps and not pending and not locked:
         try:
-            prospective(vault, "checkpoint(uint256,uint256)(uint256)", witness, 0)
+            prospective(vault, "checkpoint(uint256,uint256,bytes32)(uint256)", witness, 0, state.configuration_hash)
             state.distribution_due = True
         except subprocess.CalledProcessError:
             pass
-    if state.backing and state.gas_price <= state.gas_ceiling and not state.winding_down \
+    if (state.backing or idle_candidates) and state.gas_price <= state.gas_ceiling and not state.winding_down \
             and not state.listing_paused and state.queue_drained:
         packs = prospective(vault, "packs()(address)")
         fee, discount = num(prospective(FWA, "ownerSettlementFeeBps()(uint256)")), num(prospective(FWA, "settlementDiscountBps()(uint256)"))
@@ -366,14 +397,20 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         # build lists every pack at once: each proposal must be a distinct identifier inside the
         # interval the contract widens by one quantum per admission (reservedCount + i + 1).
         state.build_proposals = policy.propose_backings(state.backing, reserved, policy.MAX_BATCH["build"],
-                                                        index.reserved, lo, hi, head)
+                                                        index.reserved, lo, hi, head) if build_units else []
         chosen = []
-        for _, value in index.idle(policy.MAX_BATCH["list"]):
+        eligibility = {i: at(vault, 'renewalEligible(uint256)(bool)', i) == 'true' for i, _ in idle_candidates}
+        eligible = [i for i, _ in idle_candidates if eligibility[i]]
+        state.relistable_idle = 0
+        for pack_id, value in idle_candidates:
+            if state.renewal_mode == 0 and eligibility[pack_id]:
+                break
+            state.relistable_idle += 1
             units = value // policy.UNIT
-            _, target, ok = lines(prospective(vault, "edge(uint256)(uint256,uint256,bool)", units))
+            _, target, ok = lines(prospective(vault, "relistEdgeFor(uint256)(uint256,uint256,bool)", pack_id))
             if ok != "true":
                 break
-            lo, hi = proposal_limits(state, value, fee, discount, cap)
+            lo, hi = proposal_limits(state, value, fee, discount, cap, units=units, retirement_shapes=num(at(vault,"inventoryShapeCount(uint256)(uint256)",pack_id)))
             proposal = policy.propose_backings(num(target), reserved + len(chosen), 1,
                                                lambda b: b in chosen or index.reserved(b), lo, hi, head)
             if not proposal:
@@ -384,28 +421,55 @@ def read_state(vault, slowdown, burn=False, pooled=True):
                 break
             chosen += proposal
         state.backing_proposals = chosen
+        if state.renewal_mode == 0 and build_units:
+            state.renewal_pack_ids = (eligible + [0] * min(renewal[1], 4))[:4]
+            state.renewal_proposals = state.build_proposals[:len(state.renewal_pack_ids)]
+            state.renewal_pack_values = [num(at(vault, "idleValueOf(uint256)(uint256)", i)) if i else 0 for i in state.renewal_pack_ids]
+            state.renewal_pack_shapes = [num(at(vault, "inventoryShapeCount(uint256)(uint256)", i)) if i else 0 for i in state.renewal_pack_ids]
     if block_hash(head) != header["hash"]:
         raise txm.StaleContext("pinned state block was reorganized; retry snapshot")
     if rpc("eth_getBlockByNumber", "latest", False)["hash"] != prospective_parent["hash"]:
         raise txm.StaleContext("head changed during prospective pricing; refresh quote")
     return state
 
-def to_cast(step, min_pay=0):
-    """Encode exactly the planned bounded call. OP4 activation is retired."""
+def to_cast(step, min_pay=0, expected=None, caller_funded=False):
+    """Encode the reviewed configuration alongside every guarded operation."""
     fn, *args = step
     array = lambda xs: "[" + ",".join(map(str, xs)) + "]"
+    expected = expected or "0x" + "00" * 32
+    if caller_funded:
+        if fn == 'checkpoint':
+            return ['recoverCheckpoint(uint256)', args[0]]
+        if fn in ('sync', 'syncCheckpoint'):
+            return ['recover(uint256[],uint256)', array(args[0]), args[1]]
+        if fn == 'unlist':
+            return ['recoverUnlist(uint256[])', array(args[0])]
+        if fn == 'liquidate':
+            return ['recoverLiquidate(uint256)', args[0]]
+    if fn in ('claim', 'cancelDeposit'):
+        return [fn + '()']
+    if fn == 'requestRedeem':
+        return ['requestRedeem(uint256,bytes32)', args[0], expected, '--value', args[1]]
+    if fn == 'claimCheckpointRefund':
+        return ['claimCheckpointRefund(uint256[])', array(args[0])]
     if fn == "burnTokens":
         return ["burnTokens(uint256[])", array(args[0])]
-    if fn in ("harvest", "unlist", "list"):
-        return [f"{fn}(uint256[],uint256)", array(args[0]), min_pay]
-    if fn == "sync":
-        return ["sync(uint256[],uint256,uint256)", array(args[0]), args[1], min_pay]
+    if fn == "fundCheckpoint":
+        return ["fundCheckpoint(bytes32)", expected, "--value", args[0]]
+    if fn == "harvest":
+        return ["harvest(uint256[],uint256)", array(args[0]), min_pay]
+    if fn in ("unlist", "list"):
+        return [f"{fn}(uint256[],uint256,bytes32)", array(args[0]), min_pay, expected]
+    if fn in ("sync", "syncCheckpoint"):
+        return [f"{fn}(uint256[],uint256,uint256,bytes32)", array(args[0]), args[1], min_pay, expected]
     if fn == "liquidate":
-        return ["liquidate(uint256,uint256)", args[0], min_pay]
+        return ["liquidate(uint256,uint256,bytes32)", args[0], min_pay, expected]
     if fn == "build":
-        return ["build(uint256,uint256[],uint256)", args[0], array(args[1]), min_pay]
+        return ["build(uint256,uint256[],uint256,bytes32)", args[0], array(args[1]), min_pay, expected]
+    if fn == "renew":
+        return ["renew(uint256[],uint256[],uint256[],uint256,bytes32)", array(args[0]), array(args[1]), array(args[2]), min_pay, expected]
     if fn == "checkpoint":
-        return ["checkpoint(uint256,uint256)", args[0], min_pay]
+        return ["checkpoint(uint256,uint256,bytes32)", args[0], min_pay, expected]
     raise ValueError(f"unknown keeper operation: {fn}")
 
 
@@ -415,14 +479,14 @@ HEALTH = dict(last_pass=0, block=0, status=[], accounts={}, exposure=[], policy_
 
 def fee_args(base_fee, tip):
     """The fee fields the keeper signs with (tx.submit: max fee 2 x basefee + tip), so a simulation
-    sees the same tx.gasprice as inclusion; a policy may price on it (audit E1)."""
+    sees the same fee context as inclusion."""
     return ["--gas-price", str(2 * base_fee + tip), "--priority-gas-price", str(tip)]
 
 
 def compensation(vault, args, sender, fees=()):
     """What the vault promises for this exact call now: every paid function returns its payment,
     so simulating it from the keeper's address reads the contract's own quote (0 for burnTokens)."""
-    if args[0].startswith("burnTokens"):
+    if args[0].startswith(("burnTokens", "fundCheckpoint", "recover", "requestRedeem", "claim", "cancelDeposit")):
         return 0
     sig = args[0].replace(")", ")(uint256)", 1) if args[0].endswith(")") else args[0]
     return num(cast("call", vault, sig, *args[1:], "--from", sender, "--block", "pending", *fees))
@@ -448,6 +512,10 @@ def execution_cost(est, bid, fail_rate_bps, ratio=1.0):
     return int(est * ratio) * bid * (10_000 + fail_rate_bps) // 10_000
 
 
+def wallet_debit_bound(estimate, base_fee, tip, value=0):
+    return value + ((estimate * 5 + 3) // 4) * (2 * base_fee + tip)
+
+
 def profitability_gate(est, bid, pay, fail_rate_bps, min_return_bps, max_loss_wei, ratio=1.0):
     cost = execution_cost(est, bid, fail_rate_bps, ratio)
     need = cost * (10_000 + min_return_bps) // 10_000
@@ -463,7 +531,7 @@ def refresh_after_race(operation, reason, benign, refreshed):
 
 def plan_key(step):
     """Declining one funding prefix must not suppress every other bounded sync candidate."""
-    return (step[0], tuple(step[1]), step[2]) if step[0] == "sync" else (step[0],)
+    return (step[0], tuple(step[1]), step[2]) if step[0] in ("sync", "syncCheckpoint") else (step[0],)
 
 
 def run_account(a, tm, account, pooled):
@@ -483,10 +551,15 @@ def run_account(a, tm, account, pooled):
             est, _why, _exp = tm.preflight(p["to"], p["args"],
                                          ["--gas-price", str(max_fee), "--priority-gas-price", str(prio)]
                                          if prio is not None else fee_args(state.base_fee, state.max_tip))
+            if est is not None and a.caller_funded_exit:
+                sent_value=int(p['args'][p['args'].index('--value')+1]) if '--value' in p['args'] else 0
+                cap=max_fee if max_fee is not None else 2*state.base_fee+state.max_tip
+                if not tm.can_reserve(p['nonce'],(est*5+3)//4,cap,sent_value):
+                    return None
             if est is None or prio is None or p["label"] == "burnTokens":
                 return est
             pay = compensation(p["to"], p["args"], tm.sender, fee_args(state.base_fee, prio))
-            if pay + a.max_loss_wei < execution_cost(est, state.base_fee + prio, a.fail_rate_bps,
+            if not a.caller_funded_exit and pay + a.max_loss_wei < execution_cost(est, state.base_fee + prio, a.fail_rate_bps,
                                                      billed_ratio(tm, p["label"])):
                 return None
             return est
@@ -498,7 +571,34 @@ def run_account(a, tm, account, pooled):
             break
         if had_pending:
             state = stable_read_state(account, a.slowdown_volume, a.burn_tokens, pooled)
+        state.caller_funded_exit = a.caller_funded_exit
         steps = [st for st in policy.plan(state) if plan_key(st) not in skip]
+        if a.caller_funded_exit:
+            steps = [step for step in steps if step[0] not in ('build', 'list', 'renew', 'burnTokens')]
+            if pooled and tm:
+                holder = lines(call(account,'holderState(address)(uint256,uint256,uint256)',tm.sender))
+                shares, holder_locked, holder_claimable = map(num,holder)
+                own_pending = lines(call(account,'pendingDeposits(address)(uint128,uint128)',tm.sender))
+                if not (shares or holder_locked or holder_claimable or num(own_pending[0])):
+                    steps=[]
+                if shares and ('requestRedeem',) not in skip:
+                    last_nav = num(call(account, 'lastNav()(uint256)'))
+                    charge = num(call(account, 'requestCharge()(uint256)')) + shares * last_nav // state.total_shares * num(call(account, 'unwindCharge()(uint256)')) // num(call(account, 'positionValue()(uint256)'))
+                    steps.insert(0, ('requestRedeem', shares, charge))
+                if state.pending_deposits and ('cancelDeposit',) not in skip:
+                    pending = call(account, 'pendingDeposits(address)(uint128,uint128)', tm.sender).splitlines()
+                    if pending and num(pending[0]):
+                        steps.insert(0, ('cancelDeposit',))
+                if ('claim',) not in skip:
+                    try:
+                        call(account, 'claim()', '--from', tm.sender)
+                        steps.insert(0, ('claim',))
+                    except subprocess.CalledProcessError:
+                        pass
+                if a.refund_contributions and ('claimCheckpointRefund',) not in skip:
+                    refundable = [i for i in a.refund_contributions if num(call(account, 'checkpointRefund(uint256)(uint256)', i))]
+                    if refundable:
+                        steps.insert(0, ('claimCheckpointRefund', refundable[:16]))
         codes = policy.status(state)  # from the full plan: skips in this pass are this keeper's choice
         if sent == 0:
             print(f"account {account} ({'pool' if pooled else 'manager'}) {policy_info(account)}")
@@ -514,9 +614,9 @@ def run_account(a, tm, account, pooled):
             break
         if not a.send:
             for st in steps:
-                print("cast send", account, *map(str, to_cast(st)))
+                print("cast send", account, *map(str, to_cast(st, expected=state.configuration_hash, caller_funded=a.caller_funded_exit)))
             break
-        step, args = steps[0], to_cast(steps[0])
+        step, args = steps[0], to_cast(steps[0], expected=state.configuration_hash, caller_funded=a.caller_funded_exit)
         est, why, benign = tm.preflight(account, args, fee_args(state.base_fee, state.max_tip))
         pay = 0
         if est is None:
@@ -546,11 +646,20 @@ def run_account(a, tm, account, pooled):
         pay = compensation(account, args, tm.sender, fees)
         cost_, need, accepted = profitability_gate(est, bid, pay, a.fail_rate_bps, a.min_return_bps,
                                                   max_loss, billed_ratio(tm, step[0]))
+        if a.caller_funded_exit and step[0] not in ('build', 'list', 'renew', 'burnTokens'):
+            contribution = int(step[1]) if step[0] == 'fundCheckpoint' else int(step[2]) if step[0] == 'requestRedeem' else 0
+            accepted=tm.can_reserve(tm.nonce('pending'),(est*5+3)//4,2*state.base_fee+state.max_tip,contribution)
+            max_loss=max(0,a.exit_spend_limit_wei-(tm.state['signed_upper_wei']-tm.signed_start)) if accepted else 0
+        if a.caller_funded_exit and not accepted:
+            skip.add(plan_key(step))
+            declined.append(('EXIT_SPEND_LIMIT','action','signed maximum reservations exhaust the accepted wallet spending limit'))
+            print(f'skip {step[0]}: signed maximum reservation exceeds the wallet spending limit')
+            continue
         if not accepted and step[0] != "burnTokens":  # burns are the operator's opt-in cost
             skip.add(plan_key(step))
             tm.state["stats"]["skipped_loss"] += 1
             # Liability work this keeper declined: holders wait on it, so monitoring must see it.
-            alternatives = step[0] == "sync" and any(st[0] == "sync" for st in steps[1:])
+            alternatives = step[0] in ("sync", "syncCheckpoint") and any(st[0] in ("sync", "syncCheckpoint") for st in steps[1:])
             if not alternatives:
                 declined.append(("LIABILITY_WORK_SKIPPED", "action",
                                  f"{step[0]} needs --max-loss-wei >= {cost_ - pay} or lower gas"))
@@ -559,7 +668,7 @@ def run_account(a, tm, account, pooled):
         # minPay: pay and this keeper's gas both move with basefee, so the floor is relative: 80% of
         # the simulated quote (basefee falls at most 12.5% a block). A larger drop means less work
         # was left to do; the whole call reverts instead of paying less.
-        args = to_cast(step, pay * 8 // 10 if step[0] != "burnTokens" and max_loss == 0 else 0)
+        args = to_cast(step, pay * 8 // 10 if step[0] != "burnTokens" and max_loss == 0 else 0, state.configuration_hash, a.caller_funded_exit)
         # Re-check the exact signed call, minPay included, at the signed fees: a call that would
         # revert is not sent. A state change between this check and inclusion can still revert it.
         est2, why2, _ = tm.preflight(account, args, fees)
@@ -568,15 +677,25 @@ def run_account(a, tm, account, pooled):
             tm.state["stats"]["skipped_expected"] += 1
             print(f"skip {step[0]}: the signed call would revert ({why2})")
             continue
-        if est2 > est and step[0] != "burnTokens":
+        if est2 > est and step[0] != "burnTokens" and not a.caller_funded_exit:
             signed_cost = execution_cost(est2, bid, a.fail_rate_bps, billed_ratio(tm, step[0]))
             if pay + max_loss < signed_cost * (10_000 + a.min_return_bps) // 10_000:
                 skip.add(plan_key(step))
                 tm.state["stats"]["skipped_loss"] += 1
                 print(f"skip {step[0]}: signed-call cost ~{signed_cost} exceeds accepted payment/loss")
                 continue
+        if a.caller_funded_exit:
+            sent_value = int(args[args.index('--value') + 1]) if '--value' in args else 0
+            if not tm.can_reserve(tm.nonce('pending'),(est2*5+3)//4,2*state.base_fee+state.max_tip,sent_value):
+                skip.add(plan_key(step))
+                declined.append(('EXIT_SPEND_LIMIT', 'action', 'signed call exceeds the accepted wallet spending limit'))
+                continue
         try:
             tm.submit(step[0], account, args, est2, state.base_fee, state.max_tip, pay, state.pending_parent)
+        except txm.SpendLimit as e:
+            skip.add(plan_key(step))
+            declined.append(('EXIT_SPEND_LIMIT','action',str(e)))
+            continue
         except txm.StaleContext:
             print("head changed before send; refreshing prospective quote")
             continue
@@ -596,28 +715,17 @@ def run_account(a, tm, account, pooled):
     return failed, codes + declined, in_flight
 
 
-def active_backings(account):
-    """Backings of every open listing (Active or unresolved Allocated) this account holds, from its
-    event index, for the monitoring-only selection-weight share. The index is the durable,
-    reorg-repaired projection read_state just synced, so every position counts with no chain reads
-    and no cap; counting Allocated ones too never understates the keeper's selection weight."""
-    for index in INDEXES.values():
-        if index.vault.lower() == account.lower():
-            return index.open_backings()
-    raise IndexBehind(f"no event index for {account} this pass")
-
-
 def run_pass(a, tm, accounts):
     """One multi-account pass. One signer, one nonce stream, at most one in-flight transaction:
     accounts are serviced in turn and a revert, empty budget, paused listing or stuck position on one
     never stops the others (each is isolated). /health carries a per-account block plus the keeper's
-    combined FWA selection-weight share."""
+    per-account operation status. Aggregate exposure is unavailable without a separate report."""
     head = num(cast("block-number"))
     errors0 = len(tm.state["errors"]) if tm else 0
     if tm:
         tm.check_reorgs(head)
     failed = 0
-    account_health, all_backings, unindexed = {}, [], []
+    account_health = {}
     for account, pooled in accounts:
         try:
             f, codes, _in_flight = run_account(a, tm, account, pooled)
@@ -630,22 +738,13 @@ def run_pass(a, tm, accounts):
             failed += 1
             account_health[account] = dict(pooled=pooled, status=[("ACCOUNT_ERROR", "action", str(e)[:200])])
             print(f"account {account} failed this pass: {str(e)[:200]}")
-        # A failed or waiting account still counts from its saved index, so exposure never drops
-        # an account's listings for a pass; with no index at all the share is flagged incomplete.
-        try:
-            all_backings += active_backings(account)
-        except IndexBehind:
-            unindexed.append(account)
-    total_weight = num(cast("call", FWA, "totalWeight()(uint256)"))
-    exposure = policy.exposure_status(policy.exposure_share_bps(all_backings, total_weight))
-    if unindexed:
-        exposure.append(("EXPOSURE_INCOMPLETE", "action", f"no event index yet for {len(unindexed)} account(s); share excludes them"))
+    exposure = [("EXPOSURE_UNAVAILABLE", "info", "aggregate share is not calculated in bounded routine passes")]
     attention = [c for h in account_health.values() for c in h["status"] if c[1] == "action"] + \
                 [c for c in exposure if c[1] == "action"]
     HEALTH.update(block=head, accounts=account_health, exposure=exposure, policy_count=len(accounts))
     if tm:
         tm.save()
-        HEALTH.update(pending=tm.state["pending"], stats=tm.state["stats"], errors=tm.state["errors"][-5:],
+        HEALTH.update(pending=tm.state["pending"], stats=tm.state["stats"], signed_upper_wei=tm.state["signed_upper_wei"], errors=tm.state["errors"][-5:],
                       pass_errors=len(tm.state["errors"]) - errors0 + failed)
     HEALTH.update(last_pass=int(time.time()), status=[c for h in account_health.values() for c in h["status"]] + exposure)
     for code, kind, detail in exposure:
@@ -672,10 +771,7 @@ def serve_health(port, stale_after):
 
 
 def policy_info(vault):
-    """Active keeper payment policy (D57). Pay itself is read by simulating each call, so a swap
-    needs no keeper change; this is for operators."""
-    active = call(vault, "keeperPolicy()(address)")
-    return f"policy {active} v{num(call(active, 'policyVersion()(uint256)'))}"
+    return f"configuration {call(vault, 'configurationHash()(bytes32)')}"
 
 
 def is_pooled(account, factory=None):
@@ -701,7 +797,7 @@ def discover_managers(a):
     path = Path(a.state).with_name(f"discovered-{a.factory.lower()}.json")
     seen = json.loads(path.read_text()) if path.exists() else []
     count = num(cast("call", a.factory, "managerCount()(uint256)"))
-    for i in range(len(seen), count):
+    for i in range(len(seen), min(count, len(seen) + 32)):
         seen.append(cast("call", a.factory, "managerAt(uint256)(address)", i).strip())
     if count > 0 and (not path.exists() or len(seen) != len(json.loads(path.read_text()))):
         path.write_text(json.dumps(seen))
@@ -747,6 +843,9 @@ def main():
                     help="explicit PackVault/PackManager address(es); may be empty with --factory")
     ap.add_argument("--factory", help="PackManagerFactory address: its managers are discovered and serviced too")
     ap.add_argument("--send", action="store_true")
+    ap.add_argument("--caller-funded-exit", action="store_true", help="run necessary bounded exit maintenance without a keeper-profit requirement")
+    ap.add_argument("--refund-contributions", type=lambda s: [int(i) for i in s.split(',')], default=[], help="known contribution IDs to claim, bounded 16 per call")
+    ap.add_argument("--exit-spend-limit-wei", type=int, default=0, help="explicit maximum gross wallet gas and checkpoint funding for this exit run")
     ap.add_argument("--status", action="store_true", help="print status and keeper accounting, send nothing")
     ap.add_argument("--account")
     ap.add_argument("--keystore", help="encrypted keystore file (with --password-file)")
@@ -774,6 +873,8 @@ def main():
     ap.add_argument("--pending-timeout", type=float, default=120, help="seconds a pass waits for a receipt")
     ap.add_argument("--health-port", type=int, default=0)
     a = ap.parse_args()
+    if a.caller_funded_exit and (a.exit_spend_limit_wei <= 0 or a.loop):
+        ap.error("caller-funded exit requires a positive --exit-spend-limit-wei and a single pass")
     print("client " + json.dumps(txm.client_identity([sys.modules[__name__], policy, txm, event_index]), sort_keys=True))
     globals()["RPC"] = a.rpc
     globals()["INDEX_PATH"] = a.index
@@ -804,8 +905,10 @@ def main():
         try:
             tm = txm.TxManager(a.rpc, a.state, sender, auth, a.confirmations, a.replace_after, a.max_replacements,
                                int(a.max_fee_gwei * 1e9) if a.max_fee_gwei else None)
-        except txm.Locked as e:
+        except (txm.Locked,txm.IdentityMismatch) as e:
             sys.exit(str(e))
+    if tm and a.caller_funded_exit:
+        tm.begin_signed_limit(a.exit_spend_limit_wei)
     if a.health_port:
         serve_health(a.health_port, 3 * max(a.loop, 60))
     while True:

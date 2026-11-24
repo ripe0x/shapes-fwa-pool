@@ -24,8 +24,9 @@ contract AuditRoleAndKeeperTest is ForkBase {
     function test_adminMaxParamsSelfKeepExtraction() public {
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            bytes32 _expected0 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected0);
         }
         toBlackout();
         checkpoint();
@@ -37,16 +38,18 @@ contract AuditRoleAndKeeperTest is ForkBase {
         p.essentialCeiling = 50 gwei;
         p.maxTip = 50 gwei;
         p.workFee = uint64(vault.MAX_WORK_FEE());
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected1);
 
         vm.deal(owner, 1 ether);
         vm.fee(0.15 gwei);
         vm.txGasPrice(50 gwei);
         uint256 charge = vault.requestCharge();
         uint256 gross = Charges.grossFor(vault, 0.01 ether);
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.deposit{value: gross}();
+        vault.deposit{value: gross}(_expected2);
         assertEq(vault.processingPool(), charge, "the checkpoint charge funds the pool");
 
         toBlackout();
@@ -68,8 +71,9 @@ contract AuditRoleAndKeeperTest is ForkBase {
     function test_guardianZeroCeilingDoesNotTrapHolderFunds() public {
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            bytes32 _expected3 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected3);
         }
         toBlackout();
         checkpoint();
@@ -81,8 +85,9 @@ contract AuditRoleAndKeeperTest is ForkBase {
         uint256 shares = vault.shareBalance(alice);
         {
             uint256 rc_ = Charges.redeemCharge(vault, shares);
+            bytes32 _expected4 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.requestRedeem{value: rc_}(shares);
+            vault.requestRedeem{value: rc_}(shares, _expected4);
         }
 
         toBlackout();

@@ -3,11 +3,17 @@ pragma solidity 0.8.30;
 
 import {Vm} from "forge-std/Vm.sol";
 import {PackVault} from "../../src/PackVault.sol";
+import {PackAccount} from "../../src/PackAccount.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {TestVaultOps} from "./TestVaultOps.sol";
 
 library ReconcileTrace {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
+    function actors(PackVault vault, address alice, address bob, address keeper) internal view returns (string memory) {
+        return string.concat('{"alice":"', vm.toString(alice), '","bob":"', vm.toString(bob),
+            '","keeper":"', vm.toString(keeper), '","owner":"', vm.toString(vault.owner()), '"}');
+    }
 
     function uints(uint256[] memory values) internal pure returns (string memory out) {
         out = "[";
@@ -43,11 +49,32 @@ library ReconcileTrace {
     }
 
     function snapshot(PackVault v, address alice, address bob, uint256 pay, string memory step, string memory output) internal {
+        vm.writeLine(output, render(v, alice, bob, pay, step));
+    }
+
+    /// @dev A manager has no depositor liabilities or share accounting. Record its actual
+    ///      strategy book separately, without pretending that it implements holder getters.
+    function renderStrategy(PackAccount account, uint256 pay, uint256 creatorFees, string memory step)
+        internal view returns (string memory line)
+    {
+        PackVault facade = PackVault(payable(address(account)));
+        line = string.concat('{"step":"', step, '","pay":', vm.toString(pay),
+            ',"creatorFees":', vm.toString(creatorFees), ',"balance":', vm.toString(address(account).balance),
+            ',"open":', vm.toString(account.openListingCount()), ',"idle":', vm.toString(account.idlePackCount()));
+        line = string.concat(line, book(facade), ',"feeCredit":', vm.toString(account.fwa().feeCredit(address(account))));
+        (uint256 eligible, uint256 kept, uint256 float,) = account.renewalState();
+        (uint256 routine, uint256 essential) = account.budget();
+        line = string.concat(line, ',"renewalEligible":', vm.toString(eligible), ',"keptReplacements":', vm.toString(kept),
+            ',"renewalFloat":', vm.toString(float), ',"reserve":', vm.toString(account.getParams().reserve),
+            ',"routineBudget":', vm.toString(routine), ',"essentialBudget":', vm.toString(essential), '}');
+    }
+
+    function render(PackVault v, address alice, address bob, uint256 pay, string memory step) internal view returns (string memory line) {
         uint256[] memory open = TestVaultOps.open(v);
         uint256 fees;
         for (uint256 i; i < open.length; ++i) fees += v.fwa().pendingFees(open[i]);
         (uint128 aLocked,,,) = v.redemptions(alice);
-        string memory line = string.concat('{"step":"', step, '","pay":', vm.toString(pay), ',"balance":', vm.toString(address(v).balance));
+        line = string.concat('{"step":"', step, '","pay":', vm.toString(pay), ',"balance":', vm.toString(address(v).balance));
         line = string.concat(line, ',"totalShares":', vm.toString(v.totalShares()), ',"lastNav":', vm.toString(v.lastNav()));
         line = string.concat(line, ',"pendingDepositTotal":', vm.toString(v.pendingDepositTotal()), ',"redemptionReserve":', vm.toString(v.redemptionReserve()), ',"lockedShares":', vm.toString(v.lockedShares()));
         line = string.concat(line, ',"open":', vm.toString(open.length), ',"idle":', vm.toString(v.idlePackCount()));
@@ -55,7 +82,41 @@ library ReconcileTrace {
         line = string.concat(line, ',"aliceClaimable":', vm.toString(v.claimableEth(alice)), ',"pendingFeesSum":', vm.toString(fees), ',"feeCredit":', vm.toString(v.fwa().feeCredit(address(v))));
         line = string.concat(line, book(v), ',"processingPool":', vm.toString(v.processingPool()));
         line = string.concat(line, ',"distributionReserve":', vm.toString(v.distributionReserve()), ',"claimableTotal":', vm.toString(v.claimableTotal()));
+        line = string.concat(line, ',"chargeRefundReserve":', vm.toString(v.chargeRefundReserve()),
+            ',"chargeEra":', vm.toString(v.chargeEra()), ',"constructionCost":', vm.toString(v.deployCharge()),
+            ',"referenceCapital":', vm.toString(v.positionValue()), ',"liveMintFee":', vm.toString(v.shapes().mintFee()),
+            ',"unresolvedKeepUplift":', vm.toString(v.unresolvedUplift()));
+        (uint256 eligible, uint256 kept,,) = v.renewalState();
+        line = string.concat(line, ',"renewalEligible":', vm.toString(eligible),
+            ',"keptReplacements":', vm.toString(kept));
+        line = string.concat(line, contributionState(v));
         line = string.concat(line, ',"windingDown":', v.windingDown() ? "true" : "false", '}');
-        vm.writeLine(output, line);
+    }
+
+    function contributionState(PackVault v) private view returns (string memory out) {
+        out = ',"contributions":[';
+        for (uint256 i; i < v.contributionCount(); ++i) {
+            (address payer, uint256 era, uint256 start, uint256 amount, bool claimed) = v.contributions(i);
+            if (i != 0) out = string.concat(out, ',');
+            out = string.concat(out, '{"id":', vm.toString(i), ',"payer":"', vm.toString(payer),
+                '","era":', vm.toString(era), ',"start":', vm.toString(start), ',"amount":', vm.toString(amount),
+                ',"claimed":', claimed ? 'true' : 'false', '}');
+        }
+        out = string.concat(out, '],"chargeEras":[');
+        for (uint256 i; i <= v.chargeEra(); ++i) {
+            (uint256 total, uint256 refundable, bool closed) = v.chargeEras(i);
+            if (i != 0) out = string.concat(out, ',');
+            out = string.concat(out, '{"era":', vm.toString(i), ',"total":', vm.toString(total),
+                ',"refundable":', vm.toString(refundable), ',"closed":', closed ? 'true' : 'false', '}');
+        }
+        out = string.concat(out, '],"issuances":[');
+        for (uint256 i; i < v.epoch(); ++i) {
+            (uint256 gross, uint256 issued, uint256 remainingGross, uint256 remainingShares) = v.issuances(i);
+            if (i != 0) out = string.concat(out, ',');
+            out = string.concat(out, '{"epoch":', vm.toString(i), ',"gross":', vm.toString(gross),
+                ',"issued":', vm.toString(issued), ',"remainingGross":', vm.toString(remainingGross),
+                ',"remainingShares":', vm.toString(remainingShares), '}');
+        }
+        out = string.concat(out, ']');
     }
 }

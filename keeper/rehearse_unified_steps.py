@@ -17,19 +17,28 @@ def _try(report, key, fn):
     except Exception as e:  # noqa: BLE001 - one step's failure never stops the rehearsal
         report["steps"][key] = dict(error=str(e)[:400])
         report["gaps"].append(f"{key}: {str(e)[:200]}")
+        raise RuntimeError(f"rehearsal stopped at {key}: {e}") from e
+    result=report["steps"][key]
+    if isinstance(result,dict) and result.get("gap"):
+        report["gaps"].append(f"{key}: {result["gap"]}")
+    from rehearsal_batch import append_action
+    append_action(dict(operation="rehearsal step complete",step=key,result=report["steps"][key]))
     return report["steps"][key]
 
 
-def run(R, report):
-    _try(report, "8_pooled", lambda: pooled_lifecycle(R))
+def run(R, report, start=8):
+    if start <= 8:
+        _try(report, "8_pooled", lambda: pooled_lifecycle(R))
     _try(report, "6_7_outcomes_and_relist", selection)
-    _try(report, "9_manager_exit", lambda: manager_exit(R))
-    _try(report, "10_restart", lambda: restart_keeper(R))
-    _try(report, "11_replace_container", lambda: replace_container(R))
-    _try(report, "12_backup_keeper", lambda: backup_keeper(R))
-    _try(report, "16_index_persistence", lambda: index_persistence(R))
-    _try(report, "15_one_account_fails", lambda: one_account_fails(R))
+    if start < 13:
+        _try(report, "9_manager_exit", lambda: manager_exit(R))
+        _try(report, "10_restart", lambda: restart_keeper(R))
+        _try(report, "11_replace_container", lambda: replace_container(R))
+        _try(report, "12_backup_keeper", lambda: backup_keeper(R))
+        _try(report, "16_index_persistence", lambda: index_persistence(R))
+        _try(report, "15_one_account_fails", lambda: one_account_fails(R))
     _try(report, "13_14_17_tx_recovery", lambda: tx_recovery(R))
+    _try(report, "19_pull_refunds", lambda: claim_known_refunds(R))
     _try(report, "reconcile", lambda: reconcile(R))
 
 
@@ -60,7 +69,7 @@ def pooled_lifecycle(R):
     shares = R.num(R.call(vault, "shareBalance(address)(uint256)", holder))
     charge_p = _redeem(R, holder, shares // 2, loss)
     remaining = R.num(R.call(vault, "shareBalance(address)(uint256)", holder))
-    charge_f = _redeem(R, holder, remaining, loss)
+    charge_f = _redeem(R, holder, remaining, loss, caller_funded=True)
     claims = _claims(R, holder) - claims0
     pay = _logs_sum(R, vault, "KeeperPaid(address indexed,uint256)")
     ok_shares = R.num(R.call(vault, "shareBalance(address)(uint256)", holder)) == 0 and \
@@ -70,24 +79,30 @@ def pooled_lifecycle(R):
                 redemption_reserve_residual=R.num(R.call(vault, "redemptionReserve()(uint256)")))
 
 
-def _redeem(R, holder, shares, loss):
+def _redeem(R, holder, shares, loss, caller_funded=False):
     vault = R.VAULT
     if not shares:
         return 0
     charge = R.redeem_charge(shares)
     R.send(holder, vault, "requestRedeem(uint256)", shares, value=charge)
     R.expire_queue()
+    mode = ["--caller-funded-exit", "--exit-spend-limit-wei", str(10**16)] if caller_funded else loss
+    signer = holder if caller_funded else None
+    holder_state = str(Path(R.KEEPER_STATE).parent / "holder-exit") if caller_funded else None
+    if holder_state:
+        Path(holder_state).mkdir(exist_ok=True)
     for _ in range(8):
-        R.run_keeper(*loss, tag="redeem")
+        R.run_keeper(*mode, keeper_addr=signer, state_dir=holder_state, tag="redeem")
         R.warp_to(42360)
         R.expire_queue()
-        R.run_keeper(*loss, tag="redeem-ckpt")
+        R.run_keeper(*mode, keeper_addr=signer, state_dir=holder_state, tag="redeem-ckpt")
         if R.num(R.call(vault, "lockedShares()(uint256)")) == 0:
             break
         R.warp_to(60)
     else:
         raise RuntimeError("redemption not priced after eight blackouts")
-    R.send(holder, vault, "claim()")
+    if R.num(R.call(vault,"claimableEth(address)(uint256)",holder)):
+        R.send(holder, vault, "claim()")
     return charge
 
 
@@ -111,26 +126,30 @@ def _logs_sum(R, addr, sig):
 # 6. Relist returned packs / 7. keep-bid-expiry via real FWA VRF.
 # ---------------------------------------------------------------------------
 def selection():
-    """Keep, bid (then relist of the returned pack), expiry and a forced keep need a real FWA
-    selection, which only a historical request can give: keeper/rehearse_selection.py forks just
-    before a real request, replays it and delivers its real word. Run it and carry its result."""
-    import socket
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        port = sock.getsockname()[1]
-    root = Path(__file__).resolve().parent.parent
-    done = subprocess.run([sys.executable, "keeper/rehearse_selection.py", "--port", str(port)], cwd=root)
-    receipt = json.loads((root / "docs/receipts/unified-selection-rehearsal.json").read_text())
-    if done.returncode != 0 or not receipt.get("all_outcomes_passed"):
-        raise RuntimeError(f"selection rehearsal failed: exit {done.returncode}")
-    return dict(receipt="docs/receipts/unified-selection-rehearsal.json",
-                outcomes={k: {x: v[x] for x in v if x in ("resolved", "relisted_open", "pending_receipts_at_force")}
-                          for k, v in receipt["outcomes"].items()})
+    return dict(gap='No billed production-path VRF renewal receipt: inserting local contracts changes the request block hash required by the authentic historical Chainlink proof. Coordinator impersonation and receiver replacement are retired.',
+                coverage='Actual request and authenticated fulfillment are exercised by Forge fixtures; those are not billed transaction receipts.')
 
 
-# ---------------------------------------------------------------------------
-# 9. Manager withdrawals and complete owner exit.
-# ---------------------------------------------------------------------------
+def resume_pooled_exit(R):
+    loss=['--max-loss-wei',str(2*10**15),'--max-total-loss-wei',str(10**16)]
+    for _ in range(8):
+        if not R.num(R.call(R.VAULT,'lockedShares()(uint256)')):
+            break
+        R.expire_queue();R.run_keeper(*loss,tag='resume-pending-partial-exit')
+        R.warp_to(42360);R.expire_queue();R.run_keeper(*loss,tag='resume-pending-partial-pricing')
+    else:
+        raise RuntimeError('preserved partial redemption did not complete in eight windows')
+    shares=R.num(R.call(R.VAULT,'shareBalance(address)(uint256)',R.HOLDER))
+    if shares:
+        _redeem(R,R.HOLDER,shares,loss,caller_funded=True)
+    state=list(map(R.num,R.cast('call',R.VAULT,'holderState(address)(uint256,uint256,uint256)',R.HOLDER).splitlines()))
+    if state != [0,0,0]:
+        raise RuntimeError('resumed caller-funded complete exit left holder liabilities')
+    R.B.append_action(dict(operation='rehearsal step complete',step='8_pooled',result=dict(fullyExited=True,
+        resumedPreservedPartialRequest=True,newPublicStateFile=R.TX_STATE_NAME,priorStatePreserved=True)))
+    return dict(fullyExited=True,resumedPreservedPartialRequest=True,priorStatePreserved=True)
+
+
 def manager_exit(R):
     results = []
     for m, lbl in zip(R.MANAGERS, R.MGR_OWNERS):
@@ -174,7 +193,7 @@ def _index_heads(R, state_dir):
 def restart_keeper(R):
     """A restart on the existing durable state resumes without re-reconstructing any index."""
     heads0 = _index_heads(R, R.KS_STATE)
-    stats0 = json.load(open(Path(R.KS_STATE) / "keeper-state.json"))["stats"]
+    stats0 = json.load(open(Path(R.KS_STATE) / R.TX_STATE_NAME))["stats"]
     out = R.run_keeper(tag="restart")
     heads1 = _index_heads(R, R.KS_STATE)
     if any(heads1.get(k, -1) < v for k, v in heads0.items()):
@@ -184,21 +203,17 @@ def restart_keeper(R):
 
 
 def replace_container(R):
-    """Replace the keeper container while keeping its /data volume: a brand-new keeper process (fresh
-    keystore file path, same durable state dir) must continue from the persisted state and indexes,
-    not reconstruct. Docker is absent, so this runs the identical entrypoint environment outside it."""
+    """Restart the local keeper process against the same durable state and indexes."""
     import shutil
     heads0 = _index_heads(R, R.KS_STATE)
-    # New "container": a different keystore/password file pair is irrelevant; the signer identity is
-    # the same key, re-imported. Here we reuse the same keystore to model the Fly secret re-injection,
-    # and only the process is new. The volume (KS_STATE) is untouched.
     out = R.run_keeper(tag="replaced-container")
     heads1 = _index_heads(R, R.KS_STATE)
     reconstructed = any(heads1.get(k, -1) < v for k, v in heads0.items())
-    return dict(docker_available=bool(shutil.which("docker")),
-                ran_outside_docker=not bool(shutil.which("docker")),
+    return dict(docker_cli_present=bool(shutil.which("docker")),
+                ran_outside_docker=True,
+                gap="Production Docker image and keystore transport are not exercised by this unlocked local process",
                 index_heads_preserved=not reconstructed, volume=R.KS_STATE,
-                image_steps="see .github/workflows/keeper-image.yml and keeper/test_packaging.py")
+                image_steps="Current-source Docker image and production keystore transport are not exercised by this unlocked local process")
 
 
 def backup_keeper(R):
@@ -208,20 +223,20 @@ def backup_keeper(R):
     then run both so they contend once: the second finds the work done and double-builds nothing,
     each from its own nonce stream."""
     vault, holder = R.VAULT, R.HOLDER
-    ks, pwf, addr = R.new_keystore("backup")
-    state2 = str(Path(ks).parent.parent / "data-backup")
+    scratch, addr = R.new_local_signer("backup")
+    state2 = str(Path(scratch) / "data-backup")
     Path(state2).mkdir()
     ck = R.num(R.call(vault, "requestCharge()(uint256)"))
     R.send(holder, vault, "deposit()", value=ck + 5 * 10**17)
     R.warp_to(42360); R.expire_queue()
-    R.run_keeper(state_dir=state2, keystore=ks, pwfile=pwf, keeper_addr=addr, tag="backup-price")  # prices the deposit
+    R.run_keeper(state_dir=state2, keeper_addr=addr, tag="backup-price")  # prices the deposit
     R.warp_to(60); R.expire_queue()
-    out_alone = R.run_keeper(state_dir=state2, keystore=ks, pwfile=pwf, keeper_addr=addr, tag="backup-build")
+    out_alone = R.run_keeper(state_dir=state2, keeper_addr=addr, tag="backup-build")
     backup_sent = out_alone.get("stats", {}).get("sent", 0)
     open_after_backup = R.num(R.call(vault, "openListingCount()(uint256)"))
     # Contend once: primary then backup over the same remaining work, each its own nonce stream.
     out_primary = R.run_keeper(tag="primary-contend")
-    out_backup2 = R.run_keeper(state_dir=state2, keystore=ks, pwfile=pwf, keeper_addr=addr, tag="backup-contend")
+    out_backup2 = R.run_keeper(state_dir=state2, keeper_addr=addr, tag="backup-contend")
     # Clean up the fresh position for the final reconcile.
     _redeem(R, holder, R.num(R.call(vault, "shareBalance(address)(uint256)", holder)),
             ["--max-loss-wei", str(2 * 10**15), "--max-total-loss-wei", str(10**16)])
@@ -265,16 +280,19 @@ def tx_recovery(R):
     and a real token-burn candidate. Step 8 fully exited the holder, so re-establish fresh state on
     THIS rehearsal's own vault and fresh holder first, then run the harness against it."""
     vault, holder = R.VAULT, R.HOLDER
-    ck = R.num(R.call(vault, "requestCharge()(uint256)"))
-    # Deposit enough to build several packs, so there is a non-crown active position to reorg.
-    R.send(holder, vault, "deposit()", value=ck + 8 * 10**17)
-    R.warp_to(42360); R.expire_queue(); R.run_keeper(tag="txrec-price")
-    R.warp_to(60); R.expire_queue(); R.run_keeper(tag="txrec-build")
-    if R.num(R.call(vault, "shareBalance(address)(uint256)", holder)) == 0:
-        raise RuntimeError("tx-recovery setup: fresh holder has no shares")
-    if R.num(R.call(vault, "openListingCount()(uint256)")) < 2:
-        raise RuntimeError("tx-recovery setup: fewer than two active listings to witness a reorg")
-    _accrue_tokens(R)
+    if '--resume-step13' not in sys.argv:
+        ck = R.num(R.call(vault, "requestCharge()(uint256)"))
+        # Deposit enough to build several packs, so there is a non-crown active position to reorg.
+        R.send(holder, vault, "deposit()", value=ck + 8 * 10**17)
+        R.warp_to(42360); R.expire_queue(); R.run_keeper(tag="txrec-price")
+        R.warp_to(60); R.expire_queue(); R.run_keeper(tag="txrec-build")
+        if R.num(R.call(vault, "shareBalance(address)(uint256)", holder)) == 0:
+            raise RuntimeError("tx-recovery setup: fresh holder has no shares")
+        if R.num(R.call(vault, "openListingCount()(uint256)")) < 2:
+            raise RuntimeError("tx-recovery setup: fewer than two active listings to witness a reorg")
+        _accrue_tokens(R)
+    elif R.num(R.call(vault,'shareBalance(address)(uint256)',holder))==0 or R.num(R.call(vault,'openListingCount()(uint256)'))<2:
+        raise RuntimeError('resume requires the preserved successful real recovery setup')
     sys.path.insert(0, str(Path(R.ROOT) / "keeper"))
     import test_tx
     result = test_tx.exercise(R)
@@ -314,6 +332,24 @@ def index_persistence(R):
 # ---------------------------------------------------------------------------
 # Final reconciliation: every account on chain.
 # ---------------------------------------------------------------------------
+def claim_known_refunds(R):
+    # These are the bounded fixture's real local receipts, never a holder/position-book scan.
+    logs=_logs(R,R.VAULT,'ContributionFunded(uint256 indexed,address indexed,uint256 indexed,uint256)',R.B.FORK_BLOCK)
+    ids=[int(row['topics'][1],16) for row in logs if row['topics'][2][-40:].lower()==R.HOLDER[2:].lower()]
+    if len(ids)>32:
+        raise RuntimeError('fixture contribution receipt bound exceeded')
+    refundable=[i for i in ids if R.num(R.call(R.VAULT,'checkpointRefund(uint256)(uint256)',i))]
+    expected=sum(R.num(R.call(R.VAULT,'checkpointRefund(uint256)(uint256)',i)) for i in refundable)
+    state=str(Path(R.KEEPER_STATE).parent/'holder-refunds');Path(state).mkdir(exist_ok=True)
+    if refundable:
+        R.run_keeper('--caller-funded-exit','--exit-spend-limit-wei',str(10**16),'--refund-contributions',','.join(map(str,refundable)),
+                     keeper_addr=R.HOLDER,state_dir=state,tag='holder-refunds')
+    remaining=sum(R.num(R.call(R.VAULT,'checkpointRefund(uint256)(uint256)',i)) for i in ids)
+    if remaining:
+        raise RuntimeError('known holder contribution refunds remain unclaimed')
+    return dict(knownContributionIds=ids,refundClaimedWei=expected,remainingRefundWei=remaining)
+
+
 def reconcile(R):
     out = {}
     out[R.VAULT] = R.account_snapshot(R.VAULT, True)

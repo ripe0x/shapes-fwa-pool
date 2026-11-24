@@ -22,11 +22,13 @@ contract IndependentChallenge is ForkBase {
     function test_emptyCheckpointRevertsAndLeavesSlotFree() public {
         VaultLib.Params memory p = vault.getParams();
         p.distributionBps = 1_000;
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected0);
+bytes32 _expected1 = TestVaultOps.configurationHash(vault);
 
         vm.prank(alice);
-        vault.deposit{value: 1 ether}();
+        vault.deposit{value: 1 ether}(_expected1);
         toBlackout();
         checkpoint();
         uint256 aliceShares = vault.shareBalance(alice);
@@ -55,8 +57,9 @@ contract IndependentChallenge is ForkBase {
         emit log_named_uint("request charge wei", request);
         emit log_named_uint("unwind charge wei", unwind);
         emit log_named_uint("exact redemption charge wei", exactCharge);
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.requestRedeem{value: exactCharge}(aliceShares);
+        vault.requestRedeem{value: exactCharge}(aliceShares, _expected2);
         assertEq(vault.processingPool(), request, "exact checkpoint request charge held");
         assertEq(vault.lockedShares(), aliceShares);
         // The redemption prices in the same interval.

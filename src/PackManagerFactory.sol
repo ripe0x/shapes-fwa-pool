@@ -9,32 +9,40 @@ import {IShapes, IShapePacks, IFWAV2} from "./interfaces/External.sol";
 /// @title PackManagerFactory
 /// @notice Permissionless creation and discovery of personal PackManagers. Each manager is an
 ///         ERC-1167 clone of one immutable implementation, initialized in the same transaction
-///         with its owner, bounded parameters and the default keeper policy, and funded with any
+///         with its owner, bounded parameters, and funded with any
 ///         ETH sent. The factory has no owner, charges nothing, holds no ETH after a call and has
 ///         no authority over a manager once created.
 contract PackManagerFactory {
     PackManager public immutable implementation;
-    /// @notice Keeper payment policy every new manager starts with; its owner may replace it.
-    address public immutable policy;
+    error ConfigurationChanged();
 
     address[] internal _managers;
     mapping(address => bool) public isManager;
 
     event ManagerCreated(address indexed manager, address indexed owner, uint256 indexed index, uint256 funding);
 
-    constructor(IFWAV2 fwa, IShapes shapes, IShapePacks packs, address policy_) {
-        VaultLib.checkPolicy(policy_);
-        policy = policy_;
+    constructor(IFWAV2 fwa, IShapes shapes, IShapePacks packs) {
         implementation = new PackManager(fwa, shapes, packs);
     }
 
     /// @notice Create a manager owned by `owner` with parameters `p`, funded with `msg.value`.
-    function create(address owner, VaultLib.Params calldata p) external payable returns (PackManager manager) {
+    function create(address owner, VaultLib.Params calldata p, bytes32 expected) external payable returns (PackManager manager) {
+        if (expected != configHashFor(p)) revert ConfigurationChanged();
         manager = PackManager(payable(LibClone.clone(address(implementation))));
-        manager.initialize{value: msg.value}(owner, p, policy);
+        manager.initialize{value: msg.value}(owner, p);
         isManager[address(manager)] = true;
         emit ManagerCreated(address(manager), owner, _managers.length, msg.value);
         _managers.push(address(manager));
+    }
+
+    function configHashFor(VaultLib.Params calldata p) public view returns (bytes32) {
+        return keccak256(abi.encode(p, implementation.shapes().mintFee(), false, false));
+    }
+
+    function preview(VaultLib.Params calldata p) external view returns (uint256 units, uint256 principal,
+        uint256 backing, uint256 mintCost, uint256 floatRequired, uint256 openingCash, bytes32 expectedConfigHash)
+    {
+        return VaultLib.preview(p, implementation.shapes().mintFee());
     }
 
     function managerCount() external view returns (uint256) {

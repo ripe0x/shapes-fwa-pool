@@ -1,24 +1,14 @@
 #!/usr/bin/env python3
-"""Production keeper image against a fresh local mainnet fork, signing with encrypted keystores.
+"""Keeper image on an isolated mainnet fork, using fresh unlocked actors and durable state.
 
-  python3 keeper/rehearse_image.py --image <tag> [--fork-block N]   # CI: the image Fly deploys
-  python3 keeper/rehearse_image.py                                  # host processes, for debugging
-
-Starts its own Anvil fork (Tenderly's public gateway), deploys through script/deploy.sh with
-deploy/mainnet.json values (a fresh test owner), creates two disposable encrypted keystores (primary
-and backup keepers; random passwords that never leave this process tree), and then checks:
-startup through keeper/entrypoint.sh, pricing and listing by the primary for the pooled vault and
-for a personal manager created through the real factory (both on one signer, both in /health), transaction state and
-event index surviving container replacement on the same volume, the backup working beside it, and
-recovery when the RPC response to a real accepted transaction is lost (a proxy drops it; only the
-external service fails). Prints one JSON evidence object. Local simulated funds only.
+Exercises the production contract deployment, keeper/index/transaction code and container image
+without generating secrets. Encrypted-keystore transport and live Fly operation remain untested.
 """
 import argparse
 import http.server
 import json
 import re
 import os
-import secrets
 import shutil
 import socketserver
 import subprocess
@@ -45,14 +35,8 @@ def scrub(text):
     return re.sub(r"(https?://[^\s\"']*/v[0-9]+/)[A-Za-z0-9_-]{8,}", r"\1<key>", text)
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 MAX_GAS = 16_777_216
-PARAMS_T = ("(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,"
-            "uint64,uint64,uint64,uint128,uint128)")
-# deploy/manager.json keys in VaultLib.Params struct order (6 u16, 9 u64, 2 u128).
-PARAMS_ORDER = ["minEdgeBps", "bufferBps", "distributionBps", "payMarkupBps", "keeperShareBps",
-                "allocatedBoundBps", "packUnitsMask", "gasCeilingWei", "essentialCeilingWei", "maxTipWei",
-                "workFeeWei", "routineCapWei", "routineRatePerDayWei", "essentialCapWei",
-                "essentialRatePerDayWei", "reserveWei", "tvlCapWei"]
-ACTORS = {n: to_checksum_address(keccak(text=f"pack-vault-image-{n}")[-20:]) for n in ("deployer", "holder", "owner", "kicker", "manager")}
+from config import PARAMS_T, PARAMS_ORDER, tuple_arg
+ACTORS = {n: to_checksum_address(keccak(text=f"pack-vault-image-{n}")[-20:]) for n in ("deployer", "holder", "owner", "kicker", "manager", "primary", "backup")}
 evidence = dict(steps=[])
 
 
@@ -81,6 +65,8 @@ def rpc(method, *params):
 
 
 def send(frm, to, sig, *a, value=0):
+    from config import guarded_call
+    sig, a = guarded_call(sig, a, lambda view, *args: cast("call", to, view, *args).split()[0])
     r = json.loads(cast("send", to, sig, *map(str, a), "--from", frm, "--unlocked", "--value", str(value), "--json"))
     r = r.get("data", r)
     assert int(r["status"], 16) == 1, f"{sig} reverted"
@@ -158,34 +144,23 @@ class DropFirstSend(http.server.BaseHTTPRequestHandler):
 class Keeper:
     """One keeper worker: the production container, or the same command as a host process."""
 
-    def __init__(self, name, keystore, password, data, image, rpc=RPC, poll=5, health=8788):
-        self.name, self.keystore, self.password, self.data, self.image, self.rpc, self.poll, self.health_port = \
-            name, keystore, password, data, image, rpc, poll, health
+    def __init__(self, name, signer, data, image, rpc=RPC, poll=5, health=8788):
+        self.name, self.signer, self.data, self.image, self.rpc, self.poll, self.health_port = \
+            name, signer, data, image, rpc, poll, health
         self.proc = None
 
     def start(self):
-        env = dict(os.environ, VAULT=VAULT, FACTORY=FACTORY, RPC_URL=self.rpc, POLL_SECONDS=str(self.poll), KEEPER_ARGS="",
-                   HEALTH_PORT=str(self.health_port),
-                   KEEPER_KEYSTORE_JSON=Path(self.keystore).read_text(), KEEPER_KEYSTORE_PASSWORD=self.password)
-        if self.image:  # values travel as inherited environment, never in argv
-            sh("docker", "run", "-d", "--name", self.name, "--network", "host", "--mount",
-               f"type=volume,source={self.data},target=/data", *[x for k in ("VAULT", "FACTORY", "RPC_URL", "POLL_SECONDS", "KEEPER_ARGS", "HEALTH_PORT",
-                                                                     "KEEPER_KEYSTORE_JSON", "KEEPER_KEYSTORE_PASSWORD") for x in ("-e", k)],
-               self.image, env=env)
+        command = ['python3', 'keeper/keeper.py', VAULT, '--factory', FACTORY, '--send', '--from', self.signer,
+                   '--rpc', self.rpc, '--state', '/data/keeper-state.json', '--index', '/data',
+                   '--loop', str(self.poll), '--confirmations', '2', '--health-port', str(self.health_port)]
+        if self.image:
+            sh('docker', 'run', '-d', '--name', self.name, '--network', 'host', '--mount',
+               f'type=volume,source={self.data},target=/data', '--entrypoint', 'python3', self.image, *command[1:])
         else:
             Path(self.data).mkdir(parents=True, exist_ok=True)
-            self.log = open(Path(self.data) / f"{self.name}.log", "a")
-            self.proc = subprocess.Popen(["python3", "keeper/keeper.py", VAULT, "--factory", FACTORY, "--send", "--keystore", self.keystore,
-                                          "--password-file", self.password_file(), "--rpc", self.rpc,
-                                          "--state", f"{self.data}/keeper-state.json", "--index", self.data,
-                                          "--loop", str(self.poll), "--confirmations", "2", "--health-port", str(self.health_port)],
-                                         cwd=ROOT, stdout=self.log, stderr=subprocess.STDOUT)
-
-    def password_file(self):
-        path = Path(self.data) / "pw"
-        path.write_text(self.password)
-        path.chmod(0o600)
-        return path
+            command = [a.replace('/data', self.data) for a in command]
+            self.log = open(Path(self.data) / f'{self.name}.log', 'a')
+            self.proc = subprocess.Popen(command, cwd=ROOT, stdout=self.log, stderr=subprocess.STDOUT)
 
     def health(self):
         """The worker's own /health answer (served on 127.0.0.1; 503 still carries the body)."""
@@ -229,7 +204,7 @@ def main():
     global VAULT, FACTORY, MANAGER
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--image")
-    ap.add_argument("--fork-block", type=int, default=26_450_200)
+    ap.add_argument("--fork-block", type=int, default=26_484_850)
     a = ap.parse_args()
     work = Path(tempfile.mkdtemp(prefix="pack-vault-image-"))
     node = subprocess.Popen(["anvil", "--host", "127.0.0.1", "--port", str(PORT), "--accounts", "0", "--silent",
@@ -246,14 +221,10 @@ def main():
                 time.sleep(1)
         evidence.update(fork_block=a.fork_block, fork_hash=fork_hash, image=a.image,
                         foundry=sh("cast", "--version").splitlines()[0])
-        # Disposable keystores with random passwords: the real signing path, no raw key anywhere.
-        keys = {}
-        for name in ("primary", "backup"):
-            password = secrets.token_hex(24)
-            out = json.loads(sh("cast", "wallet", "new", str(work), "--unsafe-password", password, "--json"))
-            made = (out.get("data", out) if isinstance(out, dict) else out)[0]
-            keys[name] = (made["path"], password, to_checksum_address(made["address"]))
-        for address in [*ACTORS.values(), *(k[2] for k in keys.values())]:
+        # Public actor addresses only. No key/password generation or secret files.
+        keys = {name: ACTORS[name] for name in ('primary', 'backup')}
+        evidence['signing'] = 'unlocked fresh actors on owned isolated Anvil; production keystore transport untested'
+        for address in ACTORS.values():
             assert cast("code", address) == "0x" and num(cast("nonce", address)) == 0 and num(cast("balance", address)) == 0, \
                 f"actor not clean on the fork: {address}"
             rpc("anvil_setBalance", address, hex(10 * 10**18))
@@ -266,7 +237,7 @@ def main():
         cleanup.append(path)
         env = dict(os.environ, RPC_URL=RPC, FORGE_WALLET_ARGS=f"--unlocked --sender {ACTORS['deployer']}")
         sh("script/deploy.sh", path, "--broadcast", env=env)
-        run = json.loads((ROOT / "broadcast/Deploy.s.sol/1/run-latest.json").read_text())
+        run = json.loads((ROOT / "broadcast/Deploy.s.sol/31337/run-latest.json").read_text())
         VAULT = next(t["contractAddress"] for t in run["transactions"] if t.get("contractName") == "PackVault")
         evidence["vault"] = VAULT
         FACTORY = next(t["contractAddress"] for t in run["transactions"] if t.get("contractName") == "PackManagerFactory")
@@ -276,7 +247,7 @@ def main():
         # A personal manager from the real permissionless factory, with the published defaults.
         mv = json.loads((ROOT / "deploy/manager.json").read_text())
         send(ACTORS["manager"], FACTORY, f"create(address,{PARAMS_T})", ACTORS["manager"],
-             "(" + ",".join(str(mv[k]) for k in PARAMS_ORDER) + ")", value=5 * 10**17)
+             tuple_arg(mv), value=5 * 10**17)
         MANAGER = cast("call", FACTORY, "managerAt(uint256)(address)", "0").split()[0]
         assert call("managerCount()(uint256)", to=FACTORY) == 1 and \
             cast("call", MANAGER, "owner()(address)").lower() == ACTORS["manager"].lower(), "manager postflight"
@@ -290,9 +261,9 @@ def main():
         if a.image:
             for n in ("primary-data", "backup-data"):
                 sh("docker", "volume", "create", n)
-        primary = Keeper("primary", *keys["primary"][:2], volume("primary-data"), a.image)
+        primary = Keeper("primary", keys["primary"], volume("primary-data"), a.image)
         # Fly runs each worker on its own machine; sharing this host needs separate health ports.
-        backup = Keeper("backup", *keys["backup"][:2], volume("backup-data"), a.image, poll=30, health=8789)
+        backup = Keeper("backup", keys["backup"], volume("backup-data"), a.image, poll=30, health=8789)
         keepers = [primary, backup]
         primary.start()
         backup.start()
@@ -317,7 +288,7 @@ def main():
         DropFirstSend.dropped.clear()
         server = socketserver.ThreadingTCPServer(("127.0.0.1", PROXY_PORT), DropFirstSend)
         threading.Thread(target=server.serve_forever, daemon=True).start()
-        replacement = Keeper("primary-replacement", *keys["primary"][:2], volume("primary-data"), a.image,
+        replacement = Keeper("primary-replacement", keys["primary"], volume("primary-data"), a.image,
                              rpc=f"http://127.0.0.1:{PROXY_PORT}")
         keepers[0] = replacement
         replacement.start()
@@ -339,7 +310,7 @@ def main():
         dropped = rpc("eth_getTransactionReceipt", DropFirstSend.dropped[0])
         evidence["dropped_transaction_status"] = dropped and int(dropped["status"], 16)
         assert after["stats"]["mined"] >= before["stats"]["mined"] and after["head"] >= before["head"], "state or index lost"
-        backup = Keeper("backup-restarted", *keys["backup"][:2], volume("backup-data"), a.image, poll=30, health=8789)
+        backup = Keeper("backup-restarted", keys["backup"], volume("backup-data"), a.image, poll=30, health=8789)
         keepers[1] = backup
         backup.start()  # same volume: the backup resumes its own saved state beside the replacement
         # The backup polls slowly and may find nothing to send; it must still complete clean passes.

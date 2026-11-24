@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
+import {GasQuotes} from "../utils/GasQuotes.sol";
 
 import {SelectionBase} from "./ForkSelection.t.sol";
 import {VaultLib as L} from "../../src/VaultLib.sol";
@@ -69,7 +70,7 @@ contract ForkAllocationProofTest is SelectionBase {
         assertEq(entries, L.MAX_ALLOCATION_SCAN);
         assertEq(reads, 1, "one FWA read: the only Allocated position");
         emit log_named_uint("proof gas, 32 entries, 1 FWA read", used);
-        assertLe(used, entries * L.Q_ALLOCATION_ENTRY + reads * L.Q_ALLOCATION_READ, "within its quote");
+        assertLe(used, entries * GasQuotes.Q_ALLOCATION_ENTRY + reads * GasQuotes.Q_ALLOCATION_READ, "within its quote");
     }
 
     /// @dev 2,000 resolved allocations behind one unresolved head: the proof refuses at a cost

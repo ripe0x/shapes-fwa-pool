@@ -11,6 +11,26 @@ from pathlib import Path
 
 SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
+def identity_regression(R):
+    import json
+    import tx as T
+    path=Path(R.KEEPER_STATE).with_name('identity-regression.json')
+    manager=T.TxManager(R.RPC,str(path),R.KEEPER,['--unlocked','--from',R.KEEPER])
+    original=json.loads(path.read_text())
+    manager._lockf.close()
+    for altered,signer in ((original,R.HOLDER2),(original | {'identity': original['identity'] | {'chain_id':original['identity']['chain_id']+1}},R.KEEPER)):
+        path.write_text(json.dumps(altered))
+        try:
+            unexpected=T.TxManager(R.RPC,str(path),signer,['--unlocked','--from',signer])
+        except T.IdentityMismatch:
+            continue
+        unexpected._lockf.close()
+        raise RuntimeError('real node identity mismatch was accepted')
+    # Local-file corruption is the input; actual chain identity comes from the owned node.
+    path.write_text(json.dumps(original))
+    return dict(wrongSignerRejected=True,wrongChainRejected=True,chain=original['identity']['chain_id'])
+
+
 def exercise(R):
     """Real token burn, lost RPC response, restart, canonical re-inclusion and index rollback."""
     RPC, KEEPER_STATE, VAULT, KEEPER, TOKEN = R.RPC, R.KEEPER_STATE, R.VAULT, R.KEEPER, R.TOKEN
@@ -20,6 +40,13 @@ def exercise(R):
     identity = T.client_identity([sys.modules[__name__], K, T, R])
     print("loaded recovery client " + __import__("json").dumps(identity), flush=True)
     K.RPC, K.INDEX_PATH = RPC, KEEPER_STATE + ".sqlite"
+    from test_value_reorg import exercise_value_reorg
+    identity_check = identity_regression(R)
+    records=[__import__('json').loads(line) for line in Path(B.load_manifest()['actions']).read_text().splitlines()]
+    previous=next((row for row in reversed(records) if row.get('operation')=='real reverted-to-successful contribution reorg'
+        and row.get('vault_context',{}).get('source_sha256')==B.CURRENT_DEPLOYMENT['source_sha256']
+        and row.get('loaded_client',{}).get('tx',{}).get('source_sha256_at_import')==T.SOURCE_SHA256),None)
+    value_reorg = dict(reusedVerifiedReceipts=True,failed=previous['failed']['hash'],success=previous['success']['hash']) if previous and '--resume-step13' in sys.argv else exercise_value_reorg(R)
     from test_index import exercise_vault_reorg
     index_reorg = exercise_vault_reorg(R)
     for _ in range(16):
@@ -33,7 +60,7 @@ def exercise(R):
     if not observed.token_ids:
         observed = K.stable_read_state(VAULT, 0, True)  # another bounded rotation, not a portfolio scan
     if not observed.token_ids:
-        return dict(gap="no real token claim candidate for transaction recovery")
+        return dict(identity=identity_check,value_reorg=value_reorg, index_reorg=index_reorg, gap="no real token claim candidate for token-burn transaction recovery")
     args = K.to_cast(("burnTokens", observed.token_ids[:16]))
     fees = K.fee_args(observed.base_fee, observed.max_tip)
     tm = T.TxManager(RPC, KEEPER_STATE, KEEPER, ["--unlocked", "--from", KEEPER])
@@ -164,7 +191,7 @@ def exercise(R):
                          final_stats=tm.state["stats"], token_supply_restored=supply0))
     return dict(lost_response=True, restart=True, actual_receipt=recovered["hash"], reorg=True,
                 canonical_hash_unique=True, token_supply_restored=True, receipt_status=True,
-                same_nonce_replacement=True, uncertain_replacement_attempt_cap=True, index_reorg=index_reorg)
+                same_nonce_replacement=True, uncertain_replacement_attempt_cap=True, index_reorg=index_reorg, value_reorg=value_reorg, identity=identity_check)
 
 
 if __name__ == "__main__":

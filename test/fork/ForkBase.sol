@@ -6,7 +6,6 @@ import {TestVaultOps} from "../utils/TestVaultOps.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {Test} from "forge-std/Test.sol";
 import {PackVault} from "../../src/PackVault.sol";
-import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {IShapes, IShapePacks, IFWAV2, IFloorOracle} from "../../src/interfaces/External.sol";
 
@@ -69,7 +68,7 @@ abstract contract ForkBase is Test {
         // the same real admin call, made before anything lists.
         vm.prank(IOwnable(address(FWA)).owner());
         IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, defaultParams(), 0.01 ether);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, defaultParams(), 0.01 ether, keccak256(abi.encode(defaultParams(), SHAPES.mintFee(), false, false)));
         preexisting = address(vault).balance - 0.01 ether; // ETH already at the deploy address
         vm.deal(alice, 50 ether);
         vm.deal(bob, 50 ether);
@@ -77,14 +76,20 @@ abstract contract ForkBase is Test {
     }
 
     function defaultParams() internal pure returns (VaultLib.Params memory p) {
+        p.gasSchedule = VaultLib.defaultGasSchedule();
+        p.backingRatioBps = 12_000;
+        p.renewalMode = VaultLib.RenewalMode.ReuseReturned;
+        p.acceptedMintFee = 0.001 ether;
+        p.minDeposit = 0.01 ether;
+        p.minDistribution = 0.01 ether;
         p.minEdgeBps = 100;
         p.bufferBps = 0;
         p.distributionBps = 0;
-        p.payMarkupBps = 1_000;
+        p.payMarkupBps = 0;
         p.maxTip = 0.05 gwei;
         p.workFee = 0.00002 ether;
         p.keeperShareBps = 2_500;
-        p.allocatedBoundBps = 200;
+        p.upliftBoundBps = 200;
         p.packUnitsMask = uint64(1) << UNITS;
         p.gasCeiling = 5 gwei;
         p.essentialCeiling = 5 gwei;
@@ -102,16 +107,18 @@ abstract contract ForkBase is Test {
         VaultLib.Params memory q = vault.getParams();
         (q.tvlCap, q.gasCeiling, q.essentialCeiling, q.workFee) = (tvl, ceiling, ceiling, fee);
         if (q.maxTip > ceiling) q.maxTip = ceiling;
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(q);
+        vault.setParams(q, _expected0);
     }
 
     /// @dev Owner sets the routine and essential budget caps.
     function setCaps(uint64 routine, uint64 essential) internal {
         VaultLib.Params memory q = vault.getParams();
         (q.routineCap, q.essentialCap) = (routine, essential);
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(q);
+        vault.setParams(q, _expected1);
     }
 
     /// @dev Warp to the next FWA purchase blackout (no new acquisitions can open).

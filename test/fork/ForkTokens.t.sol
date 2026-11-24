@@ -7,7 +7,6 @@ import {DeployCore} from "../../script/DeployCore.sol";
 import {Test} from "forge-std/Test.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {PackAccount} from "../../src/PackAccount.sol";
-import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {
     IShapes, IShapePacks, IFWAV2, IFWARewards, IFWAToken
@@ -48,11 +47,17 @@ contract ForkTokensTest is Test {
         IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
 
         VaultLib.Params memory p;
+        p.gasSchedule = VaultLib.defaultGasSchedule();
+        p.backingRatioBps = 12_000;
+        p.renewalMode = VaultLib.RenewalMode.ReuseReturned;
+        p.acceptedMintFee = 0.001 ether;
+        p.minDeposit = 0.01 ether;
+        p.minDistribution = 0.01 ether;
         p.minEdgeBps = 100;
         p.payMarkupBps = 1_000;
         p.maxTip = 0.05 gwei;
         p.keeperShareBps = 2_500;
-        p.allocatedBoundBps = 200;
+        p.upliftBoundBps = 200;
         p.packUnitsMask = uint64(1) << 6; // the 6-unit direct-mint recipe
         p.gasCeiling = 0.5 gwei;
         p.essentialCeiling = 0.5 gwei;
@@ -64,7 +69,7 @@ contract ForkTokensTest is Test {
         p.essentialRate = 0.005 ether;
         vm.deal(address(this), 6 ether);
         // Seed covers 16 six-unit packs: each costs P + 0.002 mint fee + backing (~0.13 ETH).
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         TestVaultOps.restock(vault, 16, 6, 0); // build mints and lists all 16 at once
 
         // The real buyback, replayed as its original self-call (EIP-7702 delegated sender).

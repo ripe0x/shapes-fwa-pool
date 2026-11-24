@@ -30,7 +30,7 @@ contract ForkPartialReconcileTest is ForkBase {
         p.reserve = 0.005 ether; p.tvlCap = 2 ether;
         p.routineCap = 0.03 ether; p.routineRate = 0.0008 ether;
         p.essentialCap = 0; p.essentialRate = 0;
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         preexisting = address(vault).balance - 0.01 ether;
         vm.deal(owner, 1 ether); vm.deal(keeper, 1 ether); vm.deal(alice, 50 ether); vm.deal(bob, 50 ether);
         lastKeeper = keeper.balance;
@@ -62,13 +62,14 @@ contract ForkPartialReconcileTest is ForkBase {
     function test_reconcilePartialRedemptionAndWindDown() public {
         this.assertGasContext();
         if (vm.exists(OUT)) vm.removeFile(OUT);
-        vm.writeLine(OUT, string.concat('{"step":"setup","deployBalance":', vm.toString(address(vault).balance),
+        vm.writeLine(OUT, string.concat('{"step":"setup","actors":', ReconcileTrace.actors(vault, alice, bob, keeper), ',"deployBalance":', vm.toString(address(vault).balance),
             ',"initCursor":', vm.toString(vault.acquisitionCursor()), ',"count":6,"units":', vm.toString(UNITS),
             ',"essentialCap":0,"mintFee":', vm.toString(SHAPES.mintFee()), '}'));
         uint256 ck = vault.requestCharge();
         uint256 gross = Charges.grossFor(vault, 1 ether);
-        vm.prank(alice); vault.deposit{value: gross}();
-        (,, uint96 deploy,) = vault.pendingDeposits(alice);
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: gross}(_expected0);
+        uint256 deploy = vault.constructionCharge(alice == alice ? 1 ether : 0.5 ether);
         vm.writeLine(OUT, string.concat('{"step":"depositCharge","ck":', vm.toString(ck),
             ',"escrow":1000000000000000000,"charge":', vm.toString(uint256(deploy)), '}'));
         _snap("deposit");
@@ -89,16 +90,19 @@ contract ForkPartialReconcileTest is ForkBase {
         uint256 unwind = Charges.redeemCharge(vault, shares);
         vm.writeLine(OUT, string.concat('{"step":"redeemCharge","shares":', vm.toString(shares),
             ',"ck":', vm.toString(ck), ',"total":', vm.toString(unwind), '}'));
-        vm.prank(alice); vault.requestRedeem{value: unwind}(shares); _snap("redeem");
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.requestRedeem{value: unwind}(shares, _expected1); _snap("redeem");
         toBlackout(); checkpoint(); _snap("partial");
         assertGt(vault.lockedShares(), 0, "real first fill leaves locked shares");
         assertGt(vault.redemptionReserve(), 0.2 ether, "absolute liquid first fill");
         toOpen();
         vm.prank(owner); vault.startWindDown(); _snap("windDown");
         uint256[] memory ids = TestVaultOps.open(vault);
-        vm.prank(keeper); vault.unlist(ids, 0); _snap("unlist");
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); vault.unlist(ids, 0, _expected2); _snap("unlist");
         assertEq(vault.openListingCount(), 0);
-        vm.prank(keeper); vault.liquidate(16, 0); _snap("liquidate");
+        bytes32 _expected3 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); vault.liquidate(16, 0, _expected3); _snap("liquidate");
         assertEq(vault.idlePackCount(), 0);
         toBlackout(); checkpoint(); _snap("checkpoint2");
         assertEq(vault.lockedShares(), 0);

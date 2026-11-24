@@ -12,10 +12,17 @@ import {SelectionBase, IFwaSettle} from "../../fork/ForkSelection.t.sol";
 import {ForkBase, IOwnable, IFwaAdmin} from "../../fork/ForkBase.sol";
 import {Charges} from "../../utils/Charges.sol";
 
+// Historical six-unit reuse settings retained for these regression scenarios.
 function canary() pure returns (VaultLib.Params memory p) {
+    p.gasSchedule = VaultLib.defaultGasSchedule();
+    p.backingRatioBps = 12_000;
+    p.renewalMode = VaultLib.RenewalMode.ReuseReturned;
+    p.acceptedMintFee = 0.001 ether;
+    p.minDeposit = 0.01 ether;
+    p.minDistribution = 0.01 ether;
     p.minEdgeBps = 100;
     p.keeperShareBps = 2_500;
-    p.allocatedBoundBps = 1_000;
+    p.upliftBoundBps = 1_000;
     p.packUnitsMask = uint64(1) << 6; // 6-unit direct-mint recipe (one 0.05 + one 0.01)
     p.gasCeiling = 0.5 gwei;
     p.essentialCeiling = 2 gwei;
@@ -41,8 +48,9 @@ contract AuditBSelection is SelectionBase {
         VaultLib.Params memory p = canary();
         p.tvlCap = 100 ether;
         address vaultOwner = vault.owner();
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(vaultOwner);
-        vault.setParams(p);
+        vault.setParams(p, _expected0);
     }
 
     /// E1: repeated identifiers never count as multiple successful fee claims.
@@ -80,8 +88,9 @@ contract AuditBSelection is SelectionBase {
         // Repaired: the vault refuses to list into a busy FWA queue, so nothing stages.
         assertGt(FWA.unsettledAcquisitionCount(), 0, "queue busy");
         uint256[] memory planned26 = TestVaultOps.proposals(vault, 1, UNITS);
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.list(planned26, 0);
+        vault.list(planned26, 0, _expected1);
         vm.warp(block.timestamp + 25 hours);
         vm.roll(block.number + 7_500);
         if (FWA.unsettledAcquisitionCount() != 0) IFwaSettle(address(FWA)).processAcquisitions(50);
@@ -98,11 +107,13 @@ contract AuditBPinned is ForkBase {
 
     function _build(uint256 n) internal {
         VaultLib.Params memory p = canary();
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected2);
         uint256 gross = Charges.grossFor(vault, 1 ether);
+        bytes32 _expected3 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: gross}();
+        vault.deposit{value: gross}(_expected3);
         toBlackout();
         checkpoint();
         toOpen();
@@ -128,12 +139,14 @@ contract AuditBPinned is ForkBase {
         vm.prank(keeper);
         TestVaultOps.unlist(vault, open, 0);
         assertEq(TestVaultOps.open(vault).length, 0, "all positions unlisted in wind-down");
+        bytes32 _expected4 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper);
-        vault.liquidate(40, 0);
+        vault.liquidate(40, 0, _expected4);
         uint256 shares = vault.shareBalance(alice);
         uint256 rc = Charges.redeemCharge(vault, shares);
+        bytes32 _expected5 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.requestRedeem{value: rc}(shares);
+        vault.requestRedeem{value: rc}(shares, _expected5);
         toBlackout();
         checkpoint();
         vm.prank(alice);
@@ -157,11 +170,13 @@ contract AuditBPinned is ForkBase {
     /// E3/E4: gas used per operation at canary values, for the pay-versus-cost table.
     function test_measureOps() public {
         VaultLib.Params memory p = canary();
+        bytes32 _expected6 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected6);
         uint256 gross = Charges.grossFor(vault, 1.9 ether);
+        bytes32 _expected7 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: gross}();
+        vault.deposit{value: gross}(_expected7);
         toBlackout();
         vm.startPrank(keeper);
         uint256 g = gasleft();
@@ -190,15 +205,17 @@ contract AuditBPinned is ForkBase {
         uint256 shares = vault.shareBalance(alice);
         uint256 rc = Charges.redeemCharge(vault, shares);
         console2.log("redeem charge wei", rc);
+        bytes32 _expected8 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.requestRedeem{value: rc}(shares);
+        vault.requestRedeem{value: rc}(shares, _expected8);
         vm.startPrank(keeper);
         g = gasleft();
         pay = TestVaultOps.unlist(vault, ids, 0);
         console2.log("unlist(n): n", TestVaultOps.idle(vault).length);
         console2.log("unlist: gas, pay", g - gasleft(), pay);
         g = gasleft();
-        pay = vault.liquidate(40, 0);
+        bytes32 _expected9 = TestVaultOps.configurationHash(vault);
+        pay = vault.liquidate(40, 0, _expected9);
         console2.log("liquidate: gas, pay", g - gasleft(), pay);
         console2.log("left: open, idle packs", TestVaultOps.open(vault).length, TestVaultOps.idle(vault).length);
         vm.stopPrank();
@@ -226,21 +243,24 @@ contract AuditBBudget is ForkBase {
         // The 6-unit direct-mint exit (two Shapes/pack) is cheaper per pack than the old split
         // recipe, so one holder needs more listings for the exit work to empty the essential budget.
         p.tvlCap = 5 ether;
+        bytes32 _expected10 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected10);
         uint256 gross = Charges.grossFor(vault, 4 ether);
+        bytes32 _expected11 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: gross}();
+        vault.deposit{value: gross}(_expected11);
         toBlackout();
         checkpoint();
         toOpen();
         vm.startPrank(keeper);
         uint256 built;
         uint256 routinePaid;
-        for (uint256 i; i < 3; ++i) {
-            try vault.build(UNITS, TestVaultOps.proposals(vault, 8, UNITS), 0) returns (uint256 pay) {
+        for (uint256 i; i < 6; ++i) {
+            bytes32 _expected12 = TestVaultOps.configurationHash(vault);
+            try vault.build(UNITS, TestVaultOps.proposals(vault, 4, UNITS), 0, _expected12) returns (uint256 pay) {
                 routinePaid += pay;
-                built += 8;
+                built += 4;
             } catch {
                 break;
             }
@@ -249,7 +269,8 @@ contract AuditBBudget is ForkBase {
             uint256 count = vault.idlePackCount();
             if (count == 0) break;
             if (count > vault.MAX_LIST_BATCH()) count = vault.MAX_LIST_BATCH();
-            try vault.list(TestVaultOps.proposals(vault, count, UNITS), 0) returns (uint256 pay) {
+            bytes32 _expected13 = TestVaultOps.configurationHash(vault);
+            try vault.list(TestVaultOps.proposals(vault, count, UNITS), 0, _expected13) returns (uint256 pay) {
                 routinePaid += pay;
             } catch {
                 break;
@@ -266,23 +287,26 @@ contract AuditBBudget is ForkBase {
         vm.txGasPrice(1 gwei);
         uint256 shares = vault.shareBalance(alice);
         uint256 rc = Charges.redeemCharge(vault, shares);
+        bytes32 _expected14 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.requestRedeem{value: rc}(shares);
+        vault.requestRedeem{value: rc}(shares, _expected14);
         console2.log("alice's redeem charge (checkpoint + unwind) wei", rc);
         vm.startPrank(keeper);
         uint256 essentialPaid = TestVaultOps.unlist(vault, open, 0);
         console2.log("unlist pay", essentialPaid);
         // Redeem every idle pack (each liquidate call takes at most MAX_BATCH packs).
         while (vault.idlePackCount() != 0) {
-            try vault.liquidate(16, 0) returns (uint256 lp) { essentialPaid += lp; }
+            bytes32 _expected15 = TestVaultOps.configurationHash(vault);
+            try vault.liquidate(16, 0, _expected15) returns (uint256 lp) { essentialPaid += lp; }
             catch { break; }
         }
         (r, e) = vault.budget();
         console2.log("essential budget after unlist + liquidate", e);
         console2.log("idle packs left", TestVaultOps.idle(vault).length);
         // A keeper asking for any pay is now refused; the work is only done unpaid.
+        bytes32 _expected16 = TestVaultOps.configurationHash(vault);
         vm.expectRevert();
-        vault.liquidate(40, 1e12);
+        vault.liquidate(40, 1e12, _expected16);
         vm.stopPrank();
         console2.log("essential paid in total vs unwind charge alice paid", essentialPaid, rc);
         assertEq(e, 0, "essential budget empty after one exit");
@@ -300,11 +324,13 @@ contract AuditBBudget is ForkBase {
     /// Q6: compromised owner, first transaction: maxima, then one paid call takes the routine budget.
     function test_ownerKeyFirstDay() public {
         VaultLib.Params memory p = canary();
+        bytes32 _expected17 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected17);
         uint256 gross = Charges.grossFor(vault, 1 ether);
+        bytes32 _expected18 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: gross}();
+        vault.deposit{value: gross}(_expected18);
         toBlackout();
         checkpoint();
         toOpen();
@@ -324,8 +350,9 @@ contract AuditBBudget is ForkBase {
         p.routineRate = 0.01 ether;
         p.essentialCap = 0.1 ether;
         p.essentialRate = 0.005 ether;
+        bytes32 _expected19 = TestVaultOps.configurationHash(vault);
         vm.startPrank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected19);
         uint256 b0 = owner.balance;
         uint256[] memory one = new uint256[](1);
         one[0] = open[0];
@@ -337,7 +364,8 @@ contract AuditBBudget is ForkBase {
         console2.log("t0: wind-down unlist 1, essential pay", pay);
         vm.warp(block.timestamp + 1 days);
         vm.roll(block.number + 7200);
-        pay = vault.liquidate(1, 0);
+        bytes32 _expected20 = TestVaultOps.configurationHash(vault);
+        pay = vault.liquidate(1, 0, _expected20);
         console2.log("t+24h: liquidate 1, essential pay", pay);
         (uint256 r, uint256 e) = vault.budget();
         console2.log("t+24h budgets routine (not reachable in wind-down?), essential", r, e);

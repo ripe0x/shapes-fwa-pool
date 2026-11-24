@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {GasQuotes} from "../utils/GasQuotes.sol";
+
 import {SelectionBase} from "./ForkSelection.t.sol";
 import {IOwnable, IFwaAdmin} from "./ForkBase.sol";
 import {ReceiptFixtureFiller, ReceiptFWA, ReceiptPacks, ReceiptShapes} from "../research/ReceiptIdentity.t.sol";
@@ -75,16 +77,23 @@ contract CompleteForeignJournalTest is SelectionBase {
         vm.prank(IOwnable(address(FWA)).owner());
         IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         VaultLib.Params memory p;
+        p.gasSchedule = VaultLib.defaultGasSchedule();
+        p.backingRatioBps = 12_000;
+        p.renewalMode = VaultLib.RenewalMode.ReuseReturned;
+        p.acceptedMintFee = 0.001 ether;
+        p.minDeposit = 0.01 ether;
+        p.minDistribution = 0.01 ether;
         p.minEdgeBps = 100; p.payMarkupBps = 1_000; p.maxTip = 0.05 gwei; p.keeperShareBps = 2_500;
-        p.allocatedBoundBps = 200; p.packUnitsMask = uint64(1) << UNITS;
+        p.upliftBoundBps = 200; p.packUnitsMask = uint64(1) << UNITS;
         p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei; // the 6-unit edge lists at this ceiling
         p.tvlCap = 100 ether; p.routineCap = 0.3 ether; p.routineRate = 0.01 ether;
         p.essentialCap = 0.1 ether; p.essentialRate = 0.005 ether;
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         TestVaultOps.restock(vault, 1, UNITS, 0); // build lists it at once
         selected = vault.openListingAt(0);
         p.payMarkupBps = 0;
-        vm.prank(owner); vault.setParams(p);
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected0);
         begin = vault.acquisitionCursor();
         assertEq(begin, FWA.nextSequenceToProcess());
     }
@@ -114,7 +123,8 @@ contract CompleteForeignJournalTest is SelectionBase {
     function _requiredTail() internal {
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
         uint256 amount = 0.1 ether + vault.requestCharge();
-        vm.prank(holder); vault.deposit{value: amount}();
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
+        vm.prank(holder); vault.deposit{value: amount}(_expected1);
         uint256 interval = block.timestamp / 12 hours;
         uint256 blackout = interval * 12 hours + 12 hours - 15 minutes + 60;
         if (blackout < block.timestamp) blackout += 12 hours;
@@ -135,25 +145,29 @@ contract CompleteForeignJournalTest is SelectionBase {
         assertEq(backlog, records, "backlog is the record count under test");
         uint256 open = vault.openListingCount();
         uint256 batch = backlog < 128 ? backlog : 128;
-        uint256 gasQ = open * VaultLib.Q_SCAN <= batch * VaultLib.Q_JOURNAL
-            ? VaultLib.Q_REQUIRED_TAIL + open * VaultLib.Q_SCAN
-            : VaultLib.Q_REQUIRED_TAIL + backlog * VaultLib.Q_JOURNAL;
-        vm.prank(keeper); uint256 pay = vault.sync(new uint256[](0), 0, 1);
+        uint256 gasQ = open * GasQuotes.Q_SCAN <= batch * GasQuotes.Q_JOURNAL
+            ? GasQuotes.Q_REQUIRED_TAIL + open * GasQuotes.Q_SCAN
+            : GasQuotes.Q_REQUIRED_TAIL + backlog * GasQuotes.Q_JOURNAL;
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); uint256 pay = vault.sync(new uint256[](0), 0, 1, _expected2);
         assertEq(pay, gasQ * 0.2 gwei);
         assertEq(keeper.balance - before, pay);
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
         assertEq(vault.pendingDepositTotal(), escrow, "journal payment cannot consume deposit escrow");
         assertEq(vault.processingPool(), processing, "journal payment cannot consume checkpoint charges");
         _assertExposure();
+        bytes32 _expected3 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Nothing.selector);
-        vm.prank(keeper); vault.sync(new uint256[](0), 0, 0);
-        vm.prank(keeper); vault.checkpoint(selected, 0);
+        vm.prank(keeper); vault.sync(new uint256[](0), 0, 0, _expected3);
+        bytes32 _expected4 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); vault.checkpoint(selected, 0, _expected4);
         assertGt(vault.shareBalance(holder), 0, "holder checkpoint succeeds after real successful catchup");
     }
 
     function test_successfulForeignSingletonRequiredTail() public {
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
-        vm.prank(keeper); assertEq(vault.sync(new uint256[](0), 0, 0), 0);
+        bytes32 _expected5 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); assertEq(vault.sync(new uint256[](0), 0, 0, _expected5), 0);
         assertEq(vault.acquisitionCursor(), uint256(begin) + 1, "first singleton is voluntary while queue is live");
         _second();
         _paidTail(1);
@@ -167,11 +181,13 @@ contract CompleteForeignJournalTest is SelectionBase {
     function test_successfulForeignEarlyTailCannotCollectPayment() public {
         _second();
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
+        bytes32 _expected6 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
-        vm.prank(keeper); vault.sync(new uint256[](0), 0, 1);
+        vm.prank(keeper); vault.sync(new uint256[](0), 0, 1, _expected6);
         assertEq(vault.acquisitionCursor(), begin, "refused payment rolls back journal progress");
         uint256 before = address(vault).balance;
-        vm.prank(keeper); assertEq(vault.sync(new uint256[](0), 0, 0), 0);
+        bytes32 _expected7 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); assertEq(vault.sync(new uint256[](0), 0, 0, _expected7), 0);
         assertEq(address(vault).balance, before);
         assertEq(vault.acquisitionCursor(), uint256(begin) + 2);
         _assertExposure();
@@ -259,10 +275,12 @@ contract CompleteForeignJournalTest is SelectionBase {
         // and outside a checkpoint window, that scan earns nothing, so the minPay=1 keeper offer is
         // refused (the paid 128-record journal this test once pinned is unreachable for a small
         // vault; that journal path is reachable at >= 94 open positions, covered in ScanGas.t.sol).
+        bytes32 _expected8 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
-        vm.prank(keeper); vault.sync(new uint256[](0), 0, 1);
+        vm.prank(keeper); vault.sync(new uint256[](0), 0, 1, _expected8);
         assertEq(vault.acquisitionCursor(), begin, "refused payment rolls back the scan progress");
-        vm.prank(keeper); uint256 pay = vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected9 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); uint256 pay = vault.sync(new uint256[](0), 0, 0, _expected9);
         assertEq(pay, 0, "foreign-only scan is unpaid");
         assertEq(vault.acquisitionCursor(), uint256(begin) + 128, "one scan clears the whole 128-record backlog");
         _assertExposure();
@@ -279,12 +297,11 @@ contract CompleteForeignJournalTest is SelectionBase {
     function test_full128ForeignScanReceiptGasFitsCap() public {
         _replayForeignHistory(); _threeDeadlineRefunds();
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
-        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), 0, uint256(0)));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), 0, uint256(0), vault.configurationHash()));
         uint256 intrinsic = 21_000;
         for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
         // Receipt-equivalent: cold every contract the sync touches, as a mined transaction would.
-        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(vault.keeperPolicy()));
-        vm.cool(address(FWA)); vm.cool(address(PACKS)); vm.cool(keeper);
+        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(address(PACKS)); vm.cool(keeper);
         vm.prank(keeper);
         uint256 g = gasleft();
         (bool ok, bytes memory ret) = address(vault).call(input);
@@ -317,7 +334,8 @@ contract CompleteForeignJournalTest is SelectionBase {
         if (count < 125) setUp();
         if (count == 1) {
             vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
-            vm.prank(keeper); assertEq(vault.sync(new uint256[](0), 0, 0), 0);
+            bytes32 _expected10 = TestVaultOps.configurationHash(vault);
+            vm.prank(keeper); assertEq(vault.sync(new uint256[](0), 0, 0, _expected10), 0);
         }
         if (count >= 125) _replayForeignHistory(); else _second();
         if (count == 128) _threeDeadlineRefunds();
@@ -331,7 +349,7 @@ contract CompleteForeignJournalTest is SelectionBase {
         // Both replay paths were executed in the test body. Export that exact
         // state directly, without rewriting or inventing any protocol slot.
         bytes32 accountDigest = keccak256(abi.encode(_accountDigest(keeper), _accountDigest(holder),
-            _accountDigest(address(vault)), _accountDigest(address(vault.keeperPolicy())), _accountDigest(address(VaultLib))));
+            _accountDigest(address(vault)), _accountDigest(address(VaultLib))));
         vm.serializeBytes32(name, "accountDigest", accountDigest);
         vm.dumpState(string.concat(name, "-state.json"));
         vm.serializeAddress(name, "vault", address(vault));

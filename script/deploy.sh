@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Usage: script/deploy.sh <values.json> [--broadcast]
-# Runs script/Deploy.s.sol, which deploys the vault, its policy and the manager factory through DeployCore (the same code every fork and scenario
+# Runs script/Deploy.s.sol, which deploys the vault and the manager factory through DeployCore (the same code every fork and scenario
 # test deploys with) and runs its postflight. Without --broadcast it only simulates against the
 # chain at RPC_URL and prints the gas estimate and cost: nothing is sent.
 # Release gate: script/release.py check compares sources, build, values, keeper and evidence with
 # deploy/release-manifest.json. A simulation reports the result and continues. A broadcast to any
 # node other than a local Anvil also needs the owner's signature on docs/release/acceptance.json,
-# and is followed by the onchain postflight (runtime identities, owner, policy, parameters,
+# and is followed by the onchain postflight (runtime identities, owner, parameters,
 # budgets, seed shares, flags).
 # Signing: FORGE_WALLET_ARGS, e.g. FORGE_WALLET_ARGS="--account deployer --sender 0x..." (a forge
 # keystore account) or "--ledger --sender 0x...". Never a raw key. The simulation also needs
@@ -33,7 +33,7 @@ for ((i = 0; i < ${#WALLET[@]}; i++)); do
 done
 # Compile in this environment before the check, so the check covers the artifacts forge script
 # below deploys (an inherited FOUNDRY_* override changes them, and the check then fails).
-forge build
+forge build script/Deploy.s.sol --skip test
 if [[ "$BROADCAST" == "--broadcast" && "$LOCAL" == 0 ]]; then
   python3 script/release.py check "$VALUES" --broadcast || {
     echo "Refusing to broadcast to chain $CHAIN_ID: the release check above must pass." >&2
@@ -43,7 +43,7 @@ else
   python3 script/release.py check "$VALUES" || echo "release check failed (reported only: simulation or local Anvil)"
 fi
 echo "chain $CHAIN_ID, values $VALUES, $([[ "$BROADCAST" == "--broadcast" ]] && echo BROADCAST || echo 'simulation only')$([[ "$LOCAL" == 1 ]] && echo ' (local Anvil)')"
-ARGS=(script/Deploy.s.sol:Deploy --rpc-url "$RPC_URL" --slow -vv)
+ARGS=(script/Deploy.s.sol:Deploy --skip test --rpc-url "$RPC_URL" --slow -vv)
 if [[ "$BROADCAST" == "--broadcast" ]]; then ARGS+=(--broadcast); fi
 DEPLOY_VALUES="$VALUES" forge script "${ARGS[@]}" ${WALLET[@]+"${WALLET[@]}"}
 if [[ "$BROADCAST" == "--broadcast" && "$LOCAL" == 0 ]]; then

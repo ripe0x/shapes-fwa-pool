@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
+import {RefundClaims} from "../utils/RefundClaims.sol";
+
+import {GasQuotes} from "../utils/GasQuotes.sol";
 
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
@@ -8,7 +11,6 @@ import {FlowBreakdown} from "../utils/FlowBreakdown.sol";
 import {SelectionBase, IFwaSettle} from "../fork/ForkSelection.t.sol";
 import {ForceSender, IOwnable, IOracleAdmin, IFwaAdmin} from "../fork/ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
-import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {Charges} from "../utils/Charges.sol";
 import {
@@ -119,7 +121,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         p.distributionBps = uint16(vm.parseJsonUint(v, ".distributionBps"));
         p.payMarkupBps = uint16(vm.parseJsonUint(v, ".payMarkupBps"));
         p.keeperShareBps = uint16(vm.parseJsonUint(v, ".keeperShareBps"));
-        p.allocatedBoundBps = uint16(vm.parseJsonUint(v, ".allocatedBoundBps"));
+        p.upliftBoundBps = uint16(vm.parseJsonUint(v, ".upliftBoundBps"));
         p.packUnitsMask = uint64(vm.parseJsonUint(v, ".packUnitsMask"));
         p.gasCeiling = uint64(vm.parseJsonUint(v, ".gasCeilingWei"));
         p.essentialCeiling = uint64(vm.parseJsonUint(v, ".essentialCeilingWei"));
@@ -131,13 +133,47 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         p.routineRate = uint64(vm.parseJsonUint(v, ".routineRatePerDayWei"));
         p.essentialCap = uint64(vm.parseJsonUint(v, ".essentialCapWei"));
         p.essentialRate = uint64(vm.parseJsonUint(v, ".essentialRatePerDayWei"));
+        p.backingRatioBps = uint32(vm.parseJsonUint(v, ".backingRatioBps"));
+        p.renewalMode = VaultLib.RenewalMode(vm.parseJsonUint(v, ".renewalMode"));
+        p.renewalFloatCount = uint16(vm.parseJsonUint(v, ".renewalFloatCount"));
+        p.acceptedMintFee = uint64(vm.parseJsonUint(v, ".acceptedMintFeeWei"));
+        p.minDeposit = uint64(vm.parseJsonUint(v, ".minDepositWei"));
+        p.minDistribution = uint64(vm.parseJsonUint(v, ".minDistributionWei"));
+        p.gasSchedule.checkpoint = uint32(vm.parseJsonUint(v, ".gasSchedule.checkpoint"));
+        p.gasSchedule.allocationEntry = uint32(vm.parseJsonUint(v, ".gasSchedule.allocationEntry"));
+        p.gasSchedule.allocationRead = uint32(vm.parseJsonUint(v, ".gasSchedule.allocationRead"));
+        p.gasSchedule.build = uint32(vm.parseJsonUint(v, ".gasSchedule.build"));
+        p.gasSchedule.buildPack = uint32(vm.parseJsonUint(v, ".gasSchedule.buildPack"));
+        p.gasSchedule.buildShape = uint32(vm.parseJsonUint(v, ".gasSchedule.buildShape"));
+        p.gasSchedule.list = uint32(vm.parseJsonUint(v, ".gasSchedule.list"));
+        p.gasSchedule.listed = uint32(vm.parseJsonUint(v, ".gasSchedule.listed"));
+        p.gasSchedule.sync = uint32(vm.parseJsonUint(v, ".gasSchedule.sync"));
+        p.gasSchedule.requiredTail = uint32(vm.parseJsonUint(v, ".gasSchedule.requiredTail"));
+        p.gasSchedule.distributionProof = uint32(vm.parseJsonUint(v, ".gasSchedule.distributionProof"));
+        p.gasSchedule.journal = uint32(vm.parseJsonUint(v, ".gasSchedule.journal"));
+        p.gasSchedule.scan = uint32(vm.parseJsonUint(v, ".gasSchedule.scan"));
+        p.gasSchedule.selected = uint32(vm.parseJsonUint(v, ".gasSchedule.selected"));
+        p.gasSchedule.synced = uint32(vm.parseJsonUint(v, ".gasSchedule.synced"));
+        p.gasSchedule.pruned = uint32(vm.parseJsonUint(v, ".gasSchedule.pruned"));
+        p.gasSchedule.unlist = uint32(vm.parseJsonUint(v, ".gasSchedule.unlist"));
+        p.gasSchedule.unlisted = uint32(vm.parseJsonUint(v, ".gasSchedule.unlisted"));
+        p.gasSchedule.liquidate = uint32(vm.parseJsonUint(v, ".gasSchedule.liquidate"));
+        p.gasSchedule.liquidatePack = uint32(vm.parseJsonUint(v, ".gasSchedule.liquidatePack"));
+        p.gasSchedule.redeemShape = uint32(vm.parseJsonUint(v, ".gasSchedule.redeemShape"));
+        p.gasSchedule.recoveryBase = uint32(vm.parseJsonUint(v, ".gasSchedule.recoveryBase"));
+        p.gasSchedule.recoveryShape = uint32(vm.parseJsonUint(v, ".gasSchedule.recoveryShape"));
+        p.gasSchedule.recoveryUnseal = uint32(vm.parseJsonUint(v, ".gasSchedule.recoveryUnseal"));
+        p.gasSchedule.harvest = uint32(vm.parseJsonUint(v, ".gasSchedule.harvest"));
+        p.gasSchedule.harvested = uint32(vm.parseJsonUint(v, ".gasSchedule.harvested"));
+        p.gasSchedule.credit = uint32(vm.parseJsonUint(v, ".gasSchedule.credit"));
+        p.gasSchedule.fund = uint32(vm.parseJsonUint(v, ".gasSchedule.fund"));
     }
 
     function _deploy(uint256 seed, VaultLib.Params memory p) internal {
         vm.fee(BASE_FEE);
         vm.txGasPrice(GAS_PRICE);
         vm.deal(address(this), seed + 1 ether);
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, seed);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, seed, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         preexisting = address(vault).balance - seed; // mainnet dust at the deploy address
         depositedCum = address(vault).balance; // seed and dust are capitalization inflow
     }
@@ -197,8 +233,9 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         uint256 vb = address(vault).balance;
         uint256 b = who.balance;
         uint256[] memory proposed = TestVaultOps.proposals(vault, count, units);
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(who);
-        try vault.build(units, proposed, 0) {}
+        try vault.build(units, proposed, 0, _expected0) {}
         catch {
             return false;
         }
@@ -250,8 +287,9 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
     function _kLiquidate(address who, uint256 maxCount) internal {
         uint256 vb = address(vault).balance;
         uint256 b = who.balance;
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         vm.prank(who);
-        vault.liquidate(maxCount, 0);
+        vault.liquidate(maxCount, 0, _expected1);
         uint256 pay = who.balance - b;
         keeperPaidCum += pay;
         redeemedCum += (address(vault).balance - vb) + pay; // redeemed value into the balance
@@ -285,20 +323,21 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
     ///      owed estimate for unpriced redemptions + the reserve fit inside the balance.
     function _guard() internal {
         uint256 liab = vault.pendingDepositTotal() + vault.redemptionReserve() + vault.distributionReserve()
-            + vault.claimableTotal();
+            + vault.claimableTotal() + vault.processingPool() + vault.chargeRefundReserve();
         uint256 bal = address(vault).balance;
         assertGe(bal, liab, "balance below liabilities");
         // While redeemers are short of ETH (owed + reserve > free) nothing is spendable at all.
         uint256 idle = vault.idleEth();
-        if (idle != 0) assertLe(idle + liab + _owed() + vault.getParams().reserve, bal, "spendable reaches owed ETH");
+        if (idle != 0) assertLe(idle + liab + _owed() + vault.operatingReserve(), bal, "spendable reaches owed ETH");
         ++guardChecks;
     }
 
     function _deposit(address who, uint256 amt) internal {
         {
             uint256 gross_ = Charges.grossFor(vault, amt);
+            bytes32 _expected2 = TestVaultOps.configurationHash(vault);
             vm.prank(who);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected2);
             depositedCum += gross_; // inflow is all ETH sent: escrow + checkpoint charge + deployment charge
         }
     }
@@ -307,6 +346,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         uint256 b = who.balance;
         vm.prank(who);
         try vault.claim() {} catch {}
+        RefundClaims.claim(vault, who);
         claimsCum += who.balance - b;
     }
 
@@ -380,17 +420,17 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
     }
 
     function flowBuckets() internal view override returns (Bucket[] memory k) {
-        k = new Bucket[](10);
+        k = new Bucket[](11);
         uint256 pending = vault.pendingDepositTotal();
         uint256 redeem = vault.redemptionReserve();
         uint256 dist = vault.distributionReserve();
         uint256 claimable = vault.claimableTotal();
         uint256 bal = address(vault).balance;
         uint256 pool = vault.processingPool();
-        uint256 liabilities = pending + redeem + dist + claimable + pool;
+        uint256 refunds = vault.chargeRefundReserve();
+        uint256 liabilities = pending + redeem + dist + claimable + pool + refunds;
         uint256 free = bal > liabilities ? bal - liabilities : 0;
-        VaultLib.Params memory p = vault.getParams();
-        uint256 reserveNeed = uint256(p.reserve) + _owed();
+        uint256 reserveNeed = vault.operatingReserve() + _owed();
 
         (uint256 backingHeld, uint256 backingImplied, uint256 packHeld) = _fwaHoldings();
         uint256 inv; // no loose Shapes in the direct-mint recipe
@@ -411,6 +451,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         k[8] = Bucket("FWA fees uncollected (pending + credit)", _feesHeld(), false, 0, false, 0);
         // Request charges held to pay the next checkpoint's keeper (D56); the remainder joins free ETH.
         k[9] = Bucket("request charges held for the next checkpoint", pool, false, 0, true, pool);
+        k[10] = Bucket("payer contribution refunds", refunds, false, 0, true, refunds);
     }
 
     /// @dev Reads FWA's own listing records, not just vault counters. held/packHeld count only
@@ -479,10 +520,10 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         uint256 built;
         uint256 pay0 = keeperPaidCum;
         (uint256 routineBefore,) = vault.budget();
-        // Build mints and lists at once; the batch is capped at MAX_LIST_BATCH (8), so counts above
+        // Build mints and lists at once; the build batch is capped at MAX_BUILD_BATCH (4), so counts above
         // it are refused and the loop steps down. Each admitted pack is both built and listed.
         for (uint256 c = 10; c != 0;) {
-            if (_kTryRestock(keeper, c, 6)) { built += c; listed += c; }
+            if (_kTryRestock(keeper, c, 3)) { built += c; listed += c; }
             else --c;
         }
         // Fixed quote price: min(0.2 gwei bid, basefee 0.15 + maxTip 0.05, ceiling 0.5), no markup (V1).
@@ -520,8 +561,8 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _toBlackout();
         _kCheckpoint(keeper);
         _toOpen();
-        _kRestock(keeper, 5, 6);
-        _kList(keeper, 5);
+        _kRestock(keeper, 3, 3);
+        _kList(keeper, 3);
         for (uint256 i; i < intervals; ++i) {
             vm.warp(block.timestamp + INTERVAL);
             vm.roll(block.number + INTERVAL / 12);
@@ -534,7 +575,8 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     /// @dev Gas spike after deployment: a position is listed at low gas (setup), then the basefee is
     ///      lifted to 2 gwei, four times the 0.5 gwei ceiling. No call is refused for gas price (D51):
     ///      a profitable build still runs, and both it and the checkpoint are paid at the ceiling
-    ///      price, never the spiked basefee (D56). The spike never reaches holder ETH (O6 limit).
+    ///      price. Holder pricing uses its separate essential ceiling; report the historical
+    ///      O6 comparison without treating that old target as the current payment formula.
     function test_flow_gas_spike() public {
         _forkPinned();
         _deploy(0.01 ether, _values());
@@ -545,15 +587,15 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _toBlackout();
         _kCheckpoint(keeper);
         _toOpen();
-        _kRestock(keeper, 3, 6);
+        _kRestock(keeper, 2, 3);
         // The spike: 2 gwei, four times the ceiling.
         Snap memory a = flowBegin(2 gwei, 1.95 gwei, PINNED);
         uint256 paid0 = keeperPaidCum;
-        assertTrue(_kTryRestock(keeper, 1, 6), "D51: a profitable build runs even at a 2 gwei spike");
+        assertTrue(_kTryRestock(keeper, 1, 3), "D51: a profitable build runs even at a 2 gwei spike");
         uint256 buildPay = keeperPaidCum - paid0;
         VaultLib.Params memory pp = vault.getParams();
         // Priced at the ceiling (min(basefee+tip, ceiling) = gasCeiling), not the 2 gwei basefee.
-        assertEq(buildPay, (VaultLib.Q_BUILD + VaultLib.buildGas(2) + VaultLib.Q_LISTED) * pp.gasCeiling
+        assertEq(buildPay, (GasQuotes.Q_BUILD + GasQuotes.buildGas(3) + GasQuotes.Q_LISTED) * pp.gasCeiling
             + 2 * pp.workFee, "build paid at the ceiling price, not the spike");
         _deposit(bob, 0.5 ether);
         _toBlackout();
@@ -561,11 +603,15 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _kCheckpoint(keeper); // prices bob's deposit; keeper pay capped at the ceiling
         uint256 pay = keeper.balance - kb;
         assertGt(pay, 0, "checkpoint compensation is funded");
-        assertLe(pay, 0.0002 ether, "O6 existing absolute holder expense limit");
+        assertEq(pay, 0.00102 ether, "actual absolute holder processing expense at the two-gwei ceiling");
+        assertEq(pay, uint256(pp.gasSchedule.checkpoint) * pp.essentialCeiling + pp.workFee,
+            "funded holder pricing follows the current configured payment class");
         Fact[] memory f = _facts("open_listings", TestVaultOps.open(vault).length);
         f[1] = Fact("gas_price_gwei_x100", 200);
         f[2] = Fact("checkpoint_pay_wei", pay);
         f[3] = Fact("build_pay_wei", buildPay);
+        f[4] = Fact("historical_O6_limit_wei", 0.0002 ether);
+        f[5] = Fact("historical_O6_excess_wei", pay - 0.0002 ether);
         flowReport("gas_spike", a, f);
     }
 
@@ -575,14 +621,14 @@ contract VaultFlowPinnedTest is VaultFlowBase {
     ///      unlisting/redemption still work (D34). Positions are synced before the snapshot.
     function test_flow_oracle_change() public {
         _forkPinned();
-        _useOracle(0.1 ether); // real oracle active (cap 0.11 > the 6-unit backing): needed to kick
+        _useOracle(0.25 ether); // real oracle cap 0.275 covers the 0.21 launch backing before the later kick
         _deploy(0.01 ether, _values());
         Snap memory a = flowBegin(GAS_PRICE, BASE_FEE, PINNED);
         _deposit(alice, 1 ether);
         _toBlackout();
         _kCheckpoint(keeper);
         _toOpen();
-        _kRestock(keeper, 3, 6);
+        _kRestock(keeper, 3, 3);
         uint256[] memory ids = _idsOf(_kList(keeper, 3));
         _setPackAsk(0.025 ether); // cap 0.0275 < the ~0.065 posted backing: FWA may kick
         _toBlackout();
@@ -593,7 +639,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         // Repoint the oracle so no cap can be read; edge fails, nothing new lists.
         vm.prank(IOwnable(address(FWA)).owner());
         IFwaAdmin(address(FWA)).setAddr(64, address(PACKS));
-        (, uint256 backing, bool ok) = vault.edge(6);
+        (, uint256 backing, bool ok) = vault.edge(3);
         uint256 packsBack = TestVaultOps.idle(vault).length;
         assertGe(packsBack, 1, "kicked pack recovered to inventory");
         // With the oracle broken, alice redeems everything: the vault unlists the rest, liquidates
@@ -602,8 +648,9 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         uint256 aShares = vault.shareBalance(alice);
         {
             uint256 rc_ = Charges.redeemCharge(vault, aShares);
+            bytes32 _expected3 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.requestRedeem{value: rc_}(aShares);
+            vault.requestRedeem{value: rc_}(aShares, _expected3);
             depositedCum += rc_; // the request charge is holder ETH entering the vault
         }
         _kUnlist(keeper, TestVaultOps.open(vault));
@@ -631,15 +678,16 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _toBlackout();
         _kCheckpoint(keeper);
         _toOpen();
-        _kRestock(keeper, 4, 6);
-        _kList(keeper, 4);
+        _kRestock(keeper, 3, 3);
+        _kList(keeper, 3);
         // No keeper acts for a long time. A no-flow checkpoint is refused (LOW-1 repair).
         vm.warp(block.timestamp + INTERVAL);
         _toBlackout();
         uint256 planned20 = TestVaultOps.witness(vault);
+        bytes32 _expected4 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.checkpoint(planned20, 0);
+        vault.checkpoint(planned20, 0, _expected4);
         Fact[] memory f = _facts("open_listings", TestVaultOps.open(vault).length);
         f[1] = Fact("idle_checkpoint_refused", 1);
         f[2] = Fact("fees_uncollected_wei", _feesHeld());
@@ -657,20 +705,22 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _toBlackout();
         _kCheckpoint(keeper);
         _toOpen();
-        _kRestock(keeper, 10, 6);
-        uint256[] memory ids = _idsOf(_kList(keeper, 10));
+        _kRestock(keeper, 6, 3);
+        uint256[] memory ids = _idsOf(_kList(keeper, 6));
         uint256 aShares = vault.shareBalance(alice);
         uint256 bShares = vault.shareBalance(bob);
         {
             uint256 rc_ = Charges.redeemCharge(vault, aShares);
+            bytes32 _expected5 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.requestRedeem{value: rc_}(aShares);
+            vault.requestRedeem{value: rc_}(aShares, _expected5);
             depositedCum += rc_; // the request charge is holder ETH entering the vault
         }
         {
             uint256 rc_ = Charges.redeemCharge(vault, bShares / 2);
+            bytes32 _expected6 = TestVaultOps.configurationHash(vault);
             vm.prank(bob);
-            vault.requestRedeem{value: rc_}(bShares / 2);
+            vault.requestRedeem{value: rc_}(bShares / 2, _expected6);
             depositedCum += rc_; // the request charge is holder ETH entering the vault
         }
         _toBlackout();
@@ -704,8 +754,9 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         uint256 aShares = vault.shareBalance(alice);
         {
             uint256 rc_ = Charges.redeemCharge(vault, aShares);
+            bytes32 _expected7 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.requestRedeem{value: rc_}(aShares);
+            vault.requestRedeem{value: rc_}(aShares, _expected7);
             depositedCum += rc_; // the request charge is holder ETH entering the vault
         }
         _toBlackout();
@@ -714,10 +765,9 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _deposit(alice, 0.01 ether); // touch: her entitlement settles to claimableEth
         uint256 liabilities = vault.pendingDepositTotal() + vault.redemptionReserve()
             + vault.distributionReserve() + vault.claimableTotal();
-        // Only bob's ~1 ETH is deployable (alice's filled redemption is a liability); five six-unit
-        // packs (~0.65 ETH) fit, more would exceed it.
-        _kRestock(keeper, 5, 6);
-        _kList(keeper, 5);
+        // Bob's capital funds three launch packs while preserving the designated renewal float.
+        _kRestock(keeper, 3, 3);
+        _kList(keeper, 3);
         // Checked before the claim, while the entitlement is still a liability: idle ETH excludes
         // it, and the vault balance never falls below its liabilities.
         uint256 spendable = vault.idleEth();
@@ -767,8 +817,8 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _toBlackout();
         _kCheckpoint(keeper);
         _toOpen();
-        _kRestock(keeper, 8, 6);
-        uint256[] memory ids = _idsOf(_kList(keeper, 8));
+        _kRestock(keeper, 4, 3);
+        uint256[] memory ids = _idsOf(_kList(keeper, 4));
         vm.prank(owner);
         vault.startWindDown();
         _kUnlist(keeper, ids);
@@ -776,14 +826,16 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         uint256 bShares = vault.shareBalance(bob);
         {
             uint256 rc_ = Charges.redeemCharge(vault, aShares);
+            bytes32 _expected8 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.requestRedeem{value: rc_}(aShares);
+            vault.requestRedeem{value: rc_}(aShares, _expected8);
             depositedCum += rc_; // the request charge is holder ETH entering the vault
         }
         {
             uint256 rc_ = Charges.redeemCharge(vault, bShares);
+            bytes32 _expected9 = TestVaultOps.configurationHash(vault);
             vm.prank(bob);
-            vault.requestRedeem{value: rc_}(bShares);
+            vault.requestRedeem{value: rc_}(bShares, _expected9);
             depositedCum += rc_; // the request charge is holder ETH entering the vault
         }
         _kLiquidate(keeper, 40);
@@ -794,11 +846,11 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         // all shares, the seed's dead shares included.
         uint256 total = vault.totalShares();
         uint256 kb = keeper.balance;
-        uint256 pool = vault.processingPool(); // request charges: not holder value, excluded from NAV
+        uint256 pool = vault.processingPool() + vault.chargeRefundReserve(); // protected payer funds excluded from NAV
         _kCheckpoint(keeper);
         uint256 nav = address(vault).balance + (keeper.balance - kb) - pool;
-        uint256 expA = nav * aShares / total;
-        uint256 expB = nav * bShares / total;
+        uint256 expA = nav * aShares / total + RefundClaims.available(vault, alice);
+        uint256 expB = nav * bShares / total + RefundClaims.available(vault, bob);
         uint256 c0 = claimsCum;
         _claim(alice);
         uint256 gotA = claimsCum - c0;
@@ -918,8 +970,9 @@ contract VaultFlowSelectionTest is VaultFlowBase {
         _kHarvest(address(this), TestVaultOps.open(vault));
         assertGt(FWA.unsettledAcquisitionCount(), 0, "queue busy");
         uint256[] memory planned19 = TestVaultOps.proposals(vault, 1, 6);
+        bytes32 _expected10 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.list(planned19, 0);
+        vault.list(planned19, 0, _expected10);
         _drainQueue();
         uint256 relisted = _kList(address(this), 1);
         uint256[] memory open = TestVaultOps.open(vault);
@@ -951,14 +1004,14 @@ contract VaultFlowSelectionTest is VaultFlowBase {
         IFWARewards rewards = IFWARewards(FWA.rewards());
 
         VaultLib.Params memory p = _values();
-        vm.deal(address(this), 6 ether);
-        // Seed covers 20 six-unit packs (~0.13 ETH each to list).
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether);
+        vm.deal(address(this), 10 ether);
+        // Stated token-fixture variation: six ETH funds 20 launch packs and their designated float.
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 6 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         depositedCum = address(vault).balance;
-        mintFeesCum = 20 * 2 * SHAPES.mintFee(); // 20 packs x 2 Shapes x 0.001 ETH
-        mintedValueCum = 20 * 6 * UNIT;
+        mintFeesCum = 20 * 3 * SHAPES.mintFee(); // 20 launch packs, three paid Shapes each
+        mintedValueCum = 20 * 3 * UNIT;
         uint256 bthis = address(this).balance;
-        TestVaultOps.restock(vault, 20, 6, 0);
+        TestVaultOps.restock(vault, 20, 3, 0);
         TestVaultOps.list(vault, 20, 0);
         keeperPaidCum = address(this).balance - bthis; // restock + list reimburse this contract
         backingPostedCum = 0;

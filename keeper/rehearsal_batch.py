@@ -3,7 +3,7 @@
 
 --plan only prints the complete proposed batch. --execute-approved-local-batch is an execution
 entry point, not approval: the operator must hold the owner's authority for a local campaign.
-No keys are created. Six fresh label-derived actors use Anvil impersonation on our own process.
+No keys are created. Fresh label-derived actors use Anvil impersonation on our own process.
 The fork block is a fresh pin for each campaign (--fork-block, recorded with its hash); the
 historical default 26,418,539 is the 2026-11-18 campaign.
 """
@@ -24,9 +24,8 @@ from eth_utils import keccak, to_checksum_address
 ROOT = Path(__file__).resolve().parent.parent
 PORT = int(os.environ.get("PACK_VAULT_LOCAL_PORT", 8557))
 RPC = f"http://127.0.0.1:{PORT}"
-# Tenderly's public gateway by default. REHEARSAL_FORK_RPC (environment only) can name another
-# upstream for the fork; its URL can carry an API key, so scrub() removes it from every record.
-FORK_RPC = os.environ.get("REHEARSAL_FORK_RPC") or "https://mainnet.gateway.tenderly.co"
+# All public-mainnet reads in this campaign use the owner-required public gateway.
+FORK_RPC = "https://mainnet.gateway.tenderly.co"
 
 
 def scrub(text):
@@ -41,7 +40,7 @@ ACTOR_ETH = 10 * 10**18
 # fresh FWA purchaser for the manager outcome paths. All are fresh label-derived addresses, verified
 # clean before funding, never Anvil dev accounts (rehearse_unified.py).
 ACTORS = {name: to_checksum_address(keccak(text=f"pack-vault-rehearsal-{name}")[-20:])
-          for name in ("deployer", "holder", "holder2", "keeper", "kicker", "owner",
+          for name in ("deployer", "holder", "holder2", "keeper", "backup", "kicker", "owner",
                        "mgra", "mgrb", "mgrc", "purchaser")}
 ORACLE = "0xaA4D9009a4664604b57644bF13e447E9036727DC"
 ORACLE_OWNER = "0x9306342f408185180987bBe69B5AFDCaD5e971b4"  # pinned deployed owner(), read 2026-11-18
@@ -53,7 +52,7 @@ SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
 def source_freeze():
     return {path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
-            for path in ("src/PackVault.sol", "src/VaultLib.sol", "src/interfaces/External.sol", "src/KeeperPolicy.sol")}
+            for path in sorted(str(p.relative_to(ROOT)) for p in (ROOT / "src").rglob("*.sol"))}
 
 
 
@@ -76,33 +75,32 @@ def quantity(v):
     return int(v, 0) if isinstance(v, str) and v.startswith("0x") else int(v)
 
 
-def values(calibration=False):
+def values():
     v = json.loads((ROOT / "deploy/mainnet.json").read_text())
     v["owner"] = ACTORS["owner"]
-    if calibration:
-        v["tvlCapWei"] = 12 * 10**18
-        v["packUnitsMask"] |= 1 << 30
     return v
 
 
 def plan():
     return dict(
-        name=f"position-integration-local-{FORK_BLOCK}", endpoint=RPC, chain_id=1,
-        node_command=["anvil", "--host", "127.0.0.1", "--port", str(PORT), "--accounts", "0", "--silent",
+        name=f"position-integration-local-{FORK_BLOCK}", endpoint=RPC, chain_id=31337,
+        node_command=["anvil", "--host", "127.0.0.1", "--port", str(PORT), "--chain-id", "31337", "--accounts", "0", "--silent",
                       "--fork-url", FORK_RPC, "--fork-block-number", str(FORK_BLOCK), "--fork-retry-backoff", "5000",
                       "--retries", "30", "--base-fee", "150000000",
                       "--code-size-limit", str(CODE_SIZE), "--gas-limit", str(MAX_GAS), "--enable-tx-gas-limit"],
-        signers=ACTORS, funding_wei_per_actor=ACTOR_ETH, aggregate_funding_wei=6 * ACTOR_ETH,
+        signers=ACTORS, funding_wei_per_actor=ACTOR_ETH, aggregate_funding_wei=len(ACTORS) * ACTOR_ETH,
         external_test_signer=dict(address=ORACLE_OWNER, target=ORACLE, action="setFloor(packs,ask)",
                                   added_funding_wei=0, preconditions="pinned owner/code/nonce/balance readback; existing balance funds gas"),
+        isolated_mint_fee_sensitivity=dict(contract=values()['shapes'], signer='actual admin() EOA, existing gas balance only',
+            action='setMintFee(0.0005 ether) inside reverted local snapshot; accepted maximum retained at 0.001 ether'),
         per_transaction_gas_limit=MAX_GAS, runtime_code_limit=CODE_SIZE, production_broadcasts=0,
-        launch_values=values(), calibration_values=values(True),
+        launch_values=values(),
         phase_isolation="evm_snapshot/revert reuses the single funded baseline between phases; no second balance credit",
         phases=[
-            "Fresh production script/deploy.sh deployment and postflight; mainnet-values lifecycle using normal keeper/index, restart, tokens/burn, oracle kick, policy swap, gas spike, redemption, wind-down",
-            "Fresh production deployment for the holder workflow and a separate owner wind-down (rehearse_current.py), mainnet values and budgets; restart normal keeper; holder-run exits with loss limits",
-            "Fresh12ETH test-only calibration vault, same budgets; <=6ETH deposits by each of two holders; masks3+30; max16 listing/unlisting/harvest/token/sync items, total30Shapes restock/liquidation, exact fee witness checkpoints",
-            "Genuine external FWA acquire requests in bounded batches, expire through real processor, measure1/16 refunded global journal entries and higher gas; withdraw actual refund; no fabricated VRF success",
+            "Production deploy.sh deployment/readback; three individually owned managers; bounded real keeper discovery/build; pooled entry, checkpoint, partial redemption and caller-funded exit",
+            "Snapshot-only calibration funded upfront with25ETH: launch current and0.0005 fee at0.2/0.5gwei retainingfloat1/reserve0.005; four-pack29/30-unit extrema; actual paid primary mints",
+            "Durable keeper restart, independent backup, account failure isolation, actual value-bearing receipt reorg and chain/signer state identity rejection",
+            "Snapshot-only2.1ETH funded calibration:1/17 genuine unfulfilled FWA requests, real expiry/refund processing and required journal/scan tails, then complete branch restore",
         ],
         limitations=["Successful foreign selections use recorded real request/fulfillment replay in Forge; local request block hashes cannot reproduce their VRF proofs.",
                      "No failed NFT delivery is manufactured; no mainnet deployment, live funds or owner signature.",
@@ -122,7 +120,7 @@ def load_manifest():
     if set(owners) != {str(m["pid"])}:
         raise RuntimeError("endpoint is not exclusively owned by this task's Anvil process")
     os.kill(m["pid"], 0)
-    if "anvil" not in rpc("web3_clientVersion").lower() or quantity(rpc("eth_chainId")) != 1:
+    if "anvil" not in rpc("web3_clientVersion").lower() or quantity(rpc("eth_chainId")) != 31337:
         raise RuntimeError("endpoint is not the expected Anvil mainnet fork")
     info = rpc("anvil_nodeInfo")
     fork = info.get("forkConfig") or {}
@@ -155,12 +153,19 @@ def prepare_actor(address):
         if address not in m["funding"]:
             raise RuntimeError("fresh actor was not verified clean before funding")
         return  # funded once by the batch owner, never topped up by a phase
-    if address != ORACLE_OWNER.lower():
+    shapes = values()['shapes']
+    fee_admin = cast('call', shapes, 'admin()(address)').split()[0].lower()
+    if address not in (ORACLE_OWNER.lower(), fee_admin):
         raise RuntimeError("unnamed rehearsal signer")
-    if cast("code", address) != "0x":
-        raise RuntimeError("external test signer has code or a delegation")
+    code=cast("code",address)
+    delegated = address == fee_admin and len(code) == 48 and code.startswith('0xef0100')
+    if code != "0x" and not delegated:
+        raise RuntimeError("external test signer is neither an EOA nor its unchanged EIP-7702 delegation")
+    if delegated:
+        append_action(dict(operation='isolated fee sensitivity delegated EOA signer readback',address=address,
+            code=code,nonce=quantity(cast('nonce',address)),balanceWei=quantity(cast('balance',address)),addedFundingWei=0))
     if quantity(cast("balance", address)) == 0:
-        raise RuntimeError("oracle test signer has no gas; funding it is outside the batch")
+        raise RuntimeError("external test signer has no gas; funding it is outside the batch")
     rpc("anvil_impersonateAccount", address)
 
 
@@ -176,6 +181,8 @@ def pending_fees():
 
 
 def send(frm, to, sig, args, value=0, expect=True):
+    from config import guarded_call
+    sig, args = guarded_call(sig, args, lambda view, *a: cast("call", to, view, *a).split()[0])
     m = load_manifest()
     prepare_actor(frm)
     target_code = cast("code", to)
@@ -188,22 +195,24 @@ def send(frm, to, sig, args, value=0, expect=True):
                   expected_success=expect)
     if value < 0 or value > ACTOR_ETH or quantity(cast("balance", frm)) < value:
         raise RuntimeError("native transfer exceeds named signer funding")
-    calldata = raw("cast", "calldata", sig, *map(str, args))
+    calldata = raw("cast", "calldata", sig, *map(str, args)) if sig else "0x"
     action["calldata"] = calldata
-    estimate = subprocess.run(["cast", "estimate", to, sig, *map(str, args), "--from", frm,
-                               "--value", str(value), "--block", "pending", "--rpc-url", RPC, *fees], capture_output=True, text=True)
+    estimate = subprocess.run(["cast", "estimate", to, *([sig, *map(str, args)] if sig else []), "--from", frm,
+                               "--value", str(value), "--block", "pending", "--rpc-timeout", "120", "--rpc-url", RPC, *fees], capture_output=True, text=True)
     if estimate.returncode:
         if not expect:
             action["preflight_rejected"] = estimate.stderr[-1000:]
             append_action(action)
             return False  # expected denial is demonstrated without an unnecessary failed broadcast
+        append_action(action | dict(preflight_rejected=estimate.stderr[-1000:]))
         raise RuntimeError(f"preflight failed: {action}: {estimate.stderr}")
     gas = (quantity(estimate.stdout.strip().split()[0]) * 5 + 3) // 4
     if gas > MAX_GAS:
+        append_action(action | dict(preflightEstimateGas=quantity(estimate.stdout.strip().split()[0]),paddedGas=gas,transactionCap=MAX_GAS,preflight_rejected="padded gas exceeds transaction cap"))
         raise RuntimeError(f"25% gas margin exceeds per-transaction bound: {gas}")
     if quantity(cast("balance", frm)) < value + gas * (2 * base + 50_000_000):
         raise RuntimeError("named signer cannot cover the exact value and bounded maximum gas")
-    rec = json.loads(cast("send", to, sig, *map(str, args), "--from", frm, "--unlocked", "--json",
+    rec = json.loads(cast("send", to, *([sig, *map(str, args)] if sig else []), "--from", frm, "--unlocked", "--json",
                           "--nonce", nonce, "--value", value, "--gas-limit", gas, *fees))
     ok = quantity(rec["status"]) == 1
     action.update(receipt=rec, gas_limit=gas, post_nonce=quantity(cast("nonce", frm)))
@@ -240,7 +249,7 @@ def deploy(v, label):
             raise RuntimeError(result.stdout + result.stderr)
     finally:
         path.unlink()
-    run = json.loads((ROOT / "broadcast/Deploy.s.sol/1/run-latest.json").read_text())
+    run = json.loads((ROOT / "broadcast/Deploy.s.sol/31337/run-latest.json").read_text())
     deployments = []
     for t in run["transactions"]:
         h = t["hash"]
@@ -329,7 +338,7 @@ def run_approved(calibration_first=False):
             rpc("anvil_setBalance", address, hex(ACTOR_ETH))
             m["funding"][address.lower()] = dict(before_code="0x", before_nonce=0, before_balance=0, funded=ACTOR_ETH)
         manifest.write_text(json.dumps(m, indent=2))
-        env = {**os.environ, "FOUNDRY_GAS_LIMIT": str(MAX_GAS)}
+        env = {**os.environ, "FOUNDRY_GAS_LIMIT": str(MAX_GAS), "PATH": str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"]}
         env.pop("FOUNDRY_CODE_SIZE_LIMIT", None)
         baseline = rpc("evm_snapshot")
         # Unified system (D77): one build-and-list strategy on PackVault plus permissionless

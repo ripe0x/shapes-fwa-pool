@@ -6,7 +6,6 @@ import {PackVault} from "../../src/PackVault.sol";
 /// @notice Request charges (D56), from the vault's own views. Compute before `vm.prank`: these are
 ///         external calls and would consume the prank.
 library Charges {
-    uint256 internal constant POSITION_VALUE = 0.1248 ether;
 
     /// @dev ETH to send so that `escrow` is escrowed (deployment charge included): the
     ///      checkpoint charge goes to the pool on top.
@@ -17,6 +16,6 @@ library Charges {
     /// @dev Exact charge for redeeming `shares` now.
     function redeemCharge(PackVault v, uint256 shares) internal view returns (uint256) {
         uint256 value = shares * v.lastNav() / v.totalShares();
-        return v.requestCharge() + value * v.unwindCharge() / POSITION_VALUE;
+        return v.requestCharge() + value * v.unwindCharge() / v.positionValue();
     }
 }

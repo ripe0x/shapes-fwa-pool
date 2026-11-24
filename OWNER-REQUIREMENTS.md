@@ -235,3 +235,41 @@ layers, or reopen decisions that are already supported by evidence."
 Update (owner, 2026-11-22): no canary, ever. Item 7 is withdrawn; deployment uses
 `deploy/mainnet.json`, which has no deposit cap (set 2026-11-17, cba0cf5).
 "Do not merge, deploy, sign acceptance documents, or spend real funds."
+
+
+## A5. Main pool completion (owner, 2026-11-24)
+
+The owner's implementation request supersedes six-unit launch assumptions, compulsory buyer-keep
+backing and the external keeper policy. Full acceptance scope is in
+`docs/MAIN-POOL-COMPLETION.md`; the originating chat remains authoritative.
+
+1. “Launch with **0.03 eth packs containing three directly minted 0.01 eth shapes**.” Launch
+   units are 3 and mask 8, immediately owner-adjustable for later operation.
+2. “The owner's revenue comes from shapes mint fees.” Every fresh Shape pays the live fee within
+   the explicitly accepted maximum. No bulk/split substitution or public mint-fee change.
+3. “Preserve unlimited total positions with bounded incremental work.” Preserve pooled vault,
+   independently owned managers and shared implementation; no factory control over existing managers.
+4. “Use one consistent calculation for the payment envelope, actual compensation and relevant
+   charge calculations.” Account-owned numerical gas calibration, verified operation counts and
+   routine markup; remove the external policy path and its deployment machinery.
+5. “Use one effective economic configuration per operation.” Expected configuration guards bind
+   economically sensitive work, while claims, cancellation and necessary recovery remain available.
+6. “Implement two account owned renewal modes”: FreshAfterAcquisition and ReuseReturned. Fresh
+   mode uses single-use verified acquisition eligibility, actual returned principal, paid fresh
+   mints, a separate float, protected maintenance reserves and explicit cash/permission waits.
+7. “Unused checkpoint contributions remain attributable and refundable to their payers.” Keep
+   canonical wei attribution across zero quotes, cancellations, topups, partial fills and successful
+   checkpoints. Gross escrow is priced for construction at commitment using lazy epoch issuance.
+8. Bound incremental unresolved keep uplift, replacing allocated face percentage. The local
+   evaluation uses backing70,000bps, uplift25bps, one fresh renewal float and reserve0.005ETH.
+   “The 0.21 backing and 25 bps threshold are provisional evaluation values, not approved
+   production defaults.” The existing net depositor return requirement remains in effect.
+9. “Provide an explicit caller funded exit path in the CLI and app.” Expected wallet spend and
+   caller limit cover necessary bounded work, settlements, checkpoints, partial fills and claims.
+10. Real-counterparty forks, measured transaction receipts and independent cash-flow reconciliation
+    must evaluate creator and holder economics together, separately at current fee and fork-only
+    half fee, at0.2/0.5gwei. Synthetic assumptions are labelled; no manufactured passing return.
+11. “Keep public network transactions, production mint fee changes, live application cutover and
+    merges outside this task. Prepare the deployment package unsigned.” Draft PRs are authorized.
+
+No historical asset-flow signature or deployment acceptance authorizes this changed candidate.

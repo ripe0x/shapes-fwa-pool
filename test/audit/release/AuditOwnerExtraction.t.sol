@@ -21,11 +21,13 @@ contract AuditOwnerExtraction is ForkBase {
         p.routineRate = 0.0008 ether;
         p.essentialCap = 0.01 ether;
         p.essentialRate = 0.0002 ether;
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected0);
         uint256 ck = vault.requestCharge();
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: 1 ether + ck}();
+        vault.deposit{value: 1 ether + ck}(_expected1);
         toBlackout();
         checkpoint();
         toOpen();
@@ -48,8 +50,9 @@ contract AuditOwnerExtraction is ForkBase {
         p.essentialRate = 0.005 ether;
 
         p.tvlCap = type(uint128).max;
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected2);
         (uint256 routine, uint256 essential) = vault.budget();
         assertLt(routine, 0.03 ether, "raising cap did not refill spent budget");
         assertEq(essential, 0.01 ether);
@@ -61,8 +64,9 @@ contract AuditOwnerExtraction is ForkBase {
         assertEq(paidUnlist, routine, "unlist pays entire remaining routine budget");
         vm.prank(owner);
         vault.startWindDown();
+        bytes32 _expected3 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        uint256 paidLiquidate = vault.liquidate(40, 0);
+        uint256 paidLiquidate = vault.liquidate(40, 0, _expected3);
         assertEq(paidLiquidate, essential, "liquidate pays entire essential budget");
         assertEq(owner.balance - beforePay, routine + essential);
         emit log_named_uint("owner keeper pay extracted wei", owner.balance - beforePay);

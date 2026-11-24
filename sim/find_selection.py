@@ -18,7 +18,6 @@ import sqlite3
 import sys
 from pathlib import Path
 
-import numpy as np
 
 ROOT = Path(__file__).parent
 DB = ROOT / "data/fwa.sqlite"
@@ -63,9 +62,9 @@ def main(backing_wei=36_300_000_000_000_000, count=30, start_block=26_164_530):
                 W = sum(slot_w.values())
                 if W != int(a["totalWeight"]):
                     raise SystemExit(f"weight reconstruction broke at block {b}")
-                slots = np.array(sorted(list(slot_w) + ours), dtype=np.int64)
+                slots = sorted(list(slot_w) + ours)
                 mine = set(ours)
-                weights = [w_ours if sl in mine else slot_w[sl] for sl in slots.tolist()]
+                weights = [w_ours if sl in mine else slot_w[sl] for sl in slots]
                 open_req = dict(rid=a["requestId"], ours=ours, slots=slots, weights=weights,
                                 W=W + count * w_ours, req_tx=tx, req_block=b, req_ts=ts,
                                 purchaser=a["purchaser"])
@@ -78,7 +77,7 @@ def main(backing_wei=36_300_000_000_000_000, count=30, start_block=26_164_530):
                 target = word % open_req["W"]
                 # Exact integer prefix sums: weights reach 1e38, beyond float precision.
                 acc = 0
-                for sl, w in zip(open_req["slots"].tolist(), open_req["weights"]):
+                for sl, w in zip(open_req["slots"], open_req["weights"]):
                     acc += w
                     if target < acc:
                         break

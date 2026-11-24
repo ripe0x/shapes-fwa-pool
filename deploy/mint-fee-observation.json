@@ -1,0 +1,9 @@
+{
+ "block": 26484850,
+ "blockHash": "0xb74960f39c4f4971c0e3732837afb49ecdfd20153c3d9d0631796f1d6e086f7c",
+ "timestamp": 1795521275,
+ "shapes": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+ "mintFeeWei": 1000000000000000,
+ "rpc": "https://mainnet.gateway.tenderly.co",
+ "method": "eth_call mintFee() pinned block, read only"
+}

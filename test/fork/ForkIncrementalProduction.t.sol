@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {GasQuotes} from "../utils/GasQuotes.sol";
+
 import {Vm} from "forge-std/Vm.sol";
 import {IFWAToken, IFWAV2} from "../../src/interfaces/External.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
@@ -62,9 +64,11 @@ contract ForkProductionReceiptsTest is SelectionBase {
 
     function _catchUp(uint256[] memory ids) private {
         while (vault.acquisitionCursor() < FWA.nextSequenceToProcess()) {
-            vault.sync(new uint256[](0), 0, 0);
+            bytes32 _expected0 = TestVaultOps.configurationHash(vault);
+            vault.sync(new uint256[](0), 0, 0, _expected0);
         }
-        if (ids.length != 0) vault.sync(ids, 0, 0);
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
+        if (ids.length != 0) vault.sync(ids, 0, 0, _expected1);
     }
 
     function _drain() private {
@@ -99,12 +103,14 @@ contract ForkProductionReceiptsTest is SelectionBase {
         uint64 cursor = vault.acquisitionCursor();
         vm.expectRevert(VaultLib.CatchUpFirst.selector);
         vault.accountedNav(0);
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
-        vault.sync(_one(selected), 0, type(uint256).max);
+        vault.sync(_one(selected), 0, type(uint256).max, _expected2);
         assertEq(vault.acquisitionCursor(), cursor);
         assertEq(vault.pendingReceipts(), 1);
         assertEq(vault.idForBacking(B), selected);
-        vault.sync(_one(selected), 0, 0);
+        bytes32 _expected3 = TestVaultOps.configurationHash(vault);
+        vault.sync(_one(selected), 0, 0, _expected3);
         assertGt(vault.acquisitionCursor(), cursor, "journal precedes terminal reconciliation in the same job");
         assertEq(vault.pendingReceipts(), 0);
         assertEq(vault.idForBacking(B), 0);
@@ -114,8 +120,9 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(allocated, 0);
         uint256 nav = vault.accountedNav(0);
         assertEq(nav, address(vault).balance + FWA.feeCredit(address(vault)));
+        bytes32 _expected4 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.sync(_one(selected), 0, 0);
+        vault.sync(_one(selected), 0, 0, _expected4);
         assertEq(vault.accountedNav(0), nav);
     }
 
@@ -131,7 +138,8 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(holder.code.length, 0); assertEq(holder.balance, 0);
         uint256 charge = vault.requestCharge();
         vm.deal(holder, 0.1 ether + charge);
-        vm.prank(holder); vault.deposit{value: 0.1 ether + charge}();
+        bytes32 _expected5 = TestVaultOps.configurationHash(vault);
+        vm.prank(holder); vault.deposit{value: 0.1 ether + charge}(_expected5);
         uint64 cursor = vault.acquisitionCursor();
         uint256 open = vault.openListingCount();
         uint256 reserved = vault.reservedCount();
@@ -139,8 +147,9 @@ contract ForkProductionReceiptsTest is SelectionBase {
         uint256 interval = vault.lastCheckpointInterval();
         assertEq(vault.pendingReceipts(), 1);
         assertEq(vault.position(selected).state, VaultLib.ACTIVE, "own selection has not reached the book");
+        bytes32 _expected6 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(VaultLib.CatchUpFirst.selector);
-        vault.checkpoint(0, 0);
+        vault.checkpoint(0, 0, _expected6);
         assertEq(vault.acquisitionCursor(), cursor);
         assertEq(vault.pendingReceipts(), 1);
         assertEq(vault.openListingCount(), open);
@@ -152,7 +161,8 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(vault.lastCheckpointInterval(), interval);
         _catchUp(_one(selected));
         assertEq(vault.pendingReceipts(), 0);
-        vault.checkpoint(0, 0);
+        bytes32 _expected7 = TestVaultOps.configurationHash(vault);
+        vault.checkpoint(0, 0, _expected7);
         assertGt(vault.shareBalance(holder), 0, "authenticated reconciliation opens the same checkpoint window");
         assertEq(vault.pendingDepositTotal(), 0);
         assertEq(vault.processingPool(), 0);
@@ -160,7 +170,8 @@ contract ForkProductionReceiptsTest is SelectionBase {
 
     function test_bidReturnPreservesFloorBeforeInventorySyncAndReusesIdentifierAfterRetirement() public {
         _select(primary()); _environment();
-        vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected8 = TestVaultOps.configurationHash(vault);
+        vault.sync(new uint256[](0), 0, 0, _expected8);
         address buyer = primary().purchaser;
         uint256 before = buyer.balance;
         vm.prank(buyer); IFwaSettle(address(FWA)).acceptDepositorBid(selected);
@@ -171,14 +182,20 @@ contract ForkProductionReceiptsTest is SelectionBase {
         (uint256 tracked, uint256 idle,,,, uint256 allocated) = vault.totals();
         assertEq(tracked, 0.06 ether); assertEq(idle, 0); assertEq(allocated, 0.06 ether);
         assertEq(vault.accountedNav(0), address(vault).balance + 0.06 ether + FWA.feeCredit(address(vault)), "unsynced bid return cannot raise NAV");
-        vault.sync(_one(selected), 0, 0);
+        bytes32 _expected9 = TestVaultOps.configurationHash(vault);
+        vault.sync(_one(selected), 0, 0, _expected9);
         assertEq(vault.idForBacking(B), 0);
         assertEq(vault.idlePackCount(), 1);
         (tracked, idle,,,, allocated) = vault.totals();
         assertEq(tracked, 0.06 ether); assertEq(idle, 0.06 ether); assertEq(allocated, 0);
         _drain();
+        VaultLib.Params memory relistParams = vault.getParams();
+        relistParams.backingRatioBps = uint32(B * 10_000 / 0.06 ether);
+        bytes32 relistConfig = vault.configurationHash();
+        vm.prank(vault.owner()); vault.setParams(relistParams, relistConfig);
         uint256[] memory proposed = new uint256[](1); proposed[0] = B;
-        vault.list(proposed, 0);
+        bytes32 _expected10 = TestVaultOps.configurationHash(vault);
+        vault.list(proposed, 0, _expected10);
         uint256 fresh = vault.openListingAt(0);
         assertTrue(fresh != selected);
         assertEq(vault.idForBacking(B), fresh);
@@ -188,7 +205,8 @@ contract ForkProductionReceiptsTest is SelectionBase {
 
     function test_realTokenBidReturnsPackPreservesPrincipalAndCreatesNoEthReceipt() public {
         _select(primary()); _environment();
-        vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected11 = TestVaultOps.configurationHash(vault);
+        vault.sync(new uint256[](0), 0, 0, _expected11);
         address buyer = primary().purchaser;
         IFWAToken rewardToken = IFWAToken(FWA.token());
         uint256 buyerBefore = rewardToken.balanceOf(buyer);
@@ -219,7 +237,8 @@ contract ForkProductionReceiptsTest is SelectionBase {
         }
         assertTrue(identified, "authenticated actual token-bid outcome");
         assertEq(vault.accountedNav(0), vaultEth + 0.06 ether + FWA.feeCredit(address(vault)), "token route preserves the same conservative principal");
-        vault.sync(_one(selected), 0, 0);
+        bytes32 _expected12 = TestVaultOps.configurationHash(vault);
+        vault.sync(_one(selected), 0, 0, _expected12);
         (uint256 tracked, uint256 idle,,,, uint256 allocated) = vault.totals();
         assertEq(tracked, 0.06 ether); assertEq(idle, tracked); assertEq(allocated, 0);
         assertEq(vault.idForBacking(B), 0);
@@ -255,8 +274,9 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(idle, tracked);
         assertEq(vault.idForBacking(B), 0);
         uint256 before = vault.accountedNav(0);
+        bytes32 _expected13 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.sync(_one(selected), 0, 0);
+        vault.sync(_one(selected), 0, 0, _expected13);
         assertEq(vault.accountedNav(0), before);
     }
 
@@ -276,9 +296,18 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(vault.idlePackCount(), 0);
         (uint256 tracked, uint256 idle,,,,) = vault.totals();
         assertEq(tracked, 0.34 ether); assertEq(idle, tracked);
+        uint256 referenceCapital = vault.positionValue();
+        uint256 recoveryOnlyQuote = vault.unwindCharge();
+        assertGe(recoveryOnlyQuote * tracked, 0.000279 ether * referenceCapital,
+            "recovery-only inventory quote includes real bounded recovery expense");
         _drain();
         TestVaultOps.restock(vault, 1, UNITS, 0); // build lists it at once
         assertEq(vault.openListingCount(), 1, "oversized gift does not occupy normal stack");
+        uint256 fullQuote = vault.unwindCharge();
+        uint256 capital = 0.34 ether;
+        uint256 ordinaryId = vault.openListingAt(0);
+        VaultLib.Position memory ordinary = vault.position(ordinaryId);
+        capital += ordinary.value + ordinary.backing;
         address vaultOwner = vault.owner();
         vm.prank(vaultOwner); vault.startWindDown();
         // The 30-Shape gift pack (one 0.05 and twenty-nine 0.01) unseals and burns in one bounded
@@ -288,7 +317,8 @@ contract ForkProductionReceiptsTest is SelectionBase {
         uint256 before = address(vault).balance;
         _cold();
         uint256 start = gasleft();
-        uint256 paid = vault.liquidate(16, 0);
+        bytes32 _expected14 = TestVaultOps.configurationHash(vault);
+        uint256 paid = vault.liquidate(16, 0, _expected14);
         uint256 used = start - gasleft() + 21_000;
         emit log_named_uint("recovery thirty Shapes complete gas", used);
         emit log_named_uint("recovery thirty Shapes pay wei", paid);
@@ -299,6 +329,12 @@ contract ForkProductionReceiptsTest is SelectionBase {
         (tracked, idle,,,,) = vault.totals();
         assertEq(tracked, 0.06 ether, "only the new listed six-unit pack remains");
         assertEq(idle, 0);
+        vm.warp(vm.getBlockTimestamp() + 13 hours);
+        paid += vault.unlist(_one(ordinaryId), 0, vault.configurationHash());
+        paid += vault.liquidate(16, 0, vault.configurationHash());
+        assertEq(vault.openListingCount() + vault.idlePackCount() + vault.recoveryPackCount(), 0);
+        assertGe(fullQuote * capital, paid * referenceCapital,
+            "mixed ordinary and oversized gift quote covers every actual exit payment");
     }
 
     function test_feeChangeDoesNotReinterpretReceipt() public {
@@ -315,7 +351,8 @@ contract ForkProductionReceiptsTest is SelectionBase {
         _select(primary());
         _pendForeignAcquisition(); // a real foreign request that the drain below refunds unfulfilled
         _environment();
-        vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected15 = TestVaultOps.configurationHash(vault);
+        vault.sync(new uint256[](0), 0, 0, _expected15);
         _drain();
         uint64 cursor = vault.acquisitionCursor();
         uint64 completed = FWA.nextSequenceToProcess();
@@ -324,13 +361,15 @@ contract ForkProductionReceiptsTest is SelectionBase {
         IFWAV2.Acquisition memory a = FWA.acquisitions(request);
         assertTrue(a.status == 3 || a.status == 4, "real abandoned request was refunded through FWA");
         uint256 before = address(vault).balance;
+        bytes32 _expected16 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
-        vault.sync(new uint256[](0), 0, 1);
+        vault.sync(new uint256[](0), 0, 1, _expected16);
         assertEq(vault.acquisitionCursor(), cursor);
         _cold();
         vm.cool(address(VaultLib));
         uint256 start = gasleft();
-        uint256 paid = vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected17 = TestVaultOps.configurationHash(vault);
+        uint256 paid = vault.sync(new uint256[](0), 0, 0, _expected17);
         uint256 used = start - gasleft() + 21_000;
         assertEq(before - address(vault).balance, paid);
         assertEq(paid, 0, "unrelated short tails wait for a qualified job");
@@ -346,33 +385,38 @@ contract ForkProductionReceiptsTest is SelectionBase {
         vm.prank(primary().purchaser); IFwaSettle(address(FWA)).acceptDepositorBid(selected);
         uint64 cursor = vault.acquisitionCursor();
         uint256 creditBefore = FWA.feeCredit(address(vault));
-        uint256 paid = vault.sync(_one(selected), 0, 0);
+        bytes32 _expected18 = TestVaultOps.configurationHash(vault);
+        uint256 paid = vault.sync(_one(selected), 0, 0, _expected18);
         uint256 processed = vault.acquisitionCursor() - cursor;
         // At this selection the fee credit is large enough that the sync economically sweeps it into
         // the vault (withdrawEarnings), adding Q_CREDIT to the quote (D56). Priced from the on-chain
         // fact, not assumed: the terminal reconciliation and its bounded head cleanup are the rest.
-        uint256 swept = creditBefore != 0 && FWA.feeCredit(address(vault)) == 0 ? VaultLib.Q_CREDIT : 0;
-        assertEq(paid, (VaultLib.Q_SYNC + processed * VaultLib.Q_JOURNAL + VaultLib.Q_SELECTED
-            + VaultLib.Q_SYNCED + VaultLib.Q_PRUNED + swept) * 0.2 gwei + vault.getParams().workFee);
+        uint256 swept = creditBefore != 0 && FWA.feeCredit(address(vault)) == 0 ? GasQuotes.Q_CREDIT : 0;
+        assertEq(paid, (GasQuotes.Q_SYNC + processed * GasQuotes.Q_JOURNAL + GasQuotes.Q_SELECTED
+            + GasQuotes.Q_SYNCED + GasQuotes.Q_PRUNED + swept) * 0.2 gwei + vault.getParams().workFee);
         (uint256 head, uint256 length,,,) = vault.allocationState();
         assertEq(head, length, "terminal work includes bounded head cleanup");
         _drain();
-        vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected19 = TestVaultOps.configurationHash(vault);
+        vault.sync(new uint256[](0), 0, 0, _expected19);
         address holder = makeAddr("pack-vault-test-prune-holder");
         assertEq(holder.code.length, 0); assertEq(holder.balance, 0);
         uint256 deposit = vault.requestCharge() + 0.1 ether;
         vm.deal(holder, deposit);
-        vm.prank(holder); vault.deposit{value: deposit}();
+        bytes32 _expected20 = TestVaultOps.configurationHash(vault);
+        vm.prank(holder); vault.deposit{value: deposit}(_expected20);
         uint256 next = block.timestamp - block.timestamp % 12 hours + 11 hours + 46 minutes;
         if (next <= block.timestamp) next += 12 hours;
         vm.warp(next);
         uint256 processing = vault.processingPool();
         uint256 before = address(vault).balance;
+        bytes32 _expected21 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Nothing.selector);
-        vault.sync(new uint256[](0), 0, 0);
+        vault.sync(new uint256[](0), 0, 0, _expected21);
         assertEq(vault.processingPool(), processing, "cleanup cannot use protected checkpoint charges");
         assertEq(address(vault).balance, before);
-        vault.checkpoint(0, 0);
+        bytes32 _expected22 = TestVaultOps.configurationHash(vault);
+        vault.checkpoint(0, 0, _expected22);
         assertGt(vault.shareBalance(holder), 0, "same pricing window opens after bounded cleanup");
     }
 
@@ -551,7 +595,8 @@ contract ForkProductionInventoryTest is ForkBase {
     /// books across the build, wind-down unlist and liquidation custody states.
     function test_directMintBuildListingWithdrawalAndRedemptionMatchFullReference() public {
         uint256 amount = vault.requestCharge() + 2 ether;
-        vm.prank(alice); vault.deposit{value: amount}();
+        bytes32 _expected23 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: amount}(_expected23);
         toBlackout(); checkpoint(); toOpen();
         vm.recordLogs();
         TestVaultOps.restock(vault, 2, UNITS, 0);
@@ -569,7 +614,8 @@ contract ForkProductionInventoryTest is ForkBase {
         vm.prank(owner); vault.startWindDown();
         TestVaultOps.unlist(vault, TestVaultOps.open(vault), 0);
         _assertReference();
-        vault.liquidate(16, 0);
+        bytes32 _expected24 = TestVaultOps.configurationHash(vault);
+        vault.liquidate(16, 0, _expected24);
         _assertReference();
         (uint256 tracked, uint256 idle,,,,) = vault.totals();
         assertEq(tracked, 0); assertEq(idle, 0);
@@ -580,11 +626,14 @@ contract ForkProductionInventoryTest is ForkBase {
     /// moves it past the 10,000-wei tag window, and the stale proposal is then rejected.
     function test_gasCeilingAndBasefeeDoNotMoveBackingProposal() public {
         uint256 gross = vault.requestCharge() + 2 ether;
-        vm.prank(alice); vault.deposit{value: gross}();
+        bytes32 _expected25 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: gross}(_expected25);
         toBlackout(); checkpoint(); toOpen();
         VaultLib.Params memory p = vault.getParams();
         p.gasCeiling = 0.5 gwei; p.maxTip = 0.05 gwei; p.payMarkupBps = 0; p.workFee = 0.00002 ether;
-        vm.prank(owner); vault.setParams(p);
+        p.backingRatioBps = 15_000; // fresh construction is viable in both tested gas regimes
+        bytes32 _expected26 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected26);
         vm.prank(IOwnable(address(FWA)).owner());
         ProductionOracleExempt(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         vm.fee(0.4 gwei); vm.txGasPrice(0.45 gwei);
@@ -598,15 +647,18 @@ contract ForkProductionInventoryTest is ForkBase {
         // inside FWA's tag window, so a proposal computed at the lower ceiling still builds here.
         uint256[] memory stale = TestVaultOps.proposals(vault, 1, UNITS);
         p.gasCeiling = 1 gwei;
-        vm.prank(owner); vault.setParams(p);
+        bytes32 _expected27 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected27);
         uint256[] memory fresh = TestVaultOps.proposals(vault, 1, UNITS);
         assertEq(stale[0], fresh[0], "a higher gas ceiling does not move the backing proposal (D85)");
         // The tag window still rejects a backing outside it: one window-plus past the proposal fails.
         uint256[] memory outside = new uint256[](1);
         outside[0] = fresh[0] + 2 * 10_000;
+        bytes32 _expected28 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(VaultLib.InvalidBacking.selector);
-        vault.build(UNITS, outside, 0);
-        vault.build(UNITS, stale, 0);
+        vault.build(UNITS, outside, 0, _expected28);
+        bytes32 _expected29 = TestVaultOps.configurationHash(vault);
+        vault.build(UNITS, stale, 0, _expected29);
         assertEq(vault.openListingCount(), 1);
         assertEq(vault.position(vault.openListingAt(0)).backing, stale[0]);
     }
@@ -614,15 +666,18 @@ contract ForkProductionInventoryTest is ForkBase {
     function test_pendingEscrowProcessingClaimsAndCancellationExcludedFromNAV() public {
         uint256 amount = vault.requestCharge() + 2 ether;
         uint256 before = vault.accountedNav(0);
-        vm.prank(alice); vault.deposit{value: amount}();
+        bytes32 _expected30 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: amount}(_expected30);
         assertEq(vault.accountedNav(0), before, "escrow and fixed processing charge are liabilities");
         vm.prank(alice); vault.cancelDeposit();
         assertEq(vault.accountedNav(0), before);
-        vm.prank(alice); vault.deposit{value: amount}();
+        bytes32 _expected31 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: amount}(_expected31);
         toBlackout(); checkpoint();
         uint256 shares = vault.shareBalance(alice);
         uint256 charge = vault.requestCharge() + shares * vault.lastNav() / vault.totalShares() * vault.unwindCharge() / 0.1248 ether;
-        vm.prank(alice); vault.requestRedeem{value: charge}(shares);
+        bytes32 _expected32 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.requestRedeem{value: charge}(shares, _expected32);
         toOpen(); toBlackout(); checkpoint();
         uint256 reserved = vault.redemptionReserve();
         uint256 nav = vault.accountedNav(0);
@@ -652,7 +707,7 @@ contract ForkProductionFeeWitnessTest is ForkBase {
         vm.createSelectFork("mainnet", bytes32(0x7a2e33446681244f37d801df737f7017e3e9258d49fa6465e95983f5a3b81a6f));
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
         vm.deal(address(this), 10 ether);
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, defaultParams(), 3 ether);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, defaultParams(), 3 ether, keccak256(abi.encode(defaultParams(), SHAPES.mintFee(), false, false)));
         vm.prank(IOwnable(address(FWA)).owner());
         ProductionOracleExempt(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         TestVaultOps.restock(vault, 2, UNITS, 0);
@@ -671,7 +726,8 @@ contract ForkProductionFeeWitnessTest is ForkBase {
         (,,,,,,,,,, uint8 secondStatus) = FWA.listings(second);
         assertEq(firstStatus, 1, "first witness remains Active");
         assertEq(secondStatus, 1, "second witness remains Active");
-        vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected33 = TestVaultOps.configurationHash(vault);
+        vault.sync(new uint256[](0), 0, 0, _expected33);
     }
 
     function _independentNav(uint256 first, uint256 second) private view returns (uint256) {
@@ -732,10 +788,12 @@ contract ForkProductionAdmissionTest is ForkBase {
 
     function test_quantizedIntervalBothSidesCollisionsAndHardBounds() public {
         uint256 gross = vault.requestCharge() + 2 ether;
-        vm.prank(alice); vault.deposit{value: gross}();
+        bytes32 _expected34 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: gross}(_expected34);
         toBlackout(); checkpoint(); toOpen();
         VaultLib.Params memory p = vault.getParams(); p.gasCeiling = 1 gwei; p.payMarkupBps = 0;
-        vm.prank(owner); vault.setParams(p);
+        bytes32 _expected35 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected35);
         vm.prank(IOwnable(address(FWA)).owner());
         ProductionOracleExempt(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         (, uint256 target, bool ok) = vault.edge(UNITS); assertTrue(ok);
@@ -744,23 +802,28 @@ contract ForkProductionAdmissionTest is ForkBase {
         assertGt(lower, (uint256(0.06 ether) * 10_000 + 9_499) / 9_500, "economic floor leaves both tag directions usable");
         uint256 snapshot = vm.snapshotState();
         uint256[] memory proposed = new uint256[](1); proposed[0] = lower;
-        vault.build(UNITS, proposed, 0);
+        bytes32 _expected36 = TestVaultOps.configurationHash(vault);
+        vault.build(UNITS, proposed, 0, _expected36);
         assertEq(vault.position(vault.openListingAt(0)).backing, lower);
         uint256 balance = address(vault).balance;
+        bytes32 _expected37 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(VaultLib.InvalidBacking.selector);
-        vault.build(UNITS, proposed, 0);
+        vault.build(UNITS, proposed, 0, _expected37);
         assertEq(address(vault).balance, balance, "colliding proposal fails before paid mint");
         assertTrue(vm.revertToState(snapshot));
         proposed[0] = upper;
-        vault.build(UNITS, proposed, 0);
+        bytes32 _expected38 = TestVaultOps.configurationHash(vault);
+        vault.build(UNITS, proposed, 0, _expected38);
         assertEq(vault.position(vault.openListingAt(0)).backing, upper);
         assertTrue(vm.revertToState(snapshot));
         proposed[0] = lower - 20_000;
+        bytes32 _expected39 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(VaultLib.InvalidBacking.selector);
-        vault.build(UNITS, proposed, 0);
+        vault.build(UNITS, proposed, 0, _expected39);
         proposed[0] = lower + 1;
+        bytes32 _expected40 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(VaultLib.InvalidBacking.selector);
-        vault.build(UNITS, proposed, 0);
+        vault.build(UNITS, proposed, 0, _expected40);
         assertEq(vault.reservedCount(), 0);
         assertEq(vault.idlePackCount(), 0);
     }
@@ -803,8 +866,9 @@ contract ForkProductionStagingTest is SelectionBase {
         uint256 openBefore = vault.openListingCount();
         // build mints and lists atomically; a rejected foreign autoactivation rolls back the paid
         // mint and the posted cash in the same transaction (no separate list step any more).
+        bytes32 _expected41 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(VaultLib.InvalidListing.selector);
-        vault.build(UNITS, proposal, 0);
+        vault.build(UNITS, proposal, 0, _expected41);
         assertEq(address(vault).balance, before, "failed admission returns posted cash atomically");
         assertEq(SHAPES.totalSupply(), supply, "failed admission mints nothing atomically");
         assertEq(vault.idlePackCount(), 0); assertEq(vault.openListingCount(), openBefore);
@@ -828,19 +892,20 @@ contract ForkProductionStagingTest is SelectionBase {
         assertEq(status, 1, "FWA's final status alone permits the costly path");
         assertEq(FWA.activeListingCount() - active, 16, "real side effect activates fifteen foreign listings");
         assertTrue(vm.revertToState(snapshot));
-        // build mints and lists eight packs atomically; its incidental foreign autoactivation
+        // build mints and lists four packs atomically; its incidental foreign autoactivation
         // exceeds FWA's per-admission bound, so FWA rejects it with bounded gas and the whole build
         // (every paid mint and every posted backing) rolls back.
-        uint256[] memory proposed = TestVaultOps.proposals(vault, 8, UNITS);
+        uint256[] memory proposed = TestVaultOps.proposals(vault, 4, UNITS);
         uint256 balance = address(vault).balance;
         uint256 reserved = vault.reservedCount();
         uint256 supply = SHAPES.totalSupply();
         vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(address(PACKS));
+        bytes32 _expected42 = TestVaultOps.configurationHash(vault);
         vm.expectRevert();
         start = gasleft();
-        vault.build(UNITS, proposed, 0);
+        vault.build(UNITS, proposed, 0, _expected42);
         uint256 used = start - gasleft() + 21_000;
-        emit log_named_uint("bounded rejected maximum-eight admission gross gas", used);
+        emit log_named_uint("bounded rejected maximum-four admission gross gas", used);
         assertLt(used * 125 / 100, 16_777_216);
         assertEq(address(vault).balance, balance);
         assertEq(SHAPES.totalSupply(), supply, "rejected build mints nothing");

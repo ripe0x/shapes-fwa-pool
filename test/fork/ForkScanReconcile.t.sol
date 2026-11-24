@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {GasQuotes} from "../utils/GasQuotes.sol";
+
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
@@ -75,13 +77,14 @@ contract ForkScanReconcileTest is SelectionBase {
         p.workFee = 0;
         p.maxTip = 0;
         p.keeperShareBps = 0;
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(vault.owner());
-        vault.setParams(p);
+        vault.setParams(p, _expected0);
 
         vm.writeLine(
             OUT,
             string.concat(
-                '{"step":"setup","deployBalance":', vm.toString(deployBalance),
+                '{"step":"setup","actors":', ReconcileTrace.actors(vault, alice, bob, address(this)), ',"deployBalance":', vm.toString(deployBalance),
                 ',"selectPay":', vm.toString(selectPay),
                 ',"count":', vm.toString(COUNT), ',"units":6,"backing":', vm.toString(B),
                 ',"activationDebt":', vm.toString(activationDebt), ',"initCursor":', vm.toString(vault.acquisitionCursor()),
@@ -109,9 +112,10 @@ contract ForkScanReconcileTest is SelectionBase {
         // One scan reads the single own position, applies the selection and clears the whole
         // backlog; it is a paid own-selection sync.
         uint256 before = address(this).balance;
-        uint256 pay = vault.sync(new uint256[](0), 0, 1);
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
+        uint256 pay = vault.sync(new uint256[](0), 0, 1, _expected1);
         // maxTip 0 and ceiling well above basefee, so the fixed quote is priced at the 0.4 gwei basefee.
-        assertEq(pay, (VaultLib.Q_SYNC + VaultLib.Q_SCAN + VaultLib.Q_SELECTED) * 0.4 gwei, "paid scan quote");
+        assertEq(pay, (GasQuotes.Q_SYNC + GasQuotes.Q_SCAN + GasQuotes.Q_SELECTED) * 0.4 gwei, "paid scan quote");
         assertEq(address(this).balance - before, pay);
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess(), "scan jumped the cursor over the backlog");
         _snap("scan");

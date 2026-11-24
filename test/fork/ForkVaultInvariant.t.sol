@@ -34,8 +34,9 @@ contract VaultHandler is Test {
         address a = _actor(seed);
         amount = bound(amount, 0.01 ether, 3 ether);
         if (a.balance < amount) return;
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(a);
-        try vault.deposit{value: amount}() {} catch {}
+        try vault.deposit{value: amount}(_expected0) {} catch {}
         ++calls;
     }
 
@@ -50,8 +51,9 @@ contract VaultHandler is Test {
         uint256 bal = vault.shareBalance(a);
         if (bal == 0) return;
         uint256 amount = bal * bound(frac, 1, 100) / 100;
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         vm.prank(a);
-        try vault.requestRedeem{value: 0.01 ether}(amount) {} catch {}
+        try vault.requestRedeem{value: 0.01 ether}(amount, _expected1) {} catch {}
         ++calls;
     }
 
@@ -67,8 +69,9 @@ contract VaultHandler is Test {
         if (t >= start) start += INTERVAL;
         vm.warp(start + 60);
         uint256 witness = TestVaultOps.witness(vault);
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper);
-        try vault.checkpoint(witness, 0) {} catch {}
+        try vault.checkpoint(witness, 0, _expected2) {} catch {}
         // Leave the blackout so listing-side actions see an open interval next.
         vm.warp(start - BLACKOUT + INTERVAL + 60);
         ++calls;
@@ -78,7 +81,8 @@ contract VaultHandler is Test {
         n = bound(n, 1, 4);
         vm.startPrank(keeper);
         // Build mints and lists at once; each six-unit pack mints two Shapes at 0.001 ETH.
-        try vault.build(6, TestVaultOps.proposals(vault, n, 6), 0) {
+        bytes32 _expected3 = TestVaultOps.configurationHash(vault);
+        try vault.build(6, TestVaultOps.proposals(vault, n, 6), 0, _expected3) {
             mintFeesPaid += n * 0.002 ether;
         } catch {}
         vm.stopPrank();
@@ -88,7 +92,8 @@ contract VaultHandler is Test {
     function relist() external {
         vm.startPrank(keeper);
         // Relist whatever idle (returned) packs exist; no mint, so mintFeesPaid is unchanged.
-        try vault.list(TestVaultOps.proposals(vault, 4, 6), 0) {} catch {}
+        bytes32 _expected4 = TestVaultOps.configurationHash(vault);
+        try vault.list(TestVaultOps.proposals(vault, 4, 6), 0, _expected4) {} catch {}
         vm.stopPrank();
         ++calls;
     }
@@ -96,14 +101,16 @@ contract VaultHandler is Test {
     function unlist() external {
         uint256[] memory ids = TestVaultOps.open(vault);
         if (ids.length == 0) return;
+        bytes32 _expected5 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper);
-        try vault.unlist(ids, 0) {} catch {}
+        try vault.unlist(ids, 0, _expected5) {} catch {}
         ++calls;
     }
 
     function liquidate(uint256 n) external {
+        bytes32 _expected6 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper);
-        try vault.liquidate(bound(n, 1, 10), 0) {} catch {}
+        try vault.liquidate(bound(n, 1, 10), 0, _expected6) {} catch {}
         ++calls;
     }
 

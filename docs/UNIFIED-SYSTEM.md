@@ -1,236 +1,112 @@
-# Unified shapes FWA system
+# Unified main Shapes pool
 
-Branch `claude/unified-shapes-fwa-system-852d17`, from main `78ad729`. Owner brief: OWNER-REQUIREMENTS A3.
-Decisions: D77–D83. Status: draft PR; nothing deployed, no real funds moved, mint fee unchanged.
+Current owner scope: [MAIN-POOL-COMPLETION.md](MAIN-POOL-COMPLETION.md), OWNER-REQUIREMENTS A5.
+This is an unsigned implementation candidate. Historical design and measurements are preserved
+under `release/history/e94fd99/`. They do not validate this configuration.
 
-## 1. Architecture
+## Architecture and custody
 
-```
-                          FWA V2 main pool (one depositor of record per listing)
-                                ▲   listNFT / sync / withdraw / fees          ▲
-                                │                                             │
-   holders ──deposit/redeem──► PackVault ──┐                  ┌── PackManager (clone) ◄── one owner
-                               (shares,    │                  │   (withdraw ETH, packs;
-                                checkpoints,│                  │    pause, exit mode)
-                                reserves)   │                  │
-                                            ▼                  ▼
-                                    PackAccount: one operating surface
-                     build · list · sync · unlist · liquidate · harvest · burnTokens · views
-                                            │ DELEGATECALL, account's own storage
-                                            ▼
-                      StrategyLib ──► VaultLib ──► ScanLib       (stateless, linked once)
-                      operations      book, economics,  own-position scan
-                                      journal, settlement,
-                                      recovery, keeper pay
-                                            │
-                   ShapePacks.createPack (mint Shapes straight into the pack) · Shapes mint fee
+PackVault pools nontransferable holder shares. PackManager is an individually owned ERC-1167 clone.
+Both inherit PackAccount and execute StrategyLib, VaultLib and ScanLib against their own storage.
+Each account is FWA's depositor and owns its cash, packs, liabilities and keeper permissions.
+PackManagerFactory creates and discovers managers; it has no owner or authority over created clones.
+The original two-step ownership handover remains 48 hours. There is no external keeper policy.
 
-   PackManagerFactory ── creates ERC-1167 clones of one PackManager implementation; no owner,
-                         no fee, no authority after creation. KeeperPolicyV1: shared pay quote.
-   keeper/ (one codebase) ── schedules the vault and every discovered manager independently.
-```
+## Configuration and paid construction
 
-Every account is the FWA depositor of record for its own listings and holds its own ETH, packs and
-book. The libraries run in the account's context, have no state and no withdrawal path. There is
-no central strategy contract, custodian, registry or keeper coordinator.
+Launch units 3, mask 8: three directly minted 0.01 ETH Shapes in one 0.03 ETH pack. Every fresh Shape
+pays the actual live mint fee. The recorded baseline is 0.001 ETH per Shape at block 26,484,850:
+0.003 ETH creator revenue per fresh launch pack. No bulk mint, split, fee exemption or hidden subsidy.
+The 0.0005 ETH scenario is fork-only sensitivity, not a production fee change.
 
-## 2. Shared versus ownership-specific
+Each owner can immediately change numerical Params and its named GasSchedule. An explicit accepted
+mint-fee maximum is separate from ordinary settings. Decreases lower actual spending; increases over
+the accepted maximum block fresh mints. A configuration hash binds creation and sensitive work to
+Params, live mint fee and operating flags, excluding changing budgets and time. Claims, cancellation
+and necessary unpaid recovery remain available when the configuration changes.
 
-| Shared (one implementation: PackAccount + StrategyLib + VaultLib + ScanLib) | Pool only (PackVault) | Manager only (PackManager) |
-|---|---|---|
-| Direct-mint pack construction and atomic listing (`build`) | Shares, dead seed shares, high-water mark | Single owner custody, no shares or NAV |
-| Live FWA economics, backing rule and admission gate (`edge`) | Escrowed deposits, cancellation, request charges | `withdraw` any ETH, `withdrawPacks` idle packs |
-| Relisting returned packs (`list`) | Checkpoints in FWA's blackout, epoch pricing | `rescue` untracked NFTs |
-| Position book, journal and own-position scan, settlement (`sync`) | Pro-rata redemptions, claims, distributions | `setListingPaused`, reversible exit mode |
-| Fee collection inside paid work; caller-funded `harvest` | Protected liabilities in `_free` | `_free` = balance, `_idle` = balance − reserve |
-| Settlement from FWA's own listing record and pack ownership; `receive` receipts gate pricing (D84) | Redemption shortfall and liquidation need | One-time factory initialization |
-| Unlisting and liquidation, bounded recovery of oversized packs | One-way wind-down, deposit pause | |
-| Keeper pay by quote, budgets, policy offer, `minPay` | Deploy and unwind charges | |
-| Token claim and burn (never valued) | | |
-| Parameters within bytecode bounds, policy, two-step ownership | | |
+Backing is an adjustable ratio, checked against actual FWA admission, asset coverage, quantization,
+unique identifiers and the selected lifecycle's costs. A local backing floor of ceil(face/0.95)
+preserves the face mark of unresolved allocations even at FWA's immutable 5% settlement-fee cap;
+it limits owner-selected backing to at least 1.052632x face. It is an account NAV coverage rule,
+not FWA's mutable minimum, which the real listing call enforces. It contains no purchaser bid
+discount or redeem gas: a buyer may profitably take the bid. Buyer choice is never imposed by a keep
+preference. Local evaluation uses 70,000 bps, or 0.21 ETH backing separate from 0.03 ETH principal.
+That backing and the 25 bps checkpoint uplift value are provisional, not production approval.
 
-## 3. Recipe and backing
+FreshAfterAcquisition retires a genuinely acquired return once, redeems its actual principal, pays
+for fresh primary mints and lists a replacement. Verified keeps authorize one replacement. Owed
+returns retain eligibility until actually recovered. Ordinary kicks/withdrawals authorize none.
+ReuseReturned relists the actual returned pack. Fresh mode never silently falls back to reuse.
+Exit inventory is liquidated without fresh minting. Zero recipe mask prevents builds and renewals;
+old inventory can still relist. Listing pause stops all new exposure.
 
-New packs: 0.06 ETH = one 0.05 Shape + one 0.01 Shape minted straight into the pack
-(`ShapePacks.createPack([], [1, 1, 0, …])`): two paid primary mints, 0.002 ETH at the 0.001 fee.
-Backing: 0.06489617486338 ETH (1.082 × P), fixed by the rule, not by keeper settings (D85). A
-selected purchaser keeps a pack worth 0.06 rather than take FWA's best bid (the 91.5% token bid:
-0.05938 ETH) by 0.0003 ETH after 160,000 gas to redeem it at up to 2 gwei. Each keep returns
-B (1 − s) = 0.06424721 ETH to the account and triggers a replacement build with fresh mints; each bid
-returns the pack for relisting without a mint. FWA pays keeps and kick refunds by pushing ETH; if
-the account's `receive` ever fails, FWA force-sends it and `sync` still resolves the listing from
-FWA's record (D84).
-Rule and gates: D80. Measured construction gas: D79.
+## Cash, pricing and holder accounting
 
-## 4. Contract and deployment costs
+Growth preserves all liabilities, a separately derived renewal float and the maintenance reserve.
+One float is the maximum enabled-recipe backing plus accepted mint fees and full quoted renewal
+work at the gas ceiling. Returned principal funds replacement principal. No harvest is presumed.
+Routine payment cash excludes that float. Eligible renewal can consume it while preserving the
+maintenance reserve and owed redemptions. Accrued NAV is not spendable cash; bounded verified fee
+collection can fund genuine renewal need. Cash and spending permission are distinct conditions.
 
-| Artifact | Runtime bytes (EIP-170 limit 24,576) | Deployed per |
-|---|---:|---|
-| PackVault | 16,960 | pool |
-| PackManager implementation | 12,494 | once (factory constructor) |
-| PackManager clone | 44 | user, 474,175 gas `create` (clone + initialize + discovery) |
-| PackManagerFactory | 1,365 | once |
-| VaultLib | 23,482 | once (linked) |
-| StrategyLib, ScanLib | in `deploy/release-manifest.json` | once (linked) |
-| KeeperPolicyV1 | 216 | once, shared |
+Deposits escrow gross cancellable principal. The committing checkpoint derives construction from
+its effective settings and live fee, then stores an epoch issuance ratio. Lazy settlements assign
+the aggregate rounding residue to the final settling deposit, without holder enumeration.
+Cancellable escrow does not suppress preparatory liquidation. Actually committing deposits can
+fund atomic matched redemptions. Redemptions retain pro-rata partial fills and unconditional claims.
+Unpaid caller-funded recovery checkpoints fill redemptions from free cash only, leave gross pending
+escrow and its pricing epoch unchanged, and need no mint-fee/configuration expectation. A successful
+partial or full recovery fill closes the sponsorship era and refunds its unused funding when
+no deposits remain unpriced. Pending deposits retain their funded era for the normal checkpoint;
+an incumbent's tiny unpaid redemption cannot strip that keeper compensation.
 
-FWA pushes keep payments and kick refunds with a 100,000 gas stipend. Through the clone's extra
-DELEGATECALL: keep payment 52,363 gas, cold kick refund 35,148 gas (`ForkManager.t.sol`). If a future
-repricing ever pushed `receive` past the stipend, FWA force-sends the ETH and `sync` still resolves
-the listing from FWA's record (D84).
+Checkpoint sponsorship remains attributed to its payer and era in canonical wei. A zero quote or
+empty pool never closes an era while requests remain. Successful checkpoints, including partial
+fills, or the end of all requests finalize it. Unused funding moves directly to a protected refund
+reserve. Adjacent contribution-interval floor differences attribute every refundable wei without
+payer enumeration. Explicit topups return excess funding. Required pricing tails/scans have their
+own contribution source; contribution cash never temporarily becomes general free cash.
 
-One-time deployment, billed on a local fork through `script/deploy.sh` at the final source: ScanLib
-634,563; VaultLib 5,140,640; StrategyLib 2,817,411; KeeperPolicyV1 100,155; PackVault 4,143,997;
-PackManagerFactory with its implementation 3,131,319; **total 15,968,085 gas** (0.0080 ETH at
-0.5 gwei, 0.032 ETH at 2 gwei). A personal manager costs its owner 474,175 gas to create and nothing
-else; there is no fee.
+Allocated positions store max(backing - face, 0), using zero settlement fee as a conservative maximum
+keep uplift. The aggregate updates incrementally and removes the exact stored contribution at
+terminal resolution, including owed returns. Pricing compares it with preflow NAV. One 0.18 ETH
+uplift needs at least 72 ETH preflow NAV at 25 bps; smaller pools wait for real settlement.
 
-Billed operation gas against the fixed quotes (`ForkMaxBatchGas.t.sol`): build 1 pack 1,667,571 vs
-1,685,000; build 8 packs 9,466,009 vs 11,380,000; unlist 8 2,224,463 vs 2,620,000; liquidate 8
-(16 Shapes) 1,129,652 vs 1,275,000; relist 8 6,198,724 vs 6,880,000. Largest batch (build 8 × 30
-units) 10.40M gas, 13.0M with the keeper's 25% pad, under EIP-7825's 16,777,216. The checkpoint's
-allocation proof reads at most 32 queue entries: 188,361 gas at the bound against a 222,000 quote,
-and a constant 34,519 gas refusal beyond it whatever the history. While FWA can kick (ShapePacks
-oracle exemption lifted) it also reads every open listing, at most 32 (else `CatchUpFirst`, at most
-39,766 gas at any count); two open listings add 41,043 gas against a 72,000 quote (D84).
+## Quoted payment and bounded work
 
-## 5. Economics
+One payment calculation supplies envelopes, compensation and relevant charges: verified completed
+work times the account schedule, min(basefee + configured priority, class ceiling), routine markup
+on routine gas, flat work fees, then source/cash/permission limits. minPay protects a keeper's offer.
+No progress earns no repeat reward. Wallet gas and keeper actual billed expense are reported
+separately from account compensation. Raising a budget capacity never refills spent permission:
+old-rate accrual precedes the update, then the new capacity clamps it.
 
-Model results, not forecasts. Tokens at zero; every expense included; complete holder exit. Two
-studies, both through the formal cash-path simulator (`sim/formal.py` → `sim/forward.py` → the
-PackVault mirror `sim/vault.py` and `keeper/policy.py`), at the final backing B = 0.06489617 ETH.
+No total position limit exists. Journal reads are capped at 128, own selections/terminals/prunes
+at 16, builds at 4, relisting batches at 8, renewal at 4, allocation proof at 32 entries and optional scans at
+96 positions. Mutable economic coefficients cannot increase these operation limits. Larger books
+use the journal. Receipt callbacks read no large configuration and call no external payment policy.
+Every real transaction remains subject to EIP-7825's 16,777,216 gas limit.
 
-**Formal gate (`docs/receipts/formal-assessment.json`).** The owner's hurdle: 10% a year net at the
-actual 30 days to block 26,450,200 (356.7 successful acquisitions a day) replayed with its real timing
-for 360 days plus exit, 0.5 gwei, 16 seeds, recorded purchaser responses with every responder
-bidding:
+Retained numerical bounds are explicit operating limits: gas ceilings 50 gwei, work fee 0.00005 ETH,
+routine capacity 0.3 ETH/refill 0.02 ETH per day, essential capacity 0.1 ETH/refill 0.005 ETH per day,
+routine markup 10%, harvest compensation share 50%, distribution share 50%, uplift tolerance 10%,
+backing ratio 100x and each gas coefficient 16,777,216. They constrain quoted spending, arithmetic
+and admission under the current algorithm; an owner cannot operate beyond them by settings alone.
+They are not a promise about owner-key compromise or sufficient keeper margins at every gas price.
+Pack sizes 3 through 30 units bound per-pack mint/redemption work. Recipe selection compares
+bounded allowed alternatives; existing inventory retains actual face and Shape counts.
 
-| Pool | Median | p10 | Worst | Losing runs | Creator mint fees / yr |
-|---|---:|---:|---:|---:|---:|
-| 1.96 ETH | **+70.6%** | −55.3% | −61.5% | 5 / 16 | 0.079 ETH |
-| 6.8 ETH | **+55.9%** | +9.3% | −26.4% | 1 / 16 | 0.24 ETH |
-| 20 ETH | **+37.7%** | +22.0% | +6.0% | 0 / 16 | 0.62 ETH |
+## Validation and delivery
 
-The hurdle passes at every size on the median; the 1.96 ETH tail is wide (selection luck on few
-positions).
+Exact current measurements and gaps belong in the completion receipts and scorecard. The main
+recipe, creator revenue and holder costs must share the same scenarios. The existing net 10% annual
+holder hurdle at trailing 30-day successful activity remains in effect, with tokens zero. Synthetic
+sensitivities are not demonstrated APR. A failing economic candidate must remain failing.
 
-**Matched recipe comparison (`docs/receipts/recipe-comparison.json`, `sim/out/recipe-comparison.md`,
-`sim/recipe_comparison.py`).** Three recipes with identical capital, demand, purchaser-response
-pool, gas (0.5 gwei) and seeds; responses are held just inside FWA's settlement window so recipes
-differ only in the keep or bid choice (absolute levels therefore differ from the gate, which replays
-real timing; use this study to rank recipes, the gate for the hurdle). 100 seeds per 1.96 ETH cell, 48
-at 20 ETH. Median return / loss frequency / creator mint fees per ETH a year:
+The app and CLI expose explicit caller-funded exits under a wallet spending cap. Ordinary keeper
+profitability never vetoes necessary work that the caller accepts. The community app/contracts,
+legacy selection and keeper remain intact; the main production app gate stays closed.
 
-| Cell | 0.06 direct (chosen) | 0.03 bulk mint + split | 0.03 direct |
-|---|---|---|---|
-| 1.96 ETH, all bid | +22.8% / 45% / 0.033 | +25.1% / 39% / 0.009 | never lists |
-| 1.96 ETH, observed choices | +34.3% / 33% / 0.153 | +37.5% / 31% / 0.061 | never lists |
-| 1.96 ETH, 50% keep | +80.7% / 29% / 0.375 | +65.4% / 17% / 0.144 | never lists |
-| 1.96 ETH, all keep | +136.8% / 17% / 0.801 | +122.2% / 4% / 0.290 | never lists |
-| 20 ETH, all bid | +39.3% / 8% / 0.030 | +17.0% / 12% / 0.008 | never lists |
-| 20 ETH, observed choices | +45.9% / 4% / 0.137 | +25.4% / 2% / 0.032 | never lists |
-| 20 ETH, 50% keep | +69.4% / 2% / 0.296 | +37.3% / 2% / 0.061 | never lists |
-| 20 ETH, all keep | +88.2% / 0% / 0.546 | +48.7% / 0% / 0.100 | never lists |
-| 1.96 ETH, quieter demand (last 10 days), all bid / all keep | +0.6% / +9.8% (below the hurdle) | −3.2% / +24.1% | never lists |
-| 20 ETH, quieter demand, all bid / all keep | +4.2% / +16.7% | +5.3% / not run | never lists |
-| Zero demand, 1.96 ETH | −2.3% | −2.1% | −0.1% |
-
-**Decision: keep 0.06.** It earns 2.6 to 5.4 times the creator revenue of the 0.03 bulk-split recipe
-in every cell and a higher depositor return at 20 ETH under every behaviour. 0.03 direct packs never
-list: one keep (2.27 mETH net) cannot repay three fresh mints (3.80 mETH). The tradeoff, stated
-plainly: at 1.96 ETH the 0.03 bulk-split recipe's median edges 0.06 under all-bid and
-observed behaviour, with a milder tail (all keep: p5 +8.8% against −50.8%), because smaller packs at
-twice the FWA weight diversify a small pool; it does so by paying the creator about a third as much,
-and it would need the removed bulk-mint and split construction back. It does not materially improve
-the combined objective. No dynamic sizing.
-
-Further results: the keep advantage is +0.30 mETH at every purchaser gas assumption (the rule solves
-for it); `PURCHASER_GAS_PRICE` at 1 / 2 / 3 gwei moves the 1.96 ETH all-keep median +130% / +137% /
-+117%, so 2 gwei stays. All-bid is the floor for the median and the loss frequency in every cell, but
-**not** for the worst case: all-keep has the fatter left tail (1.96 ETH worst −93.7% against −66.5%),
-because each keep hands the pack over and pays a fresh build. Creator revenue is set by the keep rate:
-0.03 ETH per ETH a year if every purchaser bids, 0.55 to 0.80 if every purchaser keeps. At 0.2 gwei
-the 0.03 bulk-split recipe's return leads (+369% against +184% median) while 0.06 still pays the
-creator 1.8 times more. The 6.8 and 50 ETH matched cells were not run at full precision (2-seed pilot
-only); capacity across 1.96 / 6.8 / 20 ETH comes from the formal gate above.
-
-**Pool versus personal managers.**
-
-| Question | Answer (model) |
-|---|---|
-| Same capital, pool or managers? | Pool, always in these runs: 10 ETH pool +181% vs ten 1 ETH managers +162%, from one reserve (0.005 vs 0.05 ETH idle) and higher utilisation (0.98 vs 0.88). |
-| Smallest useful manager | ~0.14 ETH (one pack: reserve + B + P + build). Below it nothing lists. With one pack the outcome is a lottery; 0.5 to 1 ETH gives a usable tail. |
-| Value of shared inventory and cash | Utilisation 0.63 (50 × 0.2 ETH managers) / 0.88 (10 × 1 ETH) vs 0.98 pooled; mean +117% / +163% vs +172% at 10 to 20 ETH. |
-| Cost of pooled accounting | ~0.00007 ETH a year of checkpoint pay plus a 0.0002 ETH request charge per flow; negligible beside pooling's benefit. |
-| Creator mint fees per ETH | Set by the recipe and the keep rate, not the product: 0.96 ETH per ETH a year for 0.06 packs when purchasers keep; managers pay slightly less because more of their ETH sits idle. |
-| Aggregate participation | Our combined share of FWA weight 0.26% → 2.5% → 11% → 34% → 56% moves each account's mean +179% → +170% → +145% → +97% → +64%: negligible below ~2.5%, large above ~10% (D81). |
-
-## 6. Verification
-
-Final source (manifest `deploy/release-manifest.json`, acceptance package unsigned). Every claim names its run.
-
-- **Full candidate run** (`docs/receipts/unified-verify/SUMMARY.md`): `script/verify.sh` with
-  `CANDIDATE_RUN=1`; **276 fork tests passed, 0 failed, 1 opt-in exporter skipped**; the 301-listing
-  and 10,000-position scale tests 3/3; `sim/replay.py` 0 mismatches; the reconciler matches every
-  bucket to the wei on the full cycle, the partial fill and wind-down, and the scan path. All on the
-  real FWA, Shapes, ShapePacks, oracle and token pool; selections only from replayed real VRF.
-- **Payment receipt recovery** (`ForkReceiptRecovery.t.sol`): the account's `receive` is made to fail
-  around one real FWA call, FWA's own SELFDESTRUCT fallback delivers the ETH with no receipt, and the
-  forced keep, the forced default (`finalizeUnsettled`) and a manager's forced kick refund each resolve
-  exactly once, with the same book, cash and NAV as the recorded path; a stranger's payment of the
-  exact amount creates no receipt; the checkpoint refuses to price until the sync. With the real
-  receiver, a sweep over transaction gas never forces an unrecorded payment (65 limits reverted,
-  26 completed and recorded). Removing the checkpoint gate makes the forced-keep test fail.
-- **Bounded pricing** (`ForkAllocationProof.t.sol`): 32-entry boundary, 2,000 tombstones behind an
-  unresolved head refused at the same 34,519 gas as 33, many simultaneous unresolved allocations;
-  with the exemption lifted, 33 to 1,000 open listings refused at no more than 39,766 gas.
-- **Forced kick on the pool** (`test_forcedKickRefund_blocksPoolPricingUntilSynced`): FWA force-sends
-  B with no receipt; pricing refuses until the kick is synced, then returns the pre-kick NAV less the
-  sync pay. Without the check the same state prices B too high.
-- **Asset flow:** 16 regimes, outcomes O1–O11 pass (`asset-flow.json`, unsigned).
-- **Production rehearsal** on a fresh mainnet fork (`docs/receipts/unified-production-rehearsal.json`,
-  `keeper/rehearse_unified.py`): all 17 steps pass on the final source: deploy through `script/deploy.sh`,
-  three managers from the factory, one keeper discovering all four accounts, building and listing,
-  pooled deposit, checkpoint, redemption and claim, keep, bid (then relist without a mint), expiry and a
-  forced keep from a real request and its historical VRF word (`keeper/rehearse_selection.py`; only the
-  coordinator's proof check is skipped), manager withdrawals and full exits, keeper restart, a new
-  worker on the same volume, the backup keeper working alone and contending, a paused account not
-  stopping the others, per-account index persistence, a lost transaction response, same-nonce
-  replacement and a reorg; every account reconciles at the end. Encrypted keystores throughout.
-- **Production image** (CI run 44948198556, `docs/receipts/image-rehearsal/ci-44948198556.json`): the
-  pinned image against a fresh fork: keystore signing, factory postflight, the pooled vault and a
-  personal manager created through the real factory served by one signer (both built and listed,
-  both in `/health` before and after replacement), primary and backup, a replacement container on
-  the same volume, a lost RPC response, a backup restart on its own volume. Push CI only builds and smokes the image (under a minute); the
-  fork rehearsal runs on manual dispatch for a release candidate.
-- **Independent review** (`docs/receipts/unified-review.md`): no critical, high or medium finding.
-  Confirmed: the factory has no access to a manager's funds after creation; no manager can move or
-  account another's assets; the pool cannot subsidise managers. A second review of 958b924 found the
-  unbounded allocation proof, fixed in 4794bf5.
-
-## 7. Remaining launch blockers and owner decisions
-
-1. **Owner signature.** The restated `asset-flow.json` outcomes and `docs/release/acceptance.json`
-   are unsigned. No broadcast until the owner signs (D73).
-2. **No deposit cap and no canary** (owner, 2026-11-22): deployment uses `deploy/mainnet.json`.
-   At small sizes the formal gate's loss tail is wide (see section 5).
-3. **Third-party levers on new investment** (exits are unaffected): FWA keeping ShapePacks
-   oracle-exempt and its best bid below about 94.4% (D80). Each stops new building and listing in every
-   account at once. The keeper gas ceiling no longer affects listing (D85).
-4. **Kick refunds (D84):** a kick refund force-sent while `receive` fails is caught by the
-   checkpoint gate while kicks are possible and the pool holds at most 32 open listings; above 32
-   the check is skipped so pricing never stalls. Residual: a kick refund with no receipt (it needs
-   `receive` above FWA's 100,000 gas stipend) above 32 listings, or left unsynced while FWA restores
-   the exemption, is priced one backing high until sync.
-5. **Monitored assumptions:** FWA's 100,000 gas stipend; our combined FWA weight share (keeper flags
-   10%); FWA's owner-set economics (surcharge, discounts, fees) staying near today's values.
-
-## 8. Next steps that need the owner
-
-1. Review this document, D77–D85, OWNER-REQUIREMENTS A3 and A4, and `docs/release/ACCEPTANCE.md`.
-2. Sign `docs/release/acceptance.json` (which binds the manifest, values and outcomes) if accepted.
-3. Authorize the broadcast (`script/deploy.sh deploy/mainnet.json --broadcast` from the
-   owner's keystore), keeper funding (primary 0.05, backup 0.02 ETH) and the Fly deployment with
-   `VAULT` set and `FACTORY` unset (`docs/release/RUNBOOK.md`).
-4. Separately, decide whether to offer personal managers publicly
-   (set `FACTORY` for the keepers, publish the factory and `deploy/manager.json`).
+Things that don't make sense until measured: a single float cannot guarantee unlimited rapid
+renewals; 25 bps causes small pools to wait; positive creator fees do not imply positive holder return.

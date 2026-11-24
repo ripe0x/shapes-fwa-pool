@@ -38,15 +38,15 @@ contract PackManager is PackAccount {
         _initialized = true; // the implementation itself can never be initialized
     }
 
-    /// @notice Set the owner, parameters (within bytecode bounds) and keeper policy, and approve
+    /// @notice Set the owner, parameters (within bytecode bounds), and approve
     ///         FWA for pack listings. Once, by the factory, in the clone's creation transaction.
-    function initialize(address owner_, VaultLib.Params calldata p, address policy) external payable {
+    function initialize(address owner_, VaultLib.Params calldata p) external payable {
         if (msg.sender != factory) revert Unauthorized();
         if (_initialized) revert AlreadyInitialized();
         _initialized = true;
         // Neither the factory nor the manager itself can act as an owner: funds would lock.
         if (owner_ == msg.sender || owner_ == address(this)) revert Unauthorized();
-        _initStrategy(owner_, p, policy);
+        _initStrategy(owner_, p);
     }
 
     // ------------------------------------------------------------------ account hooks
@@ -57,7 +57,7 @@ contract PackManager is PackAccount {
     }
 
     function _idle() internal view override returns (uint256) {
-        uint256 reserve = s.params.reserve;
+        uint256 reserve = operatingReserve();
         return address(this).balance > reserve ? address(this).balance - reserve : 0;
     }
 
@@ -72,6 +72,7 @@ contract PackManager is PackAccount {
     /// @notice Take up to `count` idle packs (the most recently returned first) out of the book
     ///         and transfer them to `to`.
     function withdrawPacks(address to, uint256 count) external onlyOwner nonReentrant {
+        if (count > MAX_BATCH) revert VaultLib.BadBatch();
         VaultLib.Book storage b = s.book;
         uint256 n;
         while (n < count && b.idlePacks.length != 0) {
@@ -103,6 +104,8 @@ contract PackManager is PackAccount {
     ///         Reversible; leaving exit mode keeps listing paused until the owner resumes it.
     function setExiting(bool exiting) external onlyOwner {
         s.windingDown = exiting;
+        s.book.renewalEnabled = !exiting;
+        if (exiting) s.book.keptReplacements = 0;
         if (exiting) s.listingPaused = true;
         emit Exiting(exiting);
     }

@@ -21,6 +21,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "keeper"))
+from config import PARAMS_T, PARAM_FIELDS, GAS_FIELDS, decode_params, configuration_hash
 MANIFEST = ROOT / "deploy/release-manifest.json"
 ACCEPTANCE = ROOT / "docs/release/acceptance.json"
 SIGNATURE = ROOT / "deploy/release-acceptance.sig"
@@ -30,18 +32,21 @@ CODE_LIMIT = 24_576
 CREATE2_FACTORY = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 CONTRACTS = {"PackVault": "src/PackVault.sol", "PackManager": "src/PackManager.sol",
              "PackManagerFactory": "src/PackManagerFactory.sol", "StrategyLib": "src/StrategyLib.sol",
-             "VaultLib": "src/VaultLib.sol", "ScanLib": "src/ScanLib.sol", "KeeperPolicyV1": "src/KeeperPolicy.sol"}
+             "VaultLib": "src/VaultLib.sol", "ScanLib": "src/ScanLib.sol"}
 # Linked libraries in dependency order: VaultLib links ScanLib, StrategyLib links VaultLib; both
 # accounts (PackVault, the PackManager implementation) link VaultLib and StrategyLib.
 LIBRARIES = ["ScanLib", "VaultLib", "StrategyLib"]
 KEEPER = ["keeper/Dockerfile", "keeper/entrypoint.sh", "keeper/requirements.txt", "keeper/keeper.py",
-          "keeper/policy.py", "keeper/tx.py", "keeper/index.py", "fly.keeper-primary.toml", "fly.keeper-backup.toml"]
-VALUES = ["deploy/mainnet.json"]
+          "keeper/policy.py", "keeper/config.py", "keeper/tx.py", "keeper/index.py", "fly.keeper-primary.toml", "fly.keeper-backup.toml"]
+VALUES = ["deploy/mainnet.json", "deploy/manager.json", "deploy/mint-fee-observation.json", "deploy/existing-main-readback.json"]
 # The acceptance package names this manifest, so it is not listed here (no cycle).
-EVIDENCE = ["docs/receipts/formal-assessment.json", "docs/receipts/recipe-comparison.json",
-            "docs/receipts/unified-production-rehearsal.json", "docs/receipts/unified-selection-rehearsal.json",
-            "docs/receipts/image-rehearsal/ci-44948198556.json", "docs/receipts/unified-review.md",
-            "docs/receipts/unified-verify/SUMMARY.md", "asset-flow.json"]
+EVIDENCE = ["docs/receipts/formal-assessment.json", "docs/receipts/completion-calibration.json",
+            "docs/receipts/unified-production-rehearsal.json",
+            "docs/receipts/completion-verification.md", "docs/receipts/completion-economics.md",
+            "docs/receipts/completion-independent-review.md", "docs/receipts/completion-app.json",
+            "docs/receipts/completion-checks/input-manifest.json", "deploy/unsigned-cutover.json",
+            "deploy/keeper-unsigned.json", "docs/receipts/completion-signed-budget-reorg.json",
+            "asset-flow.json"]
 
 
 def sha(path):
@@ -53,12 +58,133 @@ def git(*args):
 
 
 def sources():
-    files = git("ls-files", "src", "script", "foundry.toml", "remappings.txt").split()
-    return {f: sha(f) for f in files if f != "script/release.py"} | {"script/release.py": sha("script/release.py")}
+    files = set(git("ls-files", "src", "script", "foundry.toml", "remappings.txt").split())
+    files.update(str(p.relative_to(ROOT)) for folder in ("src", "script") for p in (ROOT / folder).rglob("*") if p.is_file() and p.suffix in (".sol", ".py", ".sh"))
+    return {f: sha(f) for f in files if f != "script/release.py" and (ROOT / f).exists()} | {"script/release.py": sha("script/release.py")}
 
 
 def artifact(name):
     return json.loads((ROOT / f"out/{Path(CONTRACTS[name]).name}/{name}.json").read_text())
+
+
+
+# Launch checks are independent of the values/manifest being reviewed. They constrain this
+# deployment package, not an account owner's later recipe or economic settings.
+LAUNCH_UNITS = 3
+LAUNCH_PACK_MASK = 1 << LAUNCH_UNITS
+MAIN_DEPENDENCIES = {
+    "fwa": "0x958C41181182e76F221331b2755b77D9e1426A98",
+    "shapes": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+    "packs": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+}
+PARAM_ABI_ALIASES = {
+    "gasCeilingWei": "gasCeiling", "essentialCeilingWei": "essentialCeiling",
+    "maxTipWei": "maxTip", "workFeeWei": "workFee", "routineCapWei": "routineCap",
+    "routineRatePerDayWei": "routineRate", "essentialCapWei": "essentialCap",
+    "essentialRatePerDayWei": "essentialRate", "reserveWei": "reserve", "tvlCapWei": "tvlCap",
+    "acceptedMintFeeWei": "acceptedMintFee", "minDepositWei": "minDeposit",
+    "minDistributionWei": "minDistribution",
+}
+
+
+def _exact_keys(value, expected, label):
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be an object")
+    missing, extra = set(expected) - value.keys(), value.keys() - set(expected)
+    if missing or extra:
+        raise ValueError(f"{label} keys: missing {sorted(missing)}, unexpected {sorted(extra)}")
+
+
+def _unsigned(value, bits, label):
+    if type(value) is not int or not 0 <= value < 1 << bits:
+        raise ValueError(f"{label} must be an unsigned {bits}-bit JSON integer")
+
+
+def validate_launch_values(values, *, manager=False):
+    """Validate complete launch inputs without any RPC, manifest trust or numerical defaults."""
+    if not isinstance(values, dict):
+        raise ValueError("launch values must be an object")
+    required = {key for key, _ in PARAM_FIELDS} | {"gasSchedule", "expectedMintFeeWei"}
+    if not manager:
+        required |= set(MAIN_DEPENDENCIES) | {"owner", "seedWei"}
+    optional = {"comment"} if "comment" in values else set()
+    _exact_keys(values, required | optional, "manager launch values" if manager else "main launch values")
+    for key, kind in PARAM_FIELDS:
+        _unsigned(values[key], int(kind.removeprefix("uint")), key)
+    _exact_keys(values["gasSchedule"], GAS_FIELDS, "gasSchedule")
+    for key in GAS_FIELDS:
+        _unsigned(values["gasSchedule"][key], 32, f"gasSchedule.{key}")
+    _unsigned(values["expectedMintFeeWei"], 256, "expectedMintFeeWei")
+    if values["packUnitsMask"] != LAUNCH_PACK_MASK:
+        raise ValueError(f"launch requires mask {LAUNCH_PACK_MASK} (units {LAUNCH_UNITS}), not {values['packUnitsMask']}")
+    if values["expectedMintFeeWei"] > values["acceptedMintFeeWei"]:
+        raise ValueError("reviewed launch mint fee exceeds the explicitly accepted maximum")
+    if not manager:
+        for key, expected in MAIN_DEPENDENCIES.items():
+            if not isinstance(values[key], str) or values[key].lower() != expected.lower():
+                raise ValueError(f"launch {key} must be the selected main-pool dependency {expected}")
+        if not isinstance(values["owner"], str) or not re.fullmatch(r"0x[0-9a-fA-F]{40}", values["owner"]) or int(values["owner"], 16) == 0:
+            raise ValueError("launch owner must be a nonzero address supplied by the values file")
+        _unsigned(values["seedWei"], 256, "seedWei")
+
+
+def _abi_entry(abi, kind, name=None):
+    matches = [entry for entry in abi if entry.get("type") == kind and (name is None or entry.get("name") == name)]
+    if len(matches) != 1:
+        raise ValueError(f"compiled ABI must contain exactly one {name or kind}")
+    return matches[0]
+
+
+def _abi_fields(fields):
+    return [(field.get("name"), field.get("type")) for field in fields]
+
+
+def _validate_params_abi(component, label):
+    expected = [(PARAM_ABI_ALIASES.get(key, key), kind) for key, kind in PARAM_FIELDS] + [("gasSchedule", "tuple")]
+    fields = component.get("components", [])
+    if component.get("type") != "tuple" or _abi_fields(fields) != expected:
+        raise ValueError(f"{label} Params names/types/order differ from keeper.config.PARAM_FIELDS aliases")
+    gas = fields[-1].get("components", [])
+    if len(GAS_FIELDS) != 28 or _abi_fields(gas) != [(key, "uint32") for key in GAS_FIELDS]:
+        raise ValueError(f"{label} GasSchedule names/types/order differ from the complete 28 keeper.config.GAS_FIELDS")
+
+
+def validate_compiled_launch_abi(vault_abi, factory_abi):
+    """Compare the real compiler's named schema with offchain encoding and deployment entrypoints."""
+    getter = _abi_entry(vault_abi, "function", "getParams")
+    if getter.get("inputs") != [] or len(getter.get("outputs", [])) != 1:
+        raise ValueError("compiled getParams must return one Params tuple without arguments")
+    _validate_params_abi(getter["outputs"][0], "getParams")
+    constructor = _abi_entry(vault_abi, "constructor")
+    if _abi_fields(constructor.get("inputs", [])) != [("fwa_", "address"), ("shapes_", "address"),
+            ("packs_", "address"), ("owner_", "address"), ("initial", "tuple"), ("expected", "bytes32")]:
+        raise ValueError("compiled PackVault constructor must have six guarded inputs, without a policy")
+    _validate_params_abi(constructor["inputs"][4], "PackVault constructor")
+    create = _abi_entry(factory_abi, "function", "create")
+    if _abi_fields(create.get("inputs", [])) != [("owner", "address"), ("p", "tuple"), ("expected", "bytes32")]:
+        raise ValueError("compiled factory create must be only (owner, p, expected), without a policy")
+    _validate_params_abi(create["inputs"][1], "factory create")
+    if _abi_fields(_abi_entry(factory_abi, "constructor").get("inputs", [])) != [
+            ("fwa", "address"), ("shapes", "address"), ("packs", "address")]:
+        raise ValueError("compiled factory constructor must have only the three main dependencies")
+
+
+def _launch_json(path):
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate launch JSON key: {key}")
+            result[key] = value
+        return result
+    return json.loads(Path(path).read_text(), object_pairs_hook=unique_object)
+
+
+def validate_launch_inputs(values=None):
+    """Fail before manifest generation/check or any postflight read if launch identity/schema drift."""
+    validate_launch_values(_launch_json(values or ROOT / "deploy/mainnet.json"))
+    validate_launch_values(_launch_json(ROOT / "deploy/manager.json"), manager=True)
+    validate_compiled_launch_abi(artifact("PackVault")["abi"], artifact("PackManagerFactory")["abi"])
 
 
 def normalized(code, link_refs=(), immutables=()):
@@ -120,6 +246,7 @@ def toolchain():
 
 
 def manifest():
+    validate_launch_inputs()
     m = dict(name="PackVault and PackManagerFactory mainnet", sources=sources(), toolchain=toolchain(), build=build(),
              deployment_values="deploy/mainnet.json", values={v: sha(v) for v in VALUES},
              keeper={k: sha(k) for k in KEEPER},
@@ -131,6 +258,10 @@ def manifest():
 
 
 def problems(values, broadcast):
+    try:
+        validate_launch_inputs(values)
+    except (ValueError, KeyError, TypeError, OSError) as error:
+        return [f"launch inputs invalid: {error}"]
     if not MANIFEST.exists():
         return ["no deploy/release-manifest.json"]
     m = json.loads(MANIFEST.read_text())
@@ -170,17 +301,16 @@ def first(raw):
 
 
 def postflight(vault, values, owner=None, factory=None):
-    """Read the deployed vault, factory, implementation, libraries and policy back; stop on any difference."""
+    """Read the deployed vault, factory, implementation and libraries back; stop on any difference."""
+    validate_launch_inputs(values)
     m, v = json.loads(MANIFEST.read_text()), json.loads(Path(values).read_text())
     fail = []
     check = lambda ok, what: ok or fail.append(what)  # noqa: E731
-    policy = cast("call", vault, "keeperPolicy()(address)")
     libs = {name: m["build"][name]["create2_address"] for name in LIBRARIES}
-    deployed = [("PackVault", vault), ("KeeperPolicyV1", policy)] + [(n, a) for n, a in libs.items()]
+    deployed = [("PackVault", vault)] + [(n, a) for n, a in libs.items()]
     if factory:
         implementation = cast("call", factory, "implementation()(address)")
         deployed += [("PackManagerFactory", factory), ("PackManager", implementation)]
-        check(cast("call", factory, "policy()(address)").lower() == policy.lower(), "factory default policy")
         check(cast("call", implementation, "factory()(address)").lower() == factory.lower(), "implementation factory")
         check(int(cast("call", implementation, "owner()(address)"), 16) == 0, "implementation has an owner")
         for k, sig in (("fwa", "fwa()(address)"), ("shapes", "shapes()(address)"), ("packs", "packs()(address)")):
@@ -200,17 +330,18 @@ def postflight(vault, values, owner=None, factory=None):
     check(cast("call", vault, "owner()(address)").lower() == owner.lower(), "owner")
     for k, sig in (("fwa", "fwa()(address)"), ("shapes", "shapes()(address)"), ("packs", "packs()(address)")):
         check(cast("call", vault, sig).lower() == v[k].lower(), k)
-    check(first(cast("call", policy, "policyVersion()(uint256)")) == "1", "policy version")
-    fields = ["minEdgeBps", "bufferBps", "distributionBps", "payMarkupBps", "keeperShareBps", "allocatedBoundBps",
-              "packUnitsMask", "gasCeilingWei", "essentialCeilingWei", "maxTipWei", "workFeeWei", "reserveWei",
-              "tvlCapWei", "routineCapWei", "routineRatePerDayWei", "essentialCapWei", "essentialRatePerDayWei"]
-    raw = cast("call", vault, "getParams()((uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,"
-                               "uint64,uint64,uint64,uint64,uint64,uint128,uint128))")
-    got = [int(x.split()[0]) for x in raw.strip("()").split(", ")]
-    order = ["minEdgeBps", "bufferBps", "distributionBps", "payMarkupBps", "keeperShareBps", "allocatedBoundBps",
-             "packUnitsMask", "gasCeilingWei", "essentialCeilingWei", "maxTipWei", "workFeeWei", "routineCapWei",
-             "routineRatePerDayWei", "essentialCapWei", "essentialRatePerDayWei", "reserveWei", "tvlCapWei"]
-    check(dict(zip(order, got)) == {f: v[f] for f in fields}, f"params {dict(zip(order, got))}")
+    got = decode_params(cast("call", vault, f"getParams()({PARAMS_T})"))
+    expected = {k: int(v[k]) for k, _ in PARAM_FIELDS} | {"gasSchedule": {k: int(v['gasSchedule'][k]) for k in GAS_FIELDS}}
+    check(got == expected, f"params {got}")
+    mint_fee = int(first(cast("call", v['shapes'], "mintFee()(uint256)")))
+    check(cast('call', vault, 'configurationHash()(bytes32)').lower() == configuration_hash(v, mint_fee).lower(), 'configuration hash')
+    check(mint_fee <= v['acceptedMintFeeWei'], 'live mint fee exceeds accepted maximum')
+    for key, expected_address in (("rewards", cast('call', v['fwa'], 'rewards()(address)')),
+                                  ("token", cast('call', v['fwa'], 'token()(address)'))):
+        check(cast('code', expected_address) not in ('', '0x'), f'FWA {key} dependency missing')
+        check(cast('call', vault, key + '()(address)').lower() == expected_address.lower(), f'vault {key} immutable')
+        if factory:
+            check(cast('call', implementation, key + '()(address)').lower() == expected_address.lower(), f'implementation {key} immutable')
     budget = [int(first(x)) for x in cast("call", vault, "budget()(uint256,uint256)").splitlines()]
     check(budget[0] <= v["routineCapWei"] and budget[1] <= v["essentialCapWei"], "budgets above caps")
     dead = first(cast("call", vault, "DEAD_SHARES()(uint256)"))
@@ -219,19 +350,23 @@ def postflight(vault, values, owner=None, factory=None):
     for flag in ("windingDown", "depositsPaused", "listingPaused"):
         check(cast("call", vault, f"{flag}()(bool)") == "false", flag)
     check(int(first(cast("balance", vault))) >= v["seedWei"], "seed balance")
+    balances = {name: int(first(cast('call', vault, f'{name}()(uint256)'))) for name in
+                ('pendingDepositTotal', 'redemptionReserve', 'distributionReserve', 'claimableTotal', 'processingPool', 'chargeRefundReserve')}
+    balances['cash'] = int(first(cast('balance', vault)))
+    check(balances['cash'] >= sum(value for key, value in balances.items() if key != 'cash'), 'protected balances not covered')
+    print('account balances and claims: ' + json.dumps(balances, sort_keys=True))
     if fail:
         sys.exit("postflight FAILED: " + "; ".join(fail))
-    print(f"postflight passed: {vault} policy {policy} libraries {libs} owner {owner}"
+    print(f"postflight passed: {vault} libraries {libs} owner {owner}"
           + (f" factory {factory}" if factory else " (factory not checked)"))
     print("verification commands (Etherscan; ETHERSCAN_API_KEY from your environment):")
     scan, lib, strategy = libs["ScanLib"], libs["VaultLib"], libs["StrategyLib"]
-    accounts = f"--libraries src/VaultLib.sol:VaultLib:{lib} --libraries src/StrategyLib.sol:StrategyLib:{strategy}"
+    accounts = f"--libraries src/ScanLib.sol:ScanLib:{scan} --libraries src/VaultLib.sol:VaultLib:{lib} --libraries src/StrategyLib.sol:StrategyLib:{strategy}"
     print(f"  forge verify-contract {scan} src/ScanLib.sol:ScanLib --chain mainnet --watch")
     print(f"  forge verify-contract {lib} src/VaultLib.sol:VaultLib --chain mainnet "
           f"--libraries src/ScanLib.sol:ScanLib:{scan} --watch")
     print(f"  forge verify-contract {strategy} src/StrategyLib.sol:StrategyLib --chain mainnet "
           f"--libraries src/VaultLib.sol:VaultLib:{lib} --watch")
-    print(f"  forge verify-contract {policy} src/KeeperPolicy.sol:KeeperPolicyV1 --chain mainnet --watch")
     print(f"  forge verify-contract {vault} src/PackVault.sol:PackVault --chain mainnet --guess-constructor-args "
           f"{accounts} --watch")
     if factory:
@@ -251,9 +386,77 @@ def keeper_config(vault, values, owner=None):
         print(f"{name}: VAULT = {vault}")
 
 
+def calibrate(actions, output='docs/receipts/completion-calibration.json'):
+    """Collect actual billed receipts from the production-path local batch, without simulations."""
+    records={}
+    prior_candidates=set()
+    current_sources={str(p.relative_to(ROOT)):sha(p.relative_to(ROOT)) for p in sorted((ROOT/'src').rglob('*.sol'))}
+    integer=lambda v:int(v,16) if isinstance(v,str) and v.startswith('0x') else int(v)
+    for line in Path(actions).read_text().splitlines():
+        action=json.loads(line);receipt=action.get('receipt')
+        recorded=action.get('vault_context',{}).get('source_sha256')
+        if recorded is not None and recorded != current_sources:
+            prior_candidates.add(hashlib.sha256(json.dumps(recorded,sort_keys=True).encode()).hexdigest())
+            continue  # Prior failed candidate receipts remain preserved in the immutable input ledger.
+        if receipt and recorded is None:
+            raise ValueError('unbound receipt cannot calibrate the current candidate')
+        if receipt:
+            h=receipt['transactionHash']
+            records[h]=dict(operation=action['function'].split('(')[0],hash=h,gasUsed=integer(receipt['gasUsed']),
+                effectiveGasPrice=integer(receipt['effectiveGasPrice']),status=integer(receipt['status']),valueWei=action.get('value_wei',0))
+        for row in action.get('tx_state',{}).get('counted',[]):
+            if not row.get('reorged'):
+                records[row['hash']]=dict(operation=row.get('function',row['label']),hash=row['hash'],gasUsed=row['gas_used'],
+                    effectiveGasPrice=row['price'],status=row['status'],keeperPayWei=row['pay'],
+                    valueWei=row.get('transaction_value_wei',0),contributionWei=row.get('checkpoint_contributed_wei',0))
+    if not records:
+        raise ValueError('no actual transaction receipts in the batch actions')
+    data=dict(method='Billed isolated-fork receipts; prospective costs remain estimates',
+        source_sha256=current_sources,
+        actions_sha256=hashlib.sha256(Path(actions).read_bytes()).hexdigest(),excluded_prior_candidate_source_hashes=sorted(prior_candidates),transactions=list(records.values()))
+    (ROOT/output).write_text(json.dumps(data,indent=1)+'\n')
+    print(f'wrote {output}: {len(records)} actual billed transactions')
+
+
+
+def existing_readback():
+    """Refresh the existing MAIN deployment at one latest public-mainnet block; send nothing."""
+    path=ROOT/'deploy/existing-main-readback.json';previous=json.loads(path.read_text())
+    rpc='https://mainnet.gateway.tenderly.co'
+    def run(*args):
+        return subprocess.run(['cast',*map(str,args),'--rpc-url',rpc],capture_output=True,text=True)
+    header=json.loads(run('block','latest','--json').stdout);header=header.get('data',header)
+    block=int(header['number'],16);vault=previous['address'];factory=previous['factory']['address']
+    def read(to,sig,*args):
+        result=run('call',to,sig,*args,'--block',block)
+        return dict(supported=result.returncode==0,result=result.stdout.strip() if result.returncode==0 else None,
+                    error=result.stderr.strip()[-250:] if result.returncode else None)
+    views={'owner':'owner()(address)','fwa':'fwa()(address)','shapes':'shapes()(address)','packs':'packs()(address)',
+           'policy':'keeperPolicy()(address)','windingDown':'windingDown()(bool)',
+           'totals':'totals()(uint256,uint256,uint256,uint256,uint256,uint256)'}
+    for name in ('pendingDepositTotal','lockedShares','redemptionReserve','distributionReserve','claimableTotal',
+                 'processingPool','chargeRefundReserve','totalShares','openListingCount','idlePackCount','recoveryPackCount'):
+        views[name]=name+'()(uint256)'
+    code=run('code',vault,'--block',block).stdout.strip()
+    result=dict(address=vault,block=block,blockHash=header['hash'],timestamp=int(header['timestamp'],16),rpc=rpc,
+        reads={name:read(vault,sig) for name,sig in views.items()},balance=run('balance',vault,'--block',block).stdout.strip(),
+        runtimeSha256=hashlib.sha256(bytes.fromhex(code[2:])).hexdigest(),
+        factory=dict(address=factory,source=previous['factory']['source'],reads={name:read(factory,sig) for name,sig in
+                     [('managerCount','managerCount()(uint256)'),('implementation','implementation()(address)'),('policy','policy()(address)')]}))
+    result['reads']['feeCredit']=read(result['reads']['fwa']['result'],'feeCredit(address)(uint256)',vault)
+    result['liveMintFee']=read(result['reads']['shapes']['result'],'mintFee()(uint256)')
+    path.write_text(json.dumps(result,indent=1)+'\n')
+    print(f'existing MAIN deployment read only at block {block}; preserved vault/factory and all unsupported selectors')
+
+
+
 def main():
     cmd, args = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
-    if cmd == "manifest":
+    if cmd == "existing-readback":
+        existing_readback()
+    elif cmd == "calibrate" and args:
+        calibrate(args[0])
+    elif cmd == "manifest":
         manifest()
     elif cmd == "check" and args:
         found = problems(args[0], "--broadcast" in args)

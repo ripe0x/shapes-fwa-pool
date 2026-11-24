@@ -20,6 +20,9 @@ step build forge build --force --sizes
 step model-vault python3 sim/test_vault.py
 step model-forward python3 sim/test_forward.py
 step keeper-policy python3 keeper/test_policy.py
+step keeper-config python3 keeper/test_config.py
+step release-inputs python3 script/test_release.py
+step model-completion python3 sim/test_completion.py
 step keeper-index python3 keeper/test_index.py
 if [[ "${1:-}" == "--quick" ]]; then exit 0; fi
 if [[ -f sim/data/fwa.sqlite ]]; then step archive-replay python3 sim/replay.py; fi

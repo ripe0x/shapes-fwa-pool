@@ -1,0 +1,132 @@
+{
+ "address": "0x9aBbF7835240dE0dAfC7d2e512E6dA15eb0D0b46",
+ "block": 26485757,
+ "blockHash": "0x4dd5d77d5f874438d6b92140f0474c9fe5e2e64f88ed2599e59164fc98d6a9f2",
+ "timestamp": 1795532207,
+ "rpc": "https://mainnet.gateway.tenderly.co",
+ "reads": {
+  "owner": {
+   "supported": true,
+   "result": "0xCB43078C32423F5348Cab5885911C3B5faE217F9",
+   "error": null
+  },
+  "fwa": {
+   "supported": true,
+   "result": "0x958C41181182e76F221331b2755b77D9e1426A98",
+   "error": null
+  },
+  "shapes": {
+   "supported": true,
+   "result": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+   "error": null
+  },
+  "packs": {
+   "supported": true,
+   "result": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+   "error": null
+  },
+  "policy": {
+   "supported": true,
+   "result": "0xd468F42913490C32dF236894bef5C910fFF48e24",
+   "error": null
+  },
+  "windingDown": {
+   "supported": true,
+   "result": "false",
+   "error": null
+  },
+  "totals": {
+   "supported": true,
+   "result": "0\n0\n0\n0\n0\n0",
+   "error": null
+  },
+  "pendingDepositTotal": {
+   "supported": true,
+   "result": "0",
+   "error": null
+  },
+  "lockedShares": {
+   "supported": true,
+   "result": "0",
+   "error": null
+  },
+  "redemptionReserve": {
+   "supported": true,
+   "result": "0",
+   "error": null
+  },
+  "distributionReserve": {
+   "supported": true,
+   "result": "0",
+   "error": null
+  },
+  "claimableTotal": {
+   "supported": true,
+   "result": "0",
+   "error": null
+  },
+  "processingPool": {
+   "supported": true,
+   "result": "0",
+   "error": null
+  },
+  "chargeRefundReserve": {
+   "supported": false,
+   "result": null,
+   "error": "Error: server returned an error response: error code 3: execution reverted, data: \"0x\""
+  },
+  "totalShares": {
+   "supported": true,
+   "result": "1000000000000000 [1e15]",
+   "error": null
+  },
+  "openListingCount": {
+   "supported": true,
+   "result": "0",
+   "error": null
+  },
+  "idlePackCount": {
+   "supported": true,
+   "result": "0",
+   "error": null
+  },
+  "recoveryPackCount": {
+   "supported": true,
+   "result": "0",
+   "error": null
+  },
+  "feeCredit": {
+   "supported": true,
+   "result": "0",
+   "error": null
+  }
+ },
+ "balance": "10000000000000000",
+ "runtimeSha256": "d88230309f2f6f309c1482537a15d8f9e99dea1a6e37980b68f1ce4efbec402a",
+ "factory": {
+  "address": "0x0b436fff393879aae6dbdf118e9c631974731b64",
+  "source": "original preserved broadcast/Deploy.s.sol/1/run-1795409055318.json",
+  "reads": {
+   "managerCount": {
+    "supported": true,
+    "result": "0",
+    "error": null
+   },
+   "implementation": {
+    "supported": true,
+    "result": "0xa30CD5ccC6771890d02B451C89DF8C5756C86191",
+    "error": null
+   },
+   "policy": {
+    "supported": true,
+    "result": "0xd468F42913490C32dF236894bef5C910fFF48e24",
+    "error": null
+   }
+  }
+ },
+ "liveMintFee": {
+  "supported": true,
+  "result": "1000000000000000 [1e15]",
+  "error": null
+ }
+}

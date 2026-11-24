@@ -1291,3 +1291,31 @@ is now 100,000 + 30,000 per Shape (`Q_PURCHASER_REDEEM_PACK`, `_SHAPE`; `makeup(
 in `keeper/policy.py`. Cold redeems on a fork: 2 Shapes 157,014, 5 Shapes 245,262, 7 Shapes 304,165
 (`ForkDirectMint.t.sol`); 7 is the most any allowed size holds. A 0.06 ETH pack is still 160,000, so
 its backing is unchanged.
+
+
+## Main completion decisions (2026-11-24, superseding D57/D80/D85 launch assumptions)
+
+- The selected launch is0.03ETH, three paid0.01ETH mints. Future recipe changes remain immediate
+  owner settings. Historical six-unit fixtures remain marked as regression inputs.
+- One on-account quote calculation replaces the external main keeper policy. Verified work,
+  routine markup, live basefee+priority, ceilings, budgets and protected cash determine compensation.
+  Numerical calibration is mutable; algorithm changes need new code and a replacement deployment.
+- Mint fee acceptance is explicit and separate from ordinary settings. Config hashes include
+  effective settings, mint fee and operating flags, excluding dynamic budgets and timestamps.
+- Contributions are indexed intervals of their era's canonical total. Refunds are adjacent floor
+  differences, making every unused wei attributable without payer enumeration. Closed era records
+  persist to support delayed claims; their IDs only increase. No fee refund is treated as vault NAV.
+- Deposits escrow gross principal. Construction is calculated at the committing checkpoint; lazy
+  epoch issuance floors each assignment and assigns the aggregate rounding residue to the final
+  settled deposit. The aggregate issued supply is fully attributable without holder enumeration.
+- Fresh renewal permission is not an asset. Growth keeps one configured conservative float and
+  maintenance reserve; eligible renewals can consume that float while preserving holder liabilities.
+- Caller-funded recovery is unpaid at the account. Its caller explicitly pays wallet gas under a
+  client spending cap. Request-sponsored pricing work uses processingPool directly; it never
+  temporarily joins free cash, including on the checkpoint that completes the final redemption.
+- Backing70,000bps and uplift25bps are local evaluation inputs, not production approval. The
+  historical return report and owner signatures remain tied to the old candidate.
+
+Things that don't make sense until validated: one float may not cover early repeated acquisitions;
+small pools may miss checkpoint windows under the proposed uplift limit; low activity may make net
+holder returns negative even while paid mints earn creator revenue.

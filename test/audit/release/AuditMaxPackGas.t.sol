@@ -6,7 +6,6 @@ import {DeployCore} from "../../../script/DeployCore.sol";
 import {ForkBase} from "../../fork/ForkBase.sol";
 import {PackVault} from "../../../src/PackVault.sol";
 import {PackAccount} from "../../../src/PackAccount.sol";
-import {KeeperPolicyV1} from "../../../src/KeeperPolicy.sol";
 import {VaultLib} from "../../../src/VaultLib.sol";
 import {Charges} from "../../utils/Charges.sol";
 
@@ -22,16 +21,17 @@ contract AuditMaxPackGas is ForkBase {
         VaultLib.Params memory p = defaultParams();
         p.packUnitsMask = uint64(1) << 63;
         vm.expectRevert(VaultLib.OutOfBounds.selector);
-        new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
+        new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, keccak256(abi.encode(p, uint256(0.001 ether), false, false)));
         p.packUnitsMask = uint64(1) << 31;
         vm.expectRevert(VaultLib.OutOfBounds.selector);
-        new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, new KeeperPolicyV1());
+        new PackVault{value: 0.01 ether}(FWA, SHAPES, PACKS, owner, p, keccak256(abi.encode(p, uint256(0.001 ether), false, false)));
 
         p.packUnitsMask = uint64(1) << 30;
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         uint256 gross = Charges.grossFor(vault, 5 ether);
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: gross}();
+        vault.deposit{value: gross}(_expected0);
         toBlackout();
         checkpoint();
         toOpen();
@@ -44,7 +44,7 @@ contract AuditMaxPackGas is ForkBase {
         uint256 beforeGas = gasleft();
         vm.prank(keeper);
         // build mints the pack straight into ShapePacks and lists it at once (no idle leftover).
-        (bool underCap,) = address(vault).call{gas: 16_777_216}(abi.encodeCall(PackAccount.build, (30, proposals, 0)));
+        (bool underCap,) = address(vault).call{gas: 16_777_216}(abi.encodeCall(PackAccount.build, (30, proposals, 0, vault.configurationHash())));
         uint256 used = beforeGas - gasleft();
         emit log_named_uint("30 unit build gas", used);
         assertTrue(underCap, "largest allowed pack builds under the transaction cap");

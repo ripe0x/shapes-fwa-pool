@@ -8,7 +8,7 @@ One command runs the whole thing on a fresh local mainnet fork (never a public w
 It (re-)execs keeper/rehearsal_batch.py, which owns the Anvil node, the fresh label-derived actors
 and the manifest; this file is its single phase. Everything uses the real production paths:
 script/deploy.sh (DeployCore, the same code every fork test deploys), the real keeper
-(keeper/keeper.py) signing through an encrypted keystore with a durable state volume exactly as
+(keeper/keeper.py) using a fresh unlocked actor on isolated Anvil with a durable state volume, as
 keeper/entrypoint.sh does in the Fly image, and the real FWA/Shapes/ShapePacks contracts. No mocks
 of FWA, its VRF, oracle, Shapes, ShapePacks or the token pool.
 
@@ -19,7 +19,7 @@ Covered (see the per-step results in docs/receipts/unified-production-rehearsal.
  4 keeper discovers every account          13 lost transaction response
  5 build and list fresh packs              14 transaction races / nonce handling
  6 relist returned packs                   15 one account failing, others continue
- 7 keep / bid / expiry (real FWA VRF)      16 per-account event index persistence
+ 7 authenticated VRF receipts gap         16 per-account event index persistence
  8 pooled deposit/checkpoint/redeem/claim  17 reorg: keeper index and books reconcile
  9 manager withdrawals and owner exit      + every account reconciles to the wei
 
@@ -27,13 +27,8 @@ Docker is not required: when it is absent this runs the identical pinned environ
 outside Docker and leaves the image steps to CI (.github/workflows/keeper-image.yml). Steps 13-17
 reuse the real-vault harnesses keeper/test_tx.py and keeper/test_index.py.
 
-Step 7 note: a faithful real-VRF selection needs the vault to list at the exact backing the fixture
-search matched and to fork at the fixture's request block (test/fixtures/selection.json,
-sim/find_selection.py). When the live edge(6) backing differs from the fixture era (a recipe or
-purchaser-gas change moves it) the fixtures are stale and this step records a gap with the exact
-regeneration command rather than fabricate a selection. The keep/bid/expiry outcomes themselves are
-proven in the Forge fork suites (ForkSelection/ForkManager/VaultFlow); the keeper-side resolution of
-a force-sent terminal payment with no CashReceipt is covered by keeper/test_index.py.
+Step 7 records a billed-VRF-renewal receipt gap. Authenticated historical proofs remain Forge
+fixtures; the local production-path rehearsal never impersonates the coordinator or replaces code.
 """
 import json
 import re
@@ -52,13 +47,7 @@ import rehearsal_batch as B  # noqa: E402
 RPC = B.RPC
 FWA = "0x958C41181182e76F221331b2755b77D9e1426A98"
 PACKS = "0xf21514B090Da7dF4390803497d6ae673801E5cA7"
-PARAMS_T = ("(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,"
-            "uint64,uint64,uint64,uint128,uint128)")
-# deploy/manager.json keys in VaultLib.Params struct order (6 u16, 9 u64, 2 u128).
-PARAMS_ORDER = ["minEdgeBps", "bufferBps", "distributionBps", "payMarkupBps", "keeperShareBps",
-                "allocatedBoundBps", "packUnitsMask", "gasCeilingWei", "essentialCeilingWei", "maxTipWei",
-                "workFeeWei", "routineCapWei", "routineRatePerDayWei", "essentialCapWei",
-                "essentialRatePerDayWei", "reserveWei", "tvlCapWei"]
+from config import PARAMS_T, PARAMS_ORDER, tuple_arg
 E = 10**18
 MGR_OWNERS = ["mgra", "mgrb", "mgrc"]
 # Named unlocked actors the real-vault harnesses (keeper/test_tx.py, keeper/test_index.py) drive.
@@ -70,8 +59,9 @@ KEEPER_STATE = None              # harness state file (set in main)
 TOKEN = None
 VAULT = FACTORY = None
 MANAGERS = []
-# Keystore keeper (production entrypoint path): its own durable /data volume, separate from KEEPER.
-KS_KEEPER = KS_KEYSTORE = KS_PWFILE = KS_STATE = None
+# Local unlocked keeper: its own durable state volume, separate from the recovery signer.
+KS_KEEPER = KS_STATE = None
+TX_STATE_NAME = "keeper-state.json"
 
 
 # --- thin cast helpers on the batch-owned endpoint (same shapes as rehearse_canary) ---
@@ -104,7 +94,7 @@ def call(to, sig, *a):
     return cast("call", to, sig, *a).split(" ")[0]
 
 
-def edge3(account, units=6):
+def edge3(account, units=3):
     """The pending edge quote (k, backing, ok); call() truncates multi-return reads to one value."""
     _, fees = B.pending_fees()
     out = cast("call", account, "edge(uint256)(uint256,uint256,bool)", units, "--block", "pending", *fees)
@@ -194,7 +184,7 @@ def rpc(method, *params):
 # --- manager creation via the real permissionless factory ---
 def manager_params():
     v = json.loads((ROOT / "deploy/manager.json").read_text())
-    return "(" + ",".join(str(v[k]) for k in PARAMS_ORDER) + ")"
+    return tuple_arg(v)
 
 
 def create_manager(owner_label, seed):
@@ -211,50 +201,34 @@ def create_manager(owner_label, seed):
     return m
 
 
-# --- the real keeper, signing through an encrypted keystore with a durable state volume ---
-def new_keystore(label="keeper"):
-    """Generate a throwaway encrypted keystore + password in scratch (never the repo, never logged),
-    exactly the pair keeper/entrypoint.sh feeds cast as --keystore/--password-file. Returns
-    (keystore_file, password_file, address), funded for gas."""
-    scratch = Path(tempfile.mkdtemp(prefix=f"pack-vault-{label}-"))
-    (scratch / "keystores").mkdir()
-    os.chmod(scratch, 0o700)
-    import secrets
-    pw = secrets.token_hex(24)
-    pwf = scratch / f"{label}.pw"
-    pwf.write_text(pw)
-    os.chmod(pwf, 0o600)
-    sh("cast", "wallet", "new", str(scratch / "keystores"), label, "--unsafe-password", pw)
-    ks = next((scratch / "keystores").iterdir())
-    addr = sh("cast", "wallet", "address", "--keystore", str(ks), "--password-file", str(pwf))
-    if cast("code", addr) != "0x":
-        raise RuntimeError("fresh keystore signer is not clean")
-    rpc("anvil_setBalance", addr, hex(50 * E))
-    return str(ks), str(pwf), addr
+# --- the production keeper code with fresh local-only signers and durable state ---
+def new_local_signer(label='keeper'):
+    """Fresh impersonated actor on this owned Anvil only; no secrets are generated or written."""
+    address = B.ACTORS['keeper' if label == 'keeper' else 'backup']
+    B.prepare_actor(address)
+    return tempfile.mkdtemp(prefix='pack-vault-local-' + label + '-'), address
 
 
 def keeper_identity():
-    global KS_KEYSTORE, KS_PWFILE, KS_KEEPER, KS_STATE
-    KS_KEYSTORE, KS_PWFILE, KS_KEEPER = new_keystore("keeper")
-    KS_STATE = str(Path(KS_KEYSTORE).parent.parent / "data")  # the durable /data volume
+    global KS_KEEPER, KS_STATE
+    scratch, KS_KEEPER = new_local_signer('keeper')
+    KS_STATE = str(Path(scratch) / 'data')
     Path(KS_STATE).mkdir()
-    return dict(keeper=KS_KEEPER, keystore_env="encrypted keystore + password file (entrypoint.sh), scratch only",
-                state_volume=KS_STATE)
+    return dict(keeper=KS_KEEPER, signing='fresh unlocked actor on isolated Anvil', state_volume=KS_STATE,
+                limitation='production keystore transport is not exercised')
 
 
-def run_keeper(*extra, state_dir=None, keeper_addr=None, keystore=None, pwfile=None, loop_once=True, tag="keeper"):
-    """One bounded keeper invocation exactly as the Fly entrypoint runs it: keystore signing, the
+def run_keeper(*extra, state_dir=None, keeper_addr=None, loop_once=True, tag="keeper"):
+    """One bounded keeper invocation with local-only unlocked signing and the
     durable /data volume for state and the per-account indexes, --factory discovery. Retries only a
     read that failed on the throttled public fork gateway; asserts clean receipts under the gas cap."""
     state_dir = state_dir or KS_STATE
-    keystore = keystore or KS_KEYSTORE
-    pwfile = pwfile or KS_PWFILE
     keeper_addr = keeper_addr or KS_KEEPER
     B.load_manifest()
     for _ in range(16):
-        cmd = ["python3", "keeper/keeper.py", VAULT, "--factory", FACTORY, "--send",
-               "--keystore", keystore, "--password-file", pwfile, "--rpc", RPC,
-               "--state", str(Path(state_dir) / "keeper-state.json"), "--index", state_dir,
+        cmd = [sys.executable, "keeper/keeper.py", VAULT, *([] if "--caller-funded-exit" in extra else ["--factory", FACTORY]), "--send",
+               "--from", keeper_addr, "--rpc", RPC,
+               "--state", str(Path(state_dir) / TX_STATE_NAME), "--index", state_dir,
                "--confirmations", "1", "--pending-timeout", "90", *extra]
         for _ in range(6):
             r = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT)
@@ -266,7 +240,7 @@ def run_keeper(*extra, state_dir=None, keeper_addr=None, keystore=None, pwfile=N
         print(f"  [{tag}] " + out.replace("\n", "\n  "), flush=True)
         if r.returncode:
             raise RuntimeError(f"keeper exited {r.returncode}: {out[-2000:]}")
-        statef = Path(state_dir) / "keeper-state.json"
+        statef = Path(state_dir) / TX_STATE_NAME
         if "event index at block" not in out and statef.exists():
             saved = json.loads(statef.read_text())
             bad = [e for e in saved["counted"] if not e.get("reorged") and (not e["status"] or e["gas_limit"] > B.MAX_GAS)]
@@ -319,51 +293,118 @@ def _has(account, sig):
         return False
 
 
-def main():
-    global VAULT, FACTORY, MANAGERS
+def preserved_deployment_evidence(actions, vault):
+    """Keep valid deployment/setup receipts when a later phase resumes without redeploying."""
+    deployment=next(row for row in reversed(actions) if row.get('operation')=='production deployment' and row.get('vault','').lower()==vault.lower())
+    context=deployment['vault_context']
+    current=lambda row: row.get('vault_context',{}).get('source_sha256')==context['source_sha256'] and row.get('vault_context',{}).get('vault','').lower()==vault.lower()
+    receipt_keys=('transactionHash','status','blockNumber','blockHash','gasUsed','effectiveGasPrice','from','to','contractAddress')
+    compact=lambda row:{key:row[key] for key in receipt_keys if key in row}
+    contracts=[{key:row[key] for key in ('name','address','runtime_bytes','runtime_sha256','gas_used')} | {'receipt':compact(row['receipt'])} for row in deployment['deployments']]
+    factory=next(row['address'] for row in contracts if row['name']=='PackManagerFactory')
+    creations=[{key:row[key] for key in ('sender','to','function','arguments','value_wei','calldata')} | {'receipt':compact(row['receipt'])}
+        for row in actions if current(row) and row.get('to','').lower()==factory.lower() and row.get('function','').startswith('create(') and row.get('receipt')]
+    if len(creations)!=3:
+        raise RuntimeError('preserved campaign must name exactly three current-source manager creation receipts')
+    return dict(values=deployment['values'],source_sha256=context['source_sha256'],contracts=contracts,
+        onchainPostflightPassed='postflight passed' in deployment['postflight_output'],managerCreations=creations,
+        note='Preserved actual receipts from the same candidate; later phases resumed without repeating deployment.')
+
+
+def main(resume=False):
+    global VAULT, FACTORY, MANAGERS, TOKEN, TX_STATE_NAME
     report = dict(fork_block=B.FORK_BLOCK, fork_hash=B.load_manifest()["fork_hash"], rpc=RPC,
                   docker=bool(shutil.which("docker")), steps={}, gaps=[])
     for actor in B.ACTORS.values():
         impersonate(actor)
 
-    # 1. Deploy the pooled vault and the factory through the production path.
-    values = json.loads((ROOT / "deploy/mainnet.json").read_text())
-    values["owner"] = B.ACTORS["owner"]
-    VAULT = B.deploy(values, "unified")
-    FACTORY = next(t["contractAddress"] for t in
-                   json.loads((ROOT / "broadcast/Deploy.s.sol/1/run-latest.json").read_text())["transactions"]
-                   if t.get("contractName") == "PackManagerFactory")
-    global TOKEN
-    TOKEN = call(FWA, "token()(address)")
-    report["vault"], report["factory"] = VAULT, FACTORY
-    admit = fwa_admit_packs()
-    k, backing, ok = edge3(VAULT, 6)
-    report["steps"]["1_deploy"] = dict(vault=VAULT, factory=FACTORY, fwa_admission=admit,
-                                       edge6_backing=backing, edge6_ok=ok, k=k)
+    if resume:
+        actions=[json.loads(line) for line in Path(B.load_manifest()['actions']).read_text().splitlines()]
+        deployment=next(row for row in reversed(actions) if row.get('operation')=='production deployment')
+        VAULT=deployment['vault']
+        context=next(row['vault_context'] for row in reversed(actions) if row.get('vault_context'))
+        B.CURRENT_DEPLOYMENT=context
+        FACTORY=next(row['address'] for row in context['runtimes'] if row['name']=='PackManagerFactory')
+        count=num(call(FACTORY,'managerCount()(uint256)'))
+        if count != 3:
+            raise RuntimeError('resume requires exactly the three authenticated setup managers')
+        MANAGERS=[call(FACTORY,'managerAt(uint256)(address)',i) for i in range(count)]
+        for manager,label in zip(MANAGERS,MGR_OWNERS):
+            if call(manager,'owner()(address)').lower() != B.ACTORS[label].lower():
+                raise RuntimeError('resume manager owner changed')
+        TOKEN=call(FWA,'token()(address)')
+        report.update(vault=VAULT,factory=FACTORY,resumedExistingDeployment=True)
+        B.append_action(dict(operation='resume existing production deployment after phase boundary',vault=VAULT,factory=FACTORY,managers=MANAGERS))
+    else:
+        # 1. Deploy the pooled vault and the factory through the production path.
+        values = json.loads((ROOT / "deploy/mainnet.json").read_text())
+        values["owner"] = B.ACTORS["owner"]
+        VAULT = B.deploy(values, "unified")
+        FACTORY = next(t["contractAddress"] for t in
+                       json.loads((ROOT / "broadcast/Deploy.s.sol/31337/run-latest.json").read_text())["transactions"]
+                       if t.get("contractName") == "PackManagerFactory")
+        TOKEN = call(FWA, "token()(address)")
+        report["vault"], report["factory"] = VAULT, FACTORY
+        admit = fwa_admit_packs()
+        k, backing, ok = edge3(VAULT, 3)
+        report["steps"]["1_deploy"] = dict(vault=VAULT, factory=FACTORY, fwa_admission=admit,
+                                           edge3_backing=backing, edge3_ok=ok, k=k)
 
-    # 2-3. Create several personal managers for different owners, funded independently at create.
-    MANAGERS = [create_manager(lbl, 1 * E) for lbl in MGR_OWNERS]
-    report["steps"]["2_managers"] = [dict(manager=m, owner=B.ACTORS[lbl], seed_wei=E)
-                                     for m, lbl in zip(MANAGERS, MGR_OWNERS)]
-    report["steps"]["3_fund"] = dict(managers_seeded_wei=E, vault_seed_wei=values["seedWei"],
-                                     keeper_funded=True)
+        # 2-3. Create several personal managers for different owners, funded independently at create.
+        MANAGERS = [create_manager(lbl, 1 * E) for lbl in MGR_OWNERS]
+        report["steps"]["2_managers"] = [dict(manager=m, owner=B.ACTORS[lbl], seed_wei=E)
+                                         for m, lbl in zip(MANAGERS, MGR_OWNERS)]
+        report["steps"]["3_fund"] = dict(managers_seeded_wei=E, vault_seed_wei=values["seedWei"],
+                                         keeper_funded=True)
 
-    # 4-5. One keeper discovers every account and builds+lists fresh packs on each funded account.
-    keeper_identity()
-    report["steps"]["4_discovery"] = dict(keeper=KEEPER, discovers=[VAULT] + MANAGERS)
-    catch_up_and_build()
-    built = {a: num(call(a, "openListingCount()(uint256)")) for a in [VAULT] + MANAGERS}
-    report["steps"]["5_build_list"] = dict(open_listings=built,
-                                           keeper_stats=json.load(open(Path(KS_STATE) / "keeper-state.json"))["stats"])
+    resume_steps = any(flag in sys.argv for flag in ('--resume-step8','--resume-step9','--resume-step13'))
+    if '--signed-budget-state' in sys.argv:
+        TX_STATE_NAME='keeper-state-signed-max-v2.json'
+    if resume_steps:
+        global KS_KEEPER,KS_STATE
+        KS_KEEPER=B.ACTORS['keeper']
+        KS_STATE=sys.argv[sys.argv.index('--resume-state')+1]
+        state=json.loads((Path(KS_STATE)/'keeper-state.json').read_text())
+        if state.get('identity') != {'chain_id':31337,'sender':KS_KEEPER.lower()}:
+            raise RuntimeError('resume state signer/chain differs from the owned campaign')
+        report['steps'].update({row['step']:row['result'] for row in actions if row.get('operation')=='rehearsal step complete' and row.get('vault_context',{}).get('source_sha256')==B.CURRENT_DEPLOYMENT['source_sha256']})
+        report['steps']['8_pooled']=dict(resumedFromPreservedReceipts=True,
+            fullyExited=cast('call',VAULT,'holderState(address)(uint256,uint256,uint256)',HOLDER).splitlines()==['0','0','0'])
+        report['steps']['3b_receipt_calibration']=next(row for row in reversed(actions) if row.get('operation')=='completion bounded receipt calibration' and row.get('vault_context',{}).get('source_sha256')==B.CURRENT_DEPLOYMENT['source_sha256'])
+    else:
+        from completion_calibration import calibrate_receipts
+        report['steps']['3b_receipt_calibration'] = calibrate_receipts(sys.modules[__name__], reuse_launch="--calibration-reuse-launch" in sys.argv, half_only="--calibration-half-only" in sys.argv)
+        report['gaps'].extend(report['steps']['3b_receipt_calibration'].get('gaps', []))
+        if '--calibration-only' in sys.argv:
+            B.append_action(dict(operation='supplemental isolated receipt calibration',report=report))
+            print(json.dumps(report,indent=1))
+            return
+
+        # 4-5. One keeper discovers every account and builds+lists fresh packs on each funded account.
+        keeper_identity()
+        report["steps"]["4_discovery"] = dict(keeper=KEEPER, discovers=[VAULT] + MANAGERS)
+        catch_up_and_build()
+        built = {a: num(call(a, "openListingCount()(uint256)")) for a in [VAULT] + MANAGERS}
+        report["steps"]["5_build_list"] = dict(open_listings=built,
+                                               keeper_stats=json.load(open(Path(KS_STATE) / TX_STATE_NAME))["stats"])
 
     # Remaining steps are orchestrated by rehearse_unified_steps (kept here for readability).
     global KEEPER_STATE
     KEEPER_STATE = str(Path(tempfile.mkdtemp(prefix="pack-vault-harness-")) / "state.json")
     import rehearse_unified_steps as steps  # noqa: E402  (same directory)
-    steps.run(sys.modules[__name__], report)
+    if '--resume-step8' in sys.argv:
+        report['steps']['8_pooled']=steps.resume_pooled_exit(sys.modules[__name__])
+    steps.run(sys.modules[__name__], report, start=13 if "--resume-step13" in sys.argv else 9 if resume_steps else 8)
+    import calibrate_tails
+    report["steps"]["18_required_tails"] = calibrate_tails.main()
 
     errors = {k: v["error"] for k, v in report["steps"].items() if isinstance(v, dict) and v.get("error")}
     report["errors"] = errors
+    actions_path=Path(B.load_manifest()['actions'])
+    actions=[json.loads(line) for line in actions_path.read_text().splitlines()]
+    report['preserved_deployment_evidence']=preserved_deployment_evidence(actions,VAULT)
+    report['public_actions_sha256']=__import__('hashlib').sha256(actions_path.read_bytes()).hexdigest()
+    report['public_actions_records']=len(actions)
     # Committed evidence names no local machine paths.
     text = B.scrub(re.sub(r"(/private)?/var/folders/[^\"]*?/T/|/tmp/", "<tmp>/", json.dumps(report, indent=1, default=str)))
     (ROOT / "docs/receipts/unified-production-rehearsal.json").write_text(text)
@@ -390,6 +431,6 @@ def launch():
 
 if __name__ == "__main__":
     if os.environ.get(B.ENV_MANIFEST):
-        main()  # running as the batch phase
+        main(resume="--resume-deployed" in sys.argv)  # running as the batch phase
     else:
         launch()

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {GasQuotes} from "../utils/GasQuotes.sol";
+
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
 import {ForkBase, IOwnable} from "./ForkBase.sol";
@@ -30,8 +32,9 @@ contract ForkBackingTest is ForkBase {
 
     function _priced(uint256 escrow) internal {
         uint256 gross = vault.requestCharge() + escrow;
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: gross}();
+        vault.deposit{value: gross}(_expected0);
         toBlackout();
         checkpoint();
         toOpen();
@@ -41,8 +44,9 @@ contract ForkBackingTest is ForkBase {
         VaultLib.Params memory p = vault.getParams();
         (p.gasCeiling, p.essentialCeiling, p.maxTip) =
             (ceiling, ceiling, ceiling < p.maxTip ? ceiling : p.maxTip);
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected1);
     }
 
     function _bid() internal view returns (uint256) {
@@ -54,13 +58,7 @@ contract ForkBackingTest is ForkBase {
     /// @dev The exact economic target `edge` posts for an exempt collection (no oracle ceiling).
     function _target(uint256 units) internal view returns (uint256) {
         uint256 value = units * 0.01 ether;
-        // Redeem gas is priced at the fixed 2 gwei bound (VaultLib.PURCHASER_GAS_PRICE), not the
-        // keeper's gas ceiling, so the target no longer moves with the ceiling.
-        (, uint256 shapes) = VaultLib.makeup(units);
-        uint256 margin = VaultLib.MIN_KEEP_ADVANTAGE
-            + (VaultLib.Q_PURCHASER_REDEEM_PACK + shapes * VaultLib.Q_PURCHASER_REDEEM_SHAPE) * VaultLib.PURCHASER_GAS_PRICE;
-        if (value <= margin || _bid() == 0) return 0;
-        return (value - margin) * 10_000 / _bid() / 10_000 * 10_000; // floored to 10,000 wei
+        return value * vault.getParams().backingRatioBps / 10_000 / 10_000 * 10_000;
     }
 
     /// An exempt collection lists at the live linear target with no oracle ceiling, above the

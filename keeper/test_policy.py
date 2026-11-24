@@ -11,8 +11,8 @@ G, E = 10**9, 10**18
 
 
 def state(**kw):
-    # A representative 6-unit (REF_UNITS) pack's gated backing; the keeper now builds 6-unit packs.
-    backing = kw.get("backing", 726 * 10**14)
+    # Selected launch recipe: three paid Shapes, 0.03 ETH face and provisional 0.21 ETH backing.
+    backing = kw.get("backing", 21 * 10**16)
     base = dict(now=10**6, gas_price=200_000_000, base_fee=150_000_000, gas_ceiling=500_000_000,
                 max_tip=50_000_000, markup_bps=1_000, share_bps=2_500, k=1_038_500_000_000_000_000,
                 backing=backing, min_edge_bps=100, settlement_fee_bps=100, mint_fee=10**15, settlement_window=3600,
@@ -24,7 +24,7 @@ def state(**kw):
 
 
 def fns(steps):
-    return [s[0] for s in steps]
+    return ["sync" if s[0] == "syncCheckpoint" else s[0] for s in steps]
 
 
 def main():
@@ -102,19 +102,19 @@ def main():
     assert fns(plan(credit_only)) == ["checkpoint"], "checkpoint already collects sufficient credit"
 
     # Absolute envelope cash at0.5gwei: list8=(280k+8*825k)*0.55gwei=0.003784ETH;
-    # routine journal128+prune16=(85k+128*22k+16*45k)*0.55gwei=0.00199155ETH.
-    assert reserve_need(state()) == 5_775_550_000_000_000
+    # routine journal128+prune16=(125k+128*22k+16*45k)*0.55gwei=0.00201355ETH.
+    assert reserve_need(state()) == 5_797_550_000_000_000
     s = state(essential_ceiling=2 * G, work_fee=20_000_000_000_000)
-    assert reserve_need(s) == 5_935_550_000_000_000
+    assert reserve_need(s) == 5_957_550_000_000_000
     unpaid = state(essential_ceiling=2 * G, work_fee=20_000_000_000_000, essential_cap=0)
-    assert reserve_need(unpaid) == 5_935_550_000_000_000  # Sync is routine even with unpaid exits.
+    assert reserve_need(unpaid) == 5_957_550_000_000_000  # Sync is routine even with unpaid exits.
     assert "RESERVE_BELOW_NEED" in {c for c, _, _ in status(state(reserve=10**15))}
     assert P.checkpoint_cost(state(open_positions=301)) == P.checkpoint_cost(state(open_positions=10_000))
     assert P.request_charge(state(open_positions=1000)) == P.request_charge(state(open_positions=10_000))
-    # O6 retains its existing 0.0002 ETH ceiling in the configured gas-spike regime.
+    # Current provisional 500k checkpoint calibration, plus the work fee, at the routine ceiling.
     spike_checkpoint = state(base_fee=1_950_000_000, gas_price=2 * G,
                              markup_bps=0, work_fee=20_000_000_000_000)
-    assert P.pay_v1(spike_checkpoint, P.Q["checkpoint"], 1) == 200_000_000_000_000
+    assert P.payment(spike_checkpoint, P.Q["checkpoint"], 1) == 270_000_000_000_000
 
     # Global reads and terminal IDs have independent bounds; small unrelated tails wait.
     s = state(journal_cursor=7, completed_prefix=100_007, open_positions=100, active_count=100)
@@ -131,7 +131,7 @@ def main():
                                    distribution_bps=5000, distribution_due=False, witness_id=91)))
     blocked = state(journal_cursor=0, completed_prefix=128, open_positions=100, free=E,
                     idle_eth=E, idle_packs=1, routine_budget=1, markup_bps=0)
-    assert P.journal_backlog_floor(blocked) == 580_200_000_000_000
+    assert P.journal_backlog_floor(blocked) == 588_200_000_000_000
     assert "sync" in fns(plan(blocked))
     assert not {"build", "list"} & set(fns(plan(blocked)))
     assert "MAINTENANCE_UNFUNDED" in {c for c, _, _ in status(blocked)}
@@ -148,7 +148,7 @@ def main():
     assert "list" in fns(plan(resumed)) or "build" in fns(plan(resumed)) or "sync" in fns(plan(resumed))
     assert "checkpoint" not in fns(plan(state(journal_cursor=7, completed_prefix=8, pending_deposits=E, open_positions=1)))
 
-    # Scan vaults (at most 93 open): FWA's global activity alone never triggers paid work. One scan
+    # Scan vaults (at most 96 open): FWA's global activity alone never triggers paid work. One scan
     # selects and resolves each own selection once it settles or expires; other work rides along.
     scan = dict(journal_cursor=0, completed_prefix=5_000, open_positions=28, active_count=27, free=E)
     assert P.scan_vault(state(**scan)) and P.scan_proof(state(**scan))
@@ -166,7 +166,7 @@ def main():
     assert ("sync", [6, 5], 0) in plan(state(listings=[kicked, settled_own], own_journal_pending=True, **scan))
     assert ("sync", [6], 0) in plan(state(listings=[kicked], locked_shares=E, owed_estimate=E // 10, blackout=False, **scan)), \
         "holders waiting are served even when the scan is unpaid"
-    assert plan(state(listings=[kicked], pending_deposits=E, **scan))[0] == ("sync", [], 0), \
+    assert plan(state(listings=[kicked], pending_deposits=E, **scan))[0] == ("syncCheckpoint", [], 0), \
         "in a checkpoint window the paid scan runs first, the terminal after it without a scan"
     assert P.journal_backlog_floor(state(markup_bps=0, routine_budget=1, **scan)) == (120_000 + 28 * 30_000) * 200_000_000
     assert "checkpoint" in fns(plan(state(journal_cursor=7, completed_prefix=100_007, pending_deposits=E)))
@@ -194,7 +194,7 @@ def main():
     gift = state(idle_packs=1, idle_value=4 * P.UNIT, backing_proposals=[], **build)
     assert "build" in fns(plan(gift))
     gift.idle_funding = E
-    assert "build" not in fns(plan(gift))
+    assert "build" in fns(plan(gift)), "old idle quotes do not reserve cash beside renewal float"
     gift.idle_funding = 0
     gift.backing_proposals = [2 * E]
     assert "build" not in fns(plan(gift)), "viable inventory retains cash priority"

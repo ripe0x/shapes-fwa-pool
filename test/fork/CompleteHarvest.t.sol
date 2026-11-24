@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {GasQuotes} from "../utils/GasQuotes.sol";
+
 import {ForkBase, IOwnable, IFwaAdmin} from "./ForkBase.sol";
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
 import {JournalRequests} from "./EfficientJournal.t.sol";
@@ -11,8 +13,8 @@ import {VaultLib} from "../../src/VaultLib.sol";
 import {StrategyLib} from "../../src/StrategyLib.sol";
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
-/// @notice Real fees from the recorded Chainlink fulfillment. Cash is reduced only to exercise
-///         the explicit liquidity gate; FWA state, pending fees and fee debts are never fabricated.
+/// @notice Real fees from a recorded Chainlink fulfillment. Exact opening funding is spent
+///         through real paid mints and FWA listings, leaving no fabricated liquidity shortfall.
 contract CompleteHarvestTest is ForkBase {
     uint256 first;
     uint256 second;
@@ -39,9 +41,16 @@ contract CompleteHarvestTest is ForkBase {
         IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         VaultLib.Params memory p = defaultParams();
         p.payMarkupBps = 0; p.workFee = 0; p.reserve = 0; p.gasCeiling = 0.5 gwei;
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether);
+        uint256 baseGas = uint256(p.gasSchedule.build) + 2 * (uint256(p.gasSchedule.buildPack)
+            + 2 * p.gasSchedule.buildShape + p.gasSchedule.listed);
+        uint256 exactOpening = 2 * (P + FEE_PER_PACK + P * p.backingRatioBps / 10_000)
+            + baseGas * 0.2 gwei + 10_000; // second live backing needs its own 10,000-wei tag
+        address predicted = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
+        uint256 dust = predicted.balance;
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, exactOpening - dust, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         // External self-call: keeps restock/list out of setUp's stack frame (via_ir stack depth).
         this.seedTwoListings();
+        assertEq(vault.freeEth(), 0, "real construction spends exact opening cash");
         first = vault.openListingAt(0); second = vault.openListingAt(1);
         ReceiptFixtureFiller filler = new ReceiptFixtureFiller{value: 3 ether}(
             ReceiptFWA(address(FWA)), ReceiptPacks(address(PACKS)), ReceiptShapes(address(SHAPES))
@@ -60,7 +69,8 @@ contract CompleteHarvestTest is ForkBase {
         assertGt(FWA.pendingFees(second), 0);
         assertEq(FWA.feeCredit(address(vault)), 0);
         p = vault.getParams(); p.maxTip = 0;
-        vm.prank(owner); vault.setParams(p);
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected0);
         // Tiny genuine accruals suffice at one wei. Receipt calibration uses production prices.
         vm.fee(1); vm.txGasPrice(1);
     }
@@ -97,13 +107,14 @@ contract CompleteHarvestTest is ForkBase {
         ids = new uint256[](2); ids[0] = first; ids[1] = second;
     }
 
-    function _base() private pure returns (uint256) { return VaultLib.Q_SYNC + 128 * VaultLib.Q_JOURNAL; }
+    function _base() private pure returns (uint256) { return GasQuotes.Q_SYNC + 128 * GasQuotes.Q_JOURNAL; }
 
     function _measure(uint256[] memory ids) private returns (uint256 billed) {
         assertTrue(vm.isIsolateMode(), "gas profile needs --isolate");
-        address policy = address(vault.keeperPolicy());
-        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(policy); vm.cool(keeper);
-        vm.prank(keeper); vault.sync(ids, 0, 0);
+
+        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(keeper);
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); vault.sync(ids, 0, 0, _expected1);
         billed = vm.lastCallGas().gasTotalUsed;
     }
 
@@ -119,50 +130,62 @@ contract CompleteHarvestTest is ForkBase {
         uint256[] memory ids = new uint256[](1); ids[0] = first;
         uint256 firstFees = FWA.pendingFees(first);
         uint256 snapshot = vm.snapshotState();
-        uint256 withCash = _measure(ids);
-        assertEq(FWA.pendingFees(first), firstFees, "scan with cash claims no active fee");
-        assertTrue(vm.revertToState(snapshot));
-        vm.deal(address(vault), 0);
         uint256 drained = _measure(ids);
+        assertEq(FWA.pendingFees(first), firstFees, "scan without cash claims no active fee");
+        assertTrue(vm.revertToState(snapshot));
+        TestVaultOps.fundTo(vault, 0.1 ether);
+        uint256 withCash = _measure(ids);
         assertEq(FWA.pendingFees(first), firstFees, "scan with no cash still claims no active fee");
         emit log_named_uint("foreign-only scan billed gas with cash", withCash);
         emit log_named_uint("foreign-only scan billed gas drained", drained);
         uint256 delta = withCash > drained ? withCash - drained : drained - withCash;
-        assertLe(delta, VaultLib.Q_FUND, "cash level does not engage a funding path");
+        assertLe(delta, GasQuotes.Q_FUND, "cash level does not engage a funding path");
     }
 
     function test_profileRefundedRequiredSingletonAfterFundingGate() public {
         vm.skip(!vm.isIsolateMode());
-        vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
+        vault.sync(new uint256[](0), 0, 0, _expected2);
         JournalRequests f = JournalRequests(address(FWA));
         (, uint64 deadline,,,,) = f.acquisitionMeta(FWA.requestIdAtSequence(FWA.lastIssuedSequence()));
         vm.roll(uint256(deadline) + 1);
         f.processAcquisitions(1);
         assertEq(FWA.nextSequenceToProcess() - vault.acquisitionCursor(), 1);
         uint256 charge = vault.requestCharge();
-        vm.prank(alice); vault.deposit{value: 0.1 ether + charge}();
+        bytes32 _expected3 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: 0.1 ether + charge}(_expected3);
         toBlackout();
         VaultLib.Params memory p = vault.getParams(); p.maxTip = 0.05 gwei;
-        vm.prank(owner); vault.setParams(p);
+        bytes32 _expected4 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected4);
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
-        uint256 billed = _measure(new uint256[](0));
-        emit log_named_uint("required refunded singleton with funding checks isolated billed gas", billed);
-        assertLe(billed, VaultLib.Q_REQUIRED_TAIL + VaultLib.Q_JOURNAL);
+        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(keeper);
+        bytes32 expected = vault.configurationHash();
+        vm.prank(keeper);
+        uint256 paid = vault.syncCheckpoint(new uint256[](0), first, 1, expected);
+        uint256 billed = vm.lastCallGas().gasTotalUsed;
+        assertGt(paid, 0, "required holder work is paid from explicit contributions");
+        emit log_named_uint("contribution-funded required refunded singleton isolated billed gas", billed);
+        assertLe(billed, GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_JOURNAL);
     }
 
     function test_distributionTailProvesTheFullCollectionCostBeforePayingIt() public {
         JournalRequests f = JournalRequests(address(FWA));
         (, uint64 deadline,,,,) = f.acquisitionMeta(FWA.requestIdAtSequence(FWA.lastIssuedSequence()));
         vm.roll(uint256(deadline) + 1); f.processAcquisitions(1);
-        vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected5 = TestVaultOps.configurationHash(vault);
+        vault.sync(new uint256[](0), 0, 0, _expected5);
         uint256 charge = vault.requestCharge();
-        vm.prank(alice); vault.deposit{value: 0.1 ether + charge}();
-        toBlackout(); vault.checkpoint(first, 0);
+        bytes32 _expected7 = TestVaultOps.configurationHash(vault);
+        bytes32 _expected6 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: 0.1 ether + charge}(_expected6);
+        toBlackout(); vault.checkpoint(first, 0, _expected7);
         vm.prank(owner); vault.startWindDown();
         uint256[] memory one = new uint256[](1); one[0] = first;
-        vault.unlist(one, 0);
+        bytes32 _expected8 = TestVaultOps.configurationHash(vault);
+        vault.unlist(one, 0, _expected8);
         uint256 credit = FWA.feeCredit(address(vault));
-        assertGt(credit * 2500, VaultLib.Q_CREDIT * 10_000, "real credit is independently economical");
+        assertGt(credit * 2500, GasQuotes.Q_CREDIT * 10_000, "real credit is independently economical");
         toOpen();
         (,, uint256 price) = f.quoteAcquisitionPrice();
         vm.prank(bob); f.acquire{value: price}(bob, 1, 0, 0, 10_000);
@@ -170,21 +193,28 @@ contract CompleteHarvestTest is ForkBase {
         vm.roll(uint256(deadline) + 1); f.processAcquisitions(1);
         toBlackout();
         VaultLib.Params memory p = vault.getParams(); p.distributionBps = 5000;
-        vm.prank(owner); vault.setParams(p);
-        uint256 cost = VaultLib.Q_REQUIRED_TAIL + VaultLib.Q_DISTRIBUTION_PROOF + VaultLib.Q_JOURNAL;
+        p.essentialCap = 0;
+        p.essentialRate = 0;
+        bytes32 _expected9 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected9);
+        uint256 cost = GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_DISTRIBUTION_PROOF + GasQuotes.Q_JOURNAL;
         uint256 supply = vault.totalShares();
         uint256 target = (vault.highWaterMark() * supply + 1e18 - 1) / 1e18
-            + 0.02 ether + cost + VaultLib.Q_CREDIT / 2;
+            + 0.02 ether + cost + GasQuotes.Q_CREDIT / 2;
         (uint256 tracked,, uint256 backing,,,) = vault.totals();
-        vm.deal(address(vault), target - tracked - backing - FWA.pendingFees(second) - credit);
-        assertEq(vault.sync(new uint256[](0), second, 1), cost);
+        TestVaultOps.fundTo(vault, target - tracked - backing - FWA.pendingFees(second) - credit);
+        bytes32 _expected10 = TestVaultOps.configurationHash(vault);
+        assertEq(vault.sync(new uint256[](0), second, 1, _expected10), cost);
         assertEq(FWA.feeCredit(address(vault)), credit, "extra fee collection would erase the qualifying distribution");
-        vault.checkpoint(second, 0);
+        bytes32 _expected11 = TestVaultOps.configurationHash(vault);
+        assertGt(vault.checkpoint(second, 1, _expected11), 0,
+            "wind-down distribution uses routine permission, not the empty essential budget");
         assertGe(vault.distributionReserve(), 0.01 ether);
     }
 
     function test_standaloneHarvestCannotSpendBudgetAndPreservesNav() public {
-        vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected12 = TestVaultOps.configurationHash(vault);
+        vault.sync(new uint256[](0), 0, 0, _expected12);
         uint256 nav = vault.accountedNav(first);
         uint256 pending = FWA.pendingFees(first);
         (uint256 routine,) = vault.budget();
@@ -213,9 +243,11 @@ contract CompleteHarvestTest is ForkBase {
         uint256 debt = vault.position(first).feeDebt;
         uint256 cash = address(vault).balance;
         uint256 keeperCash = address(this).balance;
+        bytes32 _expected13 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
-        vault.sync(_ids(), 0, 1);
-        uint256 paid = vault.sync(_ids(), 0, 0);
+        vault.sync(_ids(), 0, 1, _expected13);
+        bytes32 _expected14 = TestVaultOps.configurationHash(vault);
+        uint256 paid = vault.sync(_ids(), 0, 0, _expected14);
         assertEq(paid, 0, "foreign-only scan is unpaid");
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess(), "one scan clears the backlog");
         assertEq(address(vault).balance, cash, "no vault cash moved");
@@ -227,9 +259,10 @@ contract CompleteHarvestTest is ForkBase {
     function test_cashShortfallScanClaimsNoFeesAndKeepsProtectedCash() public {
         _fullJob();
         uint256 charge = vault.requestCharge();
-        vm.prank(alice); vault.deposit{value: 0.1 ether + charge}();
+        bytes32 _expected15 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: 0.1 ether + charge}(_expected15);
         uint256 protectedCash = vault.pendingDepositTotal() + vault.processingPool();
-        vm.deal(address(vault), protectedCash);
+        assertEq(address(vault).balance, protectedCash, "escrow and sponsorship are the entire real balance");
         // Cash is at the liabilities floor. The 128-record journal that once forced the cash-short
         // funding path (claim only the first useful position's fees) is displaced by a scan of the
         // two own positions; a foreign-only scan does no paid work, so nothing is claimed and the
@@ -238,9 +271,11 @@ contract CompleteHarvestTest is ForkBase {
         uint256 firstFees = FWA.pendingFees(first);
         uint256 secondFees = FWA.pendingFees(second);
         uint256 secondDebt = vault.position(second).feeDebt;
+        bytes32 _expected16 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
-        vault.sync(_ids(), 0, 1);
-        uint256 paid = vault.sync(_ids(), 0, 0);
+        vault.sync(_ids(), 0, 1, _expected16);
+        bytes32 _expected17 = TestVaultOps.configurationHash(vault);
+        uint256 paid = vault.sync(_ids(), 0, 0, _expected17);
         assertEq(paid, 0, "foreign-only scan is unpaid");
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess(), "one scan clears the backlog");
         assertEq(FWA.pendingFees(first), firstFees, "no active fee claimed");
@@ -251,38 +286,44 @@ contract CompleteHarvestTest is ForkBase {
     }
 
     function test_irrelevantAndDuplicateIdsDoNotManufacturePay() public {
-        _fullJob(); vm.deal(address(vault), 0);
+        _fullJob(); assertEq(vault.freeEth(), 0, "cash shortage reached through actual construction");
         // With no cash and a foreign-only scan (no own selection, no checkpoint window) there is no
         // paid work for ids to inflate: a lone real id and a 16-slot batch padded with irrelevant
         // and duplicate ids both earn nothing, and both just clear the backlog. The minPay offer is
         // refused either way. (The journal/own-selection funding this guarded is covered there.)
         uint256 snapshot = vm.snapshotState();
         uint256[] memory one = new uint256[](1); one[0] = first;
+        bytes32 _expected18 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
-        vault.sync(one, 0, 1);
-        uint256 paid = vault.sync(one, 0, 0);
+        vault.sync(one, 0, 1, _expected18);
+        bytes32 _expected19 = TestVaultOps.configurationHash(vault);
+        uint256 paid = vault.sync(one, 0, 0, _expected19);
         assertEq(paid, 0, "lone real id earns nothing from a foreign-only scan");
         assertTrue(vm.revertToState(snapshot));
         uint256[] memory padded = new uint256[](16);
         for (uint256 i; i < padded.length; ++i) padded[i] = i % 2 == 0 ? 1e9 + i : first;
+        bytes32 _expected20 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
-        vault.sync(padded, 0, 1);
-        assertEq(vault.sync(padded, 0, 0), paid, "padded ids neither shrink nor inflate the scan pay");
+        vault.sync(padded, 0, 1, _expected20);
+        bytes32 _expected21 = TestVaultOps.configurationHash(vault);
+        assertEq(vault.sync(padded, 0, 0, _expected21), paid, "padded ids neither shrink nor inflate the scan pay");
         assertGt(FWA.pendingFees(second), 0, "no active fee claimed");
     }
 
     function test_optionalTailAndNoProgressCannotCreateFundingWork() public {
-        vm.deal(address(vault), 0);
+        assertEq(vault.freeEth(), 0, "cash shortage reached through actual construction");
         uint256 pending = FWA.pendingFees(first);
-        assertEq(vault.sync(_ids(), 0, 0), 0);
+        bytes32 _expected22 = TestVaultOps.configurationHash(vault);
+        assertEq(vault.sync(_ids(), 0, 0, _expected22), 0);
         assertEq(FWA.pendingFees(first), pending);
+        bytes32 _expected23 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Nothing.selector);
-        vault.sync(_ids(), 0, 0);
+        vault.sync(_ids(), 0, 0, _expected23);
         assertEq(FWA.pendingFees(first), pending);
     }
 
     function test_duplicateCannotManufactureScanPayOrClaimFees() public {
-        _fullJob(); vm.deal(address(vault), 0);
+        _fullJob(); assertEq(vault.freeEth(), 0, "cash shortage reached through actual construction");
         // A foreign-only scan over the two own positions does no paid work, so a duplicated id can
         // supply no "second fee balance" to a payment that never happens: the scan pays nothing and
         // claims no fees. (The paid-journal duplicate-id fee gate this test pinned is unreachable
@@ -290,26 +331,30 @@ contract CompleteHarvestTest is ForkBase {
         uint256 firstFees = FWA.pendingFees(first);
         uint256 secondFees = FWA.pendingFees(second);
         uint256[] memory ids = new uint256[](3); ids[0] = first; ids[1] = first; ids[2] = second;
+        bytes32 _expected24 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
-        vault.sync(ids, 0, 1);
-        uint256 paid = vault.sync(ids, 0, 0);
+        vault.sync(ids, 0, 1, _expected24);
+        bytes32 _expected25 = TestVaultOps.configurationHash(vault);
+        uint256 paid = vault.sync(ids, 0, 0, _expected25);
         assertEq(paid, 0, "duplicate ids earn nothing from a foreign-only scan");
         assertEq(FWA.pendingFees(first), firstFees);
         assertEq(FWA.pendingFees(second), secondFees);
     }
 
     function test_firstCashCoveringPrefixCannotBePaddedToPassTheFeeShareGate() public {
-        _fullJob(); vm.deal(address(vault), 0);
+        _fullJob(); assertEq(vault.freeEth(), 0, "cash shortage reached through actual construction");
         uint256 firstFees = FWA.pendingFees(first);
         uint256 secondFees = FWA.pendingFees(second);
-        uint256 price = firstFees / (_base() + VaultLib.Q_FUND + VaultLib.Q_HARVESTED);
+        uint256 price = firstFees / (_base() + GasQuotes.Q_FUND + GasQuotes.Q_HARVESTED);
         vm.fee(price); vm.txGasPrice(price);
         VaultLib.Params memory p = vault.getParams(); p.keeperShareBps = 350;
-        vm.prank(owner); vault.setParams(p);
-        assertLt(firstFees * p.keeperShareBps, (VaultLib.Q_FUND + VaultLib.Q_HARVESTED) * price * 10_000);
+        bytes32 _expected26 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected26);
+        assertLt(firstFees * p.keeperShareBps, (GasQuotes.Q_FUND + GasQuotes.Q_HARVESTED) * price * 10_000);
         assertGe((firstFees + secondFees) * p.keeperShareBps,
-            (VaultLib.Q_FUND + 2 * VaultLib.Q_HARVESTED) * price * 10_000);
-        assertEq(vault.sync(_ids(), 0, 0), 0);
+            (GasQuotes.Q_FUND + 2 * GasQuotes.Q_HARVESTED) * price * 10_000);
+        bytes32 _expected27 = TestVaultOps.configurationHash(vault);
+        assertEq(vault.sync(_ids(), 0, 0, _expected27), 0);
         assertEq(FWA.pendingFees(first), firstFees);
         assertEq(FWA.pendingFees(second), secondFees);
     }
@@ -317,32 +362,37 @@ contract CompleteHarvestTest is ForkBase {
     function test_budgetPermissionCannotBeReplacedWithFeeIncome() public {
         _fullJob();
         VaultLib.Params memory p = vault.getParams(); p.routineCap = 0; p.routineRate = 0;
-        vm.prank(owner); vault.setParams(p);
-        vm.deal(address(vault), 0);
+        bytes32 _expected28 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected28);
+        assertEq(vault.freeEth(), 0, "cash shortage reached through actual construction");
         uint256 pending = FWA.pendingFees(first);
-        assertEq(vault.sync(_ids(), 0, 0), 0);
+        bytes32 _expected29 = TestVaultOps.configurationHash(vault);
+        assertEq(vault.sync(_ids(), 0, 0, _expected29), 0);
         assertEq(FWA.pendingFees(first), pending);
     }
 
     function test_nonEconomicFundingCannotConsumeFees() public {
         _fullJob();
         VaultLib.Params memory p = vault.getParams(); p.keeperShareBps = 0;
-        vm.prank(owner); vault.setParams(p);
-        vm.deal(address(vault), 0);
+        bytes32 _expected30 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected30);
+        assertEq(vault.freeEth(), 0, "cash shortage reached through actual construction");
         uint256 pending = FWA.pendingFees(first);
         uint256 secondPending = FWA.pendingFees(second);
-        assertEq(vault.sync(_ids(), 0, 0), 0);
+        bytes32 _expected31 = TestVaultOps.configurationHash(vault);
+        assertEq(vault.sync(_ids(), 0, 0, _expected31), 0);
         assertEq(FWA.pendingFees(first), pending);
         assertEq(FWA.pendingFees(second), secondPending);
     }
 
     function test_insufficientRealFeesDoNotCausePartialPaidHarvest() public {
         _fullJob(); vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
-        vm.deal(address(vault), 0);
+        assertEq(vault.freeEth(), 0, "cash shortage reached through actual construction");
         uint256 firstFees = FWA.pendingFees(first);
         uint256 secondFees = FWA.pendingFees(second);
         assertLt(firstFees + secondFees, _base() * 0.5 gwei);
-        assertEq(vault.sync(_ids(), 0, 0), 0);
+        bytes32 _expected32 = TestVaultOps.configurationHash(vault);
+        assertEq(vault.sync(_ids(), 0, 0, _expected32), 0);
         assertEq(FWA.pendingFees(first), firstFees);
         assertEq(FWA.pendingFees(second), secondFees);
     }
@@ -355,7 +405,8 @@ contract CompleteCreditTest is SelectionBase {
         _select(primary());
         VaultLib.Params memory p = vault.getParams();
         p.payMarkupBps = 0; p.workFee = 0; p.maxTip = 0;
-        vm.prank(vault.owner()); vault.setParams(p);
+        bytes32 _expected33 = TestVaultOps.configurationHash(vault);
+        vm.prank(vault.owner()); vault.setParams(p, _expected33);
         vm.fee(price); vm.txGasPrice(price);
     }
 
@@ -363,18 +414,20 @@ contract CompleteCreditTest is SelectionBase {
         _selected(1);
         uint256 credit = FWA.feeCredit(address(vault));
         uint256 cash = address(vault).balance;
-        uint256 paid = vault.sync(new uint256[](0), 0, 1);
-        assertEq(paid, VaultLib.Q_SYNC + VaultLib.Q_JOURNAL + VaultLib.Q_SELECTED + VaultLib.Q_CREDIT);
+        bytes32 _expected34 = TestVaultOps.configurationHash(vault);
+        uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected34);
+        assertEq(paid, GasQuotes.Q_SYNC + GasQuotes.Q_JOURNAL + GasQuotes.Q_SELECTED + GasQuotes.Q_CREDIT);
         assertEq(FWA.feeCredit(address(vault)), 0);
         assertEq(address(vault).balance, cash + credit - paid);
+        bytes32 _expected35 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Nothing.selector);
-        vault.sync(new uint256[](0), 0, 0);
+        vault.sync(new uint256[](0), 0, 0, _expected35);
     }
 
     function _measure() private returns (uint256 billed) {
-        address policy = address(vault.keeperPolicy());
-        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(policy);
-        vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected36 = TestVaultOps.configurationHash(vault);
+
+        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vault.sync(new uint256[](0), 0, 0, _expected36);
         billed = vm.lastCallGas().gasTotalUsed;
     }
 
@@ -383,14 +436,15 @@ contract CompleteCreditTest is SelectionBase {
         _selected(1);
         uint256 snapshot = vm.snapshotState();
         VaultLib.Params memory p = vault.getParams(); p.keeperShareBps = 0;
-        vm.prank(vault.owner()); vault.setParams(p);
+        bytes32 _expected37 = TestVaultOps.configurationHash(vault);
+        vm.prank(vault.owner()); vault.setParams(p, _expected37);
         uint256 withoutCredit = _measure();
         assertTrue(vm.revertToState(snapshot));
         uint256 withCredit = _measure();
         emit log_named_uint("same own journal job with credit retained billed gas", withoutCredit);
         emit log_named_uint("same own journal job with economical credit swept billed gas", withCredit);
         emit log_named_uint("attached fee credit sweep incremental billed gas", withCredit - withoutCredit);
-        assertLe(withCredit - withoutCredit, VaultLib.Q_CREDIT);
+        assertLe(withCredit - withoutCredit, GasQuotes.Q_CREDIT);
     }
 
     function test_terminalCashPrecedesFeeCollectionAndDustWaitsForCheckpoint() public {
@@ -399,15 +453,17 @@ contract CompleteCreditTest is SelectionBase {
         // economically sweep it; lower the share so the keeper is paid purely from the kept terminal
         // cash and the credit genuinely waits for the checkpoint (the invariant under test).
         VaultLib.Params memory p = vault.getParams(); p.keeperShareBps = 350;
-        vm.prank(vault.owner()); vault.setParams(p);
+        bytes32 _expected38 = TestVaultOps.configurationHash(vault);
+        vm.prank(vault.owner()); vault.setParams(p, _expected38);
         uint256 credit = FWA.feeCredit(address(vault));
-        assertLt(credit * p.keeperShareBps / 10_000, VaultLib.Q_CREDIT * 0.5 gwei);
+        assertLt(credit * p.keeperShareBps / 10_000, GasQuotes.Q_CREDIT * 0.5 gwei);
         vm.prank(primary().purchaser); IFwaSettle(address(FWA)).keepNFT(selected);
         uint256 cash = address(vault).balance;
         uint256[] memory ids = new uint256[](1); ids[0] = selected;
-        uint256 paid = vault.sync(ids, 0, 1);
-        assertEq(paid, (VaultLib.Q_SYNC + VaultLib.Q_JOURNAL + VaultLib.Q_SELECTED
-            + VaultLib.Q_SYNCED + VaultLib.Q_PRUNED) * 0.5 gwei);
+        bytes32 _expected39 = TestVaultOps.configurationHash(vault);
+        uint256 paid = vault.sync(ids, 0, 1, _expected39);
+        assertEq(paid, (GasQuotes.Q_SYNC + GasQuotes.Q_JOURNAL + GasQuotes.Q_SELECTED
+            + GasQuotes.Q_SYNCED + GasQuotes.Q_PRUNED) * 0.5 gwei);
         assertEq(FWA.feeCredit(address(vault)), credit);
         assertEq(address(vault).balance, cash - paid);
         assertEq(vault.openListingCount(), 0);

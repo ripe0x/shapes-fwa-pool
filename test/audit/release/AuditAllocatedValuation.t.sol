@@ -50,14 +50,17 @@ contract AuditAllocatedValuation is SelectionBase {
         assertGt(block.timestamp, uint256(allocatedAt) + FWA.settlementWindow());
 
         uint256 gross = Charges.grossFor(vault, 1 ether);
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(bob);
-        vault.deposit{value: gross}();
+        vault.deposit{value: gross}(_expected0);
         toBlackout();
-        vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
+        vault.sync(new uint256[](0), 0, 0, _expected1);
         uint256 interval = vault.lastCheckpointInterval();
         uint256 planned24 = TestVaultOps.witness(vault);
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(PackVault.SyncFirst.selector);
-        vault.checkpoint(planned24, 0);
+        vault.checkpoint(planned24, 0, _expected2);
         assertEq(vault.lastCheckpointInterval(), interval, "slot not consumed");
         assertEq(vault.shareBalance(bob), 0, "not priced");
 
