@@ -1,0 +1,27 @@
+image	Image against a fresh fork	﻿2026-11-24T15:31:05.6441312Z ##[group]Run CANDIDATE_RUN=1 python3 keeper/rehearse_image.py --image packvault-keeper:70b565819f2290ea2a6723537cd0e2526aa56872 | tee image-rehearsal.json
+image	Image against a fresh fork	2026-11-24T15:31:05.6442631Z ^[[36;1mCANDIDATE_RUN=1 python3 keeper/rehearse_image.py --image packvault-keeper:70b565819f2290ea2a6723537cd0e2526aa56872 | tee image-rehearsal.json^[[0m
+image	Image against a fresh fork	2026-11-24T15:31:05.6472212Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+image	Image against a fresh fork	2026-11-24T15:31:05.6472531Z ##[endgroup]
+image	Image against a fresh fork	2026-11-24T15:31:15.0729738Z {
+image	Image against a fresh fork	2026-11-24T15:31:15.0730101Z  "steps": [],
+image	Image against a fresh fork	2026-11-24T15:31:15.0730379Z  "fork_block": 26484850,
+image	Image against a fresh fork	2026-11-24T15:31:15.0730761Z  "fork_hash": "0xb74960f39c4f4971c0e3732837afb49ecdfd20153c3d9d0631796f1d6e086f7c",
+image	Image against a fresh fork	2026-11-24T15:31:15.0731201Z  "image": "packvault-keeper:70b565819f2290ea2a6723537cd0e2526aa56872",
+image	Image against a fresh fork	2026-11-24T15:31:15.0731533Z  "foundry": "cast Version: 1.8.1",
+image	Image against a fresh fork	2026-11-24T15:31:15.0731955Z  "signing": "unlocked fresh actors on owned isolated Anvil; production keystore transport untested",
+image	Image against a fresh fork	2026-11-24T15:31:15.0732499Z  "retained_work_directory": "/tmp/pack-vault-image-x_hkg42q"
+image	Image against a fresh fork	2026-11-24T15:31:15.0732830Z }
+image	Image against a fresh fork	2026-11-24T15:31:15.1978278Z Traceback (most recent call last):
+image	Image against a fresh fork	2026-11-24T15:31:15.1979851Z   File "/home/runner/work/shapes-fwa-pool/shapes-fwa-pool/keeper/rehearse_image.py", line 359, in <module>
+image	Image against a fresh fork	2026-11-24T15:31:15.1980421Z     main()
+image	Image against a fresh fork	2026-11-24T15:31:15.1980799Z   File "/home/runner/work/shapes-fwa-pool/shapes-fwa-pool/keeper/rehearse_image.py", line 245, in main
+image	Image against a fresh fork	2026-11-24T15:31:15.1981310Z     run = json.loads((ROOT / "broadcast/Deploy.s.sol/31337/run-latest.json").read_text())
+image	Image against a fresh fork	2026-11-24T15:31:15.1981706Z                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+image	Image against a fresh fork	2026-11-24T15:31:15.1982092Z   File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+image	Image against a fresh fork	2026-11-24T15:31:15.1987714Z     with self.open(mode='r', encoding=encoding, errors=errors) as f:
+image	Image against a fresh fork	2026-11-24T15:31:15.1988142Z          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+image	Image against a fresh fork	2026-11-24T15:31:15.1988543Z   File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+image	Image against a fresh fork	2026-11-24T15:31:15.1989046Z     return io.open(self, mode, buffering, encoding, errors, newline)
+image	Image against a fresh fork	2026-11-24T15:31:15.1989660Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+image	Image against a fresh fork	2026-11-24T15:31:15.1990365Z FileNotFoundError: [Errno 2] No such file or directory: '/home/runner/work/shapes-fwa-pool/shapes-fwa-pool/broadcast/Deploy.s.sol/31337/run-latest.json'
+image	Image against a fresh fork	2026-11-24T15:31:15.2332424Z ##[error]Process completed with exit code 1.

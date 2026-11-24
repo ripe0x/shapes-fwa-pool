@@ -212,7 +212,7 @@ def main():
         with socket.socket() as available:
             available.bind(('127.0.0.1',port))  # Refuse occupied surfaces; never reuse or stop them.
     work = Path(tempfile.mkdtemp(prefix="pack-vault-image-"))
-    node = subprocess.Popen(["anvil", "--host", "127.0.0.1", "--port", str(PORT), "--accounts", "0", "--silent",
+    node = subprocess.Popen(["anvil", "--host", "127.0.0.1", "--port", str(PORT), "--chain-id", "31337", "--accounts", "0", "--silent",
                              "--fork-url", FORK_RPC, "--fork-block-number", str(a.fork_block), "--retries", "30",
                              "--fork-retry-backoff", "5000", "--base-fee", "150000000", "--gas-limit", str(MAX_GAS),
                              "--enable-tx-gas-limit"], stdout=open(work / "anvil.log", "w"), stderr=subprocess.STDOUT)
@@ -224,7 +224,8 @@ def main():
                 break
             except (RuntimeError, json.JSONDecodeError):
                 time.sleep(1)
-        evidence.update(fork_block=a.fork_block, fork_hash=fork_hash, image=a.image,
+        assert num(cast('chain-id'))==31337, 'image fork chain identity must be isolated31337 before funding or sending'
+        evidence.update(chain_id=31337,fork_block=a.fork_block, fork_hash=fork_hash, image=a.image,
                         foundry=sh("cast", "--version").splitlines()[0])
         # Public actor addresses only. No key/password generation or secret files.
         keys = {name: ACTORS[name] for name in ('primary', 'backup')}

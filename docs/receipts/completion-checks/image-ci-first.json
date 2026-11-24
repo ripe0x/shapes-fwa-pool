@@ -1,0 +1,18 @@
+{
+  "runUrl": "https://github.com/ripe0x/shapes-fwa-pool/actions/runs/45426207512",
+  "revision": "70b565819f2290ea2a6723537cd0e2526aa56872",
+  "workflow": "keeper-image.yml",
+  "dispatchCommand": [
+    "gh",
+    "workflow",
+    "run",
+    "keeper-image.yml",
+    "--repo",
+    "ripe0x/shapes-fwa-pool",
+    "--ref",
+    "codex/main-pool-completion"
+  ],
+  "result": "FAILED after passed image build and smoke/shared-volume checks",
+  "failure": "Expected local broadcast/Deploy.s.sol/31337/run-latest.json absent. Rehearsal omitted explicit Anvil chain-ID pin; repair adds pin and pre-write assertion.",
+  "limits": "Local isolated fork only; production keystore transport not exercised."
+}
