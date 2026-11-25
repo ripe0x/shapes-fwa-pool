@@ -1,5 +1,7 @@
 # Individual manager completion, 2026-11-24
 
+**Stopped at the owner’s request.** Implementation and simulation work must remain stopped while the owner-requested instruction-following investigation is handled. The 8,192-path / 49,152-scenario study size was chosen by the agent; it was never an owner-approved acceptance requirement or resource budget. Existing manifests describe the attempted analysis and do not authorize its resumption. Saved results remain preserved and incomplete.
+
 **The corrected manager implementation and unsigned tooling are prepared; economic assessment remains open.**
 Runtime source and study inputs are frozen at `1bbe54c94eed34818d5e2c7ccd95d5f83a892b90`;
 app ABI follow-up is `1330b18ee3bb38b85e9439b3c7213ac37fc9f1d8`.
@@ -8,7 +10,7 @@ change, live cutover, merge or acceptance signature was performed.
 
 The old −28.5% / two-draw result is withdrawn. A simulator cash-hold error could commit unpaid
 ordinary keeper work after consuming its renewal float. Both partial campaigns, 34,308 saved
-rows, remain preserved and marked invalid. The corrected fixed study is running: 8,192 paired
+rows, remain preserved and marked invalid. The corrected study was stopped: 8,192 paired
 path IDs over two recorded months, three backing levels and two gas prices, 49,152 scenario runs.
 No partial return supports a recommendation. The standard .03 ETH backing reference is hypothetical
 under current manager admission guards; actual MAIN FWA receipts separately prove protocol admission.
