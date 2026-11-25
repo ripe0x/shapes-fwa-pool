@@ -39,7 +39,7 @@ def main():
         'Fresh unlocked local actors; encrypted-keystore/hardware transport and live Fly deployment are not exercised.',
         'One real pending request expires locally; authentic historical VRF renewal receipt remains a separate known limitation.'])
     node=subprocess.Popen(['anvil','--host','127.0.0.1','--port',str(a.port),'--chain-id','31337','--accounts','0','--silent',
-        '--fork-url','https://mainnet.gateway.tenderly.co','--fork-block-number',str(a.fork_block),'--retries','30','--fork-retry-backoff','5000',
+        '--fork-url','https://mainnet.gateway.tenderly.co','--fork-block-number',str(a.fork_block),'--hardfork','osaka','--retries','30','--fork-retry-backoff','5000',
         '--base-fee','150000000','--gas-limit',str(I.MAX_GAS),'--enable-tx-gas-limit'],stdout=open(work/'anvil.log','w'),stderr=subprocess.STDOUT)
     workers=[];proxy=None;source={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted((ROOT/'src').rglob('*.sol'))}
     evidence['contractSourceSha256']=source
