@@ -194,10 +194,8 @@ contract PackVault is PackAccount {
         return free > keep ? free - keep : 0;
     }
 
-    function _renewalCash() internal view override returns (uint256) {
-        uint256 free = _free();
-        uint256 keep = s.params.reserve + _owedEstimate();
-        return free > keep ? free - keep : 0;
+    function _renewalHold() internal view override returns (uint256) {
+        return s.params.reserve + _owedEstimate();
     }
 
     /// @dev ETH locked shares will need at the last checkpoint's price, rounded up.

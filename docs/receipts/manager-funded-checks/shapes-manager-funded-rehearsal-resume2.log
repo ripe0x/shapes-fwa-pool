@@ -1,0 +1,80 @@
+{
+ "status": "PASS",
+ "forkBlock": 26488707,
+ "factory": "0x821212e3acdaaf80049608ed9d0d928a96a33e9d",
+ "cases": [
+  {
+   "owner": "0x7BeE4cb3A7ee9260c59fdD85a2360bC7a6e95029",
+   "label": "single-owner",
+   "manager": "0x7Eaed823B32AF58913D4FD8E57843d221557610C",
+   "fundingWei": 500000000000000000,
+   "initialAccountCashWei": 500000000000000000,
+   "preexistingDustWei": 0,
+   "expectedPacks": 1,
+   "postflight": "{\n  \"chainId\": 31337,\n  \"block\": 26488712,\n  \"blockHash\": \"0x0fb73bbc039dfb38464119a9f7e3ee527b560f0f16d75bec534e587799a2fe39\",\n  \"rpc\": \"http://127.0.0.1:18731\",\n  \"deploymentTarget\": \"manager\",\n  \"factory\": \"0x821212e3acdaaf80049608ed9d0d928a96a33e9d\",\n  \"implementation\": \"0xF83777db605f30Dccba7836833B37557948adBDa\",\n  \"libraries\": {\n    \"ScanLib\": \"0x4ac701799b22e4c7a0f24301ccc904AD6fB3F005\",\n    \"VaultLib\": \"0x35e7776666b7DD005290aD7c1F672b69a85D0EEa\",\n    \"StrategyLib\": \"0xDd9CC04580c1001a7437DC4944ecF05EE1D28Aab\"\n  },\n  \"managerCount\": 1,\n  \"factoryBalanceWei\": 0,\n  \"implementationBalanceWei\": 0,\n  \"manager\": {\n    \"address\": \"0x7Eaed823B32AF58913D4FD8E57843d221557610C\",\n    \"owner\": \"0x7BeE4cb3A7ee9260c59fdD85a2360bC7a6e95029\",\n    \"params\": {\n      \"minEdgeBps\": 100,\n      \"bufferBps\": 0,\n      \"distributionBps\": 0,\n      \"payMarkupBps\": 0,\n      \"keeperShareBps\": 2500,\n      \"upliftBoundBps\": 25,\n      \"packUnitsMask\": 8,\n      \"gasCeilingWei\": 500000000,\n      \"essentialCeilingWei\": 500000000,\n      \"maxTipWei\": 50000000,\n      \"workFeeWei\": 20000000000000,\n      \"routineCapWei\": 30000000000000000,\n      \"routineRatePerDayWei\": 10000000000000000,\n      \"essentialCapWei\": 10000000000000000,\n      \"essentialRatePerDayWei\": 5000000000000000,\n      \"reserveWei\": 5000000000000000,\n      \"tvlCapWei\": 0,\n      \"backingRatioBps\": 70000,\n      \"renewalMode\": 0,\n      \"renewalFloatCount\": 1,\n      \"acceptedMintFeeWei\": 1000000000000000,\n      \"minDepositWei\": 10000000000000000,\n      \"minDistributionWei\": 10000000000000000,\n      \"gasSchedule\": {\n        \"checkpoint\": 500000,\n        \"allocationEntry\": 6000,\n        \"allocationRead\": 30000,\n        \"build\": 360000,\n        \"buildPack\": 300000,\n        \"buildShape\": 130000,\n        \"list\": 280000,\n        \"listed\": 825000,\n        \"sync\": 125000,\n        \"requiredTail\": 120000,\n        \"distributionProof\": 80000,\n        \"journal\": 22000,\n        \"scan\": 30000,\n        \"selected\": 180000,\n        \"synced\": 120000,\n        \"pruned\": 45000,\n        \"unlist\": 340000,\n        \"unlisted\": 285000,\n        \"liquidate\": 75000,\n        \"liquidatePack\": 80000,\n        \"redeemShape\": 35000,\n        \"recoveryBase\": 100000,\n        \"recoveryShape\": 35000,\n        \"recoveryUnseal\": 70000,\n        \"harvest\": 125000,\n        \"harvested\": 80000,\n        \"credit\": 40000,\n        \"fund\": 40000\n      }\n    },\n    \"budget\": [\n      30000000000000000,\n      10000000000000000\n    ],\n    \"cashWei\": 500000000000000000,\n    \"flags\": {\n      \"windingDown\": \"false\",\n      \"listingPaused\": \"false\"\n    },\n    \"inventory\": {\n      \"openListingCount\": 0,\n      \"idlePackCount\": 0,\n      \"recoveryPackCount\": 0\n    },\n    \"liveMintFeeWei\": 500000000000000\n  }\n}\nmanager postflight passed; shared vault not required",
+   "afterBuild": {
+    "cashWei": 258232923820000000,
+    "feeCreditWei": 0,
+    "openListingCount": 1,
+    "idlePackCount": 0,
+    "recoveryPackCount": 0,
+    "pendingReceipts": 0
+   },
+   "final": {
+    "cashWei": 0,
+    "feeCreditWei": 0,
+    "openListingCount": 0,
+    "idlePackCount": 0,
+    "recoveryPackCount": 0,
+    "pendingReceipts": 0
+   },
+   "ownerExitSignedUpperWei": 115969148391740,
+   "withdrawnWei": 498232923820000000,
+   "walletGasWei": 172995406360229,
+   "ownerNetWei": -1940071586360229,
+   "ownerLedgerGapWei": 0
+  },
+  {
+   "owner": "0xb74e5b810D693369360D50E714Bc0464F35A6F78",
+   "label": "batch-owner",
+   "manager": "0x316ee7718e5769953199aDBAb4dBe27d4eba24B6",
+   "fundingWei": 1000000000000000000,
+   "initialAccountCashWei": 1000000000000000000,
+   "preexistingDustWei": 0,
+   "expectedPacks": 3,
+   "postflight": "{\n  \"chainId\": 31337,\n  \"block\": 26488718,\n  \"blockHash\": \"0xfe49f12e12c269d68b91724f5dd610e997922371fc6d57994c48b3116ec08efe\",\n  \"rpc\": \"http://127.0.0.1:18731\",\n  \"deploymentTarget\": \"manager\",\n  \"factory\": \"0x821212e3acdaaf80049608ed9d0d928a96a33e9d\",\n  \"implementation\": \"0xF83777db605f30Dccba7836833B37557948adBDa\",\n  \"libraries\": {\n    \"ScanLib\": \"0x4ac701799b22e4c7a0f24301ccc904AD6fB3F005\",\n    \"VaultLib\": \"0x35e7776666b7DD005290aD7c1F672b69a85D0EEa\",\n    \"StrategyLib\": \"0xDd9CC04580c1001a7437DC4944ecF05EE1D28Aab\"\n  },\n  \"managerCount\": 2,\n  \"factoryBalanceWei\": 0,\n  \"implementationBalanceWei\": 0,\n  \"manager\": {\n    \"address\": \"0x316ee7718e5769953199aDBAb4dBe27d4eba24B6\",\n    \"owner\": \"0xb74e5b810D693369360D50E714Bc0464F35A6F78\",\n    \"params\": {\n      \"minEdgeBps\": 100,\n      \"bufferBps\": 0,\n      \"distributionBps\": 0,\n      \"payMarkupBps\": 0,\n      \"keeperShareBps\": 2500,\n      \"upliftBoundBps\": 25,\n      \"packUnitsMask\": 8,\n      \"gasCeilingWei\": 500000000,\n      \"essentialCeilingWei\": 500000000,\n      \"maxTipWei\": 50000000,\n      \"workFeeWei\": 20000000000000,\n      \"routineCapWei\": 30000000000000000,\n      \"routineRatePerDayWei\": 10000000000000000,\n      \"essentialCapWei\": 10000000000000000,\n      \"essentialRatePerDayWei\": 5000000000000000,\n      \"reserveWei\": 5000000000000000,\n      \"tvlCapWei\": 0,\n      \"backingRatioBps\": 70000,\n      \"renewalMode\": 0,\n      \"renewalFloatCount\": 1,\n      \"acceptedMintFeeWei\": 1000000000000000,\n      \"minDepositWei\": 10000000000000000,\n      \"minDistributionWei\": 10000000000000000,\n      \"gasSchedule\": {\n        \"checkpoint\": 500000,\n        \"allocationEntry\": 6000,\n        \"allocationRead\": 30000,\n        \"build\": 360000,\n        \"buildPack\": 300000,\n        \"buildShape\": 130000,\n        \"list\": 280000,\n        \"listed\": 825000,\n        \"sync\": 125000,\n        \"requiredTail\": 120000,\n        \"distributionProof\": 80000,\n        \"journal\": 22000,\n        \"scan\": 30000,\n        \"selected\": 180000,\n        \"synced\": 120000,\n        \"pruned\": 45000,\n        \"unlist\": 340000,\n        \"unlisted\": 285000,\n        \"liquidate\": 75000,\n        \"liquidatePack\": 80000,\n        \"redeemShape\": 35000,\n        \"recoveryBase\": 100000,\n        \"recoveryShape\": 35000,\n        \"recoveryUnseal\": 70000,\n        \"harvest\": 125000,\n        \"harvested\": 80000,\n        \"credit\": 40000,\n        \"fund\": 40000\n      }\n    },\n    \"budget\": [\n      30000000000000000,\n      10000000000000000\n    ],\n    \"cashWei\": 1000000000000000000,\n    \"flags\": {\n      \"windingDown\": \"false\",\n      \"listingPaused\": \"false\"\n    },\n    \"inventory\": {\n      \"openListingCount\": 0,\n      \"idlePackCount\": 0,\n      \"recoveryPackCount\": 0\n    },\n    \"liveMintFeeWei\": 500000000000000\n  }\n}\nmanager postflight passed; shared vault not required",
+   "afterBuild": {
+    "cashWei": 274971171001705000,
+    "feeCreditWei": 0,
+    "openListingCount": 3,
+    "idlePackCount": 0,
+    "recoveryPackCount": 0,
+    "pendingReceipts": 0
+   },
+   "final": {
+    "cashWei": 0,
+    "feeCreditWei": 0,
+    "openListingCount": 0,
+    "idlePackCount": 0,
+    "recoveryPackCount": 0,
+    "pendingReceipts": 0
+   },
+   "ownerExitSignedUpperWei": 172231255521172,
+   "withdrawnWei": 994971171001705000,
+   "walletGasWei": 170118887349295,
+   "ownerNetWei": -5198947885644295,
+   "ownerLedgerGapWei": 0
+  }
+ ],
+ "gas_proxy": {
+  "create": 606194,
+  "setExiting": 53236,
+  "withdraw": 38926,
+  "unlist": 538657,
+  "liquidate": 257554,
+  "recover_sync": 199051,
+  "processAcquisitions": 115941,
+  "build": 1924916,
+  "harvest": 300000
+ }
+}

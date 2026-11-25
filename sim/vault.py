@@ -168,6 +168,12 @@ class Vault:
         f = self.free()
         return f - keep if f > keep else 0
 
+    def keeper_cash_after(self, proceeds=0):
+        return max(0, self.free() + proceeds - self.renewal_float)
+
+    def renewal_cash_after(self, proceeds=0):
+        return max(0, self.free() + proceeds - self.reserve - self.owed_estimate())
+
     def sync_budget(self, now):
         elapsed = now - self.budget_at
         self.routine_budget = min(self.routine_cap, self.routine_budget + elapsed * self.routine_rate // 86400)
@@ -189,9 +195,9 @@ class Vault:
             self.keeper_paid += amount
             return amount
         budget = self.essential_budget if essential else self.routine_budget
-        cash = self.free() if essential else max(0, self.free() - self.renewal_float)
+        cash = self.free() if essential else self.keeper_cash_after()
         if source == 'renewal':
-            cash = max(0, self.free() - self.reserve - self.owed_estimate())
+            cash = self.renewal_cash_after()
         amount = min(amount, cash, budget if cap is None else cap)
         if cap is None:
             if essential:
@@ -252,7 +258,7 @@ class Vault:
             raise RuntimeError('RenewalUnavailable')
         faces = self.renewal_eligible[:returned_count]
         price = units * UNIT + shape_count(units) * mint_fee
-        available = max(0, self.free() - self.reserve - self.owed_estimate()) + sum(faces)
+        available = self.renewal_cash_after(sum(faces))
         if available < count * price + sum(proposals):
             raise RuntimeError('RenewalCashShort')
         for face in faces:
@@ -409,7 +415,7 @@ class Vault:
 
     def renewal_fee_plan(self, ids, credit, gas_q, units, need, quote, share_bps,
                          fund_gas, harvested_gas, credit_gas, cash_delta=0):
-        cash = max(0, self.free() - self.reserve - self.owed_estimate()) + cash_delta
+        cash = self.renewal_cash_after(cash_delta)
         cost = quote(gas_q, units)
         if cash >= need + cost:
             return gas_q, 0, []
@@ -418,7 +424,7 @@ class Vault:
         for index in range(len(ids) + 1):
             funded_gas = gas_q + fund_gas + len(claims) * harvested_gas + (credit_gas if credit else 0)
             funded_cost = quote(funded_gas, units)
-            if (fees and cash + fees >= need + funded_cost and self.routine_budget >= funded_cost
+            if (fees and self.renewal_cash_after(cash_delta + fees) >= need + funded_cost and self.routine_budget >= funded_cost
                     and (funded_cost - cost) * BPS <= fees * share_bps):
                 return funded_gas, credit, claims
             if index == len(ids):
@@ -447,17 +453,17 @@ class Vault:
         cost = quote(gas_q, units)
         if self.routine_budget < cost:
             return gas_q, 0, []
-        free, taken_credit = max(0, self.free() - self.renewal_float) + cash_delta, 0
+        proceeds, taken_credit = cash_delta, 0
         original_credit = credit
         proof = lambda gas: not distribution_tail or self.distribution_tail(quote(gas, 0), original_credit)
         combined = quote(gas_q + credit_gas, units)
         if (credit and combined <= self.routine_budget
                 and (combined - cost) * BPS <= credit * share_bps and proof(gas_q + credit_gas)):
             taken_credit, credit = credit, 0
-            free += taken_credit
+            proceeds += taken_credit
             gas_q += credit_gas
             cost = combined
-        if free >= cost:
+        if self.keeper_cash_after(proceeds) >= cost:
             return gas_q, taken_credit, []
         claims, fees = [], credit
         for listing_id in ids:
@@ -469,7 +475,7 @@ class Vault:
             fees += p.pending_fees
             funded_gas = gas_q + funding_gas + len(claims) * claim_gas + (credit_gas if credit else 0)
             combined = quote(funded_gas, units)
-            if free + fees < combined:
+            if self.keeper_cash_after(proceeds + fees) < combined:
                 continue
             # The first cash-covering prefix is final. Padding cannot qualify a failing
             # fee share or permission check, or manufacture another claim's compensation.

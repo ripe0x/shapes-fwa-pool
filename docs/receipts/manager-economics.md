@@ -1,5 +1,7 @@
 # Personal manager economics
 
+**Correction, 2026-11-24:** the old return figures below are withdrawn as economic evidence. A depleted-float bug in the simulator could permit unpaid keeper work. The affected partial campaigns are preserved and marked invalid. Corrected cash protection, real-counterparty regressions and a fresh receipt calibration are being validated before the fixed-size comparison is restarted. Historical receipts retain their original code identity; they do not validate the current changed contracts. No public transaction or release is authorized.
+
 **Historical small-sample diagnostic.** The two-draw recorded-month medians in this file cannot
 establish expected returns. The larger [paired return study](manager-monte-carlo.md) is running;
 its numerical results remain pending. Original values, inputs and evidence below are preserved.

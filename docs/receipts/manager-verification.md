@@ -1,5 +1,7 @@
 # Personal manager closeout: focused acceptance
 
+**Correction, 2026-11-24:** the old return figures below are withdrawn as economic evidence. A depleted-float bug in the simulator could permit unpaid keeper work. The affected partial campaigns are preserved and marked invalid. Corrected cash protection, real-counterparty regressions and a fresh receipt calibration are being validated before the fixed-size comparison is restarted. Historical receipts retain their original code identity; they do not validate the current changed contracts. No public transaction or release is authorized.
+
 Implementation candidate: `8463c52476246a6a669ae82a8346d36355347c83`; app: `6425e78`.
 All eight Solidity source files remain exactly source set
 `d85c926518a689c73c6575937fd7d3dcde0d1a484d5abfe6de6faa22a4ca8e39`.

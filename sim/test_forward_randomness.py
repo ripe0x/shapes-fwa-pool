@@ -89,5 +89,34 @@ class RequestRandomnessTest(unittest.TestCase):
             self.assertEqual(plain_trace,cached_trace)
             self.assertEqual(cached['ledger_gap_wei'],0)
 
+    def test_price_changes_preserve_cached_and_uncached_execution(self):
+        values=json.loads((ROOT/'deploy/manager.json').read_text())
+        sc=scenario()|{'gwei':lambda day:.15 if day==0 else .45}
+        plain=F.run(sc|{'cache_economics':False},1,7,days=2,values=values)
+        cached=F.run(sc|{'cache_economics':True},1,7,days=2,values=values)
+        self.assertEqual(plain,cached)
+
+    @unittest.skipUnless((ROOT/'sim/data/fwa.sqlite').exists(),'real FWA archive unavailable')
+    def test_real_month_underfunded_float_never_uses_unpaid_keeper_progress(self):
+        from formal import PIN,WINDOW,window
+        from manager_assessment import scenario as recorded_scenario
+        recorded=window(ROOT/'sim/data/fwa.sqlite',PIN['timestamp'])
+        costs=json.loads((ROOT/'docs/receipts/manager-cost-calibration.json').read_text())
+        values=json.loads((ROOT/'deploy/manager.json').read_text())
+        trace=[]
+        sc=recorded_scenario(recorded,recorded['events'],WINDOW,.2,5*10**17,5*10**14,costs['gas_proxy'])
+        result=F.run(sc|{'trace_sink':trace},1,1,days=30,values=values)
+        initial=F.configured_state(150_000_000,values)
+        held=F.policy.renewal_float(initial,values['renewalFloatCount'])
+        self.assertTrue(any(row['action']=='renew' and row['cash']<held for row in trace))
+        self.assertGreater(result['routine_unfunded_attempts'],0)
+        self.assertEqual(result['unpaid_routine_calls'],0)
+        self.assertGreater(result['owner_calls_sync'],0)
+        self.assertTrue(result['exit_complete'])
+        self.assertEqual(result['ledger_gap_wei'],0)
+        self.assertGreater(result['keeper_gas_proxy_cost_wei'],0)
+        self.assertEqual(result['keeper_calls_unlist'],0)
+        self.assertGreater(result['owner_calls_unlist']+result['owner_calls_liquidate'],0)
+
 
 if __name__=='__main__':unittest.main()

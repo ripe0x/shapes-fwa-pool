@@ -11,7 +11,7 @@ import manager_monte_carlo as M
 
 def cash_partition():
     # Absolute wei example:500 funded+20 earned=470 returned+5 keeper+6 creator+39 backing.
-    return dict(ledger_gap_wei=0,keeper_compensation_wei=5,routine_keeper_paid_wei=3,
+    return dict(ledger_gap_wei=0,unpaid_routine_calls=0,keeper_compensation_wei=5,routine_keeper_paid_wei=3,
         keeper_gas_proxy_cost_wei=2,keeper_net_proxy_wei=3,keeper_unmeasured_operations=[],unknown_owner_gas_calls=0,
         essential_keeper_paid_wei=2,routine_period_permission_upper_wei=10,
         creator_primary_fees_accrued_wei=6,physical_assets_wei=0,external_fee_credit_wei=0,
@@ -103,7 +103,7 @@ class FinancialControlsTests(unittest.TestCase):
     def test_unexplained_wei_and_double_charging_fail(self):
         for field,delta in (('fees_received_wei',1),('keeper_compensation_wei',1),
                             ('owner_net_wei',1),('creator_primary_fees_accrued_wei',1),('ledger_gap_wei',1),
-                            ('keeper_gas_proxy_cost_wei',1),('keeper_net_proxy_wei',1)):
+                            ('keeper_gas_proxy_cost_wei',1),('keeper_net_proxy_wei',1),('unpaid_routine_calls',1)):
             bad=cash_partition();bad[field]+=delta
             with self.subTest(field=field),self.assertRaises(ValueError):M.validate_finances(bad,1)
 

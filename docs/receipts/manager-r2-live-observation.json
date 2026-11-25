@@ -1,0 +1,207 @@
+{
+ "readOnly": true,
+ "rpc": "https://mainnet.gateway.tenderly.co",
+ "block": 26488707,
+ "blockHash": "0x00852a295affdb335e52380b320592fca6d75b1f717ee13d3908a684d4e8ea0e",
+ "timestamp": 1795567667,
+ "baseFeeWei": 123377902,
+ "shapes": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+ "packs": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+ "fwa": "0x958C41181182e76F221331b2755b77D9e1426A98",
+ "mintFeeWei": 500000000000000,
+ "acceptedMaximumWei": 1000000000000000,
+ "economics": {
+  "ownerAcquisitionFeeBps": 100,
+  "ownerSettlementFeeBps": 100,
+  "topListingShareBps": 10,
+  "settlementDiscountBps": 9000,
+  "tokenSettlementDiscountBps": 9150,
+  "settlementWindow": 3600,
+  "finalizeWindow": 3600,
+  "activeListingCount": 2548,
+  "totalWeight": 52774289475051857816474,
+  "weightedBackingTotal": 2547999999999999999885253514895866283736,
+  "acquisitionFee": 50695140126230397,
+  "mainPacksOracleExempt": true,
+  "mainPacksCanDeposit": true,
+  "surchargeBps": 500
+ },
+ "oracleExempt": true,
+ "minBackingWei": 25000000000000000,
+ "configSetState": {
+  "23": {
+   "block": 26144054,
+   "valueWei": 8000
+  },
+  "61": {
+   "block": 26144022,
+   "valueWei": 1356601444931682158998139052495367640934077758016
+  },
+  "41": {
+   "block": 26126292,
+   "valueWei": 1
+  },
+  "29": {
+   "block": 26126290,
+   "valueWei": 9150
+  },
+  "65": {
+   "block": 26090542,
+   "valueWei": 1190950922593085277971512302638854613809555845969
+  },
+  "15": {
+   "block": 26078548,
+   "valueWei": 10
+  },
+  "62": {
+   "block": 25944649,
+   "valueWei": 61796977938233482145391871588020382772302905670
+  },
+  "44": {
+   "block": 25944618,
+   "valueWei": 1
+  },
+  "40": {
+   "block": 25944618,
+   "valueWei": 1
+  },
+  "27": {
+   "block": 25944617,
+   "valueWei": 21600
+  },
+  "25": {
+   "block": 25944617,
+   "valueWei": 0
+  },
+  "22": {
+   "block": 25944617,
+   "valueWei": 25000000000000000
+  },
+  "20": {
+   "block": 25944617,
+   "valueWei": 3600
+  },
+  "21": {
+   "block": 25944617,
+   "valueWei": 3600
+  },
+  "19": {
+   "block": 25944617,
+   "valueWei": 100
+  },
+  "18": {
+   "block": 25944616,
+   "valueWei": 100
+  },
+  "17": {
+   "block": 25944616,
+   "valueWei": 9000
+  },
+  "16": {
+   "block": 25944615,
+   "valueWei": 1000
+  },
+  "14": {
+   "block": 25944615,
+   "valueWei": 1000
+  },
+  "13": {
+   "block": 25944615,
+   "valueWei": 500
+  },
+  "12": {
+   "block": 25944614,
+   "valueWei": 5
+  },
+  "10": {
+   "block": 25944614,
+   "valueWei": 6
+  },
+  "7": {
+   "block": 25944614,
+   "valueWei": 3
+  },
+  "11": {
+   "block": 25944614,
+   "valueWei": 30
+  },
+  "1": {
+   "block": 25944609,
+   "valueWei": 900000
+  },
+  "24": {
+   "block": 25944609,
+   "valueWei": 58107840699933149319226264896379340422220575262651973310145411177421594153945
+  },
+  "43": {
+   "block": 25944609,
+   "valueWei": 1
+  },
+  "28": {
+   "block": 25944609,
+   "valueWei": 1000
+  },
+  "26": {
+   "block": 25944609,
+   "valueWei": 604800
+  },
+  "66": {
+   "block": 25944609,
+   "valueWei": 554796862146535778389938234499240263279840630480
+  },
+  "64": {
+   "block": 25944609,
+   "valueWei": 972258135870579478595537420462932229902532290524
+  },
+  "63": {
+   "block": 25944609,
+   "valueWei": 1157762043009029760719178682838687237985430563130
+  },
+  "2": {
+   "block": 25944609,
+   "valueWei": 105635216111862975908859364934260387362758947578681163548045548039867846446581
+  },
+  "60": {
+   "block": 25944609,
+   "valueWei": 1232972947259131235767155083770124610558295574842
+  }
+ },
+ "protocol": {
+  "ownerAcquisitionFeeBps": 100,
+  "ownerSettlementFeeBps": 100,
+  "topListingShareBps": 10,
+  "settlementDiscountBps": 9000,
+  "tokenSettlementDiscountBps": 9150,
+  "settlementWindow": 3600,
+  "finalizeWindow": 3600,
+  "activeListingCount": 2548,
+  "totalWeight": 52774289475051857816474,
+  "weightedBackingTotal": 2547999999999999999885253514895866283736,
+  "acquisitionFee": 50695140126230397,
+  "mainPacksOracleExempt": true,
+  "mainPacksCanDeposit": true,
+  "surchargeBps": 500,
+  "inferredGrossMultiplier1e18": 1038460500000000000,
+  "expectedValueWei": 48281085834505140,
+  "inferredGrossMultiplierRoundingBound": 23,
+  "retainedToProtocol": true
+ },
+ "configSetLogsSinceArchive": [],
+ "dependencyRuntimeContinuity": {
+  "FWA": {
+   "address": "0x958C41181182e76F221331b2755b77D9e1426A98",
+   "runtimeSha256": "20d0ec8fcea735357da6487d821e678a93232f4e867161682e21fadd36c2ba8e",
+   "verifiedSourceSha256": "1b5dbbe6a2c1d15e8df38c075da85036659aacb38936ccd94619b86a8240a425"
+  },
+  "Shapes": {
+   "address": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+   "runtimeSha256": "3e666d62f32c901aee8b15a9fea1682eba7278b671e608935cd34ec8a81d6539",
+   "verifiedSourceSha256": "f008bf5ddcba042f6a286d4279e34c5b3c1759ec8e21ec6df6826d6aa831ec79"
+  },
+  "ShapePacks": {
+   "address": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+   "runtimeSha256": "ebfaebd182f0366d571ea7bbfe0ac526b169c2a8e45112a9a97a5e7b590f214b",
+   "verifiedSourceSha256": "1425fabf99163f2c6a43132d42060a8ca70c88012f243aa3180ece94045a11e9"
+  }
+ }
+}

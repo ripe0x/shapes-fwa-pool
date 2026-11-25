@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/rehearse_manager_r2.py", line 316, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/rehearse_manager_r2.py", line 222, in main
+    assert state(manager)['openListingCount']==packs
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

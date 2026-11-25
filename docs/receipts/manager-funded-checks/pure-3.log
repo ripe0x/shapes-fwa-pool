@@ -1,0 +1,18 @@
+test_budget_views_do_not_lose_fractional_refill_or_refill_on_capacity_increase (test_manager.ManagerAccountingTest.test_budget_views_do_not_lose_fractional_refill_or_refill_on_capacity_increase) ... ok
+test_entire_balance_owner_no_dead_shares_or_pool_apis (test_manager.ManagerAccountingTest.test_entire_balance_owner_no_dead_shares_or_pool_apis) ... ok
+test_exit_does_not_create_new_returned_or_keep_replacement_permissions (test_manager.ManagerAccountingTest.test_exit_does_not_create_new_returned_or_keep_replacement_permissions) ... ok
+test_exit_releases_float_not_inventory_and_owner_can_resume (test_manager.ManagerAccountingTest.test_exit_releases_float_not_inventory_and_owner_can_resume) ... ok
+test_factory_or_stranger_cannot_control_owner_money (test_manager.ManagerAccountingTest.test_factory_or_stranger_cannot_control_owner_money) ... ok
+test_foreign_journal_does_not_lock_an_empty_managers_owner_cash (test_manager.ManagerAccountingTest.test_foreign_journal_does_not_lock_an_empty_managers_owner_cash) ... ok
+test_fresh_return_is_retired_once_with_three_more_paid_mints (test_manager.ManagerAccountingTest.test_fresh_return_is_retired_once_with_three_more_paid_mints) ... ok
+test_growth_and_keeper_sources_are_separate_from_owner_withdrawal (test_manager.ManagerAccountingTest.test_growth_and_keeper_sources_are_separate_from_owner_withdrawal) ... ok
+test_lower_live_fee_preserves_accepted_maximum (test_manager.ManagerAccountingTest.test_lower_live_fee_preserves_accepted_maximum) ... ok
+test_owner_can_withdraw_cash_while_allocated_without_pool_pricing_gate (test_manager.ManagerAccountingTest.test_owner_can_withdraw_cash_while_allocated_without_pool_pricing_gate) ... ok
+test_required_exit_queue_processing_is_not_free (test_manager.ManagerAccountingTest.test_required_exit_queue_processing_is_not_free) ... ok
+test_reuse_return_keeps_the_original_mints_and_face (test_manager.ManagerAccountingTest.test_reuse_return_keeps_the_original_mints_and_face) ... ok
+test_shared_executor_finishes_a_manager_without_pool_methods (test_manager.ManagerAccountingTest.test_shared_executor_finishes_a_manager_without_pool_methods) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.231s
+
+OK

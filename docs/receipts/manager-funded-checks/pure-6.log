@@ -1,0 +1,7 @@
+test_exact_preflight_reaches_two_claims_after_shorter_syncs_cannot_pay (test_forward.CandidateProjectionTest.test_exact_preflight_reaches_two_claims_after_shorter_syncs_cannot_pay) ... ok
+test_model_uses_the_index_bounds_order_and_owed_rotation (test_forward.CandidateProjectionTest.test_model_uses_the_index_bounds_order_and_owed_rotation) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.012s
+
+OK

@@ -18,7 +18,9 @@ Z95 = statistics.NormalDist().inv_cdf(.975)
 Z_PAIR = statistics.NormalDist().inv_cdf(.9875)
 CELLS = tuple(dict(id=f"b{bps}-g{gas}", backing_bps=bps, total_gas_gwei=gas)
               for bps in (70000, 50000) for gas in (.2, .5))
-SOURCE_FILES = ('sim/manager_monte_carlo.py', 'sim/test_manager_monte_carlo.py', 'sim/forward.py', 'sim/manager.py', 'sim/vault.py',
+SOURCE_FILES = ('sim/manager_monte_carlo.py', 'sim/test_manager_monte_carlo.py', 'sim/test_forward_randomness.py',
+                'sim/test_funding_holds.py', 'sim/forward.py', 'sim/manager.py', 'sim/vault.py',
+                'sim/manager_reconcile.py', 'keeper/test_policy.py', 'keeper/rehearse_manager_r2.py',
                 'sim/formal.py', 'sim/replay.py', 'keeper/policy.py', 'keeper/config.py', 'keeper/keeper.py',
                 'deploy/manager.json',
                 'deploy/mint-fee-observation.json')
@@ -91,6 +93,8 @@ def probability(rows, predicate):
 
 
 def validate_finances(result, mint_fee):
+    if result.get('unpaid_routine_calls') != 0:
+        raise ValueError('unaccepted unpaid or partially paid keeper work cannot support manager returns')
     if result['ledger_gap_wei'] != 0:
         raise ValueError('account ledger does not reconcile')
     if result['keeper_compensation_wei'] != result['routine_keeper_paid_wei'] + result['essential_keeper_paid_wei']:
@@ -233,14 +237,18 @@ def input_manifest(args):
     if observation.get('oracleExempt') is not True or observation.get('readOnly') is not True or observation.get('rpc') != 'https://mainnet.gateway.tenderly.co':
         raise ValueError('live observation does not confirm read-only Tenderly state and oracle exemption')
     protocol = observation['protocol']
+    if protocol.get('surchargeBps') != round(F.SUR*10000) or protocol.get('retainedToProtocol') is not True:
+        raise ValueError('observed surcharge/retained settlement routing differs from the model')
     constants = dict(ownerAcquisitionFeeBps=round(F.CUT*10000), topListingShareBps=10,
         ownerSettlementFeeBps=round(F.S_FEE*10000), settlementDiscountBps=round(F.BID_RATE*10000),
         settlementWindow=F.OperatingClock.SETTLEMENT)
     for key,expected in constants.items():
         if protocol.get(key) != expected:raise ValueError('live protocol differs from model: '+key)
     exact_k = int((1+Fraction(str(F.SUR)))*(1-Fraction(str(F.CUT)))*Fraction(999,1000)*F.E)
-    if abs(protocol['inferredGrossMultiplier1e18']-exact_k)>2:
-        raise ValueError('live protocol gross fee multiplier differs by more than2wei')
+    expected_value=protocol['weightedBackingTotal']//protocol['totalWeight']
+    rounding_bound=(F.E+expected_value-1)//expected_value+2
+    if abs(protocol['inferredGrossMultiplier1e18']-exact_k)>rounding_bound:
+        raise ValueError('live gross fee multiplier exceeds the acquisition-fee rounding bound')
     windows = []
     per_window = args.paths//len(ends)
     with sqlite3.connect(f'file:{ROOT/args.archive}?mode=ro', uri=True) as db:
@@ -272,6 +280,7 @@ def input_manifest(args):
             paired_interval='Two gas-level backing contrasts, each two-sided97.5%; Bonferroni family95%',
             probability_interval='Wilson95% per window; simultaneous conservative bounds for fixed mixture'),
         assumptions=['30 operating days, at most7 exit days, .5ETH owner funding, FreshAfterAcquisition, mask8.',
+            'Ordinary modeled keeper jobs require their complete reviewed quoted payment; a shorter or zero post-execution payment is a fatal invariant. Explicit owner exits pay wallet gas. The live keeper can separately accept a smaller profitable payment; that behavior is not assumed here.',
             'Response samples are the exact original formal.window tables: first archived ETH bid/token bid/keep after each window allocation, through the common archive cutoff. No allocation or late response is excluded.',
             'Every observed responder is forced to take the depositor bid with delay min(observed delay,3480seconds), including responses observed after3600seconds. Unresolved allocations at the archive cutoff remain None. This restores the original adverse stress, not empirical buyer-choice or timing replay.',
             'The older month has longer available follow-up; unresolved responses are right-censored at the archive cutoff. Per-window follow-up horizons and late/clamped counts are disclosed. Silence frequencies are not comparable empirical behavior estimates or forecasts.',
@@ -279,6 +288,7 @@ def input_manifest(args):
             'Fresh observed protocol fee/crown/settlement rules are applied to historical arrivals and weights; historical per-event fee configurations are not replayed.',
             'The30day archive repeats during the exit tail, including later requests; this is an explicit continuation assumption.',
             'Owner and keeper gas are receipt-calibrated proxies, including declared unmeasured operations; creator fees are gross accrual, not creator net profit.',
+            'Modeled exits assume the owner elects to fund the computed wallet gas; no per-path wallet-spend cap is simulated. The actual CLI/app requires an explicit caller cap and stops before exceeding it. A completed model exit does not prove completion within the rehearsal cap of .01ETH.',
             'Cash-short probability is ever observed at planner reads; full-period duration is unavailable.',
             'Incomplete exits retain realized cash net so far and unresolved assets separately; future recovery gas is unknown, so that cash figure is not a guaranteed final-return lower bound.',
             'Intervals measure conditional simulation noise, not future market uncertainty. No APR or personal-manager production return hurdle is inferred.'])
@@ -372,10 +382,10 @@ def main():
     ap.add_argument('--check',action='store_true',help='Validate all expected saved paths and regenerate the summary without running paths')
     ap.add_argument('--paths',type=int,default=8192);ap.add_argument('--seed-start',type=int,default=100000)
     ap.add_argument('--window-end',type=int,action='append');ap.add_argument('--workers',type=int,default=8)
-    ap.add_argument('--archive',default='sim/data/fwa.sqlite');ap.add_argument('--costs',default='docs/receipts/manager-cost-calibration.json')
-    ap.add_argument('--reconciliation',default='docs/receipts/manager-monte-carlo-reconciliation.json')
-    ap.add_argument('--live-observation',default='docs/receipts/manager-mc-live-observation.json')
-    ap.add_argument('--out',default='sim/out/manager-monte-carlo-adverse')
+    ap.add_argument('--archive',default='sim/data/fwa.sqlite');ap.add_argument('--costs',default='docs/receipts/manager-r2-cost-calibration.json')
+    ap.add_argument('--reconciliation',default='docs/receipts/manager-funded-reconciliation.json')
+    ap.add_argument('--live-observation',default='docs/receipts/manager-r2-live-observation.json')
+    ap.add_argument('--out',default='sim/out/manager-monte-carlo-funded')
     args=ap.parse_args(); manifest=input_manifest(args)
     if not args.execute and not args.summarize_only and not args.check:
         print(json.dumps(manifest,indent=2));return

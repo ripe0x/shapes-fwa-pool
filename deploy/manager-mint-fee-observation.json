@@ -1,11 +1,11 @@
 {
- "block": 26486686,
- "blockHash": "0x38ddbafe8b44b50f336ac8e86921cae16298beedf4631f0a11e3e78ed9ec8fe4",
- "timestamp": 1795543379,
+ "block": 26488707,
+ "blockHash": "0x00852a295affdb335e52380b320592fca6d75b1f717ee13d3908a684d4e8ea0e",
+ "timestamp": 1795567667,
  "shapes": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
  "mintFeeWei": 500000000000000,
  "rpc": "https://mainnet.gateway.tenderly.co",
- "method": "eth_call mintFee() pinned block, read only",
+ "method": "eth_call mintFee() pinned block, read only; docs/receipts/manager-r2-live-observation.json",
  "previousObservation": "deploy/mint-fee-observation.json",
  "acceptedMaximumWei": 1000000000000000,
  "note": "The fee was changed externally between observations. No public transaction was sent by this task. Historical evidence retains its original fee."

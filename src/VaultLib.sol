@@ -24,6 +24,7 @@ interface IAccount {
     function idleEth() external view returns (uint256);
     function renewalCash() external view returns (uint256);
     function keeperCash() external view returns (uint256);
+    function fundingDeficit(bool renewal) external view returns (uint256);
 }
 
 /// @notice PackVault's share-price reads, used only for its distribution checkpoint tail.
@@ -819,6 +820,7 @@ library VaultLib {
         }
         uint256 free = ISyncVault(address(this)).keeperCash();
         if (free >= cost) return gasQ;
+        uint256 deficit = ISyncVault(address(this)).fundingDeficit(false);
         uint256[] memory claims = new uint256[](ids.length);
         uint256 count;
         uint256 fees = credit;
@@ -834,7 +836,7 @@ library VaultLib {
             fees += pending;
             uint256 fundedGas = gasQ + p.gasSchedule.fund + count * p.gasSchedule.harvested + (credit != 0 ? p.gasSchedule.credit : 0);
             combined = quote(p, fundedGas, units, false);
-            if (free + fees < combined) continue;
+            if (free + fees < deficit + combined) continue;
             // Once enough cash was found, extra IDs cannot increase the claim or its payment.
             if (combined > routine || (combined - cost) * BPS > fees * p.keeperShareBps
                 || (distributionTail && !_distributionTail(p, b, f, witnessId, fundedGas))) return gasQ;
@@ -843,7 +845,7 @@ library VaultLib {
             if (!_claimFees(b, f, claims)) return gasQ;
             if (credit != 0) _withdrawCredit(b, f);
             uint256 received = address(this).balance - before;
-            if (free + received < combined || (combined - cost) * BPS > received * p.keeperShareBps) revert Payment();
+            if (ISyncVault(address(this)).keeperCash() < combined || (combined - cost) * BPS > received * p.keeperShareBps) revert Payment();
             return fundedGas;
         }
         return gasQ;

@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/rehearse_manager_r2.py", line 360, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/rehearse_manager_r2.py", line 272, in main
+    send(actors['purchaser'],FWA,'acquire(address,uint256,uint256,uint256,uint256)',actors['purchaser'],1,0,0,10000,value=price)
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/rehearse_manager_r2.py", line 178, in send
+    estimate=integer(cast('estimate',target,signature,*args,'--from',sender,'--value',value,
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/rehearse_manager_r2.py", line 138, in cast
+    def cast(*args):return command('cast',*args,'--rpc-url',url)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/rehearse_manager_r2.py", line 136, in command
+    if result.returncode:raise RuntimeError(' '.join(map(str,args[:3]))+': '+result.stdout[-3000:]+result.stderr[-3000:])
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: cast estimate 0x958C41181182e76F221331b2755b77D9e1426A98: Error: server returned an error response: error code 3: execution reverted: custom error 0xcd1c8867, data: "0xcd1c8867"
+

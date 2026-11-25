@@ -517,7 +517,8 @@ def plan(s):
             units=2*count+returned
             compensation=quote(s,gas,units)
             need=count*(s.build_units*UNIT+n*s.mint_fee)+sum(renewal_proposals)
-            cash=max(0,s.free-s.operating_reserve-s.owed_estimate)+principal
+            held=s.operating_reserve+s.owed_estimate
+            cash=max(0,s.free+principal-held)
             if s.routine_budget>=compensation and cash>=need+compensation:
                 out.append(('renew',ids,renewal_proposals,[]))
                 return out
@@ -528,7 +529,7 @@ def plan(s):
             for index in range(len(fees)+1):
                 funded_gas=gas+q['sync_funding']+len(chosen)*q['harvested']+(q['sync_credit'] if s.fee_credit else 0)
                 funded=quote(s,funded_gas,units)
-                if (income and s.routine_budget>=funded and cash+income>=need+funded
+                if (income and s.routine_budget>=funded and max(0,s.free+principal+income-held)>=need+funded
                         and (funded-compensation)*BPS<=income*s.share_bps):
                     out.append(('renew',ids,renewal_proposals,sorted(l.id for l in chosen)))
                     return out

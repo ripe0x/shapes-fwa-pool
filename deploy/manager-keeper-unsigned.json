@@ -3,10 +3,10 @@
   "deploymentTarget": "manager",
   "chainId": 1,
   "rpc": "https://mainnet.gateway.tenderly.co",
-  "factory": "0xb574dc3fa2398013ea4512d5261cf982f5d5c8fc",
+  "factory": "0x6f018ff718ab5a4287f937e4e4729aa65610f53b",
   "vault": null,
   "environment": {
-    "FACTORY": "0xb574dc3fa2398013ea4512d5261cf982f5d5c8fc",
+    "FACTORY": "0x6f018ff718ab5a4287f937e4e4729aa65610f53b",
     "RPC_URL": "https://mainnet.gateway.tenderly.co",
     "KEEPER_KEYSTORE_PATH": "<existing read-only keystore mount path>",
     "KEEPER_PASSWORD_FILE": "<existing read-only password mount path>"
@@ -16,7 +16,7 @@
     "python3",
     "keeper/keeper.py",
     "--factory",
-    "0xb574dc3fa2398013ea4512d5261cf982f5d5c8fc"
+    "0x6f018ff718ab5a4287f937e4e4729aa65610f53b"
   ],
   "signer": "existing separately selected external keystore; no secret is included",
   "sharedVaultOpen": false

@@ -19,6 +19,10 @@ keeper/index-*.sqlite*
 /sim/out/manager-monte-carlo/paths.jsonl
 /sim/out/manager-monte-carlo/writer.lock
 /sim/out/manager-monte-carlo/rejected-inputs/
+/sim/out/manager-monte-carlo-funded/paths.jsonl
+/sim/out/manager-monte-carlo-funded/writer.lock
+/sim/out/manager-standard-funded/paths.jsonl
+/sim/out/manager-standard-funded/writer.lock
 
 # Local-only audit prompt (kept out of the repository)
 docs/AUDIT-PROMPT.md

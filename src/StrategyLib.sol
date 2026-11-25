@@ -185,6 +185,7 @@ library StrategyLib {
         w.cash = IAccount(address(this)).renewalCash();
         w.cost = VaultLib.quote(s.params, gasQ, units, false);
         if (w.cash >= need + w.cost) return gasQ;
+        uint256 deficit = IAccount(address(this)).fundingDeficit(true);
         w.credit = f.feeCredit(address(this));
         w.fees = w.credit;
         w.selected = new uint256[](ids.length);
@@ -192,7 +193,7 @@ library StrategyLib {
             uint256 fundedGas = gasQ + VaultLib.renewalFundingGas(s.params, w.count, w.credit != 0);
             uint256 fundedCost = VaultLib.quote(s.params, fundedGas, units, false);
             (uint256 routine,) = VaultLib.budgetNow(s.params, s.budget);
-            if (w.fees != 0 && w.cash + w.fees >= need + fundedCost && routine >= fundedCost
+            if (w.fees != 0 && w.cash + w.fees >= deficit + need + fundedCost && routine >= fundedCost
                 && (fundedCost - w.cost) * BPS <= w.fees * s.params.keeperShareBps) {
                 uint256[] memory selected = w.selected;
                 uint256 count = w.count;

@@ -264,6 +264,18 @@ def main():
     assert ("EXPOSURE_SHARE_HIGH", "action") in {(c, k) for c, k, _ in high}
     assert P.exposure_share_bps([b] * 2, 20 * w1) == P.EXPOSURE_SHARE_HIGH_BPS
 
+    renewal = state(pooled=False, markup_bps=0, mint_fee=5*10**14, work_fee=20_000_000_000_000,
+        free=0, operating_reserve=10**16, idle_packs=1, idle_value=8*10**16, relistable_idle=0,
+        renewal_eligible=1, renewal_pack_ids=[1], renewal_pack_values=[8*10**16],
+        renewal_pack_shapes=[2], renewal_proposals=[21*10**16])
+    # A legacy .08 return is incoming principal; the .01 cash hold still applies to it.
+    # .171996 fees cover the exact .241996 capital/payment requirement after that hold.
+    renewal.fee_credit=166_996_000_000_000_000
+    assert "renew" not in fns(plan(renewal)), "pre-clamping cash must not erase the reserve"
+    renewal.fee_credit=171_996_000_000_000_000
+    steps=plan(renewal)
+    assert steps[0]==('renew',[1],[21*10**16],[]), steps
+
     print("keeper/test_policy.py: pass (economic gates, build gate, manager vs pool, per-account isolation, "
           "constant checkpoint charge, bounded catchup/proposals, reserve amounts)")
 

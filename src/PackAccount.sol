@@ -67,9 +67,14 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
     /// @dev ETH this account may spend at all: balance less every liability it owes.
     function _free() internal view virtual returns (uint256);
 
+    function _renewalHold() internal view virtual returns (uint256) {
+        return s.params.reserve;
+    }
+
     function _renewalCash() internal view virtual returns (uint256) {
         uint256 free = _free();
-        return free > s.params.reserve ? free - s.params.reserve : 0;
+        uint256 held = _renewalHold();
+        return free > held ? free - held : 0;
     }
 
     /// @dev ETH the strategy may commit to new exposure.
@@ -298,6 +303,12 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
         uint256 free = _free();
         uint256 float = s.windingDown ? 0 : renewalFloat();
         return free > float ? free - float : 0;
+    }
+    /// @notice ETH still needed to refill the protected hold before incoming fees become spendable.
+    function fundingDeficit(bool renewal) external view returns (uint256) {
+        uint256 held = renewal ? _renewalHold() : s.windingDown ? 0 : renewalFloat();
+        uint256 free = _free();
+        return held > free ? held - free : 0;
     }
     function liquidityNeed() external view returns (uint256) { return _need(); }
     function liquidityShortfall() external view returns (uint256) { return _shortfall(); }

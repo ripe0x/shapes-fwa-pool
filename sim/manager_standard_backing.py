@@ -60,7 +60,7 @@ def worker_init(manifest):
 
 def diagnostic(parent):
     values=parent['manager_values'];observation=parent['mint_fee_observation']
-    k=observation['protocol']['inferredGrossMultiplier1e18']
+    k=parent['model_gross_multiplier_1e18']
     foreign=observation['protocol']['totalWeight']
     rows=[]
     for fee in sorted({parent['mint_fee_wei'],10**15}):
@@ -127,7 +127,7 @@ def campaign_manifest(parent_path,args):
     for name in ('sim/manager_standard_backing.py','sim/test_manager_standard_backing.py'):
         result['source_sha256'][name]=MC.digest(ROOT/name)
     minimum=archived_minimum(ROOT/parent['archive'])
-    minimum_path='docs/receipts/manager-standard-min-backing-observation.json'
+    minimum_path='docs/receipts/manager-r2-min-backing-continuity.json'
     confirmation=json.loads((ROOT/minimum_path).read_text())
     if (confirmation.get('readOnly') is not True or confirmation.get('retainedToProtocol') is not True
         or confirmation.get('rpc')!='https://mainnet.gateway.tenderly.co'
@@ -203,14 +203,14 @@ def summarize(rows,manifest):
 
 def main():
     parser=argparse.ArgumentParser(add_help=False)
-    parser.add_argument('--parent-manifest',default='sim/out/manager-monte-carlo-adverse/manifest.json')
+    parser.add_argument('--parent-manifest',default='sim/out/manager-monte-carlo-funded/manifest.json')
     args,remaining=parser.parse_known_args()
     parent_path=ROOT/args.parent_manifest
     MC.CELLS=STANDARD_CELLS
     MC.input_manifest=lambda options:campaign_manifest(parent_path,options)
     MC.worker_init=worker_init
     MC.summarize=summarize
-    if '--out' not in remaining:remaining+=['--out','sim/out/manager-standard-backing']
+    if '--out' not in remaining:remaining+=['--out','sim/out/manager-standard-funded']
     sys.argv=[sys.argv[0],*remaining]
     MC.main()
 

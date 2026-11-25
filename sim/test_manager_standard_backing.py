@@ -10,14 +10,14 @@ import manager_standard_backing as S
 class StandardBackingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.parent_path=S.ROOT/'sim/out/manager-monte-carlo-adverse/manifest.json'
+        cls.parent_path=S.ROOT/'sim/out/manager-monte-carlo-funded/manifest.json'
         cls.parent=json.loads(cls.parent_path.read_text())
 
     def test_actual_minimum_is_archived025_and_live_confirmation_bound(self):
         minimum=S.archived_minimum(S.ROOT/self.parent['archive'])
         self.assertEqual(minimum['value_wei'],25*10**15)
         self.assertEqual(minimum['block'],25944617)
-        proof=json.loads((S.ROOT/'docs/receipts/manager-standard-min-backing-observation.json').read_text())
+        proof=json.loads((S.ROOT/'docs/receipts/manager-r2-min-backing-continuity.json').read_text())
         self.assertEqual(proof['archiveLastChange']['valueWei'],minimum['value_wei'])
         self.assertEqual(proof['toBlock'],self.parent['mint_fee_observation']['block'])
         self.assertEqual(proof['subsequentLogs'],[])
@@ -46,16 +46,16 @@ class StandardBackingTests(unittest.TestCase):
             self.assertEqual(row['primary_mint_fees_wei'],15*10**14)
             self.assertEqual(row['canonical_admission_backing_wei'],0)
             self.assertIn('IMMUTABLE_95PCT_FACE_COVERAGE',row['canonical_rejection_reasons'])
-            self.assertEqual(row['bid_cycle_gross_wei'],1153814999999999)
-            self.assertEqual(row['keep_cycle_gross_after_face_wei'],853814999999999)
+            self.assertEqual(row['bid_cycle_gross_wei'],1153815000000000)
+            self.assertEqual(row['keep_cycle_gross_after_face_wei'],853815000000000)
             self.assertEqual(row['bid_cycle_gross_wei']-row['keep_cycle_gross_after_face_wei'],3*10**14)
             expected=2137400000000000 if row['total_gas_gwei']==.2 else 2973500000000000
             keep_expected=2065400000000000 if row['total_gas_gwei']==.2 else 2823500000000000
             self.assertEqual(row['canonical_admission_conservative_cost_wei'],expected)
             self.assertEqual(row['bid_cycle_quoted_cost_wei'],expected)
             self.assertEqual(row['keep_cycle_quoted_cost_wei'],keep_expected)
-            self.assertEqual(row['bid_cycle_net_after_quoted_cost_wei'],1153814999999999-expected)
-            self.assertEqual(row['keep_cycle_net_after_quoted_cost_wei'],853814999999999-keep_expected)
+            self.assertEqual(row['bid_cycle_net_after_quoted_cost_wei'],1153815000000000-expected)
+            self.assertEqual(row['keep_cycle_net_after_quoted_cost_wei'],853815000000000-keep_expected)
             self.assertEqual(row['work_units'],dict(construction=2,bid_maintenance_and_retirement=2,keep_maintenance=1))
             self.assertLess(row['keep_cycle_net_after_quoted_cost_wei'],row['bid_cycle_net_after_quoted_cost_wei'])
         historical=[r for r in rows if r['mint_fee_per_shape_wei']==10**15]

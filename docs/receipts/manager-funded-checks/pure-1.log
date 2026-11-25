@@ -1,0 +1,12 @@
+test_cached_pure_economics_preserves_every_result_and_financial_trace (test_forward_randomness.RequestRandomnessTest.test_cached_pure_economics_preserves_every_result_and_financial_trace) ... ok
+test_conditional_selections_do_not_move_later_request_or_response_draws (test_forward_randomness.RequestRandomnessTest.test_conditional_selections_do_not_move_later_request_or_response_draws) ... ok
+test_keyed_mode_rejects_conditional_legacy_response_rng (test_forward_randomness.RequestRandomnessTest.test_keyed_mode_rejects_conditional_legacy_response_rng) ... ok
+test_path_is_independent_of_process_and_submission_order (test_forward_randomness.RequestRandomnessTest.test_path_is_independent_of_process_and_submission_order) ... ok
+test_price_changes_preserve_cached_and_uncached_execution (test_forward_randomness.RequestRandomnessTest.test_price_changes_preserve_cached_and_uncached_execution) ... ok
+test_real_month_underfunded_float_never_uses_unpaid_keeper_progress (test_forward_randomness.RequestRandomnessTest.test_real_month_underfunded_float_never_uses_unpaid_keeper_progress) ... ok
+test_request_draws_are_domain_separated_seeded_and_cover_refunds (test_forward_randomness.RequestRandomnessTest.test_request_draws_are_domain_separated_seeded_and_cover_refunds) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 6.844s
+
+OK
