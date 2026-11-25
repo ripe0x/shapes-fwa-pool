@@ -1,0 +1,10 @@
+client {"__main__": {"loaded_code_sha256": "cf61e57c5d33a9a4385b642f5e55c39bfc79725751187fcbf24873cbce977ebe", "source_sha256_at_import": "5bfe7f9b9965dcab42eeb92e7707e2a791132c5880b03fa2b3b929e2426816a1"}, "index": {"loaded_code_sha256": "d62be2e9d0dafba4d321d2737f03d22236689dfacf2b3f04f344ce0aeab3369e", "source_sha256_at_import": "321946551c971b6374cb37c37de93c6a79895e87492e08421956472376d3d96a"}, "policy": {"loaded_code_sha256": "6b3aaca794c8f2962d9a321ce9229f90eceebd30836832ce6f5fecc4dc18d4b6", "source_sha256_at_import": "42a40400cee6acd7ad1b3342548bd5f0754d11636a9b890118caa346bd4f219a"}, "tx": {"loaded_code_sha256": "f5fc4655be2cb92f33d5a648f85ec1dfabec8cc561a186b9bd62a1adfc96d7b9", "source_sha256_at_import": "23ef4eeb579994c28343ec58612afdaf1972317e5c43110fcdd60fcf139ede3e"}}
+account 0xddc10602782af652bb913f7bde1fd82981db7dd9 (manager) configuration 0x085a9f3e04f43d1dcfdc43dac25f828579777e0059dd04ff9c92b7c193c80430
+gas 0.200 gwei, 1 open, 0 idle packs, idle 0.0390 ETH, cycle net 7.812 mETH, 7d volume 0/day
+status WINDING_DOWN [info] 1 positions, 0 idle packs left to unwind
+status ROUTINE_BUDGET_EMPTY [wait] strategy work is unpaid until the routine budget refills
+status ESSENTIAL_BUDGET_EMPTY [action] unlisting and liquidation are unpaid; holders can run them; sync uses routine permission
+sent unlist nonce 5 hash 0xd19f5a6e3d904e548051671418b3fadc68616c105ab262c32558c6700a752f3d
+mined unlist gas 548257 (est 669562) cost 109651400000000 pay 0 net -109651400000000 wei
+exposure EXPOSURE_UNAVAILABLE [info] aggregate share is not calculated in bounded routine passes
+Error: server returned an error response: error code 3: execution reverted, data: "0x"
