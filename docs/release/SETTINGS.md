@@ -9,7 +9,7 @@ Source configuration SHA-256:
 
 The authoritative behavior is shared by [`PackAccount`](../../src/PackAccount.sol), [`VaultLib`](../../src/VaultLib.sol), [`StrategyLib`](../../src/StrategyLib.sol) and [`ScanLib`](../../src/ScanLib.sol). See [the completion requirements](../MAIN-POOL-COMPLETION.md), [owner requirements A5](../../OWNER-REQUIREMENTS.md), [the unsigned runbook](RUNBOOK.md) and [acceptance status](ACCEPTANCE.md). The final [economic scorecard](../receipts/completion-economics.md) and [receipt-backed verification](../receipts/completion-verification.md) accompany this inventory; historical scorecards do not accept this candidate.
 
-For the completed personal-manager scope, use [the manager runbook](MANAGER-RUNBOOK.md) and [focused acceptance](../receipts/manager-verification.md). The shared vault remains closed.
+For the completed personal-manager scope, use [the manager runbook](MANAGER-RUNBOOK.md) and [final focused verification](../receipts/manager-final-verification.md) and [bounded manager scorecard](../receipts/manager-closeout-economics.md). The shared vault remains closed.
 
 ## Deployment inputs and fee observation
 
@@ -26,7 +26,7 @@ These addresses are constructor dependencies, not mutable account economic setti
 
 The historical combined-candidate read is **0.001 ETH per Shape at Ethereum block 26,484,850**, block hash `0xb74960f39c4f4971c0e3732837afb49ecdfd20153c3d9d0631796f1d6e086f7c`. See the [pinned fee observation](../../deploy/mint-fee-observation.json) and [existing-main readback](../../deploy/existing-main-readback.json). The read used `https://mainnet.gateway.tenderly.co`; it changed no public state. The existing deployment's readback describes its historical implementation, not the new candidate ABI.
 
-At that observed fee, one launch pack requires exactly 0.03 ETH redeemable principal plus **3 × 0.001 = 0.003 ETH actual primary mint fees**. Creator revenue is counted only from successful paid mint events, including eligible fresh replacements. That observation remains historical evidence. The manager closeout read now observes **0.0005 ETH at block 26,486,686**, so a current pack pays **0.0015 ETH** actual primary fees. See [the new observation](../../deploy/manager-mint-fee-observation.json), [fresh legacy readback](../../deploy/manager-existing-main-readback.json) and [manager-only evaluation](../receipts/manager-economics.md). The public fee changed externally; this task sent no fee transaction. The accepted maximum remains 0.001 ETH and the old combined deployment expected-fee fixture is not refreshed or approved by this manager-only task.
+At that observed fee, one launch pack requires exactly 0.03 ETH redeemable principal plus **3 × 0.001 = 0.003 ETH actual primary mint fees**. Creator revenue is counted only from successful paid mint events, including eligible fresh replacements. That observation remains historical evidence. The manager closeout read now observes **0.0005 ETH at block 26,489,769**, so a current pack pays **0.0015 ETH** actual primary fees. See [the new observation](../../deploy/manager-mint-fee-observation.json), [fresh legacy readback](../../deploy/manager-existing-main-readback.json) and [manager-only bounded evaluation](../receipts/manager-closeout-economics.md). The public fee changed externally; this task sent no fee transaction. The accepted maximum remains 0.001 ETH and the old combined deployment expected-fee fixture is not refreshed or approved by this manager-only task.
 
 ## Account economics
 

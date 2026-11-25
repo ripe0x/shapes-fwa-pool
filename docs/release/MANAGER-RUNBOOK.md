@@ -113,7 +113,7 @@ live observation and min-backing continuity record, `manager-funded-reconciliati
 `docs/receipts/`. It also binds the corrected study manifests in
 `sim/out/manager-monte-carlo-funded/` and `sim/out/manager-standard-funded/`, and their final
 `summary.json` files when present. Pending or incomplete study output is not an accepted return
-forecast. Final numerical conclusions require completed raw-path checks and independent review.
+forecast. Those interrupted campaigns are historical; their sample size was agent-selected and is not a release or completion requirement. The manager manifest now also binds the final bounded economic scorecard, fresh dependency/fee observation and focused closeout review. No partial campaign returns are used.
 
 The earlier two-draw economics and source `8e8d5e0` campaigns are withdrawn as financial evidence.
 Their files remain history and are excluded from the current financial inventory. The R1
@@ -124,8 +124,7 @@ Owner, creator and keeper cash flows must be stated separately with every direct
 
 After final evidence is ready, regenerate the manager manifest and prepare a fresh unsigned
 package through the same target-manager deployment path. This preparation grants no live
-approval, public broadcast, settings change, cutover or merge. The corrected economic assessment
-remains pending; no replacement profitability claim is accepted here.
+approval, public broadcast, settings change, cutover or merge. The final bounded scorecard supplies actual receipt losses and declared quote sensitivities. It does not demonstrate acceptable full-period returns, and production launch is not recommended. Billed authenticated renewal, standalone harvesting and variable paid sync/list curves remain explicit evidence gaps.
 
 Things that don't make sense until evaluated: an idle manager's creation funding can be below the
 productive opening threshold; increasing permission supplies no ETH; one finite renewal float does

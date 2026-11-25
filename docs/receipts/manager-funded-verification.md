@@ -1,6 +1,6 @@
 # Manager funding correction and local exit
 
-**The cash-protection correction passes focused checks. Economic results remain pending.**
+**The cash-protection correction passes focused checks. The [final bounded economic scorecard](manager-closeout-economics.md) records actual losses and quote sensitivities, without a production return claim.**
 The earlier −28.5% result is withdrawn. Both incomplete source `8e8d5e0` campaigns are preserved
 and marked invalid. No public transaction, fee change, shared-vault opening, live cutover or merge
 was performed. This is bounded implementation evidence, not release approval.
@@ -55,5 +55,4 @@ acquisition uses the same explicit .2 gwei legacy price for quote, estimate and 
 
 Things that don't make sense: fees below the held float are not maintenance funding; a positive
 creator accrual is not owner profit; a complete model exit does not prove the caller accepts its
-wallet cost. The real CLI/app spending cap remains mandatory. The corrected fixed-size backing
-study and final numerical review remain open.
+wallet cost. The real CLI/app spending cap remains mandatory. The interrupted fixed-size backing study is historical and incomplete; it is not a requirement to finish manager engineering. See [final review](manager-closeout-review.md) for the bounded closeout.

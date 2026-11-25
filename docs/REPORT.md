@@ -1,8 +1,8 @@
 # Individual manager completion, 2026-11-24
 
-**Stopped at the owner’s request.** Implementation and simulation work must remain stopped while the owner-requested instruction-following investigation is handled. The 8,192-path / 49,152-scenario study size was chosen by the agent; it was never an owner-approved acceptance requirement or resource budget. Existing manifests describe the attempted analysis and do not authorize its resumption. Saved results remain preserved and incomplete.
+**The owner resumed individual-manager closeout on 2026-11-24.** Owner-paid exit, manager-only unsigned tooling and app integration retain their verified runtime source below. Final closeout uses the [bounded economic scorecard](receipts/manager-closeout-economics.md), actual receipt accounting and [focused final checks](receipts/manager-final-verification.md). The shared vault stays closed. The 8,192-path / 49,152-scenario study size was chosen by the agent, not approved by the owner; its interrupted campaigns remain preserved and incomplete and are not a completion requirement. No campaign was restarted.
 
-**The corrected manager implementation and unsigned tooling are prepared; economic assessment remains open.**
+**Manager engineering is prepared; production economics remain unaccepted.**
 Runtime source and study inputs are frozen at `1bbe54c94eed34818d5e2c7ccd95d5f83a892b90`;
 app ABI follow-up is `1330b18ee3bb38b85e9439b3c7213ac37fc9f1d8`.
 The shared vault and both public app switches remain closed. No public transaction, mint-fee
@@ -12,7 +12,7 @@ The old −28.5% / two-draw result is withdrawn. A simulator cash-hold error cou
 ordinary keeper work after consuming its renewal float. Both partial campaigns, 34,308 saved
 rows, remain preserved and marked invalid. The corrected study was stopped: 8,192 paired
 path IDs over two recorded months, three backing levels and two gas prices, 49,152 scenario runs.
-No partial return supports a recommendation. The standard .03 ETH backing reference is hypothetical
+No partial return supports a recommendation. The final scorecard separates billed round trips from quoted cycle sensitivities; it makes no monthly-return or APR claim. The standard .03 ETH backing reference is hypothetical
 under current manager admission guards; actual MAIN FWA receipts separately prove protocol admission.
 
 Incoming fees and principal now refill the protected float/reserve shortfall before becoming
@@ -43,7 +43,7 @@ UI/container evidence keeps its original revision and compatibility scope.
 
 Things that don't make sense: a spent float cannot be counted again as maintenance cash; positive
 creator revenue is not owner profit; uncapped model completion cannot prove exit within a real
-caller's .01 ETH wallet limit. Final results and recommendation remain pending.
+caller's .01 ETH wallet limit. The bounded closeout does not recommend production launch; full operating-return evidence is unavailable.
 
 ## Prior combined implementation evidence
 

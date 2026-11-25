@@ -1,8 +1,8 @@
 {
  "address": "0x9aBbF7835240dE0dAfC7d2e512E6dA15eb0D0b46",
- "block": 26488723,
- "blockHash": "0x16141ad596582612d62cbcd059dd0835dfa8d49c8fe579fd0676c52f799e5958",
- "timestamp": 1795567859,
+ "block": 26489773,
+ "blockHash": "0x7c3beeb54eaed65b95e8250099c45c338ed8ea36bd5c298d6f04b1470032be0f",
+ "timestamp": 1795580507,
  "rpc": "https://mainnet.gateway.tenderly.co",
  "reads": {
   "owner": {

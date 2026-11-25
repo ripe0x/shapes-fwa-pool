@@ -1,0 +1,27 @@
+{
+  "readOnly": true,
+  "publicTransactions": 0,
+  "rpc": "https://mainnet.gateway.tenderly.co",
+  "block": 26489769,
+  "blockHash": "0xa319c41fe38ed0cc0e0adc23e2c14738b7c13973c7d9bc0c9350c40bd6fb978d",
+  "timestamp": 1795580459,
+  "mintFeeWei": 500000000000000,
+  "acceptedMaximumWei": 1000000000000000,
+  "dependencies": {
+    "FWA": {
+      "address": "0x958C41181182e76F221331b2755b77D9e1426A98",
+      "runtimeSha256": "20d0ec8fcea735357da6487d821e678a93232f4e867161682e21fadd36c2ba8e",
+      "matchesReceiptDependency": true
+    },
+    "Shapes": {
+      "address": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+      "runtimeSha256": "3e666d62f32c901aee8b15a9fea1682eba7278b671e608935cd34ec8a81d6539",
+      "matchesReceiptDependency": true
+    },
+    "ShapePacks": {
+      "address": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+      "runtimeSha256": "ebfaebd182f0366d571ea7bbfe0ac526b169c2a8e45112a9a97a5e7b590f214b",
+      "matchesReceiptDependency": true
+    }
+  }
+}

@@ -1,3 +1,5 @@
+> Historical campaign record. The owner resumed manager closeout without making this agent-selected study size an acceptance requirement. The campaigns remain stopped and incomplete. Current conclusions and remaining evidence gaps are in [manager-closeout-economics.md](manager-closeout-economics.md) and [manager-closeout-review.md](manager-closeout-review.md). The older open/pending labels below describe that campaign and its review history, not an instruction to restart it.
+
 # Manager backing comparison
 
 **Corrected execution and final numerical review are pending.** The earlier two-draw −28.5% result

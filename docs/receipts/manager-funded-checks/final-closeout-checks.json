@@ -1,0 +1,49 @@
+[
+  {
+    "command": [
+      "python3",
+      "sim/test_manager_closeout.py"
+    ],
+    "exit_status": 1,
+    "elapsed_seconds": 0.108,
+    "log": "docs/receipts/manager-funded-checks/final-closeout-0.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "sim/test_manager_closeout.py"
+    ],
+    "exit_status": 0,
+    "elapsed_seconds": 0.337,
+    "log": "docs/receipts/manager-funded-checks/final-closeout-correct-environment-0.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "sim/manager_closeout.py",
+      "--out",
+      "docs/receipts/manager-closeout-economics"
+    ],
+    "exit_status": 0,
+    "elapsed_seconds": 0.2,
+    "log": "docs/receipts/manager-funded-checks/final-closeout-correct-environment-1.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "script/test_release.py"
+    ],
+    "exit_status": 0,
+    "elapsed_seconds": 0.284,
+    "log": "docs/receipts/manager-funded-checks/final-closeout-correct-environment-2.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "keeper/test_manager_exit.py"
+    ],
+    "exit_status": 0,
+    "elapsed_seconds": 0.161,
+    "log": "docs/receipts/manager-funded-checks/final-closeout-correct-environment-3.log"
+  }
+]

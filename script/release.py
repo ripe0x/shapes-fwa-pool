@@ -69,6 +69,10 @@ MANAGER_EVIDENCE = ["docs/receipts/manager-r2-closeout.json", "docs/receipts/man
                     "sim/out/manager-standard-funded/manifest.json", "sim/out/manager-standard-funded/summary.json",
                     "docs/receipts/manager-standard-backing-fork.json", "deploy/manager-create-unsigned.json",
                     "deploy/manager-unsigned-cutover.json", "deploy/manager-keeper-unsigned.json"]
+MANAGER_EVIDENCE += ["sim/manager_closeout.py", "sim/test_manager_closeout.py", "sim/manager_standard_backing.py",
+                     "docs/receipts/manager-closeout-economics.json", "docs/receipts/manager-closeout-economics.md",
+                     "docs/receipts/manager-final-live-observation.json", "docs/receipts/manager-closeout-review.md",
+                     "docs/receipts/manager-final-verification.md"]
 MANAGER_EVIDENCE += MANAGER_COMPATIBILITY_EVIDENCE
 
 
