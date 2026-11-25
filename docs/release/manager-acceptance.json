@@ -1,8 +1,8 @@
 {
  "name": "Main pool individual manager closeout",
  "deployment_target": "manager",
- "status": "UNSIGNED_IMPLEMENTATION_COMPLETE",
- "manifest_sha256": "9192ba6ae69fb70b8d9f625e3106900553a4d973549da67f2000d9cddf495086",
+ "status": "UNSIGNED_CORRECTED_VALIDATION_ECONOMIC_REVIEW_PENDING",
+ "manifest_sha256": "74070f3e1d2e8ba7f160256c7acac30edc4a32ecbd09577ed0b0c7ca56e7c2f6",
  "signature": null,
  "release_ready": false,
  "authorization": "Manager closeout implementation, isolated validation and draft PR updates only. No public transactions, production mint-fee changes, live cutover or merges.",
@@ -10,10 +10,10 @@
  "pooled_vault_return_gate_applied_to_manager": false,
  "manager_values": "deploy/manager.json",
  "economic_inputs_approved_for_production": false,
- "note": "Focused sourceR real-fork transitions, owner-paid UI/CLI exits, 48 counterfactual exits and factory-only Docker rehearsal pass. The candidate loses money in recorded-month fresh cells; no production economics or signing is approved. Hardware/keystore transport and billed authentic-VRF renewal/standalone harvest remain explicit evidence gaps.",
- "implementation_revision": "8463c52476246a6a669ae82a8346d36355347c83",
- "app_revision": "6425e78",
- "engineering_acceptance": true,
+ "note": "Current corrected source passes focused real-counterparty funding checks, 43-step accounting replay and 23 actual local receipt closeout. Old two-draw and partial campaign returns are withdrawn. Corrected paired study and numerical review remain pending. No prior acceptance/signature applies to this changed source; no public signing or release approval is recorded. Authenticated billed renewal, standalone harvest and variable paid-operation gas remain explicit limits.",
+ "implementation_revision": "1bbe54c94eed34818d5e2c7ccd95d5f83a892b90",
+ "app_revision": "1330b18ee3bb38b85e9439b3c7213ac37fc9f1d8",
+ "engineering_acceptance": false,
  "manager_return_hurdle": null,
  "production_recommendation": false
 }

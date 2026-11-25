@@ -14,7 +14,8 @@
     "sim/manager_reconcile.py": "608cc8680c39ae885920d314944daa08b1d6bc0d4ce4bb3dbc04c3f266b6740a",
     "keeper/policy.py": "42a40400cee6acd7ad1b3342548bd5f0754d11636a9b890118caa346bd4f219a",
     "keeper/rehearse_manager_r2.py": "b74f24d169ef0e10f0b8731a0f2879fa3fb9fa889c65fad9efcb4c72800f41a1",
-    "test/fork/ForkManagerFundingDeficit.t.sol": "c40367824d37d4bfcc43ddebf0adf1f22650c5b4e0710f05cb061cb2cb1f0fa2"
+    "test/fork/ForkManagerFundingDeficit.t.sol": "c40367824d37d4bfcc43ddebf0adf1f22650c5b4e0710f05cb061cb2cb1f0fa2",
+    "script/release.py": "945b208b3bdbad79650bebbf9aef78b60e56d2e91478696b0128c32235f67464"
   },
   "files": [
     {
@@ -108,6 +109,14 @@
     {
       "path": "docs/receipts/manager-funded-checks/shapes-manager-funded-unsigned-prepare.log",
       "sha256": "3e657e61afe9f9e2eca24ecf7c321b60946756216596e84ba98927b0dc1677c1"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/callback.log",
+      "sha256": "3440e94ad4247afdf6cb46cc8aca28a9c80beda768163eabfcf917b189872484"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/release-final.log",
+      "sha256": "0b9e2191320d214fc7e632dabe328e2220ff02d77c7e4b48bdf676846cc73d26"
     }
   ],
   "checks": {
@@ -125,7 +134,8 @@
     "appTests": 14,
     "appTypecheckExitStatus": 0,
     "realFundedReconciliationSteps": 43,
-    "localRehearsalReceipts": 23
+    "localRehearsalReceipts": 23,
+    "coldCloneCallbackTests": 1
   },
   "failuresPreserved": [
     "Initial legacy recipe assertion mistakenly counted two instead of four Shapes; repaired expected total fees .0035ETH.",

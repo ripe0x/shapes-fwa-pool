@@ -58,12 +58,18 @@ EVIDENCE = ["docs/receipts/formal-assessment.json", "docs/receipts/completion-ca
             "asset-flow.json"]
 MANAGER_VALUES = ["deploy/manager-factory.json", "deploy/manager.json", "deploy/manager-mint-fee-observation.json",
                   "deploy/manager-existing-main-readback.json"]
-MANAGER_EVIDENCE = ["docs/receipts/manager-closeout.json", "docs/receipts/manager-assessment.json",
-                    "docs/receipts/manager-economics.md", "docs/receipts/manager-independent-review.md",
-                    "docs/receipts/manager-ui.json", "docs/receipts/manager-cost-calibration.json",
-                    "docs/receipts/manager-reconciliation.json", "docs/receipts/manager-verification.md",
-                    "docs/receipts/manager-image.json", "deploy/manager-create-unsigned.json",
+# Historical UI/container compatibility only; these are not current-source financial proof.
+MANAGER_COMPATIBILITY_EVIDENCE = ["docs/receipts/manager-ui.json", "docs/receipts/manager-image.json"]
+MANAGER_EVIDENCE = ["docs/receipts/manager-r2-closeout.json", "docs/receipts/manager-r2-cost-calibration.json",
+                    "docs/receipts/manager-r2-live-observation.json", "docs/receipts/manager-r2-min-backing-continuity.json",
+                    "docs/receipts/manager-funded-reconciliation.json", "docs/receipts/manager-funded-verification.md",
+                    "docs/receipts/manager-funded-checks/input-manifest.json",
+                    "docs/receipts/manager-monte-carlo.md", "docs/receipts/manager-monte-carlo-independent-review.md",
+                    "sim/out/manager-monte-carlo-funded/manifest.json", "sim/out/manager-monte-carlo-funded/summary.json",
+                    "sim/out/manager-standard-funded/manifest.json", "sim/out/manager-standard-funded/summary.json",
+                    "docs/receipts/manager-standard-backing-fork.json", "deploy/manager-create-unsigned.json",
                     "deploy/manager-unsigned-cutover.json", "deploy/manager-keeper-unsigned.json"]
+MANAGER_EVIDENCE += MANAGER_COMPATIBILITY_EVIDENCE
 
 
 def target_files(target):

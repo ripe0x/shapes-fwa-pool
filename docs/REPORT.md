@@ -1,49 +1,47 @@
-# Individual manager closeout, 2026-11-24
+# Individual manager completion, 2026-11-24
 
-**Correction, 2026-11-24:** the old return figures below are withdrawn as economic evidence. A depleted-float bug in the simulator could permit unpaid keeper work. The affected partial campaigns are preserved and marked invalid. Corrected cash protection, real-counterparty regressions and a fresh receipt calibration are being validated before the fixed-size comparison is restarted. Historical receipts retain their original code identity; they do not validate the current changed contracts. No public transaction or release is authorized.
+**The corrected manager implementation and unsigned tooling are prepared; economic assessment remains open.**
+Runtime source and study inputs are frozen at `1bbe54c94eed34818d5e2c7ccd95d5f83a892b90`;
+app ABI follow-up is `1330b18ee3bb38b85e9439b3c7213ac37fc9f1d8`.
+The shared vault and both public app switches remain closed. No public transaction, mint-fee
+change, live cutover, merge or acceptance signature was performed.
 
-**Manager engineering complete; unsigned and not recommended for production on this evidence.**
-Candidate implementation `8463c52476246a6a669ae82a8346d36355347c83`, app `6425e78`.
-The shared vault and both public app switches remain closed. No public transaction, production
-fee change, live cutover, merge or acceptance signature was performed.
+The old −28.5% / two-draw result is withdrawn. A simulator cash-hold error could commit unpaid
+ordinary keeper work after consuming its renewal float. Both partial campaigns, 34,308 saved
+rows, remain preserved and marked invalid. The corrected fixed study is running: 8,192 paired
+path IDs over two recorded months, three backing levels and two gas prices, 49,152 scenario runs.
+No partial return supports a recommendation. The standard .03 ETH backing reference is hypothetical
+under current manager admission guards; actual MAIN FWA receipts separately prove protocol admission.
 
-**Return-study follow-up is running.** The two-draw −28.5% figure below is a historical diagnostic,
-not a usable expected-return estimate. The [paired comparison](receipts/manager-monte-carlo.md)
-uses 8,192 path IDs across two recorded months, three backing levels and two gas prices.
-The 0.03 ETH backing reference is hypothetical under the current manager's admission guards;
-[actual MAIN FWA fork receipts](receipts/manager-standard-backing-fork.json) separately prove that
-the protocol accepts it and returns its principal on an unselected exit. Numerical results and
-final result review remain pending. No production configuration was changed.
+Incoming fees and principal now refill the protected float/reserve shortfall before becoming
+spendable. The contract chooses the first actually funded fee prefix and rechecks cash. The model
+rejects unaccepted zero/partial ordinary compensation. No storage or individual ownership right
+changed, and no large configuration load or external call was added to the receipt callback.
 
-Owner-paid app and CLI exits now stop reinvestment, handle bounded recovery and real FWA queue
-progress, unlist/redeem and withdraw actual ETH. Both local managers fully exit with keeper
-permission set to zero, no exit topups, and explicit wallet caps. The manager-only deployment
-path prepares libraries plus factory/implementation without PackVault or a vault seed. Factory
-ownership over existing managers remains absent.
+Owner-paid CLI/app closeout stops reinvestment, handles bounded real settlement/queue progress,
+unlists, redeems, collects actual credit and withdraws ETH under the caller's explicit wallet cap.
+The fresh current-source rehearsal has 23 actual local receipts, four .03 ETH packs and twelve
+paid primary mints. Both .5 ETH and 1 ETH accounts exit with zero keeper permission, no account
+topups and zero remaining cash, inventory, receipts or fee credit. All actor ledgers reconcile.
+The manager-only unsigned production path creates libraries plus factory/implementation without
+a PackVault or vault seed. Existing factory authority over individual managers remains absent.
 
-Focused validation passes: six real-counterparty contract cases; 32 exact accounting trace steps;
-app tests and real Chromium interactions; 48/48 counterfactual exits; and the production Docker
-image, persistence/lost-response handling and owner CLI exit in [run45460887589](https://github.com/ripe0x/shapes-fwa-pool/actions/runs/45460887589).
-The keeper entrypoint supports FACTORY without VAULT and uses existing read-only signer mounts.
-It rejects the old secret-materializing environment transport; live services/stores are unchanged.
+- [Current focused scorecard and limits](receipts/manager-funded-verification.md).
+- [43-step current funding reconciliation](receipts/manager-funded-reconciliation.json).
+- [Corrected backing study and frozen design](receipts/manager-monte-carlo.md).
+- [Independent correction/receipt review; numerical review still open](receipts/manager-monte-carlo-independent-review.md).
+- [Unsigned manager-only runbook](release/MANAGER-RUNBOOK.md) and [settings inventory](release/SETTINGS.md).
 
-The live mint fee is now **0.0005 ETH**, observed at block 26,486,686; its change was external to this
-task. The accepted maximum remains 0.001 ETH. Historical 0.001 evidence is preserved. At current
-fee and 0.2/0.5 gwei, the two-draw recorded-month Fresh medians are −28.48%/−28.85% on 0.5 ETH
-and−20.79%/−21.39% on 2 ETH. No manager return hurdle is approved. These conditional results do
-not justify a production recommendation; favorable one-draw synthetic bursts are not APR.
-The pooled −53.68% result and 72 ETH pricing threshold do not measure a personal manager.
+The R2 mint-fee observation is .0005 ETH per Shape at block26488707, externally changed before
+this task's read; acceptance remains capped at .001 ETH. Backing .21 ETH, FreshAfterAcquisition,
+one float and .005 ETH reserve remain evaluation inputs. No manager production return hurdle
+is inferred from the pooled-vault hurdle. Authenticated billed renewal, standalone harvest and
+variable paid sync/list gas remain unmeasured; their modeling uses declared proxies. Historical
+UI/container evidence keeps its original revision and compatibility scope.
 
-- [Focused verification and one-screen scorecard](receipts/manager-verification.md).
-- [Same-scenario owner, keeper and creator economics](receipts/manager-economics.md).
-- [Independent manager review](receipts/manager-independent-review.md).
-- [Unsigned manager-only runbook](release/MANAGER-RUNBOOK.md), [settings](release/SETTINGS.md)
-  and [acceptance status](release/manager-acceptance.json).
-
-Remaining release conditions are production economic acceptance, signer transport and the
-explicitly unmeasured billed renewal/harvest/variable paid-operation gas. The task's unsigned
-package grants no authority for release. Things that don't make sense: creator fees remain
-positive while owner returns can be substantially negative; permission creates no cash.
+Things that don't make sense: a spent float cannot be counted again as maintenance cash; positive
+creator revenue is not owner profit; uncapped model completion cannot prove exit within a real
+caller's .01 ETH wallet limit. Final results and recommendation remain pending.
 
 ## Prior combined implementation evidence
 

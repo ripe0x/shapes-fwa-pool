@@ -14,7 +14,7 @@ view is regenerated into the app ABI.
 | Accepted step | Result | Limit |
 | --- | --- | --- |
 | Real funding boundaries | Three real-counterparty fork cases; 43 replayed steps, zero wei gaps | Historical authenticated draws and .001 ETH mint fees |
-| Existing affected callers | 18 renewal, sync and owner-exit fork cases pass | Focused pass, not a full system audit |
+| Existing affected callers | 18 renewal, sync and owner-exit fork cases pass, plus a cold clone kick/refund callback case | Callback identification succeeds under the real 100,000 gas stipend; not a billed gas measurement |
 | New model invariant | Nine funding and seven randomness/cache tests pass | Model equality alone does not establish real gas costs |
 | Current receipt rehearsal | 23 real local transactions at fork block 26488707, exact dependencies and linked libraries | No public or hardware-signing proof |
 | Owner exit | .5 ETH single-pack and 1 ETH three-pack accounts both end with zero cash, inventory, receipts and fee credit | Keeper budgets zero; no account topups |

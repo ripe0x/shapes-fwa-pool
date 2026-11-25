@@ -21,7 +21,7 @@ The 70,000 bps backing, fresh renewal mode, one float and 0.005 ETH reserve are 
 not approved production economics. The pooled 10% acceptance gate and unresolved checkpoint
 uplift threshold do not establish manager returns or impose manager share-pricing waits.
 
-The live mint fee was read as 0.0005 ETH at block 26,486,686; the accepted maximum remains 0.001 ETH. At the candidate 0.5 gwei ceiling the current conditional opening estimate is 0.461605 ETH, including the conservative 0.2141275 ETH renewal float and 0.005 ETH maintenance reserve. At 0.2 gwei it is 0.4610425 ETH. Both exclude wallet creation gas and remain conditional on FWA admission. With the candidate schedule and historical 0.001 ETH mint fee, the conditional first productive
+The R2 live observation read a 0.0005 ETH mint fee at block 26,488,707; the accepted maximum remains 0.001 ETH. See `docs/receipts/manager-r2-live-observation.json` and the adjacent min-backing continuity record. At the candidate 0.5 gwei ceiling the current conditional opening estimate is 0.461605 ETH, including the conservative 0.2141275 ETH renewal float and 0.005 ETH maintenance reserve. At 0.2 gwei it is 0.4610425 ETH. Both exclude wallet creation gas and remain conditional on FWA admission. With the candidate schedule and historical 0.001 ETH mint fee, the conditional first productive
 account funding is 0.463105 ETH at the 0.5 gwei routine ceiling, excluding wallet creation gas. This includes pack
 principal, backing, actual paid mint fees at that historical fee, initial work, maintenance
 reserve and one separate renewal float. It is not a minimum permitted manager creation value.
@@ -101,11 +101,31 @@ and reorganization. Leaving exit mode does not automatically resume listings.
 
 ## Validation and acceptance
 
-The lead freezes inputs and runs one focused pass: launch/encoding unit checks, affected manager
-fork tests against real counterparties, manager accounting reconciliation, actual local UI owner
-lifecycle, current 0.0005/historical higher 0.001 ETH fee comparisons, and independent review. Prior pooled receipts
-retain their original revision; they do not supply a manager return forecast. Owner, creator and
-keeper cash flows must be stated separately with every direct wallet cost counted.
+The corrected source is `1bbe54c94eed34818d5e2c7ccd95d5f83a892b90`. Its current proof consists of
+the R2 receipt rehearsal and gas calibration, 43 funding-trace steps, the focused verification
+packet and independent review. Incoming fees and returned principal refill their full protected
+cash hold before becoming spendable. These changes invalidate prior source-specific acceptance;
+an earlier approval or signature does not authorize this code.
+
+The manager manifest binds `manager-r2-closeout.json`, `manager-r2-cost-calibration.json`, the R2
+live observation and min-backing continuity record, `manager-funded-reconciliation.json`,
+`manager-funded-verification.md` and `manager-funded-checks/input-manifest.json` under
+`docs/receipts/`. It also binds the corrected study manifests in
+`sim/out/manager-monte-carlo-funded/` and `sim/out/manager-standard-funded/`, and their final
+`summary.json` files when present. Pending or incomplete study output is not an accepted return
+forecast. Final numerical conclusions require completed raw-path checks and independent review.
+
+The earlier two-draw economics and source `8e8d5e0` campaigns are withdrawn as financial evidence.
+Their files remain history and are excluded from the current financial inventory. The R1
+`manager-ui.json` and `manager-image.json` records are retained only as historical UI/container
+compatibility evidence; they do not prove R2 funding behavior or current billed gas. Prior pooled
+receipts likewise retain their original revision and do not supply a manager return forecast.
+Owner, creator and keeper cash flows must be stated separately with every direct wallet cost counted.
+
+After final evidence is ready, regenerate the manager manifest and prepare a fresh unsigned
+package through the same target-manager deployment path. This preparation grants no live
+approval, public broadcast, settings change, cutover or merge. The corrected economic assessment
+remains pending; no replacement profitability claim is accepted here.
 
 Things that don't make sense until evaluated: an idle manager's creation funding can be below the
 productive opening threshold; increasing permission supplies no ETH; one finite renewal float does
