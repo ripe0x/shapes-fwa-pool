@@ -153,3 +153,15 @@ The associated app follow-up is `f037af2`: three generated default values plus t
 TypeScript, fourteen focused tests and ABI/default freshness passing. Interaction code and
 community contracts/routes/deployment selection are unchanged; older preview evidence retains
 its original revision. No new browser-interaction claim is made for numerical defaults.
+
+The final app branch then incorporated current community main `3217bb36`, resolving three UI
+conflicts and preserving that release's contracts, keeper, deployment selection, ABI and legacy
+files exactly. App revision `1f2ea06a5cdb803f5655701791c16c629589debd` includes the independently
+reviewed integration tree `9543190395d7982ec5177c51a17fc0bb5e787ed9`. Its compilation check,
+199 affected app/shared tests and main ABI/default freshness pass; twelve existing opt-in RPC
+cases skip and are not reported as passes. A read-only desktop/mobile preview on the retained
+real fork checks manager discovery/settings, one-wei cap refusal, bounded cost review and manager
+selection, plus community design/help navigation. It observes no send/sign RPC and no owner nonce
+change. Two mistaken terminal-branch harness expectations and their failed attempts are retained.
+See the app's [refresh evidence](https://github.com/ripe0x/shapes-pool-balancer/blob/codex/main-pool-app-completion/docs/receipts/manager-community-refresh/README.md).
+Both public main launch switches remain false. No community transaction or live cutover follows.
