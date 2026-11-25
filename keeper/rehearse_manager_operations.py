@@ -160,7 +160,7 @@ def main():
     node = subprocess.Popen(['anvil', '--host', '127.0.0.1', '--port', str(a.port), '--chain-id', '31337', '--accounts', '0', '--silent',
                              '--fork-url', PUBLIC, '--fork-block-number', str(live['block']), '--retries', '30', '--fork-retry-backoff', '5000',
                              '--base-fee', '150000000', '--gas-limit', '16777216', '--enable-tx-gas-limit'],
-                            stdout=open(work / 'anvil.log', 'w'), stderr=subprocess.STDOUT)
+                            stdout=open(work / 'anvil.log', 'w'), stderr=subprocess.STDOUT, start_new_session=True)
     report['ownedNodePid'] = node.pid
     actors = {k: to_checksum_address(keccak(text=f'manager-operations-{live["block"]}-{k}')[-20:]) for k in ('deployer', 'owner', 'keeper', 'queue-payer')}
     report.update(actors=actors, ownerDirectSignedUpperWei=0)

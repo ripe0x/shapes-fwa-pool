@@ -51,9 +51,17 @@ seven-day event index caught up before the build. The informational `RESERVE_BEL
 reported 0.005 ETH reserve against a 0.0054 ETH maximum-batch quote; that configuration limit was
 not changed and did not prevent this bounded owner exit.
 
-The task-owned node remains available at `http://127.0.0.1:18741`, PID 11675, with its fork identity
-and retained work directory recorded in the JSON. The task-owned keeper processes were stopped.
-No other node, process, cache or service was reset or stopped.
+The task-owned node was alive at rehearsal completion at `http://127.0.0.1:18741`, PID 11675;
+`ownedNodeRetained: true` records that completion-time observation. A later scoped check found
+that PID absent and its loopback port closed. The execution runtime automatically closed the
+non-detached child after the helper completed; no manual stop was performed. The task-owned
+keeper processes were stopped by the helper. No other node, process, cache or service was reset
+or stopped. The retained work directory and actual receipts remain in the JSON.
+
+The executed harness is the version in commit `797dc15222b194076d822a950f0a2ec957b99edf`, bound by
+the receipt's `scriptSha256`. A post-run lifecycle fix adds `start_new_session=True` when starting
+future owned Anvil nodes. Only Python compilation was checked for that fix; the successful
+rehearsal was not repeated and does not claim to execute the revised harness.
 
 ## Production preparation
 
