@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Absolute economic checks against real archived receipts; no service substitutes."""
 import tempfile
+import json
 import unittest
 from pathlib import Path
 from manager_closeout import ROOT, PINS, SOURCE_PINS, build_report, checked_json, verify_sources, markdown
@@ -23,6 +24,27 @@ class CloseoutTests(unittest.TestCase):
         self.assertEqual(r['actual_creator_gross_fees_wei'], 6000000000000000)
         self.assertEqual(r['owner_wallet_gas_sensitivity'][0]['operation_costs_wei']['create'], 121238800000000)
         self.assertIn('not monthly return', markdown(r))
+
+    def test_revised_candidate_gas_does_not_rewrite_historical_receipt_settings(self):
+        receipt=checked_json(ROOT/'docs/receipts/manager-r2-closeout.json',PINS['docs/receipts/manager-r2-closeout.json'])
+        candidate=json.loads((ROOT/'deploy/manager.json').read_text())
+        candidate['gasSchedule'].update(selected=225000,synced=285000,list=380000)
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            # All evidence and code remain the real files; only the candidate config is isolated.
+            for name in ('src','sim','keeper','docs'):
+                (root/name).symlink_to(ROOT/name,target_is_directory=True)
+            (root/'deploy').mkdir()
+            (root/'deploy/manager.json').write_text(json.dumps(candidate))
+            report=build_report(root)
+        self.assertEqual(report['historical_manager_values'],receipt['managerValues'])
+        self.assertEqual(report['historical_manager_values']['gasSchedule']['selected'],180000)
+        self.assertEqual(report['historical_manager_values']['gasSchedule']['synced'],120000)
+        self.assertEqual(report['historical_manager_values']['gasSchedule']['list'],280000)
+        self.assertEqual(report['historical_manager_values_file_sha256'],receipt['managerValuesSha256'])
+        self.assertNotIn('deploy/manager.json',report['input_sha256'])
+        self.assertIn('Historical R2',report['kind'])
+        self.assertIn('Historical R2',markdown(report))
 
     def test_changed_receipt_is_rejected(self):
         name, sha = next(iter(PINS.items()))

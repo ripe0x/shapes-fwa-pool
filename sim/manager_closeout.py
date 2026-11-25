@@ -55,9 +55,7 @@ def build_report(root=ROOT):
         raise ValueError('nonpassing receipt evidence')
     if not all(d['runtimeMatch'] for d in standard['dependencies'].values()):
         raise ValueError('unverified external dependency runtime')
-    values = json.loads((root / 'deploy/manager.json').read_text())
-    if values != receipts['managerValues']:
-        raise ValueError('manager values differ from current receipt')
+    values = receipts['managerValues']
     live_path = 'docs/receipts/manager-final-live-observation.json'
     live = json.loads((root / live_path).read_text())
     if live['mintFeeWei'] != observation['mintFeeWei'] or not live['readOnly'] or not all(d['matchesReceiptDependency'] for d in live['dependencies'].values()):
@@ -88,8 +86,10 @@ def build_report(root=ROOT):
         name: costs['gas_proxy'][name] * wei for name in
         ('create', 'setExiting', 'withdraw', 'unlist', 'liquidate', 'recover_sync', 'processAcquisitions')}}
         for price, wei in ((.2, 200000000), (.5, 500000000))]
-    return dict(kind='Bounded quoted single-cycle sensitivity and separate actual unselected round trips',
-        input_sha256=PINS | {'deploy/manager.json': digest(root/'deploy/manager.json'), live_path: digest(root/live_path)},
+    return dict(kind='Historical R2 quoted single-cycle sensitivity and separate actual unselected round trips',
+        settings_scope='Historical parameters recorded in the immutable R2 receipt; independent of the current candidate',
+        historical_manager_values=values,historical_manager_values_file_sha256=receipts['managerValuesSha256'],
+        input_sha256=PINS | {live_path: digest(root/live_path)},
         latest_read_only_observation=live,
         contract_source_sha256=costs['contract_source_sha256'], model_source_sha256=reconciliation['source_sha256'] | SOURCE_PINS,
         report_writer_sha256=digest(root/'sim/manager_closeout.py'),
@@ -101,8 +101,9 @@ def build_report(root=ROOT):
         actual_keeper=keeper, actual_creator_gross_fees_wei=receipts['creatorPrimaryFeesAccruedWei'],
         actual_deployer_startup_gas_wei=receipts['deploymentWalletGasWei'],
         unmeasured_operations=costs['unmeasured_operations'], limitations=[
+            'This historical scorecard uses the parameters recorded in the pinned R2 receipt; it does not evaluate the revised candidate gas settings.',
             'No monthly return, APR, Monte Carlo inference or viability proof. No partial campaign outcomes are inputs.',
-            '.03 backing is an isolated hypothetical for the current manager, whose admission rejects it; actual FWA admission is separately proven.',
+            '.03 backing is an isolated hypothetical for the historical R2 manager, whose admission rejects it; actual FWA admission is separately proven.',
             'The cycle screen assumes gross listing-fee income k times backing per own selection under fixed proportional selection/fee weights. It is an analytical expected-fee attribution, not fees actually received on an individual acquisition or a measured return period. Cycle costs include fresh mints and full quoted keeper payments, not billed renewal/harvest/list/sync operating costs.',
             'Owner wallet sensitivity reprices measured operation gas individually; do not sum mutually conditional recovery calls or interpret them as a measured complete path.',
             'Actual round trips are unselected exits, use their own receipt gas prices, and are not added to cycle quotes. Creator accrual is gross; deployer startup is separate from owner cash.',
@@ -113,9 +114,10 @@ def build_report(root=ROOT):
 
 def markdown(report):
     eth = lambda value: format(Fraction(value, E).numerator / Fraction(value, E).denominator, '.12f')
-    lines = ['# Manager economic closeout', '', '**Bounded single-cycle sensitivity, not monthly return, APR or viability proof.**', '',
+    lines = ['# Historical manager economic closeout', '', '**Historical R2 single-cycle sensitivity, not monthly return, APR or viability proof.**', '',
+             report['settings_scope'] + '.', '',
              f"Receipt fee .0005 ETH at block {report['observation_block']}; confirmed again at block {report['latest_read_only_observation']['block']}. Accepted maximum and historical comparison .001 ETH. Standard fresh-bid mint-fee break-even before all gas: **{eth(report['standard_fresh_bid_pre_gas_break_even_fee_wei'])} ETH per Shape**.", '',
-             '.03 backing is hypothetical for the current manager. FWA admission and actual unselected round trips are separate evidence.', '',
+             '.03 backing is hypothetical for the historical R2 manager. FWA admission and actual unselected round trips are separate evidence.', '',
              '| Backing ETH | Mint fee ETH | Gas gwei | Bid net after quoted cycle costs ETH | Keep net after quoted cycle costs ETH |',
              '|---:|---:|---:|---:|---:|']
     for r in report['comparison']['rows']:
@@ -126,7 +128,7 @@ def markdown(report):
     lines += ['', 'Actual FWA standard unselected round trips:', '', '| Gas gwei | Face + backing returned ETH | Primary fees ETH | Wallet gas ETH | Owner net ETH |', '|---:|---:|---:|---:|---:|']
     for c in report['actual_standard_round_trips']:
         lines.append(f"| {c['totalGasPriceWei']/10**9:g} | {eth(c['returnedPackFaceWei']+c['returnedListingBackingWei'])} | {eth(c['paidPrimaryMintFeesWei'])} | {eth(c['totalWalletGasWei'])} | {eth(c['ownerNetWei'])} |")
-    lines += ['', 'Actual current-source manager unselected exits:', '', '| Account | Funded ETH | Withdrawn ETH | Wallet gas ETH | Owner net ETH |', '|---|---:|---:|---:|---:|']
+    lines += ['', 'Actual historical R2 manager unselected exits:', '', '| Account | Funded ETH | Withdrawn ETH | Wallet gas ETH | Owner net ETH |', '|---|---:|---:|---:|---:|']
     for c in report['actual_manager_round_trips']:
         lines.append(f"| {c['label']} | {eth(c['fundingWei'])} | {eth(c['withdrawnWei'])} | {eth(c['walletGasWei'])} | {eth(c['ownerNetWei'])} |")
     k = report['actual_keeper']

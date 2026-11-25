@@ -1319,3 +1319,21 @@ its backing is unchanged.
 Things that don't make sense until validated: one float may not cover early repeated acquisitions;
 small pools may miss checkpoint windows under the proposed uplift limit; low activity may make net
 holder returns negative even while paid mints earn creator revenue.
+
+## Individual manager measured calibration (2026-11-25)
+
+The complete uncalibrated 960-case baseline and its exact settings are preserved in
+`sim/out/manager-operating-assessment/` and `docs/receipts/manager-baseline-settings.json`.
+Actual Osaka receipts identify cold-keeper underquotes despite some positive billed margins.
+Finishing the authorized manager work includes repairing those numerical inputs rather than
+promoting a stalled strategy into a production recommendation.
+
+The next local manager candidate changes only gasSchedule.selected from 180000 to 225000,
+gasSchedule.synced from 120000 to 285000, and gasSchedule.list from 280000 to 380000. These
+rounded allowances add headroom above the recorded zero-margin estimate shortfalls. Pack value,
+three paid primary mints, accepted/live fee handling, backing target, renewal mode/float, reserve,
+budgets, markup and gas ceilings remain unchanged. These are agent-selected evaluation settings,
+not owner-approved production defaults. Actual keeper preflight, compensation and receipts must
+validate them, and the same frozen cohort design is rerun without dropping unfavorable cases.
+The new shared vault stays undeployed. This grants no public transaction, fee change, signature,
+cutover or merge authority.

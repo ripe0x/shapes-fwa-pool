@@ -1,10 +1,12 @@
-# Manager economic closeout
+# Historical manager economic closeout
 
-**Bounded single-cycle sensitivity, not monthly return, APR or viability proof.**
+**Historical R2 single-cycle sensitivity, not monthly return, APR or viability proof.**
+
+Historical parameters recorded in the immutable R2 receipt; independent of the current candidate.
 
 Receipt fee .0005 ETH at block 26488707; confirmed again at block 26489769. Accepted maximum and historical comparison .001 ETH. Standard fresh-bid mint-fee break-even before all gas: **0.000384605000 ETH per Shape**.
 
-.03 backing is hypothetical for the current manager. FWA admission and actual unselected round trips are separate evidence.
+.03 backing is hypothetical for the historical R2 manager. FWA admission and actual unselected round trips are separate evidence.
 
 | Backing ETH | Mint fee ETH | Gas gwei | Bid net after quoted cycle costs ETH | Keep net after quoted cycle costs ETH |
 |---:|---:|---:|---:|---:|
@@ -43,7 +45,7 @@ Actual FWA standard unselected round trips:
 | 0.2 | 0.060000000000 | 0.001500000000 | 0.000358795000 | -0.001858795000 |
 | 0.5 | 0.060000000000 | 0.001500000000 | 0.000896981500 | -0.002396981500 |
 
-Actual current-source manager unselected exits:
+Actual historical R2 manager unselected exits:
 
 | Account | Funded ETH | Withdrawn ETH | Wallet gas ETH | Owner net ETH |
 |---|---:|---:|---:|---:|
@@ -54,9 +56,11 @@ Actual keeper compensation / gas / net: 0.000795905178 / 0.000604073134 / 0.0001
 
 Unmeasured operating gas: renew, standalone-harvest, list, sync.
 
+This historical scorecard uses the parameters recorded in the pinned R2 receipt; it does not evaluate the revised candidate gas settings.
+
 No monthly return, APR, Monte Carlo inference or viability proof. No partial campaign outcomes are inputs.
 
-.03 backing is an isolated hypothetical for the current manager, whose admission rejects it; actual FWA admission is separately proven.
+.03 backing is an isolated hypothetical for the historical R2 manager, whose admission rejects it; actual FWA admission is separately proven.
 
 The cycle screen assumes gross listing-fee income k times backing per own selection under fixed proportional selection/fee weights. It is an analytical expected-fee attribution, not fees actually received on an individual acquisition or a measured return period. Cycle costs include fresh mints and full quoted keeper payments, not billed renewal/harvest/list/sync operating costs.
 
