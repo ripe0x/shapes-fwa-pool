@@ -10,7 +10,7 @@ One manager owns its assets and uses the shared PackAccount/StrategyLib/VaultLib
 
 The current recipe is 0.03 ETH principal from three primary Shapes, with mask bit 3 and nominal separate backing of 0.21 ETH. Returned packs are relisted intact. A kept pack leaves inventory, and any replacement is a normal build using actual cash and permission. There is no Fresh mode, renewal float, replacement-eligibility balance or paid retirement/remint path.
 
-The accepted fee is 0.001 ETH per Shape. Read-only public refresh at block 26,493,799 and the updated creation template at block 26,494,501 show an actual fee of 0.0005 ETH; the [pinned block 26,494,440 readback](../receipts/manager-a9-public-readback.json) also confirms that fee, signer nonce 4180, old factory manager count zero and unchanged 0.01 ETH legacy vault balance. These reads change no fee. The 0.5 ETH creation template is an evaluation funding amount, not a contract minimum or return recommendation.
+The accepted fee is 0.001 ETH per Shape. The [pinned block 26,494,800 readback](../receipts/manager-a10-public-readback.json) and updated creation template at block 26,494,820 show an actual fee of 0.0005 ETH, signer nonce **4181**, old factory manager count zero and unchanged 0.01 ETH legacy vault balance. The earlier nonce-4180 package is preserved in [manager-unsigned-history](../../deploy/manager-unsigned-history/) and in its original commit. These reads change no fee. The 0.5 ETH creation template is an evaluation funding amount, not a contract minimum or return recommendation. The owner's pinned wallet balance was **0.177336592479995704 ETH**, so that 0.5 ETH template cannot currently execute from this wallet: it lacks **0.322663407520004296 ETH plus wallet gas**.
 
 At zero markup, the maximum one-pack build/list funding envelope plus reserve is 0.246925 ETH at 0.2 gwei or 0.2475025 ETH at 0.5 gwei using the observed fee. Using the accepted maximum gives 0.248425 / 0.2490025 ETH. Wallet creation gas is separate. Actual compensation uses bounded measured work and can be lower; these envelopes are not billed costs or profit predictions.
 
@@ -23,39 +23,40 @@ The wrapper compiles its actual deploy inputs, checks the manifest, and then sim
 Recorded preparation commands, using the existing Git and deployment identities and Python 3.11.8:
 
 ```sh
-python3 script/release.py manifest --target manager
+/Users/dd/.pyenv/versions/3.11.8/bin/python script/release.py manifest --target manager
 
 CANDIDATE_RUN=1 RPC_URL=https://mainnet.gateway.tenderly.co \
+  PATH="/Users/dd/.pyenv/versions/3.11.8/bin:$PATH" \
   FORGE_WALLET_ARGS="--sender 0xCB43078C32423F5348Cab5885911C3B5faE217F9" \
   script/deploy.sh deploy/manager-factory.json --target manager
 
-python3 script/release.py manager-package deploy/manager-measured-dry-run.json
+/Users/dd/.pyenv/versions/3.11.8/bin/python script/release.py manager-package deploy/manager-measured-dry-run.json
 
-RPC_URL=https://mainnet.gateway.tenderly.co python3 script/release.py manager-create \
-  0x308f258b47c406a820790fa8a8894e92b02cc3ab \
+RPC_URL=https://mainnet.gateway.tenderly.co /Users/dd/.pyenv/versions/3.11.8/bin/python script/release.py manager-create \
+  0x0cEc235560B81Bf0568A1cFc07D9491fE3d9EC4B \
   0xCB43078C32423F5348Cab5885911C3B5faE217F9 500000000000000000
 ```
 
-The wrapper was run **without broadcast**, with exit status 0 in **11.67 seconds**. Its only reported release-gate failure was uncommitted release inputs in the shared draft worktree. The same compiled dry-run was independently revalidated by the updated package generator at block 26,494,500; nonce 4180 still matched. The final manifest is regenerated after source-bound artifacts. No acceptance or signature was generated or reused.
+The wrapper was run **without broadcast**, with exit status 0. Its reported release-gate failure was the shell's default Python missing `eth_utils`; the Forge simulation and local postflight still passed. The commands above pin the working Python environment, and the final release check is run separately after commit. The same compiled dry-run was independently revalidated by the package generator at block 26,494,819; nonce **4181** matched. No acceptance or signature was generated or reused.
 
-The validated public Forge dry-run was preserved as [manager-measured-dry-run.json](../../deploy/manager-measured-dry-run.json), SHA-256 `46d737aeb953a2ee156b0bee7cbbb87325ff1f1127a4eb58608d0b4fc09fc660`. The preparation log is [manager-measured-unsigned-dry-run.log](../receipts/manager-measured-unsigned-dry-run.log). Forge's sensitive cache is not an input to this package and was not copied.
+The validated public Forge dry-run was preserved as [manager-measured-dry-run.json](../../deploy/manager-measured-dry-run.json), SHA-256 `b2cd8ae949910519e996ce5fa0afff14d9b240f3a60b38a40f61cac01e0694db`. The [A10 preparation log](../receipts/manager-measured-unsigned-dry-run-a10.log) preserves the Python gate error as well as the successful Forge simulation/postflight. Forge's sensitive cache is not an input to this package and was not copied.
 
-[manager-unsigned-cutover.json](../../deploy/manager-unsigned-cutover.json) records Ethereum chain 1, refreshed nonce readback **4180** at block **26,494,500**, contiguous unsigned nonces 4180–4183, validated compiled links and dependency values:
+[manager-unsigned-cutover.json](../../deploy/manager-unsigned-cutover.json) records Ethereum chain 1, refreshed nonce readback **4181** at block **26,494,819**, contiguous unsigned nonces 4181–4184, validated compiled links and dependency values:
 
 | Contract | Predicted address | Transaction gas limit |
 |---|---|---:|
 | ScanLib | `0x8148d8b4621ce009275d88e5dfdf1302a700cbc0` | 6,827,830 |
 | VaultLib | `0x1e7a9cd8acf72f5dffda172497d41f5471d15317` | 7,181,954 |
 | StrategyLib | `0xc3ab28505d386ea4f77b4b121e0e8c4b8b828a30` | 4,399,705 |
-| PackManagerFactory | `0x308f258b47c406a820790fa8a8894e92b02cc3ab` | 7,348,688 |
+| PackManagerFactory | `0x0cEc235560B81Bf0568A1cFc07D9491fE3d9EC4B` | 7,348,688 |
 
-The implementation predicted by the factory is `0xb8d36f767363e16ae9775c22a03de14d24ba8e06`. Every transaction is below EIP-7825's 16,777,216 limit. The script's aggregate estimate is 25,758,177 gas across transactions, not one transaction. Its estimated required total of 0.018060026196089784 ETH at a 0.701137592 gwei estimate is simulation output, not gas spent or a fixed future price.
+The implementation predicted by the factory is `0xaEd9c253c62cbf390Ebbe72dddbBA85bD589A4BE`. Every transaction is below EIP-7825's 16,777,216 limit. The script's aggregate estimate is 25,758,177 gas across transactions, not one transaction. Its estimated required total of 0.005377090335253104 ETH at a 0.208752752 gwei estimate is simulation output, not gas spent or a fixed future price.
 
 Compiled runtime sizes in this package are PackManager 20,707 bytes, factory 4,876, StrategyLib 14,456, VaultLib 22,422 and ScanLib 21,310. The package binds their exact runtime/initcode hashes. Historical unsigned inputs and the earlier public dry-run are retained in [manager-unsigned-history](../../deploy/manager-unsigned-history/); their predicted addresses and nonces are not current.
 
 ## Creation template and final refresh
 
-[manager-create-unsigned.json](../../deploy/manager-create-unsigned.json) is unsigned calldata to the current predicted factory. At block **26,494,501**, the factory is not deployed, the reviewed owner is `0xCB43078C32423F5348Cab5885911C3B5faE217F9`, funding is 500,000,000,000,000,000 wei, and the configuration expectation is `0x2c8bed5338b295b8aa543711ce5b97f774557239742a91ec1e96702b7f66b0c6`. Manager values SHA-256 is `66423b7ed03e758fafe3b0a0b79a861f7894e97bf1885a8f13cfe887f38385cc`; template SHA-256 is `c25fcab2825ac3140ae91fe39d83097932f7532bb4e912d8f3105a8f31f07516`. The prior template remains available in the previous Git revision and [manager-unsigned-history](../../deploy/manager-unsigned-history/).
+[manager-create-unsigned.json](../../deploy/manager-create-unsigned.json) is unsigned calldata to the current predicted factory. At block **26,494,820**, the factory is not deployed, the reviewed owner is `0xCB43078C32423F5348Cab5885911C3B5faE217F9`, funding is 500,000,000,000,000,000 wei, and the configuration expectation is `0x2c8bed5338b295b8aa543711ce5b97f774557239742a91ec1e96702b7f66b0c6`. Manager values SHA-256 is `66423b7ed03e758fafe3b0a0b79a861f7894e97bf1885a8f13cfe887f38385cc`; template SHA-256 is `aa2b9c9313356407fa787e65afcdb6dba4aad75b51eafd7fcce1678baff41187`. The prior template remains available in the previous Git revision and [manager-unsigned-history](../../deploy/manager-unsigned-history/).
 
 A prior template attempt timed out during the pinned live mint-fee read before replacing its output. [The failure record](../receipts/manager-measured-unsigned-create-attempt1.json) is retained. Only template generation was retried; the successful deployment simulation was not repeated. The final template uses the current package's factory, rather than a historical predicted address.
 
@@ -89,7 +90,7 @@ Production signer transport, service start/restart and live discovery remain une
 
 ## Evidence limits
 
-The 50,000 overhead is an evaluation candidate. Earlier 100,000-overhead packets keep their executed metadata. Fixed-quote/Fresh studies and their old native checkpoints do not validate the new storage, reuse-only behavior, meter, operating returns or current overhead. The [focused verification](../receipts/manager-measured-verification.md), [economic scorecard](../receipts/manager-measured-economics.md) and [bounded independent review](../receipts/manager-a9-independent-review.md) identify current inputs and limits. The frozen 96-row archived-demand study is conditional and does not establish a profitable production default. It found a keeper sync bootstrap problem despite a positive measured margin on that exact work. The **0.006 ETH reserve** covers the stated maximum-work cash envelope if funded, but remains an evaluated alternative; the unsigned values still have **0.005 ETH**. No annual return or live keeper image run is claimed.
+The 50,000 overhead is an evaluation candidate. Earlier 100,000-overhead packets keep their executed metadata. Fixed-quote/Fresh studies and their old native checkpoints do not validate the new storage, reuse-only behavior, meter, operating returns or current overhead. The [focused verification](../receipts/manager-measured-verification.md), [expanded A10 economic scorecard](../receipts/manager-a10-economics.md) and [bounded independent review](../receipts/manager-a10-independent-review.md) identify current inputs and limits. The frozen 320-row assessment contains 16 recorded selection paths on only two demand tapes; its positive conditional mean does not establish a profitable reuse cycle or production default. It found a keeper sync bootstrap problem despite a positive measured margin on that exact work, and **zero ordinary keeper syncs** in all modeled rows. The **0.006 ETH reserve** covers the stated maximum-work cash envelope if funded, but remains an evaluated alternative; the unsigned values still have **0.005 ETH**. No annual return or live keeper image run is claimed.
 
 The preserved [legacy readback](../../deploy/manager-existing-main-readback.json) records the old vault's 0.01 ETH and old factory's manager count zero. Unsupported selectors and RPC errors remain explicit; this does not establish modern postflight or open the shared vault. No conditional mean, source review or calibration is a production recommendation.
 

@@ -1,5 +1,7 @@
 # Individual manager: measured reuse-only economics
 
+**Historical A9 two-seed assessment.** Its negative mean is superseded by the [expanded A10 assessment](manager-a10-economics.md). Retain the numbers below only with their original two-path scope and source-bound configuration.
+
 **Decision.** The current 0.03 ETH, three-paid-Shape, reuse-only manager with provisional 0.21 ETH backing does **not** meet a reliable positive owner-return requirement. The two archived month paths average a loss, a quiet path loses its opening costs, and an early-bid burst loses substantially more. The 0.006 ETH reserve is the smaller operational correction for a cash shortfall; it does not make the strategy profitable. No production backing or reserve value is approved by this assessment. The shared vault remains closed.
 
 ## Evidence and scope

@@ -433,6 +433,7 @@ def write_profile(report):
                  'manager-measured-sync-multi-two-attempt1.json',
                  'manager-measured-sync-multi-three-blockfork.json',
                  'manager-measured-sync-preselected-two-blockfork.json',
+                 'manager-measured-sync-multi-later-first.json',
                  'manager-measured-sync-scan-three-blockfork.json',
                  'manager-measured-sync-multi-two-no-credit.json',
                  'manager-measured-owner-batch-exit.json',
@@ -448,7 +449,7 @@ def write_profile(report):
         for original in packet.get('transactions',packet.get('measurements',[])):
             row=original.copy();receipt=row['receipt'];transaction=row['transaction']
             assert int(receipt['status'],16)==1
-            row.update(hash=receipt['transactionHash'],gasUsed=int(receipt['gasUsed'],16),
+            row.update(sourcePacket=str(path.relative_to(ROOT)),hash=receipt['transactionHash'],gasUsed=int(receipt['gasUsed'],16),
                 estimateKind=row.get('estimateKind','rpc-estimate'),signedGasLimit=int(transaction['gas'],16))
             assert type(row['gasEstimate']) is int and row['gasEstimate']>0
             op=row['operation'] or 'fund'

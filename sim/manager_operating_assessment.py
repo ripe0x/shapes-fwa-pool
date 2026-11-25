@@ -161,6 +161,10 @@ def qualify_costs(costs, final):
 def verify_measurement_receipts(costs, packets):
     def integer(value):
         return int(value, 0) if isinstance(value, str) else value
+    inputs = costs.get('receipt_inputs') or [dict(path=costs['receipts'])]
+    if len(inputs) != len(packets) or len({item['path'] for item in inputs}) != len(inputs):
+        raise ValueError('receipt packet paths must identify every raw packet once')
+    input_paths = {item['path'] for item in inputs}
     actual = {}
     estimates = {}
     rpc_estimates = {}
@@ -170,58 +174,63 @@ def verify_measurement_receipts(costs, packets):
     raw_contexts = {}
     raw_prestates = {}
     meter_topic="0x"+keccak(text="KeeperWorkMeasured(uint256,uint256,uint256,uint256,bool)").hex()
-    def visit(value):
+    def visit(value, packet_path):
         if isinstance(value, list):
-            for item in value: visit(item)
+            for item in value: visit(item, packet_path)
         elif isinstance(value, dict):
             receipt=value.get('receipt',{})
             transaction=value.get('transaction',{})
             if isinstance(receipt,dict) and receipt.get('transactionHash'):
-                tx_hash=receipt['transactionHash'].lower()
-                if isinstance(value.get('verifiedContext'),dict):raw_contexts[tx_hash]=value['verifiedContext']
-                if value.get('prestateSha256'):raw_prestates[tx_hash]=value['prestateSha256']
+                tx_key=(packet_path,receipt['transactionHash'].lower())
+                if isinstance(value.get('verifiedContext'),dict):raw_contexts[tx_key]=value['verifiedContext']
+                if value.get('prestateSha256'):raw_prestates[tx_key]=value['prestateSha256']
                 signed=value.get('signedGasLimit',transaction.get('gas') if isinstance(transaction,dict) else None)
                 if signed is not None:
-                    signed_limits[tx_hash]=integer(signed)
+                    signed_limits[tx_key]=integer(signed)
                     if isinstance(transaction,dict) and transaction.get('gas') is not None and integer(transaction['gas'])!=integer(signed):
                         raise ValueError('signed gas metadata differs from actual transaction gas')
                 estimate=value.get('gasEstimate')
                 if estimate is not None and value.get('estimateKind')!='signed-limit-upper':
-                    rpc_estimates[tx_hash]=integer(estimate)
+                    rpc_estimates[tx_key]=integer(estimate)
                 legacy=estimate if estimate is not None else signed
                 if legacy is not None:
-                    estimates[tx_hash]=integer(legacy)
+                    estimates[tx_key]=integer(legacy)
                 if 'workCount' in value:
-                    actual_counts[receipt['transactionHash'].lower()]=value['workCount']
+                    actual_counts[tx_key]=value['workCount']
             if 'transactionHash' in value and 'gasUsed' in value and 'status' in value:
                 if integer(value['status']) == 1:
-                    actual[value['transactionHash'].lower()] = integer(value['gasUsed'])
+                    tx_key=(packet_path,value['transactionHash'].lower())
+                    actual[tx_key] = integer(value['gasUsed'])
                     frames=[]
                     for log in value.get('logs',[]):
                         if log.get('topics') and log['topics'][0].lower()==meter_topic.lower():
                             data=bytes.fromhex(log['data'].removeprefix('0x'))
                             if len(data)!=160:raise ValueError('malformed actual work meter event')
                             frames.append(tuple(int.from_bytes(data[i:i+32],'big') for i in range(0,160,32)))
-                    actual_meters[value['transactionHash'].lower()]=frames
-            for item in value.values(): visit(item)
+                    actual_meters[tx_key]=frames
+            for item in value.values(): visit(item, packet_path)
     if costs.get('compensation_mode')=='bounded-measured-v1':
         schedules=[packet['fullGasSchedule'] for packet in packets if 'fullGasSchedule' in packet]
         if not schedules or any(schedule!=costs.get('fullGasSchedule') for schedule in schedules):
             raise ValueError('raw sync context gas schedule differs from calibration')
-    for packet in packets:
+    for input_row,packet in zip(inputs,packets):
         if isinstance(packet.get('authenticatedCheckpoint'),dict):
             check_sources(packet['authenticatedCheckpoint'])
             if packet.get('forkBaseMode')=='prior-block-plus-verified-export' and packet.get('verifiedExportFields',0)<=0:
                 raise ValueError('block-fork receipt lacks exported-state readback')
         if packet.get('sourceReceipt') and packet.get('sourceReceiptSha256'):
             check_sources({packet['sourceReceipt']:packet['sourceReceiptSha256']})
-        visit(packet)
+        visit(packet,input_row['path'])
     for operation, samples in costs['measurements'].items():
         for sample in samples:
             tx = sample.get('hash', sample.get('transactionHash', ''))
-            if actual.get(tx.lower()) != sample.get('gasUsed'):
+            source = sample.get('sourcePacket', inputs[0]['path'] if len(inputs) == 1 else None)
+            if source not in input_paths:
+                raise ValueError('measurement lacks its raw packet identity: '+operation)
+            tx_key=(source,tx.lower())
+            if actual.get(tx_key) != sample.get('gasUsed'):
                 raise ValueError('measurement lacks matching successful billed receipt: ' + operation)
-            if tx.lower() in actual_counts and sample.get('workCount')!=actual_counts[tx.lower()]:
+            if tx_key in actual_counts and sample.get('workCount')!=actual_counts[tx_key]:
                 raise ValueError('measurement workCount differs from receipt: '+operation)
             curve_operation={'recover':'recover_sync','recoverUnlist':'unlist','recoverLiquidate':'liquidate'}.get(operation,operation)
             if costs.get('compensation_mode')=='bounded-measured-v1' and operation in METERED_OPERATIONS:
@@ -229,28 +238,28 @@ def verify_measurement_receipts(costs, packets):
                 names=('measuredGas','gasAllowance','gasPrice','workUnits','essential')
                 if any(name not in meter for name in names):
                     raise ValueError('sample lacks genuine five-field work meter: '+operation)
-                frames=actual_meters.get(tx.lower(),[])
+                frames=actual_meters.get(tx_key,[])
                 expected=tuple(int(meter[name]) for name in names)
                 if len(frames)!=1 or frames[0]!=expected:
                     raise ValueError('sample work meter differs from actual receipt event: '+operation)
             if costs.get('compensation_mode')=='bounded-measured-v1' and operation in OWNER_SAMPLE_ALIASES.values():
-                if isinstance(sample.get('measuredWork'),dict) or 'measuredGas' in sample or actual_meters.get(tx.lower()):
+                if isinstance(sample.get('measuredWork'),dict) or 'measuredGas' in sample or actual_meters.get(tx_key):
                     raise ValueError('unpaid owner recovery cannot supply a paid work meter: '+operation)
             if costs.get('compensation_mode')=='bounded-measured-v1' and operation=='recover':
                 context=sample.get('verifiedContext')
-                if not isinstance(context,dict) or context!=raw_contexts.get(tx.lower()):
+                if not isinstance(context,dict) or context!=raw_contexts.get(tx_key):
                     raise ValueError('owner sync context differs from raw paired-state provenance')
-                paired=context.get('pairedPaidHash','').lower()
+                paired=(source,context.get('pairedPaidHash','').lower())
                 frames=actual_meters.get(paired,[])
                 digest=context.get('prestateSha256')
                 if (len(frames)!=1 or (frames[0][1],frames[0][3])!=(context.get('gasAllowance'),context.get('workUnits'))
-                        or not digest or digest!=raw_prestates.get(paired) or digest!=raw_prestates.get(tx.lower())):
+                        or not digest or digest!=raw_prestates.get(paired) or digest!=raw_prestates.get(tx_key)):
                     raise ValueError('owner sync context lacks matching paid event and identical prestate')
             if curve_operation in owner_curves(costs):
                 kind=sample.get('estimateKind')
                 if kind not in ('rpc-estimate','signed-limit-upper'):
                     raise ValueError('measurement requires explicit estimateKind: '+operation)
-                proven=(rpc_estimates if kind=='rpc-estimate' else signed_limits).get(tx.lower())
+                proven=(rpc_estimates if kind=='rpc-estimate' else signed_limits).get(tx_key)
                 if proven is None or sample.get('gasEstimate')!=proven:
                     raise ValueError('measurement estimate kind lacks matching raw RPC estimate/signed gas: '+operation)
     if costs.get('gas_curves'):
@@ -260,7 +269,8 @@ def verify_measurement_receipts(costs, packets):
         samples=costs['measurements'].get(operation,costs['measurements'].get(aliases.get(operation,''),[]))
         if not samples:
             raise ValueError('signed/estimated gas proxy lacks receipt samples: '+operation)
-        proven=[estimates.get(sample.get('hash',sample.get('transactionHash','')).lower()) for sample in samples]
+        proven=[estimates.get((sample.get('sourcePacket',inputs[0]['path'] if len(inputs)==1 else None),
+                               sample.get('hash',sample.get('transactionHash','')).lower())) for sample in samples]
         if any(value is None for value in proven) or proxy<max(proven):
             raise ValueError('signed/estimated gas proxy understates receipt estimate/upper: '+operation)
 

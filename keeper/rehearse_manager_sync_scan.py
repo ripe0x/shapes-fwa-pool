@@ -6,6 +6,7 @@ import json
 import subprocess
 import tempfile
 import time
+from urllib.error import HTTPError
 from pathlib import Path
 
 from eth_abi import decode
@@ -25,6 +26,16 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def public_read(method, params):
+    for attempt in range(30):
+        try:
+            return rpc_at(PUBLIC, method, params)
+        except HTTPError as error:
+            if error.code != 429 or attempt == 29:
+                raise
+            time.sleep(5)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--output', default=str(DEFAULT_OUT))
@@ -32,11 +43,14 @@ def main():
     ap.add_argument('--scan-positions', type=int, choices=(1,2,3), default=2)
     ap.add_argument('--multi', action='store_true', help='Use the real five-proof fixture with two selected manager listings')
     ap.add_argument('--preselected', action='store_true', help='Use the five-proof fixture after one unpaid intermediate selection sync')
+    ap.add_argument('--resolve-later-first', action='store_true', help='Settle the later of two selected listings first, leaving the earlier allocation in the prune queue')
     ap.add_argument('--no-fee-sweep-calibration', action='store_true')
     ap.add_argument('--block-fork', action='store_true', help='Fork immediately before the recorded request, then verify every exported state field')
     args = ap.parse_args()
     if args.preselected:
         args.multi = True
+    if args.resolve_later_first and not args.multi:
+        ap.error('--resolve-later-first requires --multi')
     out = Path(args.output).resolve()
     if out.exists():
         raise SystemExit('preserve the existing scan packet; choose a fresh output')
@@ -66,8 +80,8 @@ def main():
     url = f'http://127.0.0.1:{args.port}'
     work = Path(tempfile.mkdtemp(prefix='manager-scan-'))
     if args.multi:
-        historical = rpc_at(PUBLIC,'eth_getTransactionByHash',[meta['requestTx']])
-        header = rpc_at(PUBLIC,'eth_getBlockByNumber',[historical['blockNumber'],False])
+        historical = public_read('eth_getTransactionByHash',[meta['requestTx']])
+        header = public_read('eth_getBlockByNumber',[historical['blockNumber'],False])
         index = int(historical['transactionIndex'],16)
         assert header['transactions'][index].lower() == meta['requestTx'].lower()
         prefix = (['--fork-block-number',str(meta['requestBlock']-1)] if args.block_fork else
@@ -93,6 +107,7 @@ def main():
                   scriptSha256=digest(__file__), nodePid=node.pid, nodeCommand=command,
                   workDirectory=str(work), publicTransactions=0, transactions=[], contexts=[],
                   scanPositions=args.scan_positions,multipleRealSelections=args.multi,
+                  resolveLaterFirst=args.resolve_later_first,
                   preselectedListing=meta.get('preselected'),
                   forkBaseMode='prior-block-plus-verified-export' if args.block_fork else 'prior-transaction-plus-verified-export',
                   calibrationOverride=None if args.no_fee_sweep_calibration else {
@@ -314,10 +329,11 @@ def main():
             prepared=rpc('evm_snapshot')
             branch=(f'multi-{args.scan_positions}-{resolved}-{price}' if args.multi else
                     f'scan-no-credit-{price}' if args.no_fee_sweep_calibration else f'scan-credit-{price}')
+            ids = (ordered[-1:] if args.multi and args.resolve_later_first and resolved == 1
+                   else ordered[:resolved])
             if args.multi:
-                for listing in ordered[:resolved]:
+                for listing in ids:
                     send(purchaser,FWA,'acceptDepositorBid(uint256)',('uint256',),(listing,),branch=branch)
-            ids=ordered[:resolved]
             before,state=fingerprint()
             pair=rpc('evm_snapshot')
             paid=send(keeper, manager, 'sync(uint256[],uint256,uint256,bytes32)',

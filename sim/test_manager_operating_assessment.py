@@ -210,6 +210,8 @@ class OperatingAssessmentTests(unittest.TestCase):
         costs=json.loads((O.ROOT/'docs/receipts/manager-r2-cost-calibration.json').read_text())
         actual=json.loads((O.ROOT/costs['receipts']).read_text())
         O.verify_measurement_receipts(costs,[actual])
+        costs['gas_estimate_proxy']={'setExiting':10**9}
+        O.verify_measurement_receipts(costs,[actual])
         costs['gas_estimate_proxy']={'setExiting':74659}
         with self.assertRaisesRegex(ValueError,'understates receipt estimate'):
             O.verify_measurement_receipts(costs,[actual])
