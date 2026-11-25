@@ -38,7 +38,8 @@ RPC_URL=https://mainnet.gateway.tenderly.co \
   FORGE_WALLET_ARGS="--sender <existing-deployment-address>" \
   script/deploy.sh deploy/manager-factory.json --target manager
 python3 script/release.py manager-package broadcast/Deploy.s.sol/1/dry-run/run-latest.json
-python3 script/release.py manager-create <predicted-factory> <individual-owner> <funding-wei>
+python3 script/release.py manager-create <predicted-factory> <individual-owner> <funding-wei> \
+  > deploy/manager-create-unsigned.json
 ```
 
 There is no `--broadcast` in the public command. The package contains unsigned calldata only.
@@ -101,9 +102,12 @@ and reorganization. Leaving exit mode does not automatically resume listings.
 
 ## Validation and acceptance
 
-The corrected source is `1bbe54c94eed34818d5e2c7ccd95d5f83a892b90`. Its current proof consists of
-the R2 receipt rehearsal and gas calibration, 43 funding-trace steps, the focused verification
-packet and independent review. Incoming fees and returned principal refill their full protected
+The corrected Solidity source is `1bbe54c94eed34818d5e2c7ccd95d5f83a892b90`. Its current proof includes
+the R2 closeout, 69 baseline Osaka observations (53 distinct hashes), 43 corrected-candidate
+observations (29 distinct hashes), authenticated
+fresh renewal and explicit reuse, paid listing sizes 1/3/8, the current production-image manager-only
+rehearsal, 43 funded plus 32 historical accounting steps, and independent source/calibration review.
+See `docs/receipts/manager-operating-verification.md` for exact revisions, commands and limits. Incoming fees and returned principal refill their full protected
 cash hold before becoming spendable. These changes invalidate prior source-specific acceptance;
 an earlier approval or signature does not authorize this code.
 
@@ -124,8 +128,15 @@ Owner, creator and keeper cash flows must be stated separately with every direct
 
 After final evidence is ready, regenerate the manager manifest and prepare a fresh unsigned
 package through the same target-manager deployment path. This preparation grants no live
-approval, public broadcast, settings change, cutover or merge. The final bounded scorecard supplies actual receipt losses and declared quote sensitivities. It does not demonstrate acceptable full-period returns, and production launch is not recommended. Billed authenticated renewal, standalone harvesting and variable paid sync/list curves remain explicit evidence gaps.
+approval, public broadcast, settings change, cutover or merge. The earlier bounded scorecard remains historical single-cycle evidence. The new recorded-period assessment is `docs/receipts/manager-operating-economics.md`; its frozen inputs and all completed or incomplete exits must be read together. Billed authenticated single-pack renewal, standalone harvesting and listing sizes 1/3/8 are measured. The corrected gas allowances also pass all twelve one-work ordinary execution cases and a zero-budget owner exit. Larger sync and fresh-renewal batches remain unmeasured, and curve/work-allowance costs outside those samples remain explicit estimates. This package grants no production recommendation or acceptance.
 
 Things that don't make sense until evaluated: an idle manager's creation funding can be below the
 productive opening threshold; increasing permission supplies no ETH; one finite renewal float does
 not cover an arbitrary acquisition burst. These are visible waits, not a return promise.
+
+Recorded focused candidate rehearsal command: `CANDIDATE_RUN=1 /Users/dd/.pyenv/versions/3.11.8/bin/python keeper/rehearse_manager_calibration.py --execute --port <new-free-port>`.
+Its existing receipt path is protected against overwrite. Reproduction requires an isolated
+checkout with the existing candidate outputs preserved and archived before execution; the helper
+does not accept a different output directory. Historical R2/baseline reproduction uses the named
+original revision and configuration. Do not replace their evidence with current settings. The current
+scorecard and corrected full-period assessment are separate from those historical receipts.

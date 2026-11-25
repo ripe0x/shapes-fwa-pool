@@ -1,8 +1,8 @@
 {
  "name": "Main pool individual manager closeout",
  "deployment_target": "manager",
- "status": "UNSIGNED_ENGINEERING_CLOSEOUT_NO_PRODUCTION_RECOMMENDATION",
- "manifest_sha256": "6cd38abe208c41b765fbe9fbb28208e62ac6b706060f86afedfae587fc9928a0",
+ "status": "UNSIGNED_MANAGER_ENGINEERING_COMPLETE_ECONOMICS_UNACCEPTED",
+ "manifest_sha256": "01da18a8a8d4192f0dcb34b6512298022b29dca2a63ce87aa81b4d2abe041d38",
  "signature": null,
  "release_ready": false,
  "authorization": "Manager closeout implementation, isolated validation and draft PR updates only. No public transactions, production mint-fee changes, live cutover or merges.",
@@ -10,12 +10,12 @@
  "pooled_vault_return_gate_applied_to_manager": false,
  "manager_values": "deploy/manager.json",
  "economic_inputs_approved_for_production": false,
- "note": "Manager engineering has focused real-counterparty funding checks, 43-step accounting replay and 23 actual local closeout receipts. The final bounded scorecard reports actual owner/keeper/creator cash and quoted cycle costs. The interrupted agent-selected Monte Carlo campaigns remain incomplete and are not a completion requirement. No full-period profitability or acceptable production return is established. No owner acceptance/signature, public signing or release approval is recorded. Authenticated billed renewal, standalone harvest and variable paid-operation gas remain explicit gaps.",
+ "note": "Manager-only engineering, corrected small-work keeper quotes, owner-paid zero-budget exit, ABI/default integration and unsigned preparation are complete within the recorded scope. Corrected actual execution has 43 branched receipt observations and 14 CLI runs; 73 focused Python tests, 14 app tests and 43 funded plus 32 historical accounting steps pass. The corrected 960-case study has 957 complete exits including all 480 cases at 0.21 ETH backing; three hypothetical 0.03 ETH cases retain assets at the stated cap. Positive conditional means do not establish production viability. Large losses, reserve below maximum need, larger-sync/multiple-renewal measurement gaps and signing/public-service limitations remain. No owner acceptance/signature or public authority is granted.",
  "implementation_revision": "1bbe54c94eed34818d5e2c7ccd95d5f83a892b90",
- "app_revision": "1330b18ee3bb38b85e9439b3c7213ac37fc9f1d8",
+ "app_revision": "f037af2",
  "engineering_acceptance": false,
  "manager_return_hurdle": null,
  "production_recommendation": false,
- "engineering_status": "IMPLEMENTED_WITH_FOCUSED_EVIDENCE",
- "economic_assessment": "BOUNDED_RECEIPT_AND_QUOTED_CYCLE_SCORECARD_NO_FULL_PERIOD_RETURN"
+ "engineering_status": "IMPLEMENTED_WITH_CORRECTED_QUOTE_AND_FOCUSED_VALIDATION",
+ "economic_assessment": "COMPLETE_RECEIPT_CALIBRATED_960_CASE_CONDITIONAL_COHORT"
 }

@@ -153,3 +153,47 @@ The hash intentionally excludes continuously changing balances, block time and b
 - The provisional 0.21 ETH backing, 25 bps uplift bound, renewal float and budget rates need their final completed holder/creator cash-flow comparison at current and isolated half fee. This inventory supplies no acceptance result.
 - The final receipt-calibrated gas coverage and economic scorecard must identify any changed owner outcome limits explicitly. Updating a coefficient is not approval to relax a net depositor-return requirement.
 - The 0.01 ETH deployment seed creates an idle vault; it does not fund the derived first productive position. Production funding and launch economics remain unapproved.
+
+## Manager operating evaluation, 2026-11-25
+
+The manager-only public readback now observes **0.0005 ETH per primary Shape at block 26,492,785**
+(`deploy/manager-mint-fee-observation.json`). The accepted maximum remains 0.001 ETH. No
+production setting was changed. The 0.03 ETH/three-Shape recipe and mask 8 remain selected.
+
+| Setting | Evaluation value | Production status |
+| --- | --- | --- |
+| Pack principal / mint count | 0.03 ETH / 3 | Selected launch recipe; future owner adjustment preserved |
+| Separate FWA backing | 0.21 ETH / 70,000 bps | Provisional evaluated candidate |
+| Renewal mode | FreshAfterAcquisition | Evaluated alongside explicit ReuseReturned |
+| Renewal float | One; 0.2141275 ETH at configured ceiling | Provisional; conservative accepted fee, separate from actual mint spending |
+| Operating reserve | 0.005 ETH | Provisional; below 0.0054805 ETH current maximum-batch need |
+| Routine / essential ceiling | 0.5 / 0.5 gwei | Existing unsigned candidate, not newly approved |
+| Priority allowance / work fee / markup | 0.05 gwei / 0.00002 ETH / 0 bps | Existing unsigned candidate |
+| Routine capacity / daily rate | 0.03 / 0.01 ETH | Permission only, creates no funding |
+| Essential capacity / daily rate | 0.01 / 0.005 ETH | Permission only; owner exits remain separately wallet funded |
+| Evaluation caller exit cap | 0.01 ETH cumulative signed maxima | Local evaluation choice, not a required production cap |
+| Unresolved uplift threshold | 25 bps | Shared-vault pricing input; no manager shares/checkpoint gate |
+| Gas schedule | All 28 fields in `deploy/manager.json` | Owner adjustable; current values independently verified by postflight |
+
+The full setting inventory is the values file, including zero-value fields; the unsigned creation
+calldata includes every scalar and gas coefficient. No factory policy argument or authority over
+previously created managers is added. Numerical calibration stays immediate under each owner.
+Algorithm changes require new code. The recorded-period evaluation keeps initial funding at
+0.5 ETH without topups and compares both renewal modes, 0.21 and hypothetical 0.03 ETH backing,
+three explicitly labeled fee cases, and 0.2/0.5 gwei gas scenarios. Current manager coverage/admission
+rejects 0.03 ETH backing; the protocol-admitted comparison is isolated and cannot be selected for
+production through the current manager. Its returns do not establish a deployable configuration.
+
+At the observed fee, independent arithmetic gives 0.24 ETH principal plus separate backing before
+fees/reserves. One productive Fresh position needs 0.461605 ETH at 0.5 gwei or 0.4610425 ETH at
+0.2 gwei, including actual opening mint fees, quoted initial work, the conservative float and
+reserve, excluding wallet creation gas. Reuse requires no fresh-renewal float; actual productive
+position counts, funding waits, receipts and owner/keeper/creator outcomes are reported in the
+operating assessment rather than inferred from this opening arithmetic.
+
+The measured manager quote repair changes only `gasSchedule.selected=225000`,
+`gasSchedule.synced=285000` and `gasSchedule.list=380000`. All twelve one-work ordinary cases
+cover actual keeper costs at matched 0.2/0.5 gwei, including exact minPay re-estimation. The
+current keeper reserve-need view is 0.0054805 ETH at the 0.5 gwei ceiling; the candidate reserve
+remains 0.005 ETH and the informational warning remains visible. These measured corrections
+are evaluated local defaults, not owner production acceptance or a profit promise.

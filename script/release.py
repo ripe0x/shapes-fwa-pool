@@ -81,11 +81,29 @@ MANAGER_EVIDENCE += ["docs/receipts/manager-keeper-readiness.json", "docs/receip
                      "docs/receipts/manager-operating-model-review.md",
                      "docs/receipts/manager-operating-osaka-receipts.json",
                      "docs/receipts/manager-operating-cost-calibration.json",
+                     "docs/receipts/manager-operating-calibration.md",
+                     "docs/receipts/manager-operating-history-checks.json",
+                     "docs/receipts/manager-operating-unsigned-checks.json",
                      "docs/receipts/manager-operating-verification.md",
                      "docs/receipts/manager-operating-economics.md",
                      "docs/receipts/manager-operating-image.json",
                      "sim/out/manager-operating-assessment/manifest.json",
                      "sim/out/manager-operating-assessment/summary.json"]
+MANAGER_EVIDENCE += ["docs/receipts/manager-baseline-settings.json",
+                     "docs/receipts/manager-operating-baseline-economics.json",
+                     "docs/receipts/manager-operating-baseline-economics.md",
+                     "docs/receipts/manager-operating-baseline-review.md",
+                     "docs/receipts/manager-calibrated-receipts.json",
+                     "docs/receipts/manager-calibrated-cost-calibration.json",
+                     "docs/receipts/manager-calibrated-verification.md",
+                     "docs/receipts/manager-calibrated-review.md",
+                     "docs/receipts/manager-calibrated-checks.json",
+                     "docs/receipts/manager-calibrated-reconciliation.json",
+                     "docs/receipts/manager-calibrated-economics-review.md",
+                     "docs/receipts/manager-calibrated-unsigned-checks.json",
+                     "docs/receipts/manager-operating-economics.json",
+                     "sim/out/manager-calibrated-assessment/manifest.json",
+                     "sim/out/manager-calibrated-assessment/summary.json"]
 
 
 def target_files(target):
