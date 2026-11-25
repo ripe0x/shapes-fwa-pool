@@ -1,0 +1,22 @@
+{
+ "status": "HISTORICAL_UNCALIBRATED_BASELINE",
+ "sourceRevision": "2b9b165",
+ "inputSha256": {
+  "sim/out/manager-operating-assessment/manifest.json": "8ba3482f4146b9d32c276cb8ff13c9d1cf2b9e5a4f6734c099bed5ac13093e34",
+  "sim/out/manager-operating-assessment/paths.jsonl": "de382ba22fc69bf2e7493faffef039cc8fec6052ecaa9ca724ed992fff2212b3",
+  "sim/out/manager-operating-assessment/summary.json": "e595103ee5f54eba54b50dbdf3fa622b931ba80bf62e03f1344ea9165e67aa4e",
+  "docs/receipts/manager-operating-cost-calibration.json": "e954c54974cf97f5d5aed9843df4137ef4be6df37bc05b6eb87a95981ea432af"
+ },
+ "scenarioCount": 960,
+ "qualifiedExits": 960,
+ "maximumSignedExitReservationWei": 9418954550000000,
+ "ownerCashPartitionCheckedForEveryRow": true,
+ "keeperCashPartitionCheckedForEveryRow": true,
+ "creatorCountedOnlyFromPaidMints": true,
+ "productionEconomicValuesApproved": false,
+ "productionRecommendation": false,
+ "publicTransactions": 0,
+ "sharedVaultDeployed": false,
+ "runtimeSeconds": 1739.1584897499997,
+ "settingsSnapshot": "docs/receipts/manager-baseline-settings.json"
+}
