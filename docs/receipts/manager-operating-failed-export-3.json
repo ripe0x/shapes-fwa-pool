@@ -1,0 +1,65 @@
+{
+ "status": "FAIL",
+ "command": [
+  "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+  "keeper/calibrate_manager_operations.py",
+  "--execute",
+  "--port",
+  "18781"
+ ],
+ "transactions": [],
+ "contractSourceSha256": {
+  "src/PackAccount.sol": "18effdf4eeddc1cde3eab969fe7cab29080985c1d4e35b0717cf1b26b15b0af2",
+  "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+  "src/PackVault.sol": "a2c1d7c4d0826722cc5658943a15bf5c5cafd119ff7ff56d35b7b876ce4d2aee",
+  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+  "src/StrategyLib.sol": "9552d8c0b2581287e041a17a6fe9399775f3e37576a25051dff9af1f2f83c7ab",
+  "src/VaultLib.sol": "0b341caa2b97f279d3107963e15e30e35ce0e87e4cc54342a9fd39904f64f75f",
+  "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+ },
+ "scriptSha256": "195c9d59d0c40898a03c2b3ea2e92bf941ff36a7ad9fcfcf28f89af2d00f6795",
+ "publicTransactions": 0,
+ "previousAttempts": [
+  {
+   "path": "docs/receipts/manager-operating-failed-export-1.json",
+   "sha256": "283d63757a1432103b7d510d7f3dbb435fee2371b983522a855799ad5bbb06b6",
+   "log": "docs/receipts/manager-operating-failed-export-1.log",
+   "logSha256": "3ecde7f87a01e31393587bcfe2db46587af1989ae3ad87c214b8540354986dc8"
+  },
+  {
+   "path": "docs/receipts/manager-operating-failed-export-2.json",
+   "sha256": "895183e51c18a12dd553137091c9566bd7d6aa2bb2b62e0c939c16df707f4da8",
+   "log": "docs/receipts/manager-operating-failed-export-2.log",
+   "logSha256": "30684b695921d2bf23da62e38075052b16f0c1ad32c68a0545eab5a2bb36cbbf"
+  }
+ ],
+ "limitations": [
+  "Historical authenticated setup is not billed and is not a production deployment rehearsal.",
+  "Local chain only; purchaser/admin role impersonation uses actual external entry points, never the VRF coordinator.",
+  "One genuinely selected returned pack; multi-pack fresh renewal is not measured."
+ ],
+ "export": {
+  "command": [
+   "forge",
+   "test",
+   "--match-path",
+   "test/fork/ManagerOperationsCheckpoint.t.sol",
+   "--match-test",
+   "test_exportAuthenticatedAllocatedCheckpoint",
+   "--rpc-url",
+   "https://mainnet.gateway.tenderly.co",
+   "--fork-retries",
+   "30",
+   "--fork-retry-backoff",
+   "5000",
+   "--compute-units-per-second",
+   "100",
+   "-vv"
+  ],
+  "exitStatus": 1,
+  "elapsedSeconds": 12.343721624929458,
+  "log": "docs/receipts/manager-operating-export.log",
+  "logSha256": "ee5ee2ca1c95e829f3122498c9a14b4945f5e22e04efb02e4dec9233e3054d5a"
+ }
+}
