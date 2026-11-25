@@ -123,8 +123,132 @@ class ManagerAccountingTest(unittest.TestCase):
             foreign_pool_weight=1.,exempt=True,gwei=.15,deposit_wei=5*10**17,mint_fee_wei=10**15,
             exit_all=True,exit_days=1,user_gas_proxy=costs['gas_proxy'],holder_rescue_sync=True,
             self_serve_exits=True,user_gas_estimate_proxy=estimates)
+        operating_days=overrides.pop('operating_days',1)
         sc.update(overrides)
-        return F.run(sc,1,1,days=1,values=values)
+        return F.run(sc,1,1,days=operating_days,values=values)
+
+    def test_count_aware_receipt_floor_prices_one_and_eight_items_separately(self):
+        import forward as F
+        # Pure gas arithmetic, not a successful response from any external service.
+        curves={'list':dict(single_billed_gas=300000,single_estimate_gas=400000,
+            billed_per_extra_work=100000,estimate_per_extra_work=150000)}
+        self.assertEqual(F.receipt_gas(curves,'list',1,250000,legacy_floor=1000000),300000)
+        self.assertEqual(F.receipt_gas(curves,'list',8,250000,legacy_floor=1000000),1000000)
+        self.assertEqual(F.receipt_gas(curves,'list',1,estimate=True),400000)
+        self.assertEqual(F.receipt_gas(curves,'list',8,estimate=True),1450000)
+        self.assertEqual(F.receipt_gas(curves,'list',8,2000000),2000000)
+        self.assertEqual(F.receipt_gas({},'list',1,250000,legacy_floor=1000000),1000000)
+        for count in (0,9,True,1.5):
+            with self.subTest(count=count),self.assertRaises(ValueError):F.receipt_gas(curves,'list',count)
+        with self.assertRaises(ValueError):F.receipt_gas(curves,'build',1)
+
+    def test_unpaid_foreign_tail_costs_physical_reads_and_preflights_owner_cap(self):
+        import forward as F
+        from formal import window, PIN, flatten
+        root=Path(__file__).resolve().parent.parent
+        recorded=window(root/'sim/data/fwa.sqlite',PIN['timestamp'])
+        days={}
+        for request,completion,payload in recorded['pairs']:
+            day=request//F.DAY
+            if request-day*F.DAY>60 and not payload[0] and completion-request<F.DAY:
+                days.setdefault(day,[]).append((request,completion,payload))
+        day,pairs=next((day,pairs[:127]) for day,pairs in sorted(days.items()) if len(pairs)>=127)
+        events=flatten([(request-day*F.DAY,completion-day*F.DAY,payload) for request,completion,payload in pairs])
+        operating_days=max(completion-day*F.DAY for _,completion,_ in pairs)//F.DAY+1
+        values=json.loads((root/'deploy/manager.json').read_text())
+        values['gasSchedule']['scan']=10000000
+        # Explicitly fund the estimate-based single-build quote; the unpaid tail remains rewardless.
+        values['workFeeWei']=100000000000000
+        values['routineCapWei']=575000000000000
+        values['routineRatePerDayWei']=0
+        costs=json.loads((root/'docs/receipts/manager-r2-cost-calibration.json').read_text())
+        actual=json.loads((root/costs['receipts']).read_text())
+        signed={t['transaction']['hash']:int(t['transaction']['gas'],0) for t in actual['transactions']}
+        estimates={op:max(signed[s['hash']] for s in samples) for op,samples in costs['measurements'].items()}
+        for op,alias in {'recover_sync':'recover','unlist':'recoverUnlist','liquidate':'recoverLiquidate'}.items():
+            estimates[op]=estimates[alias]
+        estimates['build']=signed[costs['measurements']['build'][0]['hash']]
+        # Only single-item calls occur here; these are actual receipt baselines, not batch extrapolations.
+        curves={op:dict(single_billed_gas=costs['gas_proxy'][op],single_estimate_gas=estimates[op],
+            billed_per_extra_work=0,estimate_per_extra_work=0) for op in
+            ('create','build','setExiting','recover_sync','unlist','liquidate','withdraw')}
+        def run(cap):
+            trace=[]
+            sc=F.Scenario(manager=True,volume=F.const(0),timed=True,start_timestamp=recorded['start']+day*F.DAY,
+                poll_seconds=60,receipt_seconds=36,replay_events=events,replay_period_seconds=(operating_days+3)*F.DAY,
+                foreign_pool_weight=1.,exempt=True,gwei=.15,deposit_wei=5*10**17,mint_fee_wei=10**15,
+                exit_all=True,exit_days=1,user_gas_proxy=costs['gas_proxy'],gas_curves=curves,
+                holder_rescue_sync=True,self_serve_exits=True,manager_keeper_zero_loss=True,
+                owner_exit_spend_limit_wei=cap,trace_sink=trace)
+            return F.run(sc,1,1,days=operating_days,values=values),trace
+        result,trace=run(10**16)
+        self.assertEqual(result['selections'],0)
+        self.assertEqual(result['keeper_paid_build_wei'],575000000000000)
+        self.assertEqual(result['operation_end_routine_budget_wei'],0)
+        self.assertEqual(result['operation_end_backlog'],127)
+        sync=next(t for t in trace if t['action']=='sync')
+        self.assertEqual(sync['sync_payment_gas'],0)
+        self.assertEqual(sync['sync_physical_work_gas'],2919000)
+        self.assertEqual(result['keeper_paid_sync_wei'],0)
+        self.assertEqual(result['owner_zero_quote_sync_calls'],1)
+        self.assertEqual(result['owner_exit_spent_wei'],779232400000000)
+        self.assertTrue(result['exit_complete'])
+        stopped,_=run(5*10**14)
+        self.assertEqual(stopped['owner_calls_sync'],0)
+        self.assertEqual(stopped['journal_backlog'],127)
+        self.assertEqual(stopped['end_open_positions'],1)
+        self.assertFalse(stopped['exit_complete'])
+        wait=stopped['first_wait_observation']['EXIT_SPEND_LIMIT']
+        self.assertEqual(wait['operation'],'sync')
+        self.assertEqual(wait['next_signed_bound_wei'],1277062500000000)
+        self.assertEqual(stopped['owner_exit_reserved_wei'],32663750000000)
+
+    def test_acceptance_covers_billed_curve_when_affine_estimates_cross(self):
+        import forward as F
+        from keeper import profitability_gate
+        # Envelopes from n1(100/150), n2(300/301), n8(800/801) billed/estimated gas.
+        curves={'list':dict(single_billed_gas=100,single_estimate_gas=150,
+            billed_per_extra_work=200,estimate_per_extra_work=151)}
+        self.assertEqual(F.receipt_gas(curves,'list',3),500)
+        self.assertEqual(F.receipt_gas(curves,'list',3,estimate=True),452)
+        acceptance=F.receipt_acceptance_gas(curves,'list',3)
+        self.assertEqual(acceptance,500)
+        self.assertFalse(profitability_gate(acceptance,1,475,0,0,0,ratio=1.)[2])
+        self.assertTrue(profitability_gate(acceptance,1,510,0,0,0,ratio=1.)[2])
+        self.assertEqual(F.receipt_acceptance_gas(curves,'list',3,600),600)
+
+    def test_estimated_acceptance_can_decline_a_profitable_billed_build(self):
+        root=Path(__file__).resolve().parent.parent
+        costs=json.loads((root/'docs/receipts/manager-r2-cost-calibration.json').read_text())
+        actual=json.loads((root/costs['receipts']).read_text())
+        signed={t['transaction']['hash']:int(t['transaction']['gas'],0) for t in actual['transactions']}
+        estimates={op:max(signed[s['hash']] for s in samples) for op,samples in costs['measurements'].items()}
+        for op,alias in {'recover_sync':'recover','unlist':'recoverUnlist','liquidate':'recoverLiquidate'}.items():
+            estimates[op]=estimates[alias]
+        # The single-pack signed gas limit is a conservative upper for its unavailable raw estimate.
+        estimates['build']=signed[costs['measurements']['build'][0]['hash']]
+        curves={op:dict(single_billed_gas=costs['gas_proxy'][op],single_estimate_gas=estimates[op],
+            billed_per_extra_work=0,estimate_per_extra_work=0) for op in
+            ('create','build','setExiting','recover_sync','unlist','liquidate','withdraw')}
+        result=self.quiet_with_costs(gas_curves=curves,manager_keeper_zero_loss=True,
+            owner_exit_spend_limit_wei=10**16)
+        payment=415000000000000
+        self.assertEqual(costs['gas_proxy']['build']*200000000,384983200000000)
+        self.assertLess(costs['gas_proxy']['build']*200000000,payment)
+        self.assertGreater(estimates['build']*200000000,payment)
+        self.assertEqual(result['keeper_calls_build'],0)
+        self.assertEqual(result['creator_primary_fees_accrued_wei'],0)
+        self.assertEqual(result['keeper_gas_proxy_cost_wei'],0)
+        self.assertEqual(result['owner_withdrawn_wei'],5*10**17)
+        self.assertGreater(result['keeper_loss_waits'],0)
+        # At an explicit0basefee/0.05gwei tip the same estimate fits; ledger charges the actual bill.
+        accepted=self.quiet_with_costs(gwei=0,gas_curves=curves,manager_keeper_zero_loss=True,
+            owner_exit_spend_limit_wei=10**16)
+        self.assertEqual(accepted['keeper_calls_build'],1)
+        self.assertEqual(accepted['keeper_compensation_wei'],133750000000000)
+        self.assertEqual(accepted['keeper_gas_proxy_cost_wei'],96245800000000)
+        self.assertEqual(accepted['keeper_net_proxy_wei'],37504200000000)
+        self.assertTrue(accepted['exit_complete'])
 
     def test_runtime_signed_exit_cap_completes_quiet_round_trip(self):
         result=self.quiet_with_costs(owner_exit_spend_limit_wei=10**16,manager_keeper_zero_loss=True)

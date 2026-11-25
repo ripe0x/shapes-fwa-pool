@@ -74,6 +74,18 @@ MANAGER_EVIDENCE += ["sim/manager_closeout.py", "sim/test_manager_closeout.py", 
                      "docs/receipts/manager-final-live-observation.json", "docs/receipts/manager-closeout-review.md",
                      "docs/receipts/manager-final-verification.md"]
 MANAGER_EVIDENCE += MANAGER_COMPATIBILITY_EVIDENCE
+MANAGER_EVIDENCE += ["docs/receipts/manager-keeper-readiness.json", "docs/receipts/manager-keeper-readiness.md",
+                     "docs/receipts/manager-operating-live-observation.json",
+                     "docs/receipts/manager-operating-min-backing-continuity.json",
+                     "docs/receipts/manager-operating-reconciliation.json",
+                     "docs/receipts/manager-operating-model-review.md",
+                     "docs/receipts/manager-operating-osaka-receipts.json",
+                     "docs/receipts/manager-operating-cost-calibration.json",
+                     "docs/receipts/manager-operating-verification.md",
+                     "docs/receipts/manager-operating-economics.md",
+                     "docs/receipts/manager-operating-image.json",
+                     "sim/out/manager-operating-assessment/manifest.json",
+                     "sim/out/manager-operating-assessment/summary.json"]
 
 
 def target_files(target):

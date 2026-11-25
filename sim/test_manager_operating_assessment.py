@@ -17,7 +17,8 @@ def partition():
         unharvested_listing_fees_wei=0,fees_received_wei=20,backing_lost_wei=39,settlement_fees_wei=0,
         waiting_observations={},randomness_mode='request-keyed-v1',request_events_sha256='pure-accounting-example',
         unknown_owner_gas_calls=0,keeper_unmeasured_operations=[],owner_total_value_before_gas_wei=O.CAPITAL-30,
-        owner_exit_reserved_wei=10,owner_exit_spent_wei=7,owner_exit_spend_limit_wei=100,keeper_zero_loss_enabled=True)
+        owner_exit_reserved_wei=10,owner_exit_spent_wei=7,owner_exit_spend_limit_wei=100,keeper_zero_loss_enabled=True,
+        count_aware_gas_curves_enabled=True,physical_sync_cost_basis_enabled=True,keeper_estimate_acceptance_enabled=True)
 
 
 class OperatingAssessmentTests(unittest.TestCase):
@@ -86,6 +87,42 @@ class OperatingAssessmentTests(unittest.TestCase):
         self.assertTrue(all(at<2*O.F.DAY for at,kind,_ in events if kind=='request'))
         self.assertTrue(all((w['start']+at)%O.F.OperatingClock.INTERVAL<O.F.OperatingClock.BLACKOUT_START
                             for at,kind,_ in events if kind=='request'))
+
+    def test_complete_curve_envelope_covers_each_recorded_work_count(self):
+        # Independent integer examples for packet qualification; no RPC response is fabricated.
+        samples={op:[dict(workCount=1,gasUsed=100,gasEstimate=150,estimateKind='rpc-estimate')] for op in O.REQUIRED_GAS}
+        curves={op:dict(single_billed_gas=100,single_estimate_gas=150,
+            billed_per_extra_work=0,estimate_per_extra_work=0) for op in O.REQUIRED_GAS}
+        samples['list'].append(dict(workCount=8,gasUsed=800,gasEstimate=1000,estimateKind='rpc-estimate'))
+        curves['list'].update(billed_per_extra_work=100,estimate_per_extra_work=122)
+        packet=dict(measurements=samples,gas_curves=curves)
+        samples['list'].append(dict(workCount=1,gasUsed=99,gasEstimate=10000,estimateKind='signed-limit-upper'))
+        O.verify_gas_curves(packet)
+        self.assertEqual(len(O.estimate_samples(samples['list'])),2)
+        self.assertEqual(O.F.receipt_gas(curves,'list',1),100)
+        self.assertEqual(O.F.receipt_gas(curves,'list',8),800)
+        self.assertEqual(O.F.receipt_gas(curves,'list',8,estimate=True),1004)
+        curves['list']['estimate_per_extra_work']=121
+        with self.assertRaisesRegex(ValueError,'complete recorded sample envelope'):O.verify_gas_curves(packet)
+        curves['list']['estimate_per_extra_work']=122
+        samples['list'][1]['workCount']=9
+        with self.assertRaises(ValueError):O.verify_gas_curves(packet)
+
+    def test_rpc_estimate_requires_rpc_single_baseline_and_real_raw_field(self):
+        with self.assertRaisesRegex(ValueError,'single-work baseline'):
+            O.estimate_samples([dict(workCount=1,estimateKind='signed-limit-upper'),
+                                dict(workCount=8,estimateKind='rpc-estimate')])
+        costs=json.loads((O.ROOT/'docs/receipts/manager-r2-cost-calibration.json').read_text())
+        actual=json.loads((O.ROOT/costs['receipts']).read_text())
+        signed={t['transaction']['hash']:int(t['transaction']['gas'],0) for t in actual['transactions']}
+        costs['gas_curves']={'create':{}}
+        for sample in costs['measurements']['create']:
+            sample['estimateKind']='signed-limit-upper'
+            sample['gasEstimate']=signed[sample['hash']]
+        O.verify_measurement_receipts(costs,[actual])
+        costs['measurements']['create'][0]['estimateKind']='rpc-estimate'
+        with self.assertRaisesRegex(ValueError,'raw RPC estimate'):
+            O.verify_measurement_receipts(costs,[actual])
 
     def test_old_cost_packet_cannot_be_promoted_to_final_operating_evidence(self):
         costs=json.loads((O.ROOT/'docs/receipts/manager-r2-cost-calibration.json').read_text())

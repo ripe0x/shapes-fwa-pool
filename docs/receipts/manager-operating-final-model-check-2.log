@@ -1,0 +1,151 @@
+{
+ "status": "PASS",
+ "command": [
+  "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+  "sim/manager_reconcile.py",
+  "--funded",
+  "--output",
+  "docs/receipts/manager-operating-reconciliation.json"
+ ],
+ "source_sha256": {
+  "sim/manager.py": "901e776456b46b501af574562b41ac4f1b0e94f0e8edd3e6d5464e0a62a34a01",
+  "sim/vault.py": "4f22da5672c1d078c837c27252f068a7761541077616bafced1495830ffb1390",
+  "sim/forward.py": "777a8c24ffb9d41f34e24d022f633ab8fbb27c4ddd442c8bda6ce1c689c13889",
+  "keeper/policy.py": "42a40400cee6acd7ad1b3342548bd5f0754d11636a9b890118caa346bd4f219a",
+  "keeper/config.py": "39acb35f93fb64916dd4c8c8ab64da76742ec8c8b1c90902c9c1b014a6a22f06",
+  "sim/manager_reconcile.py": "608cc8680c39ae885920d314944daa08b1d6bc0d4ce4bb3dbc04c3f266b6740a"
+ },
+ "results": [
+  {
+   "trace": "sim/out/manager-half-eth-float-wait-trace.jsonl",
+   "trace_sha256": "8e58a39482b85b225e595262b6d891cf0dd37703b67656e301df901669a7fe17",
+   "steps": 10,
+   "status": "PASS",
+   "failures": [],
+   "funding_checks": [
+    {
+     "step": "allocationApplied",
+     "claimed": [],
+     "receivedWei": 0,
+     "paymentWei": 65400000000000
+    }
+   ],
+   "verified_rejections": 1,
+   "owner_withdrawn_wei": 0,
+   "keeper_paid_wei": 967400000000000,
+   "gross_primary_fees_accrued_wei": 6000000000000000,
+   "external_fee_income_wei": 0,
+   "final_balance_wei": 43032600000000000,
+   "keeper_cash_wei": 0,
+   "renewal_cash_wei": 38032600000000000,
+   "actual_mint_fee_wei": 1000000000000000,
+   "scope": "New current-source funding boundary proof; no billed wallet gas or return forecast"
+  },
+  {
+   "trace": "sim/out/manager-sync-funding-deficit-trace.jsonl",
+   "trace_sha256": "2958012ef9a39a6268c5be73a767a2b85468e3305a9f02b772bfaa6f6d9e9f46",
+   "steps": 17,
+   "status": "PASS",
+   "failures": [],
+   "funding_checks": [
+    {
+     "step": "twoFeePrefixPaid",
+     "claimed": [
+      91952,
+      91953
+     ],
+     "receivedWei": 243481167059822,
+     "paymentWei": 1200000001
+    }
+   ],
+   "verified_rejections": 1,
+   "owner_withdrawn_wei": 1082258778427230925,
+   "keeper_paid_wei": 2905001200000001,
+   "gross_primary_fees_accrued_wei": 21000000000000000,
+   "external_fee_income_wei": 292149819215885,
+   "final_balance_wei": 214128370191764959,
+   "keeper_cash_wei": 60870191764956,
+   "renewal_cash_wei": 209128370191764959,
+   "actual_mint_fee_wei": 1000000000000000,
+   "scope": "New current-source funding boundary proof; no billed wallet gas or return forecast"
+  },
+  {
+   "trace": "sim/out/manager-renewal-reserve-deficit-trace.jsonl",
+   "trace_sha256": "b8efa3ef59050de6ddc0801b068cfac883f849095120ad9d4e0924323346ec40",
+   "steps": 16,
+   "status": "PASS",
+   "failures": [],
+   "funding_checks": [],
+   "verified_rejections": 1,
+   "owner_withdrawn_wei": 1295094999999780000,
+   "keeper_paid_wei": 2905000000000000,
+   "gross_primary_fees_accrued_wei": 21000000000000000,
+   "external_fee_income_wei": 0,
+   "final_balance_wei": 1000000000000000,
+   "keeper_cash_wei": 0,
+   "renewal_cash_wei": 0,
+   "actual_mint_fee_wei": 1000000000000000,
+   "scope": "New current-source funding boundary proof; no billed wallet gas or return forecast"
+  }
+ ],
+ "limits": [
+  "NewA/B/C traces use actual historical0.001mintfee and executed0.15base/0.2gwei; no current-fee return inference.",
+  "A proves actual0.5ETH opening\u2192paidfreshrenewal\u2192floatcashdeficit and rejection without new work; no second authenticated paid progress is supplied.",
+  "B proves a positive-minimum one-claim rejection and first truly funded two-fee prefix, using explicitly cheap owner gas calibration; no keeper profitability claim.",
+  "C proves genuine modest credit/fees cannot fund the enlarged reserve plus retirement/rebuild, preserving every bucket atomically; a fundable below-reserve case is not reached.",
+  "External FWA earnings records, accumulator floors, live admission/claim debt and completion prefix are observed inputs; account financial buckets are replayed independently.",
+  "Actual wallet billed gas remains a separate current-source receipt calibration. Idle inventory aggregate value/count are compared; per-pack custody assertions belong to the real trace writer."
+ ],
+ "historical_compatibility_results": [
+  {
+   "trace": "sim/out/manager-fresh-trace.jsonl",
+   "trace_sha256": "b05ca04a2cbc551e2e42aca713c51a3fae5522dd443395b206bece1d61647e5f",
+   "steps": 16,
+   "status": "PASS",
+   "failures": [],
+   "owner_withdrawn_wei": 783057722058121371,
+   "keeper_paid_wei": 967400000000000,
+   "gross_primary_fees_accrued_wei": 6000000000000000,
+   "external_fee_income_wei": 25122058121371,
+   "backing_lost_wei": 210000000000000000,
+   "final_balance_wei": 0,
+   "renewal_mode": 0,
+   "actual_mint_fee_wei": 1000000000000000
+  },
+  {
+   "trace": "sim/out/manager-reuse-trace.jsonl",
+   "trace_sha256": "cd964fdb30d02675c70a99566e81d22f04bc28edd95e1e06dc4d8b20e5fa1d87",
+   "steps": 16,
+   "status": "PASS",
+   "failures": [],
+   "owner_withdrawn_wei": 786303722058121371,
+   "keeper_paid_wei": 721400000000000,
+   "gross_primary_fees_accrued_wei": 3000000000000000,
+   "external_fee_income_wei": 25122058121371,
+   "backing_lost_wei": 210000000000000000,
+   "final_balance_wei": 0,
+   "renewal_mode": 1,
+   "actual_mint_fee_wei": 1000000000000000
+  }
+ ],
+ "historical_compatibility_scope": "Original32historicalsteps retained separately; not new funding-deficit money proof or current billed receipts.",
+ "contract_source_sha256": {
+  "src/PackAccount.sol": "18effdf4eeddc1cde3eab969fe7cab29080985c1d4e35b0717cf1b26b15b0af2",
+  "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+  "src/PackVault.sol": "a2c1d7c4d0826722cc5658943a15bf5c5cafd119ff7ff56d35b7b876ce4d2aee",
+  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+  "src/StrategyLib.sol": "9552d8c0b2581287e041a17a6fe9399775f3e37576a25051dff9af1f2f83c7ab",
+  "src/VaultLib.sol": "0b341caa2b97f279d3107963e15e30e35ce0e87e4cc54342a9fd39904f64f75f",
+  "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+ },
+ "trace_writer_sha256": {
+  "test/fork/ForkManagerFundingDeficit.t.sol": "c40367824d37d4bfcc43ddebf0adf1f22650c5b4e0710f05cb061cb2cb1f0fa2"
+ },
+ "compiled_runtime_object_sha256": {
+  "PackManager": "3e45445388acecb6d8ff29e7bd69423de81c6ab192a522eed5246d6dc030917c",
+  "VaultLib": "f72501aaed682724b546f8cf554ddc4a5d0457191837874a440cbae4791fe37a",
+  "StrategyLib": "b7ddddacd826a2a493bfd90c65ee1027ff7c8c684c5a7a4d1b5810e478a022a3",
+  "ScanLib": "78ab9c88856152b8c00cc4880a2d4bc0013f738f2aaed84e79db839a29b35c0c"
+ }
+}
