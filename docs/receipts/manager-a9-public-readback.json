@@ -1,0 +1,125 @@
+{
+  "readOnly": true,
+  "rpc": "https://mainnet.gateway.tenderly.co",
+  "block": 26494440,
+  "blockHash": "0xc840f9461c7810536b7fa93177be0ac75850af21344263a659964bbac8c5e71c",
+  "timestamp": 1795636739,
+  "signer": "0xCB43078C32423F5348Cab5885911C3B5faE217F9",
+  "signerNonce": {
+    "supported": true,
+    "result": "4180",
+    "error": null
+  },
+  "signerBalance": {
+    "supported": true,
+    "result": "177340214562578704",
+    "error": null
+  },
+  "mintFeeWei": {
+    "supported": true,
+    "result": "500000000000000 [5e14]",
+    "error": null
+  },
+  "newFactoryCode": {
+    "supported": true,
+    "result": "0x",
+    "error": null
+  },
+  "legacyVault": {
+    "address": "0x9aBbF7835240dE0dAfC7d2e512E6dA15eb0D0b46",
+    "balance": {
+      "supported": true,
+      "result": "10000000000000000",
+      "error": null
+    },
+    "reads": {
+      "owner": {
+        "supported": true,
+        "result": "0xCB43078C32423F5348Cab5885911C3B5faE217F9",
+        "error": null
+      },
+      "pendingDepositTotal": {
+        "supported": true,
+        "result": "0",
+        "error": null
+      },
+      "lockedShares": {
+        "supported": true,
+        "result": "0",
+        "error": null
+      },
+      "redemptionReserve": {
+        "supported": true,
+        "result": "0",
+        "error": null
+      },
+      "distributionReserve": {
+        "supported": true,
+        "result": "0",
+        "error": null
+      },
+      "claimableTotal": {
+        "supported": true,
+        "result": "0",
+        "error": null
+      },
+      "processingPool": {
+        "supported": true,
+        "result": "0",
+        "error": null
+      },
+      "openListingCount": {
+        "supported": true,
+        "result": "0",
+        "error": null
+      },
+      "idlePackCount": {
+        "supported": true,
+        "result": "0",
+        "error": null
+      },
+      "recoveryPackCount": {
+        "supported": true,
+        "result": "0",
+        "error": null
+      },
+      "feeCredit": {
+        "supported": true,
+        "result": "0",
+        "error": null
+      }
+    }
+  },
+  "oldFactory": {
+    "address": "0x0b436fff393879aae6dbdf118e9c631974731b64",
+    "managerCount": {
+      "supported": true,
+      "result": "0",
+      "error": null
+    }
+  },
+  "dependencies": {
+    "fwa": {
+      "address": "0x958C41181182e76F221331b2755b77D9e1426A98",
+      "supported": true,
+      "runtimeBytes": 24390,
+      "runtimeSha256": "20d0ec8fcea735357da6487d821e678a93232f4e867161682e21fadd36c2ba8e",
+      "error": null
+    },
+    "shapes": {
+      "address": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+      "supported": true,
+      "runtimeBytes": 22460,
+      "runtimeSha256": "3e666d62f32c901aee8b15a9fea1682eba7278b671e608935cd34ec8a81d6539",
+      "error": null
+    },
+    "packs": {
+      "address": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+      "supported": true,
+      "runtimeBytes": 17715,
+      "runtimeSha256": "ebfaebd182f0366d571ea7bbfe0ac526b169c2a8e45112a9a97a5e7b590f214b",
+      "error": null
+    }
+  },
+  "publicTransactions": 0
+}

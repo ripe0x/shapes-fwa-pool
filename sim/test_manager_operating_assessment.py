@@ -23,9 +23,10 @@ def partition():
 
 class OperatingAssessmentTests(unittest.TestCase):
     def test_fixed_design_covers_requested_cross_product_and_stress_cases(self):
-        self.assertEqual(len(O.CELLS),12)
-        self.assertEqual({c['mint_fee_wei'] for c in O.CELLS},{250000000000000,500000000000000,1000000000000000})
-        self.assertEqual({c['backing_bps'] for c in O.CELLS},{10000,70000})
+        self.assertEqual(len(O.CELLS),8)
+        self.assertEqual({c['mint_fee_wei'] for c in O.CELLS},{500000000000000,1000000000000000})
+        self.assertEqual({c['backing_bps'] for c in O.CELLS},{70000})
+        self.assertEqual({c['reserve_wei'] for c in O.CELLS},{5000000000000000,6000000000000000})
         self.assertTrue(all('renewal_mode' not in cell for cell in O.CELLS))
         frozen=dict(buyer_regimes=['observed-choices','forced-responsive-bid-stress'],
             windows=[dict(id='first',seeds=[10,11]),dict(id='second',seeds=[12,13])])
@@ -148,8 +149,8 @@ class OperatingAssessmentTests(unittest.TestCase):
         samples['sync'][0].update(gasAllowance=372000,workUnits=0)
         samples['recover'][0]['verifiedContext']=dict(gasAllowance=372000,workUnits=0,pairedPaidHash='arithmetic-only')
         costs.update(fullGasSchedule={'sync':1},
-            sync_contexts={'372000:0':dict(single_billed_gas=100,single_estimate_gas=150,measured_gas=80)},
-            owner_sync_contexts={'372000:0':dict(single_billed_gas=200,single_estimate_gas=250)})
+            sync_contexts={'372000:0:1':dict(billed_gas=100,estimate_gas=150,measured_gas=80)},
+            owner_sync_contexts={'372000:0:1':dict(billed_gas=200,estimate_gas=250)})
         O.qualify_costs(costs,True)
         self.assertEqual(O.F.receipt_gas(curves,'unlist',1,999999),100)
         self.assertEqual(O.F.receipt_gas(O.owner_curves(costs),'unlist',1),200)
@@ -165,8 +166,10 @@ class OperatingAssessmentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'actual work meter'):O.qualify_costs(bad,True)
 
     def test_sync_contexts_cannot_reuse_terminal_receipts_for_foreign_tails(self):
-        contexts={'455000:1':dict(single_billed_gas=100,single_estimate_gas=150,measured_gas=80)}
+        contexts={'455000:1:1':dict(billed_gas=100,estimate_gas=150,measured_gas=80),
+                  '1005000:1:2':dict(billed_gas=350,estimate_gas=400,measured_gas=300)}
         self.assertEqual(O.F.sync_context_gas(contexts,455000,1)['measured_gas'],80)
+        self.assertEqual(O.F.sync_context_gas(contexts,1005000,1,2)['billed_gas'],350)
         for allowance,units,count in ((2919000,0,1),(455000,1,2),(455000,0,1)):
             with self.subTest(allowance=allowance,units=units,count=count),self.assertRaisesRegex(ValueError,'unmeasured sync context'):
                 O.F.sync_context_gas(contexts,allowance,units,count)
@@ -184,15 +187,15 @@ class OperatingAssessmentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'paired-state provenance'):O.verify_measurement_receipts(changed,packets)
         changed=copy.deepcopy(costs)
         first=next(iter(changed['sync_contexts']))
-        changed['sync_contexts'][first]['single_billed_gas']+=1
+        changed['sync_contexts'][first]['billed_gas']+=1
         with self.assertRaisesRegex(ValueError,'sync context envelope'):O.qualify_costs(changed,True)
         for op in ('unlist','liquidate'):
             self.assertTrue(O.operation_samples(costs,op,owner=True))
             self.assertTrue(all('measuredGas' not in row and 'measuredWork' not in row
                                 for row in O.operation_samples(costs,op,owner=True)))
-        self.assertEqual(O.supported_work(costs)['sync'],1)
+        self.assertEqual(O.supported_work(costs)['sync'],2)
         with self.assertRaisesRegex(ValueError,'actual receipt support'):
-            O.F.metered_work_gas(costs['gas_curves'],costs['gas_meter_proxy'],'sync',2,O.supported_work(costs))
+            O.F.metered_work_gas(costs['gas_curves'],costs['gas_meter_proxy'],'sync',3,O.supported_work(costs))
         changed=copy.deepcopy(costs)
         sample=O.operation_samples(changed,'build')[0]
         meter=sample.get('measuredWork',sample)

@@ -22,6 +22,7 @@ abstract contract MainRenewalBase is ForkBase {
     address internal constant BUYER = address(bytes20(hex"4de365ea3b8e94f30b4d5bfd9d89fae323bee55d"));
     struct ReplayCandidate { uint256 blockNumber; bytes32 requestTx; uint256 count; uint256 index; uint256 slot; address purchaser; }
     uint256 internal fixtureRequestBlock;
+    bytes32 internal fixtureRequestTx;
     address internal selectedPurchaser;
     uint256 internal selected;
     uint256 internal packId;
@@ -57,6 +58,7 @@ abstract contract MainRenewalBase is ForkBase {
         vm.createSelectFork("mainnet", c.requestTx);
         vm.recordLogs();
         fixtureRequestBlock = c.blockNumber;
+        fixtureRequestTx = c.requestTx;
         selectedPurchaser = c.purchaser;
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
@@ -108,7 +110,11 @@ abstract contract MainRenewalBase is ForkBase {
         vm.setBlockhash(fixtureRequestBlock, vm.parseJsonBytes32(fx, string.concat(key, ".reqBlockHash")));
         vm.fee(vm.parseJsonUint(fx, string.concat(key, ".fulBaseFee")));
         _call(fx, "ful");
-        for (uint256 i = 2; i <= _fulfillmentCount(); ++i) _call(fx, string.concat("ful", vm.toString(i)));
+        _afterFulfillment(1);
+        for (uint256 i = 2; i <= _fulfillmentCount(); ++i) {
+            _call(fx, string.concat("ful", vm.toString(i)));
+            _afterFulfillment(i);
+        }
         (,, address purchaser,,,,,,,, uint8 status) = FWA.listings(selected);
         assertEq(status, LISTING_ALLOCATED, "actual Chainlink proof selected our listing");
         assertEq(purchaser, selectedPurchaser);
@@ -164,6 +170,7 @@ abstract contract MainRenewalBase is ForkBase {
     function _initialBacking(uint256) internal view virtual returns (uint256[] memory) { return backing(); }
     function _fillerFunding() internal view virtual returns (uint256) { return 10 ether; }
     function _fulfillmentCount() internal view virtual returns (uint256) { return 1; }
+    function _afterFulfillment(uint256) internal virtual {}
 }
 
 /// @notice Acquisition returns reuse their exact existing pack; keeps alone require new builds.

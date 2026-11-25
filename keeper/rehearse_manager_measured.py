@@ -427,7 +427,15 @@ def write_profile(report):
     assert report['status']=='PASS' and report['contractSourceSha256']==sources()
     paths=[OUT]
     for name in ('manager-measured-splitting-50k.json','manager-measured-owner-exit.json',
-                 'manager-measured-sync-contexts.json','manager-measured-owner-batch-exit.json',
+                 'manager-measured-sync-contexts.json','manager-measured-sync-scan-attempt2.json',
+                 'manager-measured-sync-scan-attempt3.json','manager-measured-sync-scan-one.json',
+                 'manager-measured-sync-scan-one-no-credit-blockfork.json',
+                 'manager-measured-sync-multi-two-attempt1.json',
+                 'manager-measured-sync-multi-three-blockfork.json',
+                 'manager-measured-sync-preselected-two-blockfork.json',
+                 'manager-measured-sync-scan-three-blockfork.json',
+                 'manager-measured-sync-multi-two-no-credit.json',
+                 'manager-measured-owner-batch-exit.json',
                  'manager-measured-ordinary-keeper.json','manager-measured-ordinary-relist.json'):
         path=ROOT/'docs/receipts'/name
         if path.exists():paths.append(path)
@@ -468,8 +476,8 @@ def write_profile(report):
         result={}
         for row in selected:
             source=row['verifiedContext'] if owner else row['measuredWork']
-            key=f"{source['gasAllowance']}:{source['workUnits']}"
-            sample=dict(single_billed_gas=row['gasUsed'],single_estimate_gas=row['gasEstimate'])
+            key=f"{source['gasAllowance']}:{source['workUnits']}:{row['workCount']}"
+            sample=dict(billed_gas=row['gasUsed'],estimate_gas=row['gasEstimate'])
             if not owner:sample['measured_gas']=source['measuredGas']
             result[key]={name:max(value,result.get(key,{}).get(name,0)) for name,value in sample.items()}
         assert result
@@ -477,7 +485,10 @@ def write_profile(report):
     sync_contexts=contexts(rows['sync'])
     owner_sync_contexts=contexts(rows['recover'],True)
     source_paths=list(report['contractSourceSha256'])+['keeper/rehearse_manager_measured.py',
-        'keeper/rehearse_manager_sync_contexts.py','keeper/policy.py','keeper/config.py',
+        'keeper/rehearse_manager_sync_contexts.py','keeper/rehearse_manager_sync_scan.py',
+        'keeper/policy.py','keeper/config.py',
+        'test/fork/ManagerOperationsCheckpoint.t.sol','test/fork/ForkMainRenewal.t.sol',
+        'test/fixtures/completion-selection.json',
         'sim/vault.py','sim/manager.py','sim/forward.py','sim/manager_operating_assessment.py']
     profile=dict(compensation_mode='bounded-measured-v1',contract_source_sha256=report['contractSourceSha256'],
         source_sha256={p:sha(ROOT/p) for p in source_paths},receipts=str(OUT.relative_to(ROOT)),receipts_sha256=sha(OUT),

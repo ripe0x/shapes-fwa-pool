@@ -26,9 +26,10 @@ METERED_OPERATIONS=('build','list','sync','unlist','liquidate')
 OWNER_OPERATIONS=('create','setExiting','withdraw','unlist','liquidate','recover_sync','processAcquisitions','harvest')
 OWNER_SAMPLE_ALIASES={'recover_sync':'recover','unlist':'recoverUnlist','liquidate':'recoverLiquidate'}
 KNOWN_UNSUPPORTED=('larger sync batches',)
-CELLS = tuple(dict(id=f'b{backing}-f{fee}-g{gas}',backing_bps=backing,
-                  mint_fee_wei=fee,total_gas_gwei=gas)
-              for backing in (70000,10000) for fee in (25*10**13,5*10**14,10**15) for gas in (.2,.5))
+CELLS = tuple(dict(id=f'b{backing}-r{reserve}-f{fee}-g{gas}',backing_bps=backing,
+                  reserve_wei=reserve,mint_fee_wei=fee,total_gas_gwei=gas)
+              for backing in (70000,) for reserve in (5*10**15,6*10**15)
+              for fee in (5*10**14,10**15) for gas in (.2,.5))
 WORKER = None
 
 
@@ -124,12 +125,10 @@ def verify_sync_contexts(costs):
             context=sample.get('verifiedContext') if owner else sample.get('measuredWork',sample)
             if not isinstance(context,dict) or any(type(context.get(n)) is not int or context[n]<0 for n in ('gasAllowance','workUnits')):
                 raise ValueError('sync sample lacks verified allowance/units context')
-            if sample['workCount']!=1:
-                raise ValueError('larger sync contexts are unmeasured')
             if owner and not context.get('pairedPaidHash'):
                 raise ValueError('owner sync context lacks paired paid receipt')
-            name=f"{context['gasAllowance']}:{context['workUnits']}"
-            row=dict(single_billed_gas=sample['gasUsed'],single_estimate_gas=sample['gasEstimate'])
+            name=f"{context['gasAllowance']}:{context['workUnits']}:{sample['workCount']}"
+            row=dict(billed_gas=sample['gasUsed'],estimate_gas=sample['gasEstimate'])
             if not owner:row['measured_gas']=context['measuredGas']
             expected[name]={field:max(value,expected.get(name,{}).get(field,0)) for field,value in row.items()}
         if not expected or costs.get(key)!=expected:
@@ -209,7 +208,14 @@ def verify_measurement_receipts(costs, packets):
         schedules=[packet['fullGasSchedule'] for packet in packets if 'fullGasSchedule' in packet]
         if not schedules or any(schedule!=costs.get('fullGasSchedule') for schedule in schedules):
             raise ValueError('raw sync context gas schedule differs from calibration')
-    for packet in packets: visit(packet)
+    for packet in packets:
+        if isinstance(packet.get('authenticatedCheckpoint'),dict):
+            check_sources(packet['authenticatedCheckpoint'])
+            if packet.get('forkBaseMode')=='prior-block-plus-verified-export' and packet.get('verifiedExportFields',0)<=0:
+                raise ValueError('block-fork receipt lacks exported-state readback')
+        if packet.get('sourceReceipt') and packet.get('sourceReceiptSha256'):
+            check_sources({packet['sourceReceipt']:packet['sourceReceiptSha256']})
+        visit(packet)
     for operation, samples in costs['measurements'].items():
         for sample in samples:
             tx = sample.get('hash', sample.get('transactionHash', ''))
@@ -349,8 +355,7 @@ def manifest(args):
         estimate_curve_sources={op:estimate_samples(operation_samples(costs,op))[0]['estimateKind'] for op in costs.get('gas_curves',{})},
         unmeasured_operations=costs.get('unmeasured_operations', []), manager_values=values,
         mint_fee_observation=observation, protocol_minimum_backing=minimum,
-        fee_cases={str(25*10**13):'Agent-chosen fork-only half-current sensitivity; not approved baseline',
-                   str(5*10**14):'Observed current mint fee',str(10**15):'Historical/accepted maximum comparison'},
+        fee_cases={str(5*10**14):'Observed current mint fee',str(10**15):'Historical/accepted maximum comparison'},
         expected_rows=2*(2*args.paths_per_window+4)*len(CELLS),
         buyer_regimes=['observed-choices','forced-responsive-bid-stress'],
         physical_sync_cost_basis='Exact verified allowance/units context under recorded full GasSchedule; paid event spans and separately billed paired unpaid recovery receipts. Unknown contexts refuse; quote coefficients are not actual gas expense',
@@ -362,8 +367,9 @@ def manifest(args):
             'The fixed path count is an agent choice for bounded descriptive evaluation; no sample-size threshold or future-return confidence is claimed. No outcome-dependent stopping or exclusion.',
             'Foreign request timing, recorded success/refund and weights are fixed. Added manager listings dilute allocation/fees; external market participants do not react.',
             'Response cohorts have unequal follow-up/right censoring. Observed choices preserve archived keeps and late delays; the second regime forces every eventual responder to bid by3480seconds, including late/archive-after-window responses. Neither is a forecast or exact VRF replay.',
-            'Current protocol fee rules and oracle exemption are applied to historical requests. Historical configuration changes are not individually replayed. The .00025ETH fee is an agent-chosen fork-only half-current sensitivity, not a production recommendation or approval of baseline economics; no public fee changes.',
-            'Standard .03 backing relaxes only admission in an isolated worker. Current manager rejects it; it is not an executable candidate configuration.',
+            'Current protocol fee rules and oracle exemption are applied to historical requests. Historical configuration changes are not individually replayed. The observed .0005ETH and historical/accepted .001ETH fees are separate local cases; no public fee changes.',
+            'The .005ETH and .006ETH manager reserve targets differ only in withheld cash. The latter is an evaluation candidate, not an approved production setting or an actual cost.',
+            'This executable campaign keeps the provisional .21ETH backing fixed. A one-to-one .03ETH backing scenario requires relaxed manager admission and remains a separately labelled hypothetical, not a deployable candidate.',
             'Reuse-only strategy: returned packs are relisted intact, no fresh renewal eligibility or float. Canonical reserves, cash and spending permissions remain; no account topups or volunteer keeper subsidy. Compensation uses independently recorded work-span proxies bounded by operation allowances, plus named overhead; it is not billed gas or a fixed quote. Censored spans remain explicit.',
             'Keeper acceptance reuses production billed_ratio: initial per-operation defaults, then after3 same-label receipts min(1,sum billed gas / sum estimates across the last20). Each path starts with a fresh keeper and no other-account history. Accepted ordinary calls add calibrated proxy bill/estimate pairs; owner recovery does not. A separate calibrated billed cost floor forbids assumed losses. Replacement/minPay-specific estimate changes, failed inclusion and external-account history are not modeled. Estimate curves prefer genuine RPC samples with an RPC single-work baseline, otherwise explicit historical signed-limit uppers; billed curves cover all samples. The25percent signing pad belongs only to the owner cap.',
             'Paid meter curves and unpaid owner recovery bill/estimate curves use separate actual samples. Modeled paid and owner work counts above actual receipt support are refused, including larger sync batches. Non-sync gas uses count-aware receipt curves independently of mutable quote allowances. Sync requires an exact recorded allowance/units context under the same full GasSchedule; unknown journal, scan, fee-claim or multiple-position patterns are refused. These are calibrated proxies, not actual receipts for simulated calls. Creator amounts are gross accrual; global deployment/service costs are outside per-clone owner returns.',
@@ -452,7 +458,7 @@ def run_path(task):
         return (delay, kept) if buyer_regime=='observed-choices' or delay is None else (min(delay,3480),False)
     rows = []
     for cell in frozen['cells']:
-        values = frozen['manager_values'] | dict(backingRatioBps=cell['backing_bps'])
+        values = frozen['manager_values'] | dict(backingRatioBps=cell['backing_bps'],reserveWei=cell['reserve_wei'])
         sc = F.Scenario(manager=True, volume=F.const(0), timed=True, start_timestamp=w['start'],
             poll_seconds=60, receipt_seconds=36, replay_events=events,replay_period_seconds=period,
             request_randomness=True, request_response_sampler=response, foreign_pool_weight=1.,exempt=True,
@@ -501,12 +507,13 @@ def summarize(rows, frozen):
             mean_wei={name:statistics.fmean(r[name] for r in group) if group else None for name in numbers},
             wait_observations={k:sum(r['waiting_observations'].get(k,0) for r in group) for k in sorted({k for r in group for k in r['waiting_observations']})}))
     paired = []
+    paired_reserve = []
     indexed = {(r['window'],r['seed'],r['regime'],r['buyer_regime'],r['cell']):r for r in rows}
     for c in cells:
         if c['backing_bps'] != 10000:
             continue
         parent = next(other for other in frozen['cells'] if other['backing_bps']==70000 and
-            all(other[k]==c[k] for k in ('mint_fee_wei','total_gas_gwei')))
+            all(other[k]==c[k] for k in ('reserve_wei','mint_fee_wei','total_gas_gwei')))
         differences=[]
         for row in rows:
             if row['buyer_regime']!=c['buyer_regime'] or row['regime']!=c['regime'] or row['cell']!=c['id']:
@@ -519,20 +526,39 @@ def summarize(rows, frozen):
         paired.append(dict(regime=c['regime'],buyer_regime=c['buyer_regime'],standard_cell=c['id'],
             manager_cell=parent['id'],qualified_pairs=len(differences),expected_pairs=c['expected_paths'],
             mean_standard_minus_manager_net_wei=statistics.fmean(differences) if len(differences)==c['expected_paths'] else None))
+    for c in cells:
+        if c['reserve_wei'] != 6*10**15:
+            continue
+        parent = next((other for other in frozen['cells'] if other['reserve_wei']==5*10**15 and
+                       all(other[k]==c[k] for k in ('backing_bps','mint_fee_wei','total_gas_gwei'))),None)
+        if parent is None:
+            continue
+        differences=[]
+        for row in rows:
+            if row['buyer_regime']!=c['buyer_regime'] or row['regime']!=c['regime'] or row['cell']!=c['id']:
+                continue
+            other=indexed.get((row['window'],row['seed'],row['regime'],row['buyer_regime'],parent['id']))
+            if other and row['qualified_exit'] and other['qualified_exit']:
+                if row['request_events_sha256'] != other['request_events_sha256']:
+                    raise ValueError('paired reserve contrast request tape differs')
+                differences.append(row['owner_net_wei']-other['owner_net_wei'])
+        paired_reserve.append(dict(regime=c['regime'],buyer_regime=c['buyer_regime'],six_milli_cell=c['id'],
+            five_milli_cell=parent['id'],qualified_pairs=len(differences),expected_pairs=c['expected_paths'],
+            mean_six_minus_five_net_wei=statistics.fmean(differences) if len(differences)==c['expected_paths'] else None))
     return dict(expected_rows=frozen['expected_rows'],rows=len(rows),finished=len(rows)==frozen['expected_rows'],cells=cells,
-        paired_backing_differences=paired,
+        paired_backing_differences=paired,paired_reserve_differences=paired_reserve,
         claim='Descriptive conditional cohort only; missing/incomplete/over-cap exits suppress owner-return means. No APR or future-market inference.')
 
 
 def markdown(report):
     lines = ['# Manager recorded operating assessment','',report['summary']['claim'],'',
-        f"Observed mint fee .0005 ETH; historical/accepted baseline .001 ETH; .00025 ETH is an agent-chosen fork-only half-current sensitivity. {report['summary']['rows']} / {report['summary']['expected_rows']} rows. Wall time {report['runtime_seconds']:.1f} seconds.",
-        '', '| Buyer regime / demand | Mode | Backing | Fee | Gas | Qualified exits | Owner mean net ETH | Earned ETH | Keeper pay / gas ETH | Creator ETH | Unresolved max ETH |',
+        f"Observed mint fee .0005 ETH; historical/accepted baseline .001 ETH; .005/.006 ETH reserve sensitivity. {report['summary']['rows']} / {report['summary']['expected_rows']} rows. Wall time {report['runtime_seconds']:.1f} seconds.",
+        '', '| Buyer regime / demand | Mode | Backing | Reserve | Fee | Gas | Qualified exits | Owner mean net ETH | Earned ETH | Keeper pay / gas ETH | Creator ETH | Unresolved max ETH |',
         '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
     def money(value):return 'suppressed' if value is None else f'{value/F.E:.8f}'
     for c in report['summary']['cells']:
         m=c['mean_wei']
-        lines.append(f"| {c['buyer_regime']} / {c['regime']} | {'Reuse'} | {'.03 hypothetical' if c['backing_bps']==10000 else '.21'} | {c['mint_fee_wei']/F.E:g} | {c['total_gas_gwei']} | {c['qualified_exits']}/{c['expected_paths']} | {money(c['owner_net_mean_wei'])} | {money(m['external_total_earned_wei'])} | {money(m['keeper_compensation_wei'])} / {money(m['keeper_gas_proxy_cost_wei'])} | {money(m['creator_primary_fees_accrued_wei'])} | {money(c['maximum_unresolved_assets_wei'])} |")
+        lines.append(f"| {c['buyer_regime']} / {c['regime']} | {'Reuse'} | {c['backing_bps']*0.03/10000:g} | {c['reserve_wei']/F.E:g} | {c['mint_fee_wei']/F.E:g} | {c['total_gas_gwei']} | {c['qualified_exits']}/{c['expected_paths']} | {money(c['owner_net_mean_wei'])} | {money(m['external_total_earned_wei'])} | {money(m['keeper_compensation_wei'])} / {money(m['keeper_gas_proxy_cost_wei'])} | {money(m['creator_primary_fees_accrued_wei'])} | {money(c['maximum_unresolved_assets_wei'])} |")
     lines += ['', 'JSON retains each path and owner/keeper/creator/physical-asset partitions. Owner exit calls stop before cumulative signed maxima exceed the exit cap, excluding clone creation. Unfinished exits retain cash/inventory; the cap does not guarantee completion.', '']
     lines += [paragraph for item in report['manifest']['assumptions'] for paragraph in (item,'')]
     lines += ["Things that don't make sense: a positive conditional mean cannot establish future profitability; an exit-spend cap can stop recovery with assets still held; isolated .03 admission cannot be deployed through this manager.",'']

@@ -417,12 +417,12 @@ def metered_work_gas(curves, meters, operation, work_count=1, max_work=None):
 
 
 def sync_context_gas(contexts, allowance, units, work_count=1):
-    key=f'{allowance}:{units}'
-    if work_count!=1 or key not in contexts:
+    key=f'{allowance}:{units}:{work_count}'
+    if key not in contexts:
         raise ValueError('unmeasured sync context: '+key+f' count={work_count}')
     context=contexts[key]
     if any(type(context.get(name)) is not int or context[name]<=0
-           for name in ('single_billed_gas','single_estimate_gas')):
+           for name in ('billed_gas','estimate_gas')):
         raise ValueError('invalid sync receipt context: '+key)
     return context
 
@@ -535,7 +535,7 @@ def run(sc, n_target, seed, days=365, values=None):
         return metered_work_gas(gas_curves,gas_meter_proxy,operation,count,gas_meter_max_work)
     def operation_gas(operation,count,allowance,units=0,estimate=False):
         if operation=='sync':
-            return sync_context(allowance,units,count)['single_estimate_gas' if estimate else 'single_billed_gas']
+            return sync_context(allowance,units,count)['estimate_gas' if estimate else 'billed_gas']
         return receipt_gas(gas_curves,operation,count,allowance,estimate=estimate,legacy_floor=user_gas.get(operation,0))
     meter_censored_calls = 0
     user_estimates = sc.get("user_gas_estimate_proxy", {})
@@ -619,14 +619,14 @@ def run(sc, n_target, seed, days=365, values=None):
     def owner_billed(operation, work_gas=0, work_count=1, units=0):
         owner_supported(operation,work_count)
         if operation=='recover_sync':
-            return sync_context(work_gas,units,work_count,owner=True)['single_billed_gas']
+            return sync_context(work_gas,units,work_count,owner=True)['billed_gas']
         return owner_gas(receipt_gas(owner_gas_curves,operation,work_count,work_gas,legacy_floor=user_gas.get(operation,0)))
 
     def owner_estimate(operation, work_gas, work_count=1, units=0):
         owner_supported(operation,work_count)
         if operation=='recover_sync':
             context=sync_context(work_gas,units,work_count,owner=True)
-            return max(context['single_billed_gas'],context['single_estimate_gas'])
+            return max(context['billed_gas'],context['estimate_gas'])
         if owner_gas_curves:
             return max(21_000,receipt_acceptance_gas(owner_gas_curves,operation,work_count,work_gas))
         if operation not in user_estimates:

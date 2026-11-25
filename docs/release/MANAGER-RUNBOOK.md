@@ -10,7 +10,7 @@ One manager owns its assets and uses the shared PackAccount/StrategyLib/VaultLib
 
 The current recipe is 0.03 ETH principal from three primary Shapes, with mask bit 3 and nominal separate backing of 0.21 ETH. Returned packs are relisted intact. A kept pack leaves inventory, and any replacement is a normal build using actual cash and permission. There is no Fresh mode, renewal float, replacement-eligibility balance or paid retirement/remint path.
 
-The accepted fee is 0.001 ETH per Shape. Read-only public refresh at block 26,493,799 and the creation template at block 26,493,803 show an actual fee of 0.0005 ETH. These reads change no fee. The 0.5 ETH creation template is an evaluation funding amount, not a contract minimum or return recommendation.
+The accepted fee is 0.001 ETH per Shape. Read-only public refresh at block 26,493,799 and the updated creation template at block 26,494,501 show an actual fee of 0.0005 ETH; the [pinned block 26,494,440 readback](../receipts/manager-a9-public-readback.json) also confirms that fee, signer nonce 4180, old factory manager count zero and unchanged 0.01 ETH legacy vault balance. These reads change no fee. The 0.5 ETH creation template is an evaluation funding amount, not a contract minimum or return recommendation.
 
 At zero markup, the maximum one-pack build/list funding envelope plus reserve is 0.246925 ETH at 0.2 gwei or 0.2475025 ETH at 0.5 gwei using the observed fee. Using the accepted maximum gives 0.248425 / 0.2490025 ETH. Wallet creation gas is separate. Actual compensation uses bounded measured work and can be lower; these envelopes are not billed costs or profit predictions.
 
@@ -36,11 +36,11 @@ RPC_URL=https://mainnet.gateway.tenderly.co python3 script/release.py manager-cr
   0xCB43078C32423F5348Cab5885911C3B5faE217F9 500000000000000000
 ```
 
-The wrapper was run **without broadcast**, with exit status 0 in **11.67 seconds**. Its only reported release-gate failure was uncommitted release inputs in the shared draft worktree. The candidate manifest is intermediate; the lead refreshes it after final source-bound artifacts. No acceptance or signature was generated or reused.
+The wrapper was run **without broadcast**, with exit status 0 in **11.67 seconds**. Its only reported release-gate failure was uncommitted release inputs in the shared draft worktree. The same compiled dry-run was independently revalidated by the updated package generator at block 26,494,500; nonce 4180 still matched. The final manifest is regenerated after source-bound artifacts. No acceptance or signature was generated or reused.
 
 The validated public Forge dry-run was preserved as [manager-measured-dry-run.json](../../deploy/manager-measured-dry-run.json), SHA-256 `46d737aeb953a2ee156b0bee7cbbb87325ff1f1127a4eb58608d0b4fc09fc660`. The preparation log is [manager-measured-unsigned-dry-run.log](../receipts/manager-measured-unsigned-dry-run.log). Forge's sensitive cache is not an input to this package and was not copied.
 
-[manager-unsigned-cutover.json](../../deploy/manager-unsigned-cutover.json) records Ethereum chain 1, refreshed nonce readback **4180** at block **26,493,843**, contiguous unsigned nonces 4180–4183, validated compiled links and dependency values:
+[manager-unsigned-cutover.json](../../deploy/manager-unsigned-cutover.json) records Ethereum chain 1, refreshed nonce readback **4180** at block **26,494,500**, contiguous unsigned nonces 4180–4183, validated compiled links and dependency values:
 
 | Contract | Predicted address | Transaction gas limit |
 |---|---|---:|
@@ -55,7 +55,7 @@ Compiled runtime sizes in this package are PackManager 20,707 bytes, factory 4,8
 
 ## Creation template and final refresh
 
-[manager-create-unsigned.json](../../deploy/manager-create-unsigned.json) is unsigned calldata to the current predicted factory. At block **26,493,803**, the factory is not deployed, the reviewed owner is `0xCB43078C32423F5348Cab5885911C3B5faE217F9`, funding is 500,000,000,000,000,000 wei, and the configuration expectation is `0x2c8bed5338b295b8aa543711ce5b97f774557239742a91ec1e96702b7f66b0c6`. Manager values SHA-256 is `66423b7ed03e758fafe3b0a0b79a861f7894e97bf1885a8f13cfe887f38385cc`; template SHA-256 is `12c871f80c554d9f56e24be2ecc9667d2b8942fd7ed05370f1313c1e6c3413d4`. The prior template is preserved in [manager-unsigned-history](../../deploy/manager-unsigned-history/).
+[manager-create-unsigned.json](../../deploy/manager-create-unsigned.json) is unsigned calldata to the current predicted factory. At block **26,494,501**, the factory is not deployed, the reviewed owner is `0xCB43078C32423F5348Cab5885911C3B5faE217F9`, funding is 500,000,000,000,000,000 wei, and the configuration expectation is `0x2c8bed5338b295b8aa543711ce5b97f774557239742a91ec1e96702b7f66b0c6`. Manager values SHA-256 is `66423b7ed03e758fafe3b0a0b79a861f7894e97bf1885a8f13cfe887f38385cc`; template SHA-256 is `c25fcab2825ac3140ae91fe39d83097932f7532bb4e912d8f3105a8f31f07516`. The prior template remains available in the previous Git revision and [manager-unsigned-history](../../deploy/manager-unsigned-history/).
 
 A prior template attempt timed out during the pinned live mint-fee read before replacing its output. [The failure record](../receipts/manager-measured-unsigned-create-attempt1.json) is retained. Only template generation was retried; the successful deployment simulation was not repeated. The final template uses the current package's factory, rather than a historical predicted address.
 
@@ -89,8 +89,8 @@ Production signer transport, service start/restart and live discovery remain une
 
 ## Evidence limits
 
-The 50,000 overhead is an evaluation candidate. Earlier 100,000-overhead packets keep their executed metadata. Fixed-quote/Fresh studies and their old native checkpoints do not validate the new storage, reuse-only behavior, meter, operating returns or current overhead. The [focused verification](../receipts/manager-measured-verification.md) and [economic scorecard](../receipts/manager-measured-economics.md) identify current inputs and limits. No current annual return or live keeper image run is claimed.
+The 50,000 overhead is an evaluation candidate. Earlier 100,000-overhead packets keep their executed metadata. Fixed-quote/Fresh studies and their old native checkpoints do not validate the new storage, reuse-only behavior, meter, operating returns or current overhead. The [focused verification](../receipts/manager-measured-verification.md), [economic scorecard](../receipts/manager-measured-economics.md) and [bounded independent review](../receipts/manager-a9-independent-review.md) identify current inputs and limits. The frozen 96-row archived-demand study is conditional and does not establish a profitable production default. It found a keeper sync bootstrap problem despite a positive measured margin on that exact work. The **0.006 ETH reserve** covers the stated maximum-work cash envelope if funded, but remains an evaluated alternative; the unsigned values still have **0.005 ETH**. No annual return or live keeper image run is claimed.
 
 The preserved [legacy readback](../../deploy/manager-existing-main-readback.json) records the old vault's 0.01 ETH and old factory's manager count zero. Unsupported selectors and RPC errors remain explicit; this does not establish modern postflight or open the shared vault. No conditional mean, source review or calibration is a production recommendation.
 
-Things that don't make sense: increasing permission supplies no cash; the current 0.005 ETH reserve is below the 0.0055305 ETH maximum-work keeper envelope; gross metered gas differs from refunded billed gas; a profitable or accepted isolated job does not establish full-cycle economic viability.
+Things that don't make sense: increasing permission supplies no cash; the current 0.005 ETH reserve is below the 0.0055305 ETH maximum-work keeper envelope; a new keeper can decline a profitable sync before it has enough receipts to recalibrate; gross metered gas differs from refunded billed gas; a profitable or accepted isolated job does not establish full-cycle economic viability.

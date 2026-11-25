@@ -1,0 +1,2881 @@
+{
+  "manifest": {
+    "schema": 1,
+    "design": "Fixed paired descriptive cohort; agent-chosen size, no owner return hurdle",
+    "source_sha256": {
+      "deploy/manager.json": "66423b7ed03e758fafe3b0a0b79a861f7894e97bf1885a8f13cfe887f38385cc",
+      "deploy/mint-fee-observation.json": "feb7d12387928144de212966dd3e431c4f2ba5b648ad3ea409f9ba61620ac29b",
+      "docs/receipts/manager-measured-50k-receipts.json": "fa7d556a19caa2b06c7600233be023a5e1ba2acb6155117dce94b48db67c35cf",
+      "docs/receipts/manager-measured-cost-calibration.json": "d4ad1fb1d519971c1dcf8147170d09f6c39caa4b5315b4886a18e53f859ceac3",
+      "docs/receipts/manager-measured-ordinary-keeper.json": "15a8efbab299879e9737dfc926c4e05cbdb699b3ef8bec75b2c48bcef223cde2",
+      "docs/receipts/manager-measured-ordinary-relist.json": "07ce667c1632363d1c92c4c1bdd6e83c212ffd92e221a90be47250aae0c0cd09",
+      "docs/receipts/manager-measured-owner-batch-exit.json": "56828c7ed9252842803ffdfe481c78f09d80c752384e36e2d5474c332cd4ff63",
+      "docs/receipts/manager-measured-owner-exit.json": "c0a5a702414af1a2508723f3baab79136ee2d6997484ddd1d53a0bae290d492e",
+      "docs/receipts/manager-measured-reconciliation-a9.json": "243f91dcfee4c551cf4da8c5f4cf2420295fede89d781a9e8678cbf566063fa6",
+      "docs/receipts/manager-measured-splitting-50k.json": "6374c25a25364be6970500be8c3a8e12f376989b8021bb4310070989988a9f5b",
+      "docs/receipts/manager-measured-sync-contexts.json": "43c47428a8e8be6c6e16f85599ec0395327669e3cb49bef8a98116eee6fccfc9",
+      "docs/receipts/manager-measured-sync-multi-three-blockfork.json": "49d38750a1362c02868a206731162d8ffdae759e22d79d7ca0da31801b182a20",
+      "docs/receipts/manager-measured-sync-multi-two-attempt1.json": "dc1eec11d2a1c46f9ebd3c86510370fb37a6ee22387028b97eafc9d5bec9e35b",
+      "docs/receipts/manager-measured-sync-multi-two-no-credit.json": "a1abe4d32d4bbe9c6e267b0aea96df1ca9f0b19f74b8b78d11e3f27703975fec",
+      "docs/receipts/manager-measured-sync-preselected-two-blockfork.json": "4d5e788146af669498d9157d6564ea6ef8311f6d6d98e3d627e96a6d141f6546",
+      "docs/receipts/manager-measured-sync-scan-attempt2.json": "03a437cc98bdc634efcb8850433b0bcf479fdb2fdcf0bc79e0fb2137d17d1087",
+      "docs/receipts/manager-measured-sync-scan-attempt3.json": "c9efb0cd1b68d9e3cb8d6ad85a34f8f5ff7dd92068c8e01645b8680f8d991b9d",
+      "docs/receipts/manager-measured-sync-scan-one-no-credit-blockfork.json": "5a9867df52633bb97a6942ceb9f969981bc55fa08a572a2963aea00ec7cec3ce",
+      "docs/receipts/manager-measured-sync-scan-one.json": "3b510a7826a4db816eb42109049c4e82e75379d62fe06218b23b13149886a55a",
+      "docs/receipts/manager-measured-sync-scan-three-blockfork.json": "8fe1f431d82e3686c02575582d5e0642480da0dd16eafa840fb8bfbf75125f98",
+      "docs/receipts/manager-r2-live-observation.json": "ae53f7fa2025ce2c0483813409fdff0c2c9bcfd4f20e2c705cc550d3b86a97f3",
+      "docs/receipts/manager-r2-min-backing-continuity.json": "a0733be2e8766dea995a353a53c9e801a3d74a77d88404a4d20a19a0dd2c06bd",
+      "keeper/config.py": "c156e8ba3b178dd463a9adbfb6dd857557d750e8bf20027853b75d7e7b917458",
+      "keeper/keeper.py": "34123373cd60522738dc2911ac60c07f308a38450d1dc659a7cb12d87993db00",
+      "keeper/policy.py": "633ed96b7b82c1a706cb28d5ae1d9a0c537d7d7ce300cc718757f7323f3511a8",
+      "keeper/rehearse_manager_r2.py": "b74f24d169ef0e10f0b8731a0f2879fa3fb9fa889c65fad9efcb4c72800f41a1",
+      "keeper/test_policy.py": "a790561ea394107a0281f19a9017a6b745864a8333de54de6492758ca5ab9e58",
+      "sim/data/fwa.sqlite": "9f05929e7d333f3b43d5c85ef3e8b03f0498523c1a7ab60a0267c87749cd019c",
+      "sim/formal.py": "867aad3ff65b424675fa289119d1913c472c7097bb4b6b8e2b236dd7bab7fe8f",
+      "sim/forward.py": "0744b21fb4050e6f5652407b83229b1b85ffa41a90dff0ebe36d16f2ca25f56c",
+      "sim/manager.py": "c3bc13818bba8c2eeae5a12bfc8e2f1ecfb3d76a4ddb2780299066f1b74cfc68",
+      "sim/manager_assessment.py": "7b3434eebda165b954abea6d62590fc95719337ef889a1eb66d24b1aca75cab4",
+      "sim/manager_monte_carlo.py": "fa043e61c30840751bee1fa7714e11d7f621a273792047a6295f445c5301ea4b",
+      "sim/manager_operating_assessment.py": "ba93697ce59e1fad11fa5e8e5a28409bff1c9925b8e60e29e3bd4d091ef9c107",
+      "sim/manager_reconcile.py": "f34f37ed41a2a6512e81d7959961ea86a59a281ab60043049c78394cfbb7590b",
+      "sim/manager_standard_backing.py": "e280253c62e37d8db8e3c3e74b4a0c697be66af10634b9b465ba1f4c5b8f16db",
+      "sim/replay.py": "2d1f0227026e7fe7690229717ff31b7ac37a056ad197bb85687939a128879262",
+      "sim/test_forward_randomness.py": "24c7867b1a4e55b4c3262ac120f2e43604f2931ebfe42b58f17a8ef327e71987",
+      "sim/test_funding_holds.py": "2d363ab16a669d1e22bedc94050a890ac267c89b2710ac9c07d02bbb7bf9b0fb",
+      "sim/test_manager_monte_carlo.py": "662ab42e60be7331a4fd9d404159288bfb0bc0f491b42d82d9707698879db207",
+      "sim/test_manager_operating_assessment.py": "ed1652112370f43c4771796a3fd891b24f374df992aa23274a8af21ff2bb4782",
+      "sim/vault.py": "4a00ab89aa1f33f21761baeac0702f075dbdb3e8f5523637b79c57106b6bf829"
+    },
+    "contract_source_sha256": {
+      "src/PackAccount.sol": "65b182c8e95e2bc45dcc2a1d17f5dede87edf5d2b9c345c9c7df181257537702",
+      "src/PackManager.sol": "d6d32b6e28fc8d14bfbc1f10208150e9f26e32a10a2c216457a79216cdf6f498",
+      "src/PackManagerFactory.sol": "e133a6e74d530288ab725006ad6af22eaf484cc666517b52e1fe83064bd47253",
+      "src/PackVault.sol": "321d2dc3f4e940033f71aa0fbd79924894d4aba956b9757ee01c8fed78b1b942",
+      "src/ScanLib.sol": "7e1bf868c5e61b98d702ca4eb6ee5dfc031e3656847988ea28a9e050763e3d17",
+      "src/StrategyLib.sol": "14533fa5c10fa9bfd10d3a0146a713b47c64f445a9660e6f2144a359ff3ffeda",
+      "src/VaultLib.sol": "ca47a48923bc9fbb8f5f2b2e12f03bea167e8aa0b9a520d1cea344a2534331c6",
+      "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+    },
+    "archive": "sim/data/fwa.sqlite",
+    "full_gas_schedule": {
+      "checkpoint": 500000,
+      "allocationEntry": 6000,
+      "allocationRead": 30000,
+      "build": 360000,
+      "buildPack": 300000,
+      "buildShape": 130000,
+      "list": 380000,
+      "listed": 825000,
+      "sync": 125000,
+      "requiredTail": 120000,
+      "distributionProof": 80000,
+      "journal": 22000,
+      "scan": 30000,
+      "selected": 225000,
+      "synced": 285000,
+      "pruned": 45000,
+      "unlist": 340000,
+      "unlisted": 285000,
+      "liquidate": 75000,
+      "liquidatePack": 80000,
+      "redeemShape": 35000,
+      "recoveryBase": 100000,
+      "recoveryShape": 35000,
+      "recoveryUnseal": 70000,
+      "harvest": 125000,
+      "harvested": 80000,
+      "credit": 40000,
+      "fund": 40000,
+      "overhead": 50000
+    },
+    "sync_contexts": {
+      "372000:0:1": {
+        "billed_gas": 327544,
+        "estimate_gas": 359764,
+        "measured_gas": 312894
+      },
+      "455000:1:1": {
+        "billed_gas": 360266,
+        "estimate_gas": 428203,
+        "measured_gas": 380607
+      },
+      "702000:1:1": {
+        "billed_gas": 465208,
+        "estimate_gas": 599147,
+        "measured_gas": 550185
+      },
+      "740000:1:1": {
+        "billed_gas": 487910,
+        "estimate_gas": 961988,
+        "measured_gas": 581341
+      },
+      "780000:1:1": {
+        "billed_gas": 501096,
+        "estimate_gas": 1178999,
+        "measured_gas": 610093
+      },
+      "750000:1:1": {
+        "billed_gas": 466248,
+        "estimate_gas": 1588355,
+        "measured_gas": 589217
+      },
+      "710000:1:1": {
+        "billed_gas": 449620,
+        "estimate_gas": 1371336,
+        "measured_gas": 560463
+      },
+      "1005000:1:2": {
+        "billed_gas": 590010,
+        "estimate_gas": 5188682,
+        "measured_gas": 825590
+      },
+      "1335000:2:2": {
+        "billed_gas": 648052,
+        "estimate_gas": 9497044,
+        "measured_gas": 1114466
+      },
+      "1035000:1:2": {
+        "billed_gas": 633785,
+        "estimate_gas": 5027613,
+        "measured_gas": 848362
+      },
+      "1365000:2:2": {
+        "billed_gas": 677632,
+        "estimate_gas": 9090833,
+        "measured_gas": 1135366
+      },
+      "705000:1:2": {
+        "billed_gas": 426283,
+        "estimate_gas": 3067060,
+        "measured_gas": 569402
+      },
+      "1080000:2:2": {
+        "billed_gas": 557777,
+        "estimate_gas": 6452622,
+        "measured_gas": 887235
+      },
+      "810000:1:1": {
+        "billed_gas": 530471,
+        "estimate_gas": 1017929,
+        "measured_gas": 632864
+      },
+      "965000:1:2": {
+        "billed_gas": 576824,
+        "estimate_gas": 4811034,
+        "measured_gas": 790710
+      },
+      "1295000:2:2": {
+        "billed_gas": 631424,
+        "estimate_gas": 9119380,
+        "measured_gas": 1079583
+      }
+    },
+    "owner_sync_contexts": {
+      "372000:0:1": {
+        "billed_gas": 261385,
+        "estimate_gas": 294995
+      },
+      "455000:1:1": {
+        "billed_gas": 294110,
+        "estimate_gas": 364520
+      },
+      "702000:1:1": {
+        "billed_gas": 412284,
+        "estimate_gas": 538178
+      },
+      "740000:1:1": {
+        "billed_gas": 426354,
+        "estimate_gas": 556616
+      },
+      "780000:1:1": {
+        "billed_gas": 426354,
+        "estimate_gas": 556616
+      },
+      "750000:1:1": {
+        "billed_gas": 396695,
+        "estimate_gas": 517748
+      },
+      "710000:1:1": {
+        "billed_gas": 396695,
+        "estimate_gas": 517748
+      },
+      "1005000:1:2": {
+        "billed_gas": 510656,
+        "estimate_gas": 623202
+      },
+      "1335000:2:2": {
+        "billed_gas": 578492,
+        "estimate_gas": 755980
+      },
+      "1035000:1:2": {
+        "billed_gas": 554431,
+        "estimate_gas": 653999
+      },
+      "1365000:2:2": {
+        "billed_gas": 608072,
+        "estimate_gas": 794743
+      },
+      "705000:1:2": {
+        "billed_gas": 346929,
+        "estimate_gas": 436563
+      },
+      "1080000:2:2": {
+        "billed_gas": 488216,
+        "estimate_gas": 637676
+      },
+      "810000:1:1": {
+        "billed_gas": 451117,
+        "estimate_gas": 587412
+      },
+      "965000:1:2": {
+        "billed_gas": 510656,
+        "estimate_gas": 623202
+      },
+      "1295000:2:2": {
+        "billed_gas": 578492,
+        "estimate_gas": 755980
+      }
+    },
+    "compensation_mode": "bounded-measured-v1",
+    "gas_meter_proxy": {
+      "build": 2002227,
+      "list": 1179698,
+      "sync": 632864,
+      "unlist": 602996,
+      "liquidate": 339400
+    },
+    "gas_meter_max_work": {
+      "build": 4,
+      "list": 8,
+      "sync": 2,
+      "unlist": 8,
+      "liquidate": 8
+    },
+    "owner_gas_max_work": {
+      "create": 1,
+      "setExiting": 1,
+      "withdraw": 1,
+      "unlist": 4,
+      "liquidate": 4,
+      "recover_sync": 2,
+      "processAcquisitions": 1,
+      "harvest": 1
+    },
+    "owner_gas_curves": {
+      "unlist": {
+        "single_billed_gas": 548281,
+        "billed_per_extra_work": 259083,
+        "single_estimate_gas": 669415,
+        "estimate_per_extra_work": 343418
+      },
+      "liquidate": {
+        "single_billed_gas": 255665,
+        "billed_per_extra_work": 166345,
+        "single_estimate_gas": 328239,
+        "estimate_per_extra_work": 214584
+      }
+    },
+    "archive_coverage": {
+      "first_timestamp": 1789014107,
+      "last_timestamp": 1795520759,
+      "top_block": 26484807
+    },
+    "windows": [
+      {
+        "id": "w1792929275",
+        "start": 1790337275,
+        "end": 1792929275,
+        "month_events_sha256": "7f909f02bb0eedcad92492707711e2e68e4f6080b6d5c340b10fa77716b317ad",
+        "burst_events_sha256": "6d6a547743a0f084b1ef7c8524ace1c52355838b07580c550759396e69b9ab03",
+        "burst": {
+          "actual_day_index": 6,
+          "requests": 16486,
+          "successful": 16486,
+          "method": "Actual busy-day pairs repeated at whole-day offsets; original request-to-completion delays and blackout phase retained. No new requests after day2."
+        },
+        "successful": 47553,
+        "refunded": 6,
+        "response_cohort": {
+          "method": "original-formal-eventual-response-adverse-v1",
+          "observed_until": 1795520759,
+          "allocations_in_window": 47553,
+          "sampled_allocations": 47553,
+          "responsive_allocations": 46341,
+          "unresolved_at_archive_cutoff": 1212,
+          "allocations_excluded": 0,
+          "responsive_after3600_seconds": 1121,
+          "responsive_delays_clamped_to3480": 1168,
+          "responses_observed_after_window_end": 0,
+          "allocation_followup_seconds": {
+            "minimum": 2592012,
+            "median": 4415808,
+            "maximum": 5183064
+          },
+          "unresolved_allocation_followup_seconds": {
+            "minimum": 2600064,
+            "median": 4638498.0,
+            "maximum": 5182176
+          },
+          "cohort_sha256": "c827a09e3d593f9a3be28eb96cdcd905b9d96275e9a2576060bb2ab0afb27e05",
+          "responses_sha256": "518520dd7a5fcc736505074d600e5815232ce3882f07a17efee67db25d9bf3b5"
+        },
+        "seeds": [
+          200000
+        ]
+      },
+      {
+        "id": "w1795521275",
+        "start": 1792929275,
+        "end": 1795521275,
+        "month_events_sha256": "16c8618f954e6cba72bb7fd10542e3105aab112a2aeeae227f1031822a6ecc6d",
+        "burst_events_sha256": "c1f35cd23e83b4e95230eec379ad407f43f2c79b281edc01dd54f3500852fb7e",
+        "burst": {
+          "actual_day_index": 5,
+          "requests": 20020,
+          "successful": 9840,
+          "method": "Actual busy-day pairs repeated at whole-day offsets; original request-to-completion delays and blackout phase retained. No new requests after day2."
+        },
+        "successful": 9856,
+        "refunded": 5090,
+        "response_cohort": {
+          "method": "original-formal-eventual-response-adverse-v1",
+          "observed_until": 1795520759,
+          "allocations_in_window": 9856,
+          "sampled_allocations": 9856,
+          "responsive_allocations": 9684,
+          "unresolved_at_archive_cutoff": 172,
+          "allocations_excluded": 0,
+          "responsive_after3600_seconds": 3089,
+          "responsive_delays_clamped_to3480": 3096,
+          "responses_observed_after_window_end": 0,
+          "allocation_followup_seconds": {
+            "minimum": 5016,
+            "median": 2107044.0,
+            "maximum": 2589252
+          },
+          "unresolved_allocation_followup_seconds": {
+            "minimum": 359952,
+            "median": 2097594.0,
+            "maximum": 2554392
+          },
+          "cohort_sha256": "2eb725399636a78c164696d09317da48e98341d49f148b6f9b6efc8f44be5671",
+          "responses_sha256": "0f82f409d834e5b6560e4b5b0c29d8c512110dbfd0e3199fae31c0c5154b93db"
+        },
+        "seeds": [
+          200001
+        ]
+      }
+    ],
+    "cells": [
+      {
+        "id": "b70000-r5000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2
+      },
+      {
+        "id": "b70000-r5000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5
+      },
+      {
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2
+      },
+      {
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5
+      },
+      {
+        "id": "b70000-r6000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2
+      },
+      {
+        "id": "b70000-r6000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5
+      },
+      {
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2
+      },
+      {
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5
+      }
+    ],
+    "paths_per_window": 1,
+    "operating_days": 30,
+    "exit_days": 7,
+    "initial_funding_wei": 500000000000000000,
+    "owner_exit_spend_limit_wei": 10000000000000000,
+    "final_gas_qualification": true,
+    "gas_proxy": {
+      "build": 1864565,
+      "list": 1167582,
+      "sync": 530471,
+      "unlist": 534092,
+      "liquidate": 300396,
+      "create": 566877,
+      "setExiting": 50645,
+      "withdraw": 38838,
+      "recover_sync": 451117,
+      "processAcquisitions": 160083,
+      "harvest": 58256
+    },
+    "gas_estimate_proxy": {
+      "build": 2062780,
+      "list": 1234508,
+      "sync": 1588355,
+      "unlist": 652984,
+      "liquidate": 386544,
+      "create": 566877,
+      "setExiting": 52211,
+      "withdraw": 44118,
+      "recover_sync": 587412,
+      "processAcquisitions": 165069,
+      "harvest": 76553
+    },
+    "gas_curves": {
+      "build": {
+        "single_billed_gas": 1864565,
+        "billed_per_extra_work": 1286219,
+        "single_estimate_gas": 2062780,
+        "estimate_per_extra_work": 1490040,
+        "single_meter_gas": 2002227,
+        "meter_per_extra_work": 1456018
+      },
+      "list": {
+        "single_billed_gas": 1167582,
+        "billed_per_extra_work": 730856,
+        "single_estimate_gas": 1234508,
+        "estimate_per_extra_work": 780241,
+        "single_meter_gas": 1179698,
+        "meter_per_extra_work": 773777
+      },
+      "sync": {
+        "single_billed_gas": 530471,
+        "billed_per_extra_work": 147161,
+        "single_estimate_gas": 1588355,
+        "estimate_per_extra_work": 7908689,
+        "single_meter_gas": 632864,
+        "meter_per_extra_work": 502502
+      },
+      "unlist": {
+        "single_billed_gas": 534092,
+        "billed_per_extra_work": 268162,
+        "single_estimate_gas": 652984,
+        "estimate_per_extra_work": 346913,
+        "single_meter_gas": 602996,
+        "meter_per_extra_work": 343972
+      },
+      "liquidate": {
+        "single_billed_gas": 300396,
+        "billed_per_extra_work": 166347,
+        "single_estimate_gas": 386544,
+        "estimate_per_extra_work": 214586,
+        "single_meter_gas": 339400,
+        "meter_per_extra_work": 212869
+      },
+      "create": {
+        "single_billed_gas": 566877,
+        "billed_per_extra_work": 0,
+        "single_estimate_gas": 566877,
+        "estimate_per_extra_work": 0
+      },
+      "setExiting": {
+        "single_billed_gas": 50645,
+        "billed_per_extra_work": 0,
+        "single_estimate_gas": 52211,
+        "estimate_per_extra_work": 0
+      },
+      "withdraw": {
+        "single_billed_gas": 38838,
+        "billed_per_extra_work": 0,
+        "single_estimate_gas": 44118,
+        "estimate_per_extra_work": 0
+      },
+      "recover_sync": {
+        "single_billed_gas": 451117,
+        "billed_per_extra_work": 156955,
+        "single_estimate_gas": 587412,
+        "estimate_per_extra_work": 207331
+      },
+      "processAcquisitions": {
+        "single_billed_gas": 160083,
+        "billed_per_extra_work": 0,
+        "single_estimate_gas": 165069,
+        "estimate_per_extra_work": 0
+      },
+      "harvest": {
+        "single_billed_gas": 58256,
+        "billed_per_extra_work": 0,
+        "single_estimate_gas": 76553,
+        "estimate_per_extra_work": 0
+      }
+    },
+    "estimate_curve_sources": {
+      "build": "rpc-estimate",
+      "list": "rpc-estimate",
+      "sync": "rpc-estimate",
+      "unlist": "rpc-estimate",
+      "liquidate": "rpc-estimate",
+      "create": "rpc-estimate",
+      "setExiting": "rpc-estimate",
+      "withdraw": "rpc-estimate",
+      "recover_sync": "rpc-estimate",
+      "processAcquisitions": "rpc-estimate",
+      "harvest": "rpc-estimate"
+    },
+    "unmeasured_operations": [
+      "larger sync batches"
+    ],
+    "manager_values": {
+      "comment": "Unsigned reuse-only evaluation candidate; not approved production economics. 0.03 ETH packs, three paid 0.01 ETH mints; 70000 bps backing, 25 bps pooled uplift, 0.005 ETH reserve. Measured-work cap plus receipt-calibrated 50000 gas overhead; all numerical inputs remain owner adjustable.",
+      "minEdgeBps": 100,
+      "bufferBps": 0,
+      "distributionBps": 0,
+      "payMarkupBps": 0,
+      "keeperShareBps": 2500,
+      "packUnitsMask": 8,
+      "gasCeilingWei": 500000000,
+      "essentialCeilingWei": 500000000,
+      "maxTipWei": 50000000,
+      "workFeeWei": 20000000000000,
+      "reserveWei": 5000000000000000,
+      "tvlCapWei": 0,
+      "routineCapWei": 30000000000000000,
+      "routineRatePerDayWei": 10000000000000000,
+      "essentialCapWei": 10000000000000000,
+      "essentialRatePerDayWei": 5000000000000000,
+      "upliftBoundBps": 25,
+      "backingRatioBps": 70000,
+      "acceptedMintFeeWei": 1000000000000000,
+      "minDepositWei": 10000000000000000,
+      "minDistributionWei": 10000000000000000,
+      "gasSchedule": {
+        "checkpoint": 500000,
+        "allocationEntry": 6000,
+        "allocationRead": 30000,
+        "build": 360000,
+        "buildPack": 300000,
+        "buildShape": 130000,
+        "list": 380000,
+        "listed": 825000,
+        "sync": 125000,
+        "requiredTail": 120000,
+        "distributionProof": 80000,
+        "journal": 22000,
+        "scan": 30000,
+        "selected": 225000,
+        "synced": 285000,
+        "pruned": 45000,
+        "unlist": 340000,
+        "unlisted": 285000,
+        "liquidate": 75000,
+        "liquidatePack": 80000,
+        "redeemShape": 35000,
+        "recoveryBase": 100000,
+        "recoveryShape": 35000,
+        "recoveryUnseal": 70000,
+        "harvest": 125000,
+        "harvested": 80000,
+        "credit": 40000,
+        "fund": 40000,
+        "overhead": 50000
+      },
+      "expectedMintFeeWei": 500000000000000
+    },
+    "mint_fee_observation": {
+      "readOnly": true,
+      "rpc": "https://mainnet.gateway.tenderly.co",
+      "block": 26488707,
+      "blockHash": "0x00852a295affdb335e52380b320592fca6d75b1f717ee13d3908a684d4e8ea0e",
+      "timestamp": 1795567667,
+      "baseFeeWei": 123377902,
+      "shapes": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+      "packs": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+      "fwa": "0x958C41181182e76F221331b2755b77D9e1426A98",
+      "mintFeeWei": 500000000000000,
+      "acceptedMaximumWei": 1000000000000000,
+      "economics": {
+        "ownerAcquisitionFeeBps": 100,
+        "ownerSettlementFeeBps": 100,
+        "topListingShareBps": 10,
+        "settlementDiscountBps": 9000,
+        "tokenSettlementDiscountBps": 9150,
+        "settlementWindow": 3600,
+        "finalizeWindow": 3600,
+        "activeListingCount": 2548,
+        "totalWeight": 52774289475051857816474,
+        "weightedBackingTotal": 2547999999999999999885253514895866283736,
+        "acquisitionFee": 50695140126230397,
+        "mainPacksOracleExempt": true,
+        "mainPacksCanDeposit": true,
+        "surchargeBps": 500
+      },
+      "oracleExempt": true,
+      "minBackingWei": 25000000000000000,
+      "configSetState": {
+        "23": {
+          "block": 26144054,
+          "valueWei": 8000
+        },
+        "61": {
+          "block": 26144022,
+          "valueWei": 1356601444931682158998139052495367640934077758016
+        },
+        "41": {
+          "block": 26126292,
+          "valueWei": 1
+        },
+        "29": {
+          "block": 26126290,
+          "valueWei": 9150
+        },
+        "65": {
+          "block": 26090542,
+          "valueWei": 1190950922593085277971512302638854613809555845969
+        },
+        "15": {
+          "block": 26078548,
+          "valueWei": 10
+        },
+        "62": {
+          "block": 25944649,
+          "valueWei": 61796977938233482145391871588020382772302905670
+        },
+        "44": {
+          "block": 25944618,
+          "valueWei": 1
+        },
+        "40": {
+          "block": 25944618,
+          "valueWei": 1
+        },
+        "27": {
+          "block": 25944617,
+          "valueWei": 21600
+        },
+        "25": {
+          "block": 25944617,
+          "valueWei": 0
+        },
+        "22": {
+          "block": 25944617,
+          "valueWei": 25000000000000000
+        },
+        "20": {
+          "block": 25944617,
+          "valueWei": 3600
+        },
+        "21": {
+          "block": 25944617,
+          "valueWei": 3600
+        },
+        "19": {
+          "block": 25944617,
+          "valueWei": 100
+        },
+        "18": {
+          "block": 25944616,
+          "valueWei": 100
+        },
+        "17": {
+          "block": 25944616,
+          "valueWei": 9000
+        },
+        "16": {
+          "block": 25944615,
+          "valueWei": 1000
+        },
+        "14": {
+          "block": 25944615,
+          "valueWei": 1000
+        },
+        "13": {
+          "block": 25944615,
+          "valueWei": 500
+        },
+        "12": {
+          "block": 25944614,
+          "valueWei": 5
+        },
+        "10": {
+          "block": 25944614,
+          "valueWei": 6
+        },
+        "7": {
+          "block": 25944614,
+          "valueWei": 3
+        },
+        "11": {
+          "block": 25944614,
+          "valueWei": 30
+        },
+        "1": {
+          "block": 25944609,
+          "valueWei": 900000
+        },
+        "24": {
+          "block": 25944609,
+          "valueWei": 58107840699933149319226264896379340422220575262651973310145411177421594153945
+        },
+        "43": {
+          "block": 25944609,
+          "valueWei": 1
+        },
+        "28": {
+          "block": 25944609,
+          "valueWei": 1000
+        },
+        "26": {
+          "block": 25944609,
+          "valueWei": 604800
+        },
+        "66": {
+          "block": 25944609,
+          "valueWei": 554796862146535778389938234499240263279840630480
+        },
+        "64": {
+          "block": 25944609,
+          "valueWei": 972258135870579478595537420462932229902532290524
+        },
+        "63": {
+          "block": 25944609,
+          "valueWei": 1157762043009029760719178682838687237985430563130
+        },
+        "2": {
+          "block": 25944609,
+          "valueWei": 105635216111862975908859364934260387362758947578681163548045548039867846446581
+        },
+        "60": {
+          "block": 25944609,
+          "valueWei": 1232972947259131235767155083770124610558295574842
+        }
+      },
+      "protocol": {
+        "ownerAcquisitionFeeBps": 100,
+        "ownerSettlementFeeBps": 100,
+        "topListingShareBps": 10,
+        "settlementDiscountBps": 9000,
+        "tokenSettlementDiscountBps": 9150,
+        "settlementWindow": 3600,
+        "finalizeWindow": 3600,
+        "activeListingCount": 2548,
+        "totalWeight": 52774289475051857816474,
+        "weightedBackingTotal": 2547999999999999999885253514895866283736,
+        "acquisitionFee": 50695140126230397,
+        "mainPacksOracleExempt": true,
+        "mainPacksCanDeposit": true,
+        "surchargeBps": 500,
+        "inferredGrossMultiplier1e18": 1038460500000000000,
+        "expectedValueWei": 48281085834505140,
+        "inferredGrossMultiplierRoundingBound": 23,
+        "retainedToProtocol": true
+      },
+      "configSetLogsSinceArchive": [],
+      "dependencyRuntimeContinuity": {
+        "FWA": {
+          "address": "0x958C41181182e76F221331b2755b77D9e1426A98",
+          "runtimeSha256": "20d0ec8fcea735357da6487d821e678a93232f4e867161682e21fadd36c2ba8e",
+          "verifiedSourceSha256": "1b5dbbe6a2c1d15e8df38c075da85036659aacb38936ccd94619b86a8240a425"
+        },
+        "Shapes": {
+          "address": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+          "runtimeSha256": "3e666d62f32c901aee8b15a9fea1682eba7278b671e608935cd34ec8a81d6539",
+          "verifiedSourceSha256": "f008bf5ddcba042f6a286d4279e34c5b3c1759ec8e21ec6df6826d6aa831ec79"
+        },
+        "ShapePacks": {
+          "address": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+          "runtimeSha256": "ebfaebd182f0366d571ea7bbfe0ac526b169c2a8e45112a9a97a5e7b590f214b",
+          "verifiedSourceSha256": "1425fabf99163f2c6a43132d42060a8ca70c88012f243aa3180ece94045a11e9"
+        }
+      }
+    },
+    "protocol_minimum_backing": {
+      "value_wei": 25000000000000000,
+      "block": 25944617,
+      "log_index": 384,
+      "method": "Latest archived actual FWA ConfigSet key22; not a fresh public-state read"
+    },
+    "fee_cases": {
+      "500000000000000": "Observed current mint fee",
+      "1000000000000000": "Historical/accepted maximum comparison"
+    },
+    "expected_rows": 96,
+    "buyer_regimes": [
+      "observed-choices",
+      "forced-responsive-bid-stress"
+    ],
+    "physical_sync_cost_basis": "Exact verified allowance/units context under recorded full GasSchedule; paid event spans and separately billed paired unpaid recovery receipts. Unknown contexts refuse; quote coefficients are not actual gas expense",
+    "keeper_policy": "Production billed_ratio defaults then same-label receipt history, with additional independently billed cost floor; actual cost ledger uses billed curve; failure/minimum-return/max-loss all zero",
+    "keeper_initial_billed_ratios": {
+      "build": 0.92,
+      "list": 0.98,
+      "sync": 0.93,
+      "unlist": 0.8,
+      "liquidate": 0.8,
+      "checkpoint": 0.97,
+      "harvest": 0.95,
+      "burnTokens": 0.95
+    },
+    "keeper_receipt_history_start": "Fresh keeper, empty per scenario; no other account receipts",
+    "response_method": "Paired request-keyed response cohort. Observed choices retain first archived keep/bid and delay; stress forces every archived eventual responder to bid within3480seconds. Unresolved stays silent in both.",
+    "assumptions": [
+      "Thirty operating days and at most seven exit days. Recorded-month requests repeat during exit; quiet has no requests; early burst repeats the busiest actual day twice at whole-day offsets then has no requests.",
+      "The fixed path count is an agent choice for bounded descriptive evaluation; no sample-size threshold or future-return confidence is claimed. No outcome-dependent stopping or exclusion.",
+      "Foreign request timing, recorded success/refund and weights are fixed. Added manager listings dilute allocation/fees; external market participants do not react.",
+      "Response cohorts have unequal follow-up/right censoring. Observed choices preserve archived keeps and late delays; the second regime forces every eventual responder to bid by3480seconds, including late/archive-after-window responses. Neither is a forecast or exact VRF replay.",
+      "Current protocol fee rules and oracle exemption are applied to historical requests. Historical configuration changes are not individually replayed. The observed .0005ETH and historical/accepted .001ETH fees are separate local cases; no public fee changes.",
+      "The .005ETH and .006ETH manager reserve targets differ only in withheld cash. The latter is an evaluation candidate, not an approved production setting or an actual cost.",
+      "This executable campaign keeps the provisional .21ETH backing fixed. A one-to-one .03ETH backing scenario requires relaxed manager admission and remains a separately labelled hypothetical, not a deployable candidate.",
+      "Reuse-only strategy: returned packs are relisted intact, no fresh renewal eligibility or float. Canonical reserves, cash and spending permissions remain; no account topups or volunteer keeper subsidy. Compensation uses independently recorded work-span proxies bounded by operation allowances, plus named overhead; it is not billed gas or a fixed quote. Censored spans remain explicit.",
+      "Keeper acceptance reuses production billed_ratio: initial per-operation defaults, then after3 same-label receipts min(1,sum billed gas / sum estimates across the last20). Each path starts with a fresh keeper and no other-account history. Accepted ordinary calls add calibrated proxy bill/estimate pairs; owner recovery does not. A separate calibrated billed cost floor forbids assumed losses. Replacement/minPay-specific estimate changes, failed inclusion and external-account history are not modeled. Estimate curves prefer genuine RPC samples with an RPC single-work baseline, otherwise explicit historical signed-limit uppers; billed curves cover all samples. The25percent signing pad belongs only to the owner cap.",
+      "Paid meter curves and unpaid owner recovery bill/estimate curves use separate actual samples. Modeled paid and owner work counts above actual receipt support are refused, including larger sync batches. Non-sync gas uses count-aware receipt curves independently of mutable quote allowances. Sync requires an exact recorded allowance/units context under the same full GasSchedule; unknown journal, scan, fee-claim or multiple-position patterns are refused. These are calibrated proxies, not actual receipts for simulated calls. Creator amounts are gross accrual; global deployment/service costs are outside per-clone owner returns.",
+      "Owner recovery and pending processing are paid from the owner wallet. Each call must fit the cumulative signed maximum:125percent of max(work allowance,actual estimate or signed-limit upper proxy,21000gas) at2basefee+tip. The default .01ETH exit cap excludes clone creation, stops before unaffordable mutations, and can leave incomplete assets.",
+      "Unfinished exits retain returned cash, unresolved cash/inventory/credit, and future-cost uncertainty. No monthly-to-annual extrapolation, APR, production viability or release authority follows."
+    ]
+  },
+  "runtime_seconds": 188.59494820795953,
+  "summary": {
+    "expected_rows": 96,
+    "rows": 96,
+    "finished": true,
+    "cells": [
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r5000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.7616957600825184e+16,
+        "owner_net_min_wei": -225273125174289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.827260659991748e+17,
+          "owner_wallet_gas_proxy_wei": 343023600000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 643862800000000.0,
+          "owner_exit_spent_wei": 229648200000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78037
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r5000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.9163493000825184e+16,
+        "owner_net_min_wei": -226819660574289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.816940659991748e+17,
+          "owner_wallet_gas_proxy_wei": 857559000000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1747627600000000.0,
+          "owner_exit_spent_wei": 574120500000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78037
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.0616957600825184e+16,
+        "owner_net_min_wei": -228273125174289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.797260659991748e+17,
+          "owner_wallet_gas_proxy_wei": 343023600000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 643862800000000.0,
+          "owner_exit_spent_wei": 229648200000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78037
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.2163493000825184e+16,
+        "owner_net_min_wei": -229819660574289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.786940659991748e+17,
+          "owner_wallet_gas_proxy_wei": 857559000000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1747627600000000.0,
+          "owner_exit_spent_wei": 574120500000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78037
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r6000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.7616957600825184e+16,
+        "owner_net_min_wei": -225273125174289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.827260659991748e+17,
+          "owner_wallet_gas_proxy_wei": 343023600000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 643862800000000.0,
+          "owner_exit_spent_wei": 229648200000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78037
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r6000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.9163493000825184e+16,
+        "owner_net_min_wei": -226819660574289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.816940659991748e+17,
+          "owner_wallet_gas_proxy_wei": 857559000000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1747627600000000.0,
+          "owner_exit_spent_wei": 574120500000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78037
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.0616957600825184e+16,
+        "owner_net_min_wei": -228273125174289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.797260659991748e+17,
+          "owner_wallet_gas_proxy_wei": 343023600000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 643862800000000.0,
+          "owner_exit_spent_wei": 229648200000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78037
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.2163493000825184e+16,
+        "owner_net_min_wei": -229819660574289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.786940659991748e+17,
+          "owner_wallet_gas_proxy_wei": 857559000000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1747627600000000.0,
+          "owner_exit_spent_wei": 574120500000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78037
+        }
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r5000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -4145146800000000.0,
+        "owner_net_min_wei": -4145146800000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.96232e+17,
+          "owner_wallet_gas_proxy_wei": 377146800000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 722744050000000.0,
+          "owner_exit_spent_wei": 263771400000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r5000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -5742867000000000.0,
+        "owner_net_min_wei": -5742867000000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.952e+17,
+          "owner_wallet_gas_proxy_wei": 942867000000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1961733850000000.0,
+          "owner_exit_spent_wei": 659428500000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -7145146800000000.0,
+        "owner_net_min_wei": -7145146800000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.93232e+17,
+          "owner_wallet_gas_proxy_wei": 377146800000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 722744050000000.0,
+          "owner_exit_spent_wei": 263771400000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -8742867000000000.0,
+        "owner_net_min_wei": -8742867000000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.922e+17,
+          "owner_wallet_gas_proxy_wei": 942867000000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1961733850000000.0,
+          "owner_exit_spent_wei": 659428500000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r6000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -4145146800000000.0,
+        "owner_net_min_wei": -4145146800000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.96232e+17,
+          "owner_wallet_gas_proxy_wei": 377146800000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 722744050000000.0,
+          "owner_exit_spent_wei": 263771400000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r6000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -5742867000000000.0,
+        "owner_net_min_wei": -5742867000000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.952e+17,
+          "owner_wallet_gas_proxy_wei": 942867000000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1961733850000000.0,
+          "owner_exit_spent_wei": 659428500000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -7145146800000000.0,
+        "owner_net_min_wei": -7145146800000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.93232e+17,
+          "owner_wallet_gas_proxy_wei": 377146800000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 722744050000000.0,
+          "owner_exit_spent_wei": 263771400000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -8742867000000000.0,
+        "owner_net_min_wei": -8742867000000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.922e+17,
+          "owner_wallet_gas_proxy_wei": 942867000000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1961733850000000.0,
+          "owner_exit_spent_wei": 659428500000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r5000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.1943157831715165e+17,
+        "owner_net_min_wei": -171130503042698027,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 3.808948107828484e+17,
+          "owner_wallet_gas_proxy_wei": 326389100000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 3.3000000000001e+17,
+          "settlement_fees_wei": 1050000000000000.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 596922550000000.0,
+          "owner_exit_spent_wei": 213013700000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r5000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.2095316196715165e+17,
+        "owner_net_min_wei": -172677038442698027,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 3.798628107828484e+17,
+          "owner_wallet_gas_proxy_wei": 815972750000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 3.3000000000001e+17,
+          "settlement_fees_wei": 1050000000000000.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1620218350000000.0,
+          "owner_exit_spent_wei": 532534250000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.2243157831715165e+17,
+        "owner_net_min_wei": -174130503042698027,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 3.778948107828484e+17,
+          "owner_wallet_gas_proxy_wei": 326389100000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 3.3000000000001e+17,
+          "settlement_fees_wei": 1050000000000000.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 596922550000000.0,
+          "owner_exit_spent_wei": 213013700000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.2395316196715165e+17,
+        "owner_net_min_wei": -175677038442698027,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 3.768628107828484e+17,
+          "owner_wallet_gas_proxy_wei": 815972750000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 3.3000000000001e+17,
+          "settlement_fees_wei": 1050000000000000.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1620218350000000.0,
+          "owner_exit_spent_wei": 532534250000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r6000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.1943157831715165e+17,
+        "owner_net_min_wei": -171130503042698027,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 3.808948107828484e+17,
+          "owner_wallet_gas_proxy_wei": 326389100000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 3.3000000000001e+17,
+          "settlement_fees_wei": 1050000000000000.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 596922550000000.0,
+          "owner_exit_spent_wei": 213013700000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r6000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.2095316196715165e+17,
+        "owner_net_min_wei": -172677038442698027,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 3.798628107828484e+17,
+          "owner_wallet_gas_proxy_wei": 815972750000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 3.3000000000001e+17,
+          "settlement_fees_wei": 1050000000000000.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1620218350000000.0,
+          "owner_exit_spent_wei": 532534250000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.2243157831715165e+17,
+        "owner_net_min_wei": -174130503042698027,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 3.778948107828484e+17,
+          "owner_wallet_gas_proxy_wei": 326389100000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 3.3000000000001e+17,
+          "settlement_fees_wei": 1050000000000000.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 596922550000000.0,
+          "owner_exit_spent_wei": 213013700000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "observed-choices",
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.2395316196715165e+17,
+        "owner_net_min_wei": -175677038442698027,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 3.768628107828484e+17,
+          "owner_wallet_gas_proxy_wei": 815972750000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 3.3000000000001e+17,
+          "settlement_fees_wei": 1050000000000000.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1620218350000000.0,
+          "owner_exit_spent_wei": 532534250000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r5000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.7616957600825184e+16,
+        "owner_net_min_wei": -225273125174289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.827260659991748e+17,
+          "owner_wallet_gas_proxy_wei": 343023600000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 643862800000000.0,
+          "owner_exit_spent_wei": 229648200000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78039
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r5000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.9163493000825184e+16,
+        "owner_net_min_wei": -226819660574289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.816940659991748e+17,
+          "owner_wallet_gas_proxy_wei": 857559000000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1747627600000000.0,
+          "owner_exit_spent_wei": 574120500000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78039
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.0616957600825184e+16,
+        "owner_net_min_wei": -228273125174289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.797260659991748e+17,
+          "owner_wallet_gas_proxy_wei": 343023600000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 643862800000000.0,
+          "owner_exit_spent_wei": 229648200000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78039
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.2163493000825184e+16,
+        "owner_net_min_wei": -229819660574289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.786940659991748e+17,
+          "owner_wallet_gas_proxy_wei": 857559000000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1747627600000000.0,
+          "owner_exit_spent_wei": 574120500000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78039
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r6000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.7616957600825184e+16,
+        "owner_net_min_wei": -225273125174289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.827260659991748e+17,
+          "owner_wallet_gas_proxy_wei": 343023600000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 643862800000000.0,
+          "owner_exit_spent_wei": 229648200000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78039
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r6000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -1.9163493000825184e+16,
+        "owner_net_min_wei": -226819660574289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.816940659991748e+17,
+          "owner_wallet_gas_proxy_wei": 857559000000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1747627600000000.0,
+          "owner_exit_spent_wei": 574120500000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78039
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.0616957600825184e+16,
+        "owner_net_min_wei": -228273125174289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.797260659991748e+17,
+          "owner_wallet_gas_proxy_wei": 343023600000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 643862800000000.0,
+          "owner_exit_spent_wei": 229648200000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78039
+        }
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.2163493000825184e+16,
+        "owner_net_min_wei": -229819660574289588,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.786940659991748e+17,
+          "owner_wallet_gas_proxy_wei": 857559000000000.0,
+          "fees_received_wei": 4.0649406599918483e+17,
+          "external_total_earned_wei": 4.0649406599918483e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1747627600000000.0,
+          "owner_exit_spent_wei": 574120500000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 78039
+        }
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r5000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -4145146800000000.0,
+        "owner_net_min_wei": -4145146800000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.96232e+17,
+          "owner_wallet_gas_proxy_wei": 377146800000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 722744050000000.0,
+          "owner_exit_spent_wei": 263771400000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r5000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -5742867000000000.0,
+        "owner_net_min_wei": -5742867000000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.952e+17,
+          "owner_wallet_gas_proxy_wei": 942867000000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1961733850000000.0,
+          "owner_exit_spent_wei": 659428500000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -7145146800000000.0,
+        "owner_net_min_wei": -7145146800000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.93232e+17,
+          "owner_wallet_gas_proxy_wei": 377146800000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 722744050000000.0,
+          "owner_exit_spent_wei": 263771400000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -8742867000000000.0,
+        "owner_net_min_wei": -8742867000000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.922e+17,
+          "owner_wallet_gas_proxy_wei": 942867000000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1961733850000000.0,
+          "owner_exit_spent_wei": 659428500000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r6000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -4145146800000000.0,
+        "owner_net_min_wei": -4145146800000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.96232e+17,
+          "owner_wallet_gas_proxy_wei": 377146800000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 722744050000000.0,
+          "owner_exit_spent_wei": 263771400000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r6000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -5742867000000000.0,
+        "owner_net_min_wei": -5742867000000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.952e+17,
+          "owner_wallet_gas_proxy_wei": 942867000000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1961733850000000.0,
+          "owner_exit_spent_wei": 659428500000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -7145146800000000.0,
+        "owner_net_min_wei": -7145146800000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.93232e+17,
+          "owner_wallet_gas_proxy_wei": 377146800000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 722744050000000.0,
+          "owner_exit_spent_wei": 263771400000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 0,
+        "owner_net_mean_wei": -8742867000000000.0,
+        "owner_net_min_wei": -8742867000000000,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 4.922e+17,
+          "owner_wallet_gas_proxy_wei": 942867000000000.0,
+          "fees_received_wei": 0.0,
+          "external_total_earned_wei": 0.0,
+          "backing_lost_wei": 0.0,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1961733850000000.0,
+          "owner_exit_spent_wei": 659428500000000.0
+        },
+        "wait_observations": {}
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r5000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.083982128171516e+17,
+        "owner_net_min_wei": -245665922591605261,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 2.919448107828484e+17,
+          "owner_wallet_gas_proxy_wei": 343023600000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 643862800000000.0,
+          "owner_exit_spent_wei": 229648200000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r5000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.099447482171516e+17,
+        "owner_net_min_wei": -247212457991605261,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 2.909128107828484e+17,
+          "owner_wallet_gas_proxy_wei": 857559000000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1747627600000000.0,
+          "owner_exit_spent_wei": 574120500000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.113982128171516e+17,
+        "owner_net_min_wei": -248665922591605261,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 2.889448107828484e+17,
+          "owner_wallet_gas_proxy_wei": 343023600000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 643862800000000.0,
+          "owner_exit_spent_wei": 229648200000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r5000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 5000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.129447482171516e+17,
+        "owner_net_min_wei": -250212457991605261,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 2.8791281078284835e+17,
+          "owner_wallet_gas_proxy_wei": 857559000000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1747627600000000.0,
+          "owner_exit_spent_wei": 574120500000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r6000000000000000-f500000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.083982128171516e+17,
+        "owner_net_min_wei": -245665922591605261,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 2.919448107828484e+17,
+          "owner_wallet_gas_proxy_wei": 343023600000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 643862800000000.0,
+          "owner_exit_spent_wei": 229648200000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r6000000000000000-f500000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 500000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.099447482171516e+17,
+        "owner_net_min_wei": -247212457991605261,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 2.909128107828484e+17,
+          "owner_wallet_gas_proxy_wei": 857559000000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 3000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1747627600000000.0,
+          "owner_exit_spent_wei": 574120500000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.2",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.2,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.113982128171516e+17,
+        "owner_net_min_wei": -248665922591605261,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 2.889448107828484e+17,
+          "owner_wallet_gas_proxy_wei": 343023600000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 768000000000000.0,
+          "keeper_gas_proxy_cost_wei": 630156800000000.0,
+          "keeper_net_proxy_wei": 137843200000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 643862800000000.0,
+          "owner_exit_spent_wei": 229648200000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "id": "b70000-r6000000000000000-f1000000000000000-g0.5",
+        "backing_bps": 70000,
+        "reserve_wei": 6000000000000000,
+        "mint_fee_wei": 1000000000000000,
+        "total_gas_gwei": 0.5,
+        "paths": 2,
+        "expected_paths": 2,
+        "complete_exits": 2,
+        "qualified_exits": 2,
+        "exit_limit_violations": 0,
+        "spend_limit_stops": 0,
+        "keeper_loss_paths": 2,
+        "owner_net_mean_wei": -2.129447482171516e+17,
+        "owner_net_min_wei": -250212457991605261,
+        "maximum_unresolved_assets_wei": 0,
+        "mean_wei": {
+          "owner_withdrawn_wei": 2.8791281078284835e+17,
+          "owner_wallet_gas_proxy_wei": 857559000000000.0,
+          "fees_received_wei": 2.1571281078285837e+17,
+          "external_total_earned_wei": 2.1571281078285837e+17,
+          "backing_lost_wei": 4.2000000000001e+17,
+          "settlement_fees_wei": 0.0,
+          "creator_primary_fees_accrued_wei": 6000000000000000.0,
+          "keeper_compensation_wei": 1800000000000000.0,
+          "keeper_gas_proxy_cost_wei": 1575392000000000.0,
+          "keeper_net_proxy_wei": 224608000000000.0,
+          "remaining_assets_wei": 0.0,
+          "settled_keep_face_not_yet_consumed_wei": 0.0,
+          "owner_exit_reserved_wei": 1747627600000000.0,
+          "owner_exit_spent_wei": 574120500000000.0
+        },
+        "wait_observations": {
+          "KEEPER_LOSS": 84250
+        }
+      }
+    ],
+    "paired_backing_differences": [],
+    "paired_reserve_differences": [
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "observed-choices",
+        "six_milli_cell": "b70000-r6000000000000000-f500000000000000-g0.2",
+        "five_milli_cell": "b70000-r5000000000000000-f500000000000000-g0.2",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "observed-choices",
+        "six_milli_cell": "b70000-r6000000000000000-f500000000000000-g0.5",
+        "five_milli_cell": "b70000-r5000000000000000-f500000000000000-g0.5",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "observed-choices",
+        "six_milli_cell": "b70000-r6000000000000000-f1000000000000000-g0.2",
+        "five_milli_cell": "b70000-r5000000000000000-f1000000000000000-g0.2",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "observed-choices",
+        "six_milli_cell": "b70000-r6000000000000000-f1000000000000000-g0.5",
+        "five_milli_cell": "b70000-r5000000000000000-f1000000000000000-g0.5",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "observed-choices",
+        "six_milli_cell": "b70000-r6000000000000000-f500000000000000-g0.2",
+        "five_milli_cell": "b70000-r5000000000000000-f500000000000000-g0.2",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "observed-choices",
+        "six_milli_cell": "b70000-r6000000000000000-f500000000000000-g0.5",
+        "five_milli_cell": "b70000-r5000000000000000-f500000000000000-g0.5",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "observed-choices",
+        "six_milli_cell": "b70000-r6000000000000000-f1000000000000000-g0.2",
+        "five_milli_cell": "b70000-r5000000000000000-f1000000000000000-g0.2",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "observed-choices",
+        "six_milli_cell": "b70000-r6000000000000000-f1000000000000000-g0.5",
+        "five_milli_cell": "b70000-r5000000000000000-f1000000000000000-g0.5",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "observed-choices",
+        "six_milli_cell": "b70000-r6000000000000000-f500000000000000-g0.2",
+        "five_milli_cell": "b70000-r5000000000000000-f500000000000000-g0.2",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "observed-choices",
+        "six_milli_cell": "b70000-r6000000000000000-f500000000000000-g0.5",
+        "five_milli_cell": "b70000-r5000000000000000-f500000000000000-g0.5",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "observed-choices",
+        "six_milli_cell": "b70000-r6000000000000000-f1000000000000000-g0.2",
+        "five_milli_cell": "b70000-r5000000000000000-f1000000000000000-g0.2",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "observed-choices",
+        "six_milli_cell": "b70000-r6000000000000000-f1000000000000000-g0.5",
+        "five_milli_cell": "b70000-r5000000000000000-f1000000000000000-g0.5",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "six_milli_cell": "b70000-r6000000000000000-f500000000000000-g0.2",
+        "five_milli_cell": "b70000-r5000000000000000-f500000000000000-g0.2",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "six_milli_cell": "b70000-r6000000000000000-f500000000000000-g0.5",
+        "five_milli_cell": "b70000-r5000000000000000-f500000000000000-g0.5",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "six_milli_cell": "b70000-r6000000000000000-f1000000000000000-g0.2",
+        "five_milli_cell": "b70000-r5000000000000000-f1000000000000000-g0.2",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "recorded-month",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "six_milli_cell": "b70000-r6000000000000000-f1000000000000000-g0.5",
+        "five_milli_cell": "b70000-r5000000000000000-f1000000000000000-g0.5",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "six_milli_cell": "b70000-r6000000000000000-f500000000000000-g0.2",
+        "five_milli_cell": "b70000-r5000000000000000-f500000000000000-g0.2",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "six_milli_cell": "b70000-r6000000000000000-f500000000000000-g0.5",
+        "five_milli_cell": "b70000-r5000000000000000-f500000000000000-g0.5",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "six_milli_cell": "b70000-r6000000000000000-f1000000000000000-g0.2",
+        "five_milli_cell": "b70000-r5000000000000000-f1000000000000000-g0.2",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "quiet",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "six_milli_cell": "b70000-r6000000000000000-f1000000000000000-g0.5",
+        "five_milli_cell": "b70000-r5000000000000000-f1000000000000000-g0.5",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "six_milli_cell": "b70000-r6000000000000000-f500000000000000-g0.2",
+        "five_milli_cell": "b70000-r5000000000000000-f500000000000000-g0.2",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "six_milli_cell": "b70000-r6000000000000000-f500000000000000-g0.5",
+        "five_milli_cell": "b70000-r5000000000000000-f500000000000000-g0.5",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "six_milli_cell": "b70000-r6000000000000000-f1000000000000000-g0.2",
+        "five_milli_cell": "b70000-r5000000000000000-f1000000000000000-g0.2",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      },
+      {
+        "regime": "early-burst-then-zero",
+        "buyer_regime": "forced-responsive-bid-stress",
+        "six_milli_cell": "b70000-r6000000000000000-f1000000000000000-g0.5",
+        "five_milli_cell": "b70000-r5000000000000000-f1000000000000000-g0.5",
+        "qualified_pairs": 2,
+        "expected_pairs": 2,
+        "mean_six_minus_five_net_wei": 0.0
+      }
+    ],
+    "claim": "Descriptive conditional cohort only; missing/incomplete/over-cap exits suppress owner-return means. No APR or future-market inference."
+  },
+  "paths": "paths.jsonl"
+}
