@@ -5,7 +5,7 @@
     "docs/receipts/manager-r2-closeout.json": "51f824ae75c58bfdb46875cf72cdf63ea944d583d80dea2278930e4d141522a8",
     "docs/receipts/manager-r2-live-observation.json": "ae53f7fa2025ce2c0483813409fdff0c2c9bcfd4f20e2c705cc550d3b86a97f3",
     "docs/receipts/manager-standard-backing-fork.json": "5347a7b2060cf8a1eacd63cfd8e2aabb829507038a54ad7be425e2449b3be8b2",
-    "docs/receipts/manager-operating-reconciliation.json": "6d1215ffa053bd0e951a0ad5d6d9a6cbe0a0405c3c47853120fb5b92963b5924",
+    "docs/receipts/manager-operating-reconciliation.json": "04c13cac73ecae970a5f2d842add72b369e788609ff82957ef6d29c7007843d9",
     "deploy/manager.json": "f216770efacfe587770fe3d3821d0f2489d40c4e4f7758a051be77195ac0c026",
     "docs/receipts/manager-final-live-observation.json": "28e4b9e4acce43dec541c7aeba0b5ad30bfbc43339319c74dc8a95d5f3d95877"
   },
@@ -49,7 +49,7 @@
   "model_source_sha256": {
     "sim/manager.py": "901e776456b46b501af574562b41ac4f1b0e94f0e8edd3e6d5464e0a62a34a01",
     "sim/vault.py": "4f22da5672c1d078c837c27252f068a7761541077616bafced1495830ffb1390",
-    "sim/forward.py": "777a8c24ffb9d41f34e24d022f633ab8fbb27c4ddd442c8bda6ce1c689c13889",
+    "sim/forward.py": "dde8e57fa8090cf51c8aba741f7e3e19691dc98c5191c534ebf54167cd7a13d1",
     "keeper/policy.py": "42a40400cee6acd7ad1b3342548bd5f0754d11636a9b890118caa346bd4f219a",
     "keeper/config.py": "39acb35f93fb64916dd4c8c8ab64da76742ec8c8b1c90902c9c1b014a6a22f06",
     "sim/manager_reconcile.py": "608cc8680c39ae885920d314944daa08b1d6bc0d4ce4bb3dbc04c3f266b6740a",
@@ -57,7 +57,7 @@
     "sim/manager_monte_carlo.py": "99992c7ec87e58370b769239176f6162459b2cb161dd93a6828b7c0c7ce204a2",
     "keeper/keeper.py": "5bfe7f9b9965dcab42eeb92e7707e2a791132c5880b03fa2b3b929e2426816a1"
   },
-  "report_writer_sha256": "8e0058d9321b0265f2d19797910cbe2f49a922360301f62d4ef1bb93d231bad9",
+  "report_writer_sha256": "36856d1f76a396921dcb79dba0a6c57e418acdd696f741737430368415720d89",
   "observation_block": 26488707,
   "mint_fee_wei": 500000000000000,
   "accepted_mint_fee_wei": 1000000000000000,

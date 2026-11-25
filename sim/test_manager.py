@@ -250,6 +250,49 @@ class ManagerAccountingTest(unittest.TestCase):
         self.assertEqual(accepted['keeper_net_proxy_wei'],37504200000000)
         self.assertTrue(accepted['exit_complete'])
 
+    def test_runtime_receipt_history_accepts_actual_cold_build_calibration(self):
+        from keeper import profitability_gate, billed_ratio
+        root=Path(__file__).resolve().parent.parent
+        costs=json.loads((root/'docs/receipts/manager-operating-cost-calibration.json').read_text())
+        build=costs['gas_curves']['build']
+        self.assertEqual(build['single_billed_gas'],1924916)
+        self.assertEqual(build['single_estimate_gas'],2107326)
+        price,payment=200000000,415000000000000
+        self.assertEqual(build['single_billed_gas']*price,384983200000000)
+        self.assertFalse(profitability_gate(build['single_estimate_gas'],price,payment,0,0,0,1.)[2])
+        self.assertTrue(profitability_gate(build['single_estimate_gas'],price,payment,0,0,0,billed_ratio(None,'build'))[2])
+        conservative=self.quiet_with_costs(gas_curves=costs['gas_curves'],manager_keeper_zero_loss=True,
+            owner_exit_spend_limit_wei=10**16)
+        self.assertEqual(conservative['keeper_calls_build'],0)
+        self.assertEqual(conservative['creator_primary_fees_accrued_wei'],0)
+        accepted=self.quiet_with_costs(gas_curves=costs['gas_curves'],manager_keeper_zero_loss=True,
+            manager_keeper_receipt_history=True,owner_exit_spend_limit_wei=10**16)
+        self.assertEqual(accepted['keeper_calls_build'],1)
+        self.assertEqual(accepted['keeper_compensation_wei'],415000000000000)
+        self.assertEqual(accepted['keeper_gas_proxy_cost_wei'],384983200000000)
+        self.assertEqual(accepted['keeper_net_proxy_wei'],30016800000000)
+        self.assertEqual(accepted['keeper_receipt_history_counts']['build'],1)
+        self.assertEqual(accepted['keeper_receipt_history_ratios']['build'],.92)
+        self.assertTrue(accepted['exit_complete'])
+
+    def test_runtime_billed_ratio_threshold_last20_and_cap(self):
+        from types import SimpleNamespace
+        from keeper import billed_ratio, BILLED_PER_ESTIMATE
+        # Pure proxy-receipt arithmetic using the production function, not an external service.
+        history=SimpleNamespace(state={'counted':[]})
+        self.assertEqual(billed_ratio(history,'build'),BILLED_PER_ESTIMATE['build'])
+        self.assertEqual(billed_ratio(history,'build'),.92)
+        history.state['counted']=[dict(label='build',est=100,gas_used=90),dict(label='build',est=100,gas_used=80)]
+        self.assertEqual(billed_ratio(history,'build'),.92)
+        history.state['counted'].append(dict(label='sync',est=100,gas_used=20))
+        self.assertEqual(billed_ratio(history,'build'),.92)
+        history.state['counted'].append(dict(label='build',est=100,gas_used=70))
+        self.assertEqual(billed_ratio(history,'build'),.8)
+        history.state['counted']=[dict(label='build',est=100,gas_used=i) for i in range(1,26)]
+        self.assertEqual(billed_ratio(history,'build'),310/2000)
+        history.state['counted']=[dict(label='build',est=100,gas_used=150) for _ in range(3)]
+        self.assertEqual(billed_ratio(history,'build'),1.)
+
     def test_runtime_signed_exit_cap_completes_quiet_round_trip(self):
         result=self.quiet_with_costs(owner_exit_spend_limit_wei=10**16,manager_keeper_zero_loss=True)
         self.assertTrue(result['exit_complete'])

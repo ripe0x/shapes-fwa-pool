@@ -18,7 +18,7 @@ def partition():
         waiting_observations={},randomness_mode='request-keyed-v1',request_events_sha256='pure-accounting-example',
         unknown_owner_gas_calls=0,keeper_unmeasured_operations=[],owner_total_value_before_gas_wei=O.CAPITAL-30,
         owner_exit_reserved_wei=10,owner_exit_spent_wei=7,owner_exit_spend_limit_wei=100,keeper_zero_loss_enabled=True,
-        count_aware_gas_curves_enabled=True,physical_sync_cost_basis_enabled=True,keeper_estimate_acceptance_enabled=True)
+        count_aware_gas_curves_enabled=True,physical_sync_cost_basis_enabled=True,keeper_estimate_acceptance_enabled=True,keeper_receipt_history_enabled=True)
 
 
 class OperatingAssessmentTests(unittest.TestCase):

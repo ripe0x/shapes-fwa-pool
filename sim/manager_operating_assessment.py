@@ -15,6 +15,7 @@ from formal import PIN, WINDOW, window
 from manager_assessment import feasible_burst
 import manager_monte_carlo as MC
 import manager_standard_backing as S
+from keeper import BILLED_PER_ESTIMATE
 
 ROOT = Path(__file__).resolve().parent.parent
 CAPITAL = 5 * 10**17
@@ -257,7 +258,8 @@ def manifest(args):
         expected_rows=2*(2*args.paths_per_window+4)*len(CELLS),
         buyer_regimes=['observed-choices','forced-responsive-bid-stress'],
         physical_sync_cost_basis='Actual base, every consumed journal/scan item, selected/resolved/pruned work and actual fee claims; separate from payment eligibility',
-        keeper_policy='Zero-loss acceptance uses max(physical work allowance, unpadded count-aware estimate curve, billed curve), ratio1; actual cost ledger uses billed curve; failure/minimum-return/max-loss all zero',
+        keeper_policy='Production billed_ratio defaults then same-label receipt history, with additional known billed/physical cost floor; actual cost ledger uses billed curve; failure/minimum-return/max-loss all zero',
+        keeper_initial_billed_ratios=dict(BILLED_PER_ESTIMATE),keeper_receipt_history_start='Fresh keeper, empty per scenario; no other account receipts',
         response_method='Paired request-keyed response cohort. Observed choices retain first archived keep/bid and delay; stress forces every archived eventual responder to bid within3480seconds. Unresolved stays silent in both.',
         assumptions=[
             'Thirty operating days and at most seven exit days. Recorded-month requests repeat during exit; quiet has no requests; early burst repeats the busiest actual day twice at whole-day offsets then has no requests.',
@@ -267,7 +269,7 @@ def manifest(args):
             'Current protocol fee rules and oracle exemption are applied to historical requests. Historical configuration changes are not individually replayed. The .00025ETH fee is an agent-chosen fork-only half-current sensitivity, not a production recommendation or approval of baseline economics; no public fee changes.',
             'Standard .03 backing relaxes only admission in an isolated worker. Current manager rejects it; it is not an executable candidate configuration.',
             'Fresh/Reuse use canonical cash holds, reserves, spending budgets, and strict fully paid ordinary work. No account topups or volunteer keeper subsidy.',
-            'Keeper acceptance uses max(unpadded estimate curve,billed curve,physical work) at ratio1; each estimate curve prefers genuine RPC samples with an RPC single-work baseline, otherwise explicitly falls back to historical signed-limit uppers. Billed curves still cover all samples. Acceptance is conservatively above production initial/adaptive billed-per-estimate ratios. Adaptive receipt history and replacement/minPay-specific estimate changes are not modeled; this can refuse work a production keeper accepts. The25percent signing pad belongs only to the owner spending cap, not this profitability test.',
+            'Keeper acceptance reuses production billed_ratio: initial per-operation defaults, then after3 same-label receipts min(1,sum billed gas / sum estimates across the last20). Each path starts with a fresh keeper and no other-account history. Accepted ordinary calls add calibrated proxy bill/estimate pairs; owner recovery does not. A separate known billed/physical cost floor forbids assumed losses. Replacement/minPay-specific estimate changes, failed inclusion and external-account history are not modeled. Estimate curves prefer genuine RPC samples with an RPC single-work baseline, otherwise explicit historical signed-limit uppers; billed curves cover all samples. The25percent signing pad belongs only to the owner cap.',
             'Gas is max(count-aware single-work baseline plus measured per-extra-work slope, canonical work allowance), not exact billed gas for every batch. Creator amounts are gross accrual; global deployment/service costs are outside per-clone owner returns.',
             'Owner recovery and pending processing are paid from the owner wallet. Each call must fit the cumulative signed maximum:125percent of max(work allowance,actual estimate or signed-limit upper proxy,21000gas) at2basefee+tip. The default .01ETH exit cap excludes clone creation, stops before unaffordable mutations, and can leave incomplete assets.',
             'Unfinished exits retain returned cash, unresolved cash/inventory/credit, and future-cost uncertainty. No monthly-to-annual extrapolation, APR, production viability or release authority follows.'])
@@ -311,6 +313,8 @@ def qualify_result(result, fee, cap, final):
         raise ValueError('owner total-value partition failed')
     row['settled_keep_face_not_yet_consumed_wei'] = pending_keep
     row['external_total_earned_wei'] = row['fees_received_wei'] + row['external_fee_credit_wei'] + row['unharvested_listing_fees_wei']
+    if final and not row.get('keeper_receipt_history_enabled'):
+        raise ValueError('final assessment requires production receipt-history keeper acceptance')
     if final and not row.get('keeper_estimate_acceptance_enabled'):
         raise ValueError('final assessment requires estimated-gas keeper acceptance')
     if final and not row.get('physical_sync_cost_basis_enabled'):
@@ -355,7 +359,7 @@ def run_path(task):
             exit_all=True,exit_days=frozen['exit_days'], user_gas_proxy=frozen['gas_proxy'],
             holder_rescue_sync=True,self_serve_exits=True,unmeasured_gas_operations=frozen['unmeasured_operations'],
             user_gas_estimate_proxy=frozen['gas_estimate_proxy'],gas_curves=frozen['gas_curves'],
-            manager_keeper_zero_loss=True, owner_exit_spend_limit_wei=frozen['owner_exit_spend_limit_wei'])
+            manager_keeper_zero_loss=True,manager_keeper_receipt_history=True, owner_exit_spend_limit_wei=frozen['owner_exit_spend_limit_wei'])
         started = time.monotonic()
         with admission(cell['backing_bps']==10000, frozen['protocol_minimum_backing']['value_wei']):
             raw = F.run(sc,1,seed,days=30,values=values)

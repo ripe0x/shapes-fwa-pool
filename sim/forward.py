@@ -24,6 +24,7 @@ import hashlib
 from itertools import islice
 from fractions import Fraction
 from collections import deque
+from types import SimpleNamespace
 import sqlite3
 import sys
 from pathlib import Path
@@ -506,7 +507,11 @@ def run(sc, n_target, seed, days=365, values=None):
     owner_exit_reserved = owner_exit_spent = 0
     owner_processing_blocked = False
     keeper_zero_loss = manager and bool(sc.get('manager_keeper_zero_loss', False))
-    from keeper import profitability_gate, wallet_debit_bound
+    from keeper import profitability_gate, wallet_debit_bound, billed_ratio
+    keeper_receipt_history_enabled = manager and bool(sc.get('manager_keeper_receipt_history',False))
+    if keeper_receipt_history_enabled and (not keeper_zero_loss or not gas_curves):
+        raise ValueError('keeper receipt history requires calibrated curves and zero-loss admission')
+    keeper_receipt_history=SimpleNamespace(state={'counted':[]})
     holder_claimed = holder_cancelled = holder_keeper_pay = holder_maintenance_gas = 0
     exit_requested = False
     operation_end_backlog = 0
@@ -949,8 +954,14 @@ def run(sc, n_target, seed, days=365, values=None):
                         # An owner recovery pays no keeper; acceptance is the final pre-mutation check.
                         return owner_preflight([estimate], st.base_fee, fn)
                     if keeper_zero_loss:
-                        cost, need, accepted = profitability_gate(receipt_acceptance_gas(gas_curves,fn,work_count,cost_basis,user_gas.get(fn,0)), st.gas_price,
-                            paid, sc.get('keeper_fail_rate_bps', 0), sc.get('keeper_min_return_bps', 0), 0, ratio=1.0)
+                        estimate_gas=receipt_gas(gas_curves,fn,work_count,cost_basis,estimate=True,legacy_floor=user_gas.get(fn,0))
+                        billed_gas=receipt_gas(gas_curves,fn,work_count,cost_basis,legacy_floor=user_gas.get(fn,0))
+                        ratio=billed_ratio(keeper_receipt_history,fn) if keeper_receipt_history_enabled else 1.
+                        cost,need,accepted=profitability_gate(estimate_gas,st.gas_price,paid,
+                            sc.get('keeper_fail_rate_bps',0),sc.get('keeper_min_return_bps',0),0,ratio=ratio)
+                        billed_cost,billed_need,billed_accepted=profitability_gate(billed_gas,st.gas_price,paid,
+                            sc.get('keeper_fail_rate_bps',0),sc.get('keeper_min_return_bps',0),0,ratio=1.)
+                        cost,need,accepted=max(cost,billed_cost),max(need,billed_need),accepted and billed_accepted
                         if not accepted:
                             if final_candidate:
                                 manager_waits['KEEPER_LOSS'] = manager_waits.get('KEEPER_LOSS', 0) + 1
@@ -985,6 +996,10 @@ def run(sc, n_target, seed, days=365, values=None):
                             keeper_unmeasured.add(fn)
                         if paid < offer or paid == 0:
                             raise RuntimeError(('ordinary keeper payment fell below its reviewed envelope', fn, paid, offer))
+                        if keeper_receipt_history_enabled:
+                            keeper_receipt_history.state['counted'].append(dict(label=fn,
+                                est=receipt_gas(gas_curves,fn,work_count,cost_basis,estimate=True),
+                                gas_used=receipt_gas(gas_curves,fn,work_count,cost_basis)))
                     op_paid[fn] += paid
                     op_calls[fn] += 1
                     if fn in ("checkpoint", "syncCheckpoint") and funding_cap is not None:
@@ -1459,6 +1474,9 @@ def run(sc, n_target, seed, days=365, values=None):
             count_aware_gas_curves_enabled=bool(gas_curves),physical_sync_cost_basis_enabled=bool(gas_curves),
             owner_zero_quote_sync_calls=zero_quote_sync_calls,
             keeper_estimate_acceptance_enabled=bool(gas_curves and keeper_zero_loss),
+            keeper_receipt_history_enabled=keeper_receipt_history_enabled,
+            keeper_receipt_history_counts={name:sum(e['label']==name for e in keeper_receipt_history.state['counted']) for name in op_names},
+            keeper_receipt_history_ratios={name:billed_ratio(keeper_receipt_history,name) for name in op_names} if keeper_receipt_history_enabled else {},
             keeper_zero_loss_enabled=keeper_zero_loss,keeper_loss_waits=manager_waits.get('KEEPER_LOSS',0),
             ordinary_completion_actor='Recorded external VRF/processor; historical requesters fund it',
             exit_processing_assumption='Owner reserve for pending prefix, <=16 records per call, full measured single-request call gas charged per pending record; archived ready times retained')

@@ -14,7 +14,7 @@ PINS = {
     'docs/receipts/manager-r2-closeout.json': '51f824ae75c58bfdb46875cf72cdf63ea944d583d80dea2278930e4d141522a8',
     'docs/receipts/manager-r2-live-observation.json': 'ae53f7fa2025ce2c0483813409fdff0c2c9bcfd4f20e2c705cc550d3b86a97f3',
     'docs/receipts/manager-standard-backing-fork.json': '5347a7b2060cf8a1eacd63cfd8e2aabb829507038a54ad7be425e2449b3be8b2',
-    'docs/receipts/manager-operating-reconciliation.json': '6d1215ffa053bd0e951a0ad5d6d9a6cbe0a0405c3c47853120fb5b92963b5924',
+    'docs/receipts/manager-operating-reconciliation.json': '04c13cac73ecae970a5f2d842add72b369e788609ff82957ef6d29c7007843d9',
 }
 
 SOURCE_PINS = {
