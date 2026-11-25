@@ -140,7 +140,20 @@ def main():
         after=replacement.stored();primary_full=json.loads(I.sh('docker','run','--rm','--mount',f'type=volume,source={volume},target=/data','--entrypoint','python3',a.image,'-c',"import json;print(open('/data/keeper-state.json').read())"))
         evidence['primaryTxState']=primary_full
         creator_paid=I.call('pendingFees()(uint256)',to=shapes)-creator_before
-        assert creator_paid==15*live_mint_fee,'five launch packs must pay fifteen actual primary mint fees'
+        primary_topic='0x'+keccak(text='PrimaryMinted(uint256,uint256,uint256,uint256)').hex()
+        minted=[0,0,0,0]
+        from eth_abi import decode
+        for counted in primary_full['counted']:
+            if counted.get('reorged'):continue
+            receipt=I.rpc('eth_getTransactionReceipt',counted['hash'])
+            assert receipt and int(receipt['status'],16)==1
+            for log in receipt['logs']:
+                if log['address'].lower()==I.MANAGER.lower() and log['topics'] and log['topics'][0]==primary_topic:
+                    amounts=decode(['uint256']*4,bytes.fromhex(log['data'][2:]))
+                    minted=[a+b for a,b in zip(minted,amounts)]
+        assert minted[0]>=5 and minted[1]==3*minted[0] and minted[2]==3*10**16*minted[0]
+        assert creator_paid==minted[3]==minted[1]*live_mint_fee,'every receipt-proven primary Shape pays the actual fee'
+        evidence['primaryMintEvents']=dict(zip(('packs','shapes','principalWei','mintFeesWei'),minted))
         evidence['creatorPrimaryFeesAccruedWei']=creator_paid
         dropped=I.rpc('eth_getTransactionReceipt',I.DropFirstSend.dropped[0])
         assert dropped and int(dropped['status'],16)==1 and after['stats']['mined']>before['stats']['mined'] and after['head']>=before['head']

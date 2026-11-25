@@ -1337,3 +1337,25 @@ not owner-approved production defaults. Actual keeper preflight, compensation an
 validate them, and the same frozen cohort design is rerun without dropping unfavorable cases.
 The new shared vault stays undeployed. This grants no public transaction, fee change, signature,
 cutover or merge authority.
+
+## A8 reuse-only, measured work and intact migration (2026-11-25)
+
+The owner explicitly selected reuse as the sole returned-pack behavior, bounded measured-gas
+compensation and a first-version import function with UI migration. This supersedes the fixed-quote
+and fresh-renewal decisions above. No external payment policy, fresh-return retirement, eligibility
+ledger or renewal float remains. Three paid .01 Shapes per .03 launch pack remains unchanged.
+
+Caps come from verified completed operations; actual work uses min(gasleft span, allowance), named
+overhead and min(actual bid, basefee+priority, class ceiling), consistent routine markup and real
+work fees, then protected sources/budgets/minPay. Actual receipt expense remains independent.
+Numeric inputs remain immediate owner settings; algorithm changes need new code. The immutable
+factory gains no manager authority or implementation setter.
+
+Owner-paid paused migration unlists without exit mode, transfers sealed canonical packs, and imports
+at most16 packs/30 Shapes each with actual custody/principal/count checks. Indexed sealed recovery
+withdrawal cannot be blocked by a different partially redeemed claim. The UI verifies supported
+contents before transfer, both owners, official clones/dependencies, canonical receipts and its
+stated wallet cap. Already burned pack NFTs cannot migrate intact. Unsupported packs stay at source.
+
+Earlier studies/receipts remain historical. New code needs fresh validation and unsigned artifacts;
+this decision grants no public transaction, signature, live cutover, shared vault deployment or merge.

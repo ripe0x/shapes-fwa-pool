@@ -1,5 +1,9 @@
 # Main pool completion: unsigned deployment package
 
+> The shared vault remains closed. The current individual-manager package and postflight are in
+> [MANAGER-RUNBOOK.md](MANAGER-RUNBOOK.md); this combined route is retained for a separately
+> authorized pooled-vault release.
+
 This candidate is for local validation and draft review. Public transactions, production mint fee
 changes, live application cutover and merges are outside its authorization. Previous instructions,
 signatures and measurements are preserved in `history/e94fd99/` and their original receipts.
@@ -13,12 +17,13 @@ authority over created managers. There is no external keeper policy contract.
 
 `deploy/mainnet.json` and `deploy/manager.json` contain the full account configuration, including the
 named gas schedule and explicitly accepted maximum mint fee. They describe the local evaluation:
-backing 70,000 bps, unresolved keep uplift 25 bps, FreshAfterAcquisition, one renewal float and a
+backing 70,000 bps, unresolved keep uplift 25 bps, reuse-only returned packs and a
 0.005 ETH maintenance reserve. **Backing and uplift are not approved production defaults.** The
 live fee observation, with block and hash, is `deploy/mint-fee-observation.json`.
 
 Numerical settings apply immediately under each account owner's authority. Verified operation
-counts and quoted gas allowances determine pay; billed transaction gas calibrates the schedule.
+counts cap measured work; account-owned overhead and actual transaction pricing determine pay.
+Quotes remain conservative spending envelopes. Receipt gas calibrates viability separately.
 Changing numbers needs an owner settings transaction. Changing the algorithm needs new code and
 a replacement deployment. The two-step ownership acceptance window remains 48 hours.
 
@@ -47,11 +52,10 @@ keeper behavior.
 
 ## Funding, checkpoints and recovery
 
-Growth preserves holder liabilities, maintenance reserve and the separately derived renewal float.
-Only verified acquisitions authorize fresh replacement. Unselected withdrawals and kicks do not.
-Eligibility is permission, not NAV. Returned principal stays accounted. Renewal waits distinguish
-cash from spending permission. Zero mask disables fresh minting while old inventory may relist;
-listing pause stops both sources of new exposure.
+Growth preserves holder liabilities and the maintenance reserve. Returned packs are relisted
+intact; there is no fresh-return mode or renewal float. A kept pack may be replaced by a funded
+paid build. Cash and spending permission are separate. Zero mask disables fresh builds while old
+inventory may relist; listing pause stops both sources of new exposure.
 
 Deposits hold gross cancellable escrow. Construction previews are estimates until the committing
 checkpoint applies its current configuration and live fee. Contribution IDs retain their payer and
@@ -83,6 +87,15 @@ addresses must be refreshed before separately authorized signing. Existing Fly t
 Public broadcast, production fee changes, live app cutover and merges require separate owner
 authority. The owner's recorded “no canary, ever” decision remains intact. Local tests supply no public action authority.
 
-Things that don't make sense until measured: one float may not cover repeated early acquisitions;
+Things that don't make sense until measured: overhead can favor splitting necessary work;
 a small pool may miss pricing windows at 25 bps; creator revenue can be positive while net holder
 returns fail the existing 10% annual hurdle.
+
+## A8 manager-only package
+
+A8 supersedes earlier fixed-quote/Fresh configuration. Use `deploy/manager-factory.json` and
+`script/deploy.sh deploy/manager-factory.json --target manager` for an unsigned read-only dry run.
+Do not pass `--broadcast` on a public RPC. Current manager creation takes the complete Params
+and configuration expectation, with no external policy. Re-export ABIs after compiling final code.
+The manager ABI must include import, owner unlisting and checked sealed recovery withdrawal.
+Historical acceptance/economic outputs do not validate the changed compensation model.

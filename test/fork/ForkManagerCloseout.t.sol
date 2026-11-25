@@ -43,7 +43,7 @@ abstract contract ManagerCloseoutBase is MainRenewalBase {
     }
 
     function _beforeInitialBuild() internal override {
-        if (vm.exists(output())) vm.removeFile(output());
+        require(!vm.exists(output()), "preserve prior measured manager trace");
         initialCash = address(account).balance;
         ownerInitial = accountOwner.balance;
         this.assertGasEnvironment();
@@ -122,12 +122,12 @@ abstract contract ManagerCloseoutBase is MainRenewalBase {
             if (i != 0) idle = string.concat(idle, ",");
             idle = string.concat(idle, '{"id":', vm.toString(id), ',"value":', vm.toString(account.idleValueOf(id)),
                 ',"shapes":', vm.toString(account.inventoryShapeCount(id)), ',"quote":', vm.toString(storedBacking[id]),
-                ',"acquired":', account.renewalEligible(id) ? "true" : "false", '}');
+                '}');
         }
         idle = string.concat(idle, "]");
         uint256 pending;
         for (uint256 i; i < account.openListingCount(); ++i) pending += FWA.pendingFees(account.openListingAt(i));
-        string memory line = string.concat('{"step":"', step, '","action":"', action, '","account":"',
+        string memory line = string.concat('{"compensationMode":"bounded-measured-v1","step":"', step, '","action":"', action, '","account":"',
             vm.toString(address(account)), '","owner":"', vm.toString(accountOwner), '","keeper":"', vm.toString(address(this)),
             '","block":', vm.toString(block.number), ',"timestamp":', vm.toString(block.timestamp));
         line = string.concat(line, ',"baseFee":', vm.toString(block.basefee), ',"gasPrice":', vm.toString(tx.gasprice),
@@ -138,28 +138,26 @@ abstract contract ManagerCloseoutBase is MainRenewalBase {
             ',"windingDown":', account.windingDown() ? "true" : "false", ',"listingPaused":', account.listingPaused() ? "true" : "false",
             ',"input":', input, ',"state":', ReconcileTrace.renderStrategy(account, pay, primaryFees, step), '}');
         vm.writeLine(output(), line);
+        vm.recordLogs();
     }
 
-    function _finish(bool fresh) internal {
+    function _finish(bool) internal {
         _selectedSnapshot();
         _bidAndRecover();
         uint256 supply = SHAPES.totalSupply();
         uint256 beforeFees = IShapesFeeAdmin(address(SHAPES)).pendingFees();
-        uint256 paid = fresh
-            ? account.renew(one(packId), backing(), new uint256[](0), 0, account.configurationHash())
-            : account.list(backing(), 0, account.configurationHash());
+        uint256 paid = account.list(backing(), 0, account.configurationHash());
         keeperPaid += paid;
         uint256 feeDelta = IShapesFeeAdmin(address(SHAPES)).pendingFees() - beforeFees;
-        assertEq(feeDelta, fresh ? 0.003 ether : 0, "fresh/reuse primary fees are actual paid mint events");
-        assertEq(SHAPES.totalSupply(), supply, "fresh retires old three and mints three; reuse mints none");
-        primaryFees += feeDelta;
-        assertFalse(account.renewalEligible(packId), "completed acquisition permits replacement or reuse only once");
+        assertEq(feeDelta, 0, "returned pack reuse pays no primary mint fees");
+        assertEq(SHAPES.totalSupply(), supply, "returned pack is neither retired nor replaced");
+        assertEq(account.position(account.openListingAt(0)).packId, packId);
         uint256 id = account.openListingAt(0);
         VaultLib.Position memory replacement = account.position(id);
         storedBacking[replacement.packId] = replacement.backing;
         assertEq(replacement.value, 0.03 ether);
         assertEq(replacement.backing, 0.21 ether);
-        _snapshot("reinvested", fresh ? "renew" : "list", paid, string.concat('{"units":3,"ids":[', vm.toString(id),
+        _snapshot("reinvested", "list", paid, string.concat('{"units":3,"ids":[', vm.toString(id),
             '],"returnedPack":', vm.toString(packId), ',"packId":', vm.toString(replacement.packId),
             ',"backings":[', vm.toString(replacement.backing), '],"feeDebt":', vm.toString(replacement.feeDebt), '}'));
 
@@ -207,15 +205,10 @@ abstract contract ManagerCloseoutBase is MainRenewalBase {
     }
 }
 
-contract ForkManagerCloseoutFreshTest is ManagerCloseoutBase {
-    function output() internal pure override returns (string memory) { return "sim/out/manager-fresh-trace.jsonl"; }
-    function test_managerFreshOwnerPaidExitReconcilesEveryWei() public { _select(false); _finish(true); }
-}
-
 contract ForkManagerCloseoutReuseTest is ManagerCloseoutBase {
     function parameters() internal pure override returns (VaultLib.Params memory p) {
-        p = super.parameters(); p.renewalMode = VaultLib.RenewalMode.ReuseReturned;
+        p = super.parameters();
     }
-    function output() internal pure override returns (string memory) { return "sim/out/manager-reuse-trace.jsonl"; }
+    function output() internal pure override returns (string memory) { return "sim/out/manager-measured-final-reuse-trace.jsonl"; }
     function test_managerReuseOwnerPaidExitReconcilesEveryWei() public { _select(false); _finish(false); }
 }

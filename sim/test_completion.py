@@ -124,14 +124,15 @@ class CompletionAccountingTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'CatchUpFirst'):
             v.checkpoint()
 
-    def test_renewal_funding_collects_only_needed_prefix(self):
-        from vault import Position
-        v = Vault(seed=0, balance=0, reserve=0, routine_budget=1_000_000)
-        v.positions = {1: Position(3,21*10**16,pending_fees=500_000),2: Position(3,21*10**16+10_000,pending_fees=500_000)}
-        quote = lambda gas, units: gas
-        self.assertEqual(v.renewal_fee_plan([1,2],200_000,85_000,2,100_000,quote,2500,40_000,80_000,40_000), (245_000,200_000,[1]))
-        v.balance = 1_000_000
-        self.assertEqual(v.renewal_fee_plan([1,2],200_000,85_000,2,100_000,quote,2500,40_000,80_000,40_000), (85_000,0,[]))
+    def test_reused_return_preserves_original_mints_and_exact_backing(self):
+        v=Vault(seed=0,balance=10**18,reserve=0)
+        v.build([1],3,5*10**14,[21*10**16]);v.select(1);v.bid_settled(1);v.sync_owned(1)
+        before=v.balance
+        v.list(2,21*10**16)
+        self.assertEqual(v.balance,before-21*10**16)
+        self.assertEqual(v.mint_fees,15*10**14)
+        self.assertEqual(v.positions[2].value,3*10**16)
+        self.assertFalse(hasattr(v,'renewal_fee_plan'))
 
     def test_checkpoint_compensation_counts_only_actual_allocation_reads(self):
         from vault import Position,ALLOCATED

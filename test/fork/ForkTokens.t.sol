@@ -49,7 +49,6 @@ contract ForkTokensTest is Test {
         VaultLib.Params memory p;
         p.gasSchedule = VaultLib.defaultGasSchedule();
         p.backingRatioBps = 12_000;
-        p.renewalMode = VaultLib.RenewalMode.ReuseReturned;
         p.acceptedMintFee = 0.001 ether;
         p.minDeposit = 0.01 ether;
         p.minDistribution = 0.01 ether;

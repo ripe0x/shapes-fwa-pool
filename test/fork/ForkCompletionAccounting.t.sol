@@ -24,8 +24,6 @@ contract ForkCompletionAccountingTest is ForkBase {
         VaultLib.Params memory p = vault.getParams();
         p.packUnitsMask = 8;
         p.backingRatioBps = 70_000;
-        p.renewalMode = VaultLib.RenewalMode.FreshAfterAcquisition;
-        p.renewalFloatCount = 1;
         p.reserve = 0.005 ether;
         p.upliftBoundBps = 25;
         p.essentialCap = 0;

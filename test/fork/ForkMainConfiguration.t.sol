@@ -38,8 +38,6 @@ contract ForkMainConfigurationTest is ForkBase {
         p = defaultParams();
         p.packUnitsMask = 8;
         p.backingRatioBps = 70_000;
-        p.renewalMode = VaultLib.RenewalMode.FreshAfterAcquisition;
-        p.renewalFloatCount = 1;
         p.upliftBoundBps = 25;
         p.reserve = 0.005 ether;
         p.gasCeiling = 0.5 gwei;
@@ -85,9 +83,10 @@ contract ForkMainConfigurationTest is ForkBase {
         uint256 balance = address(m).balance;
         uint256 quoteGas = uint256(p.gasSchedule.build) + p.gasSchedule.buildPack
             + 3 * p.gasSchedule.buildShape + p.gasSchedule.listed;
-        uint256 expectedPay = quoteGas * 0.2 gwei * 11_000 / 10_000 + 2 * p.workFee;
+        uint256 expectedPay = (quoteGas + p.gasSchedule.overhead) * 0.2 gwei * 11_000 / 10_000 + 2 * p.workFee;
         uint256 paid = this.buildInRealFeeContext(m, proposal(), m.configurationHash());
-        assertEq(paid, expectedPay, "markup increases compensation itself");
+        assertLe(paid, expectedPay, "measured routine pay stays inside the marked-up work cap");
+        assertGt(paid, 2 * p.workFee, "real paid work reimburses positive measured gas");
         assertEq(SHAPES.totalSupply() - supply, 3, "three fresh primary mints");
         assertEq(IShapesFeeAdmin(address(SHAPES)).pendingFees() - creatorFees, 0.003 ether,
             "creator receives exactly three paid mint fees");
@@ -126,14 +125,14 @@ contract ForkMainConfigurationTest is ForkBase {
         vm.prank(owner);
         m.withdraw(owner, address(m).balance);
         assertEq(address(m).balance, 0, "real owner withdrawal leaves all value in the protocol");
-        uint256 paid = m.unlist(ids, 0.000145 ether, m.configurationHash());
-        assertEq(paid, 0.000145 ether, "verified backing return funds a positive keeper minimum");
+        uint256 paid = m.unlist(ids, m.getParams().workFee, m.configurationHash());
+        assertGe(paid, m.getParams().workFee, "verified backing return funds a positive keeper minimum");
         assertEq(address(m).balance, 0.21 ether - paid);
         vm.prank(owner);
         m.withdraw(owner, address(m).balance);
         assertEq(address(m).balance, 0, "actual pack principal is the remaining payment source");
-        paid = m.liquidate(16, 0.000072 ether, m.configurationHash());
-        assertEq(paid, 0.000072 ether);
+        paid = m.liquidate(16, m.getParams().workFee, m.configurationHash());
+        assertGe(paid, m.getParams().workFee);
         assertEq(address(m).balance, 0.03 ether - paid);
         assertEq(m.openListingCount() + m.idlePackCount(), 0);
     }
@@ -208,7 +207,8 @@ contract ForkMainConfigurationTest is ForkBase {
         uint256 paid = this.buildInRealFeeContext(m, proposal(), m.configurationHash());
         uint256 gasQ = uint256(p.gasSchedule.build) + p.gasSchedule.buildPack
             + 3 * p.gasSchedule.buildShape + p.gasSchedule.listed;
-        assertEq(paid, gasQ * 0.2 gwei * 11_000 / 10_000 + 2 * p.workFee);
+        assertLe(paid, (gasQ + p.gasSchedule.overhead) * 0.2 gwei * 11_000 / 10_000 + 2 * p.workFee);
+        assertGt(paid, 2 * p.workFee);
     }
 
     function test_oldRateAccrualAndCapacityIncreaseNeverRefillSpentBudget() public {
@@ -241,7 +241,7 @@ contract ForkMainConfigurationTest is ForkBase {
         ids[0] = id;
         m.recoverUnlist(ids);
         uint256 packId = m.idlePackAt(0);
-        assertFalse(m.renewalEligible(packId), "unselected withdrawal grants no fresh renewal permission");
+        assertEq(m.idleValueOf(packId), 0.03 ether, "unselected inventory stays tracked");
         vm.prank(owner);
         m.setExiting(false);
         vm.prank(owner);
@@ -257,9 +257,7 @@ contract ForkMainConfigurationTest is ForkBase {
         expected = m.configurationHash();
         vm.expectRevert(VaultLib.BadBatch.selector);
         m.build(3, proposal(), 0, expected);
-        expected = m.configurationHash();
-        vm.expectRevert(StrategyLib.Amount.selector);
-        m.renew(ids, proposal(), new uint256[](0), 0, expected);
+
     }
 
     function test_managerEconomicSettingsRemainOnlyItsOwners() public {
@@ -336,7 +334,6 @@ contract ForkMainConfigurationTest is ForkBase {
         vm.prank(owner);
         m.setListingPaused(false);
         VaultLib.Params memory p = m.getParams();
-        p.renewalMode = VaultLib.RenewalMode.ReuseReturned;
         p.backingRatioBps = 20_000;
         p.payMarkupBps = 0;
         set(m, p);
@@ -348,7 +345,7 @@ contract ForkMainConfigurationTest is ForkBase {
         assertEq(relistBacking, 0.06 ether);
         uint256 maintenance = m.quote(652_000, 1, false);
         uint256 construction = m.buildCost(3);
-        assertEq(maintenance + construction, 0.0035654 ether, "each initial construction and maintenance base counted once");
+        assertEq(maintenance + construction, 0.0036054 ether, "each initial construction and maintenance base counted once");
         assertGt(maintenance + construction, 0.06 ether * (k - 1e18) / 1e18, "initial bid cycle would lose ETH");
         uint256 supply = SHAPES.totalSupply();
         uint256 fees = IShapesFeeAdmin(address(SHAPES)).pendingFees();
@@ -382,7 +379,6 @@ contract ForkMainConfigurationTest is ForkBase {
         vm.prank(owner);
         m.setListingPaused(false);
         VaultLib.Params memory p = m.getParams();
-        p.renewalMode = VaultLib.RenewalMode.ReuseReturned;
         p.backingRatioBps = 10_527;
         p.payMarkupBps = 0;
         set(m, p);
@@ -416,7 +412,7 @@ contract ForkMainConfigurationTest is ForkBase {
         return m.list(values, 0, expected);
     }
 
-    function test_legacyOneMintPackPricesCurrentThreeMintReplacementBeforeRelisting() public {
+    function test_legacyOneMintPackRelistsWithoutReplacingItsComposition() public {
         PackManager m = manager();
         VaultLib.Params memory p = m.getParams();
         p.packUnitsMask = uint64(1) << 10;
@@ -448,35 +444,17 @@ contract ForkMainConfigurationTest is ForkBase {
         set(m, p);
         vm.fee(0.45 gwei);
         vm.txGasPrice(0.5 gwei);
-        (uint256 k,, bool freshRelist) = m.relistEdgeFor(packId);
-        assertFalse(freshRelist, "the current three-mint replacement is included");
-        uint256 bidEdge = 0.11 ether * (k - 1e18) / 1e18;
-        uint256 actualRetirementAndMaintenance = m.quote(802_000, 2, false);
-        uint256 currentConstruction = m.buildCost(3);
-        uint256 obsoleteConstruction = m.buildCost(10);
-        assertEq(currentConstruction, 0.0039775 ether);
-        assertEq(obsoleteConstruction, 0.0018475 ether);
-        assertEq(actualRetirementAndMaintenance, 0.000441 ether, "retirement uses the stored one-Shape composition");
-        assertGt(bidEdge, obsoleteConstruction + actualRetirementAndMaintenance, "the obsolete recipe would wrongly pass");
-        assertLt(bidEdge, currentConstruction + actualRetirementAndMaintenance, "the actual current recipe would lose ETH");
+        (,, bool reuseRelist) = m.relistEdgeFor(packId);
+        assertTrue(reuseRelist, "existing legacy inventory is priced without replacing its recipe");
+        assertEq(m.inventoryShapeCount(packId), 1, "legacy composition remains one Shape");
         values[0] = 0.11 ether;
         supply = SHAPES.totalSupply();
         fees = IShapesFeeAdmin(address(SHAPES)).pendingFees();
-        bytes32 expected = m.configurationHash();
-        vm.expectRevert(VaultLib.InvalidBacking.selector);
-        this.listInHalfGweiContext(m, values, expected);
-        assertEq(m.idlePackCount(), 1);
-        assertEq(PACKS.ownerOf(packId), address(m));
-        assertEq(SHAPES.totalSupply(), supply);
-        assertEq(IShapesFeeAdmin(address(SHAPES)).pendingFees(), fees);
-        p.renewalMode = VaultLib.RenewalMode.ReuseReturned;
-        set(m, p);
-        (,, bool reuseRelist) = m.relistEdgeFor(packId);
-        assertTrue(reuseRelist, "actual existing inventory can still be reused without a fresh mint");
         this.listInHalfGweiContext(m, values, m.configurationHash());
         assertEq(m.position(m.openListingAt(0)).packId, packId);
         assertEq(SHAPES.totalSupply(), supply);
         assertEq(IShapesFeeAdmin(address(SHAPES)).pendingFees(), fees);
+
     }
 
 }

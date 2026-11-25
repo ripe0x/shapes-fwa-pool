@@ -459,6 +459,7 @@ def reconcile_funding():
 
 
 def main():
+    raise SystemExit('Historical fixed/Fresh assessment: use the preserved evidence and its pinned revision; current measured reuse evaluations use manager_operating_assessment.py and manager_reconcile.py')
     cycle = reconcile_cycle()
     partial = reconcile_partial()
     scan = reconcile_scan()

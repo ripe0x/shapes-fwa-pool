@@ -11,12 +11,12 @@ import {Charges} from "../utils/Charges.sol";
 import {LISTING_ACTIVE} from "../../src/interfaces/External.sol";
 
 /// @notice One full cycle on real contracts with a real VRF selection, written step by step to
-///         sim/out/reconcile-trace.jsonl. sim/reconcile.py replays the same steps through the
+///         sim/out/reconcile-measured-trace.jsonl. sim/reconcile.py replays the same steps through the
 ///         Python vault model (sim/vault.py, the one the forward simulation uses) and must match
 ///         every vault number to the wei. Inputs the model takes as given: FWA's fee formula
 ///         inputs, observed fixed-quote keeper payouts, and each listing's live backing.
 contract ForkReconcileTest is SelectionBase {
-    string constant OUT = "sim/out/reconcile-trace.jsonl";
+    string constant OUT = "sim/out/reconcile-measured-trace.jsonl";
     address alice = makeAddr("pack-vault-test-alice");
     address bob = makeAddr("pack-vault-test-bob");
     uint256 lastBal; // this contract's balance before the step: keeper pay is the delta
@@ -52,7 +52,7 @@ contract ForkReconcileTest is SelectionBase {
     }
 
     function test_reconcileFullCycle() public {
-        if (vm.exists(OUT)) vm.removeFile(OUT);
+        require(!vm.exists(OUT), "preserve prior measured pooled trace");
         Candidate memory c = primary();
         _select(c); // deploy (3 ETH seed), restock 30, list 30, real request + fulfillment
         _pendForeignAcquisition(); // real pending request: busy queue for the relist refusal, then a
@@ -67,7 +67,7 @@ contract ForkReconcileTest is SelectionBase {
         vm.writeLine(
             OUT,
             string.concat(
-                '{"step":"setup","actors":', ReconcileTrace.actors(vault, alice, bob, address(this)), ',"deployBalance":', vm.toString(deployBalance),
+                '{"compensationMode":"bounded-measured-v1","step":"setup","actors":', ReconcileTrace.actors(vault, alice, bob, address(this)), ',"deployBalance":', vm.toString(deployBalance),
                 ',"selectPay":', vm.toString(selectPay),
                 ',"count":', vm.toString(COUNT), ',"units":6,"backing":', vm.toString(B),
                 ',"activationDebt":', vm.toString(activationDebt), ',"initCursor":', vm.toString(vault.acquisitionCursor()), ',"selectedListing":', vm.toString(selected), ',"backings":[', vm.toString(B), '],"acqFee":', vm.toString(acqFee), ',"acqCutBps":', vm.toString(acqCutBps),
@@ -80,6 +80,7 @@ contract ForkReconcileTest is SelectionBase {
         vm.fee(0.4 gwei);
         vm.txGasPrice(0.45 gwei);
         this.assertGasContext();
+        vm.recordLogs();
         _snap("selected");
 
         vm.prank(c.purchaser);

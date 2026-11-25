@@ -17,7 +17,7 @@ import {IShapes, IShapePacks, IFWAV2, IFWARewards, IFWAToken} from "./interfaces
 /// @dev The concrete account defines what ETH is free (`_free`) and spendable on new exposure
 ///      (`_idle`), plus the facts only it knows: whether a checkpoint is due (`_checkpointMode`)
 ///      and how much ETH its owners are owed beyond what it holds (`_shortfall`, `_need`).
-///      Maintenance is permissionless and paid by quote (D56) from this account's budgets only.
+///      Maintenance is permissionless and paid for bounded measured work from this account's budgets only.
 ///      One owner (Solady Ownable): two-step handover only, never renounced (D76).
 abstract contract PackAccount is ReentrancyGuard, Ownable {
     IFWAV2 public immutable fwa;
@@ -57,7 +57,6 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
         deploymentBlock = block.number;
         s.book.acquisitionCursor = fwa.nextSequenceToProcess();
         s.book.pendingPlusOne = 1;
-        s.book.renewalEnabled = true;
         ScanLib.initializeParams(s, p);
         packs.setApprovalForAll(address(fwa), true);
     }
@@ -67,15 +66,9 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
     /// @dev ETH this account may spend at all: balance less every liability it owes.
     function _free() internal view virtual returns (uint256);
 
-    function _renewalHold() internal view virtual returns (uint256) {
-        return s.params.reserve;
-    }
 
-    function _renewalCash() internal view virtual returns (uint256) {
-        uint256 free = _free();
-        uint256 held = _renewalHold();
-        return free > held ? free - held : 0;
-    }
+
+
 
     /// @dev ETH the strategy may commit to new exposure.
     function _idle() internal view virtual returns (uint256);
@@ -117,7 +110,7 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
         return StrategyLib.edge(s, fwa, packs, shapes, units);
     }
 
-    /// @notice Economics for existing inventory; excludes fresh mint expense in reuse mode.
+    /// @notice Economics for existing inventory; excludes fresh mint expense.
     function relistEdge(uint256 units) external view returns (uint256, uint256, bool) {
         return StrategyLib.relistEdge(s, fwa, packs, shapes, units);
     }
@@ -127,38 +120,54 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
     }
 
     /// @notice Mint packs of `units` straight into ShapePacks and list each at once.
-    function build(uint256 units, uint256[] calldata backingProposals, uint256 minPay, bytes32 expected)
-        external nonReentrant returns (uint256)
-    {
+    function build(uint256 units, uint256[] calldata backingProposals, uint256 minPay, bytes32 expected) external returns (uint256) {
+        return _build(units, backingProposals, minPay, expected, gasleft());
+    }
+
+    function _build(uint256 units, uint256[] calldata backingProposals, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256) {
         _checkConfiguration(expected);
-        return StrategyLib.build(s, fwa, packs, shapes, units, backingProposals, minPay);
+        return StrategyLib.build(s, fwa, packs, shapes, units, backingProposals, minPay, gasStart);
     }
 
     /// @notice Relist idle packs at bounded backing proposals, checked against live economics.
-    function list(uint256[] calldata backingProposals, uint256 minPay, bytes32 expected) external nonReentrant returns (uint256) {
+    function list(uint256[] calldata backingProposals, uint256 minPay, bytes32 expected) external returns (uint256) {
+        return _list(backingProposals, minPay, expected, gasleft());
+    }
+
+    function _list(uint256[] calldata backingProposals, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256) {
         _checkConfiguration(expected);
-        return StrategyLib.list(s, fwa, packs, shapes, backingProposals, minPay);
+        return StrategyLib.list(s, fwa, packs, shapes, backingProposals, minPay, gasStart);
     }
 
     /// @notice Bounded journal or scan job, terminal resolutions and allocation cleanup.
-    function sync(uint256[] calldata listingIds, uint256 witnessId, uint256 minPay, bytes32 expected)
-        external nonReentrant returns (uint256)
-    {
+    function sync(uint256[] calldata listingIds, uint256 witnessId, uint256 minPay, bytes32 expected) external returns (uint256) {
+        return _sync(listingIds, witnessId, minPay, expected, gasleft());
+    }
+
+    function _sync(uint256[] calldata listingIds, uint256 witnessId, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256) {
         _checkConfiguration(expected);
-        return StrategyLib.sync(s, fwa, packs, listingIds, witnessId, _checkpointMode(), minPay);
+        return StrategyLib.sync(s, fwa, packs, listingIds, witnessId, _checkpointMode(), minPay, gasStart);
     }
 
     /// @notice Withdraw active listings: in wind-down, when FWA's live fees leave no edge, or for
     ///         ETH owed that free ETH and inventory cannot cover.
-    function unlist(uint256[] calldata listingIds, uint256 minPay, bytes32 expected) external nonReentrant returns (uint256) {
+    function unlist(uint256[] calldata listingIds, uint256 minPay, bytes32 expected) external returns (uint256) {
+        return _unlist(listingIds, minPay, expected, gasleft());
+    }
+
+    function _unlist(uint256[] calldata listingIds, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256) {
         _checkConfiguration(expected);
-        return StrategyLib.unlist(s, fwa, packs, listingIds, minPay, _shortfall());
+        return StrategyLib.unlist(s, fwa, packs, listingIds, minPay, _shortfall(), gasStart);
     }
 
     /// @notice Redeem idle packs to ETH while ETH is owed beyond liquid ETH, or in wind-down.
-    function liquidate(uint256 maxCount, uint256 minPay, bytes32 expected) external nonReentrant returns (uint256) {
+    function liquidate(uint256 maxCount, uint256 minPay, bytes32 expected) external returns (uint256) {
+        return _liquidate(maxCount, minPay, expected, gasleft());
+    }
+
+    function _liquidate(uint256 maxCount, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256) {
         _checkConfiguration(expected);
-        return StrategyLib.liquidate(s, packs, shapes, maxCount, minPay, _need());
+        return StrategyLib.liquidate(s, packs, shapes, maxCount, minPay, _need(), gasStart);
     }
 
     /// @notice Caller-funded fee collection (never paid).
@@ -172,12 +181,7 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
         StrategyLib.burnTokens(rewards, token, activeIds);
     }
 
-    function renew(uint256[] calldata returnedPackIds, uint256[] calldata backingProposals,
-        uint256[] calldata feeIds, uint256 minPay, bytes32 expected) external nonReentrant returns (uint256)
-    {
-        _checkConfiguration(expected);
-        return StrategyLib.renew(s, fwa, packs, shapes, returnedPackIds, backingProposals, feeIds, minPay);
-    }
+
 
     /// @notice Necessary maintenance and exit work remain caller funded under configuration drift.
     function recover(uint256[] calldata ids, uint256 witnessId) external nonReentrant {
@@ -186,13 +190,13 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
 
     function recoverUnlist(uint256[] calldata ids) external nonReentrant {
         s.callerFunded = true;
-        StrategyLib.unlist(s, fwa, packs, ids, 0, _shortfall());
+        StrategyLib.unlist(s, fwa, packs, ids, 0, _shortfall(), 0);
         s.callerFunded = false;
     }
 
     function recoverLiquidate(uint256 maxCount) external nonReentrant {
         s.callerFunded = true;
-        StrategyLib.liquidate(s, packs, shapes, maxCount, 0, _need());
+        StrategyLib.liquidate(s, packs, shapes, maxCount, 0, _need(), 0);
         s.callerFunded = false;
     }
 
@@ -236,19 +240,13 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
     function quote(uint256 gasAllowance, uint256 units, bool essential) external view returns (uint256) {
         return VaultLib.quote(s.params, gasAllowance, units, essential);
     }
-    function renewalQuote(uint256 returnedPackId, uint256 feeClaims, bool withdrawCredit) external view returns (uint256) {
-        return ScanLib.renewalQuote(s.params, s.book, returnedPackId, feeClaims, withdrawCredit);
-    }
+
     function operatingReserve() public view returns (uint256) { return VaultLib.operatingReserve(s.params); }
-    function renewalFloat() public view returns (uint256) { return VaultLib.renewalFloat(s.params); }
+
     function unresolvedUplift() public view returns (uint256) { return s.book.unresolvedKeepUplift; }
     function inventoryShapeCount(uint256 packId) external view returns (uint256) { return s.book.packShapeCount[packId]; }
-    function renewalEligible(uint256 packId) external view returns (bool) { return s.book.renewalEligible[packId]; }
-    function renewalState() external view returns (uint256 eligibleReturned, uint256 keptReplacements,
-        uint256 floatRequired, uint256 cashAvailable)
-    {
-        return (s.book.renewalEligibleCount, s.book.keptReplacements, renewalFloat(), _renewalCash());
-    }
+
+
 
     // ------------------------------------------------------------------ views
 
@@ -299,20 +297,10 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
         return VaultLib.accountedNav(s.params, s.book, fwa, packs, _free(), witnessId);
     }
 
-    function keeperCash() public view returns (uint256) {
-        uint256 free = _free();
-        uint256 float = s.windingDown ? 0 : renewalFloat();
-        return free > float ? free - float : 0;
-    }
-    /// @notice ETH still needed to refill the protected hold before incoming fees become spendable.
-    function fundingDeficit(bool renewal) external view returns (uint256) {
-        uint256 held = renewal ? _renewalHold() : s.windingDown ? 0 : renewalFloat();
-        uint256 free = _free();
-        return held > free ? held - free : 0;
-    }
+    function keeperCash() public view returns (uint256) { return _free(); }
     function liquidityNeed() external view returns (uint256) { return _need(); }
     function liquidityShortfall() external view returns (uint256) { return _shortfall(); }
-    function renewalCash() external view returns (uint256) { return _renewalCash(); }
+
     function freeEth() external view returns (uint256) { return _free(); }
     function idleEth() external view returns (uint256) { return _idle(); }
 

@@ -59,8 +59,8 @@ class LaunchValidationTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "missing"):
                         release.validate_launch_values(wrong, manager=manager)
 
-    def test_all_28_gas_fields_are_required_and_no_unknown_key_is_ignored(self):
-        self.assertEqual(len(release.GAS_FIELDS), 28)
+    def test_all_29_gas_fields_are_required_and_no_unknown_key_is_ignored(self):
+        self.assertEqual(len(release.GAS_FIELDS), 29)
         for key in release.GAS_FIELDS:
             with self.subTest(missing=key):
                 wrong = copy.deepcopy(self.main)
@@ -229,6 +229,16 @@ class ManagerDeploymentTests(unittest.TestCase):
         next(e for e in bad if e.get("type") == "constructor")["inputs"].append({"name": "policy", "type": "address"})
         with self.assertRaisesRegex(ValueError, "manager constructor"):
             release.validate_compiled_manager_abi(bad, self.factory_abi)
+
+    def test_migration_surface_and_retired_renewal_cannot_hide_in_old_abi(self):
+        for name in ('importPacks','unlistForWithdrawal'):
+            bad=[e for e in self.manager_abi if e.get('name') != name]
+            with self.assertRaisesRegex(ValueError,name):
+                release.validate_compiled_manager_abi(bad,self.factory_abi)
+        for name in ('renew','renewalFloat','renewalEligible'):
+            bad=copy.deepcopy(self.manager_abi)+[{'type':'function','name':name,'inputs':[],'outputs':[]}]
+            with self.assertRaisesRegex(ValueError,'retired'):
+                release.validate_compiled_manager_abi(bad,self.factory_abi)
 
     def _encoded_run(self):
         from eth_abi import encode

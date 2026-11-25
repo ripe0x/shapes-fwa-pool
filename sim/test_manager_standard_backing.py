@@ -39,7 +39,7 @@ class StandardBackingTests(unittest.TestCase):
         finally:S.MIN_BACKING=previous
 
     def test_current_cycle_costs_and_bid_keep_losses_are_absolute(self):
-        rows=S.diagnostic(self.parent)['rows']
+        rows=json.loads((S.ROOT/'docs/receipts/manager-closeout-economics.json').read_text())['comparison']['rows']
         current=[r for r in rows if r['backing_wei']==3*10**16 and r['mint_fee_per_shape_wei']==5*10**14]
         self.assertEqual(len(current),2)
         for row in current:
@@ -62,29 +62,12 @@ class StandardBackingTests(unittest.TestCase):
         self.assertTrue(historical)
         self.assertTrue(all(r['primary_mint_fees_wei']==3*10**15 for r in historical))
 
-    def test_frozen_paths_and_lineage_are_preserved_without_parent_mutation(self):
+    def test_frozen_paths_are_preserved_and_recomputation_is_explicitly_retired(self):
         before=self.parent_path.read_bytes()
+        self.assertEqual(self.parent['paths_per_cell'],8192)
         options=argparse.Namespace(paths=8192,seed_start=100000,window_end=None,workers=8)
-        stale = [name for name, expected in self.parent['source_sha256'].items()
-                 if S.MC.digest(S.ROOT/name) != expected]
-        if stale:
-            with self.assertRaisesRegex(ValueError, 'parent input changed'):
-                S.campaign_manifest(self.parent_path, options)
-            self.assertEqual(self.parent_path.read_bytes(), before)
-            options.paths = 4096
-            with self.assertRaisesRegex(ValueError, 'retains every frozen parent path'):
-                S.campaign_manifest(self.parent_path, options)
-            return
-        manifest=S.campaign_manifest(self.parent_path,options)
-        self.assertEqual(manifest['windows'],self.parent['windows'])
-        self.assertEqual(manifest['paths_per_cell'],8192)
-        self.assertEqual({c['backing_bps'] for c in manifest['cells']},{10000})
-        self.assertEqual(len(manifest['cells']),2)
-        self.assertEqual(manifest['parent_campaign_hash'],S.MC.canonical_hash(self.parent))
-        self.assertEqual(manifest['standard_backing_regime']['protocol_minimum']['value_wei'],25*10**15)
+        with self.assertRaisesRegex(RuntimeError,'pinned revision'):S.campaign_manifest(self.parent_path,options)
         self.assertEqual(self.parent_path.read_bytes(),before)
-        options.paths=4096
-        with self.assertRaises(ValueError):S.campaign_manifest(self.parent_path,options)
 
 
 if __name__=='__main__':unittest.main()

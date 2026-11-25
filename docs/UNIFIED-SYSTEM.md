@@ -1,6 +1,6 @@
 # Unified main Shapes pool
 
-Current owner scope: [MAIN-POOL-COMPLETION.md](MAIN-POOL-COMPLETION.md), OWNER-REQUIREMENTS A5.
+Current owner scope: [MAIN-POOL-COMPLETION.md](MAIN-POOL-COMPLETION.md), OWNER-REQUIREMENTS A8.
 This is an unsigned implementation candidate. Historical design and measurements are preserved
 under `release/history/e94fd99/`. They do not validate this configuration.
 
@@ -15,9 +15,10 @@ The original two-step ownership handover remains 48 hours. There is no external 
 ## Configuration and paid construction
 
 Launch units 3, mask 8: three directly minted 0.01 ETH Shapes in one 0.03 ETH pack. Every fresh Shape
-pays the actual live mint fee. The recorded baseline is 0.001 ETH per Shape at block 26,484,850:
-0.003 ETH creator revenue per fresh launch pack. No bulk mint, split, fee exemption or hidden subsidy.
-The 0.0005 ETH scenario is fork-only sensitivity, not a production fee change.
+pays the actual live mint fee. The historical 0.001 ETH fee was observed at block 26,484,850;
+the read-only refresh at block 26,493,799 found 0.0005 ETH per Shape. A fresh pack therefore accrued
+0.0015 ETH creator revenue in the current-fee local fork. No bulk mint, split, fee exemption or hidden subsidy.
+The 0.00025 ETH case is an isolated half-current-fee sensitivity, not a public fee change or production approval.
 
 Each owner can immediately change numerical Params and its named GasSchedule. An explicit accepted
 mint-fee maximum is separate from ordinary settings. Decreases lower actual spending; increases over
@@ -34,21 +35,17 @@ discount or redeem gas: a buyer may profitably take the bid. Buyer choice is nev
 preference. Local evaluation uses 70,000 bps, or 0.21 ETH backing separate from 0.03 ETH principal.
 That backing and the 25 bps checkpoint uplift value are provisional, not production approval.
 
-FreshAfterAcquisition retires a genuinely acquired return once, redeems its actual principal, pays
-for fresh primary mints and lists a replacement. Verified keeps authorize one replacement. Owed
-returns retain eligibility until actually recovered. Ordinary kicks/withdrawals authorize none.
-ReuseReturned relists the actual returned pack. Fresh mode never silently falls back to reuse.
-Exit inventory is liquidated without fresh minting. Zero recipe mask prevents builds and renewals;
-old inventory can still relist. Listing pause stops all new exposure.
+Returned packs are reused intact. There is one renewal behavior, with no fresh-return mode,
+replacement eligibility ledger or dedicated renewal float. A purchaser keep removes that pack;
+funded growth may build a replacement using paid primary mints. Zero recipe mask prevents fresh
+builds while old inventory may still relist. Listing pause stops all new exposure. Exit inventory
+is redeemed without reminting.
 
 ## Cash, pricing and holder accounting
 
-Growth preserves all liabilities, a separately derived renewal float and the maintenance reserve.
-One float is the maximum enabled-recipe backing plus accepted mint fees and full quoted renewal
-work at the gas ceiling. Returned principal funds replacement principal. No harvest is presumed.
-Routine payment cash excludes that float. Eligible renewal can consume it while preserving the
-maintenance reserve and owed redemptions. Accrued NAV is not spendable cash; bounded verified fee
-collection can fund genuine renewal need. Cash and spending permission are distinct conditions.
+Growth preserves holder liabilities and the owner's maintenance reserve. Cash and spending
+permission are separate: increasing a budget creates no ETH. Bounded collection of actual FWA
+fees may fund necessary maintenance; accrued NAV is not spendable cash.
 
 Deposits escrow gross cancellable principal. The committing checkpoint derives construction from
 its effective settings and live fee, then stores an epoch issuance ratio. Lazy settlements assign
@@ -73,17 +70,27 @@ keep uplift. The aggregate updates incrementally and removes the exact stored co
 terminal resolution, including owed returns. Pricing compares it with preflow NAV. One 0.18 ETH
 uplift needs at least 72 ETH preflow NAV at 25 bps; smaller pools wait for real settlement.
 
-## Quoted payment and bounded work
+## Bounded measured payment and work
 
-One payment calculation supplies envelopes, compensation and relevant charges: verified completed
-work times the account schedule, min(basefee + configured priority, class ceiling), routine markup
-on routine gas, flat work fees, then source/cash/permission limits. minPay protects a keeper's offer.
-No progress earns no repeat reward. Wallet gas and keeper actual billed expense are reported
-separately from account compensation. Raising a budget capacity never refills spent permission:
-old-rate accrual precedes the update, then the new capacity clamps it.
+Verified completed work determines the gas allowance cap. Actual pay uses the lesser of the
+captured gasleft span and that cap, plus the account's named overhead allowance. The price is
+min(actual transaction gas price, basefee + configured priority allowance, class gas ceiling).
+Routine markup applies to routine gas compensation; verified service units add the work fee.
+Cash, funding source and spending permission then clip the result. minPay rolls back all work
+when the final offer is too low. Quotes and holder charges remain conservative envelopes.
+No verified progress earns no overhead or repeat reward. Paid inputs must all be useful; stale,
+foreign, duplicate or unnecessary hints revert atomically. Unpaid recovery tolerates stale hints.
+
+The work span is gross gas before refunds, not receipt gasUsed. Keeper expense is measured from
+actual receipts and reported separately from account compensation. The candidate overhead of
+100,000 gas is provisional main-system calibration, not community's coefficient. Per-transaction
+overhead and positive markup can change incentives to split jobs; receipt comparisons must state
+that tradeoff. Raising capacity never refills spent permission: old-rate accrual precedes a
+settings update and the new capacity clamps it. Numeric calibration remains immediately owner
+adjustable. Changing the algorithm requires new code.
 
 No total position limit exists. Journal reads are capped at 128, own selections/terminals/prunes
-at 16, builds at 4, relisting batches at 8, renewal at 4, allocation proof at 32 entries and optional scans at
+at 16, builds at 4, relisting batches at 8, allocation proof at 32 entries and optional scans at
 96 positions. Mutable economic coefficients cannot increase these operation limits. Larger books
 use the journal. Receipt callbacks read no large configuration and call no external payment policy.
 Every real transaction remains subject to EIP-7825's 16,777,216 gas limit.
@@ -108,5 +115,20 @@ The app and CLI expose explicit caller-funded exits under a wallet spending cap.
 profitability never vetoes necessary work that the caller accepts. The community app/contracts,
 legacy selection and keeper remain intact; the main production app gate stays closed.
 
-Things that don't make sense until measured: a single float cannot guarantee unlimited rapid
-renewals; 25 bps causes small pools to wait; positive creator fees do not imply positive holder return.
+## Intact manager migration
+
+The owner pauses source and destination, unlists without entering exit mode, transfers actual
+pack NFTs and explicitly imports them at the destination. Import accepts canonical sealed packs,
+at most 16 per call and 30 Shapes per pack, verifies contents/custody/principal and records actual
+Shape counts. It neither mints nor pays a keeper. A sealed recovery pack can be withdrawn by its
+checked index and ID even when another recovery entry is an unsealed claim. Burned pack NFTs
+cannot move intact. Recovery claims retain their original owner-controlled cash recovery path.
+The factory remains immutable and has no authority over existing managers.
+
+The UI checks both owners, official factory membership, clone runtime, dependencies and import
+support; it retains nonce-based spend reservations and rechecks canonical receipts in bounded
+pages. ETH is an explicit source-to-owner withdrawal followed by a reviewed wallet transfer.
+Migration never turns on permissionless liquidation.
+
+Things that don't make sense until measured: 25 bps causes small pooled vaults to wait; positive
+creator fees do not imply positive owner return; per-call overhead may favor splitting work.

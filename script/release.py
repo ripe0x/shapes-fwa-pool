@@ -104,6 +104,27 @@ MANAGER_EVIDENCE += ["docs/receipts/manager-baseline-settings.json",
                      "docs/receipts/manager-operating-economics.json",
                      "sim/out/manager-calibrated-assessment/manifest.json",
                      "sim/out/manager-calibrated-assessment/summary.json"]
+MANAGER_EVIDENCE += ["deploy/manager-measured-dry-run.json",
+                     "docs/receipts/manager-measured-50k-receipts.json",
+                     "docs/receipts/manager-measured-sync-contexts.json",
+                     "docs/receipts/manager-measured-cost-calibration.json",
+                     "docs/receipts/manager-measured-reconciliation.json",
+                     "docs/receipts/manager-measured-splitting-50k.json",
+                     "docs/receipts/manager-measured-owner-exit.json",
+                     "docs/receipts/manager-measured-owner-batch-exit.json",
+                     "docs/receipts/manager-measured-ordinary-keeper.json",
+                     "docs/receipts/manager-measured-ordinary-relist.json",
+                     "docs/receipts/manager-measured-ui-create.json",
+                     "docs/receipts/manager-measured-ui-migration.json",
+                     "docs/receipts/manager-measured-ui-canonical.json",
+                     "docs/receipts/manager-measured-postflight-create.json",
+                     "docs/receipts/manager-measured-postflight-readback.json",
+                     "docs/receipts/manager-measured-economics.md",
+                     "docs/receipts/manager-measured-verification.md",
+                     "sim/out/manager-measured-a8-bounded/manifest.json",
+                     "sim/out/manager-measured-a8-bounded/failure.json",
+                     "keeper/rehearse_manager_measured.py",
+                     "keeper/rehearse_manager_sync_contexts.py"]
 
 
 def target_files(target):
@@ -220,8 +241,8 @@ def _validate_params_abi(component, label):
     if component.get("type") != "tuple" or _abi_fields(fields) != expected:
         raise ValueError(f"{label} Params names/types/order differ from keeper.config.PARAM_FIELDS aliases")
     gas = fields[-1].get("components", [])
-    if len(GAS_FIELDS) != 28 or _abi_fields(gas) != [(key, "uint32") for key in GAS_FIELDS]:
-        raise ValueError(f"{label} GasSchedule names/types/order differ from the complete 28 keeper.config.GAS_FIELDS")
+    if len(GAS_FIELDS) != 29 or _abi_fields(gas) != [(key, "uint32") for key in GAS_FIELDS]:
+        raise ValueError(f"{label} GasSchedule names/types/order differ from the complete 29 keeper.config.GAS_FIELDS")
 
 
 def validate_compiled_launch_abi(vault_abi, factory_abi):
@@ -261,9 +282,17 @@ def validate_compiled_manager_abi(manager_abi, factory_abi):
     if _abi_fields(initial.get("inputs", [])) != [("owner_", "address"), ("p", "tuple")]:
         raise ValueError("compiled manager initialize must be only (owner_, p)")
     _validate_params_abi(initial["inputs"][1], "manager initialize")
+    for name, fields in (("importPacks", [("ids", "uint256[]"), ("expected", "bytes32")]),
+                         ("unlistForWithdrawal", [("listingIds", "uint256[]")]),
+                         ("withdrawRecoveryPack", [("to", "address"), ("index", "uint256"),
+                                                   ("expectedPackId", "uint256")])):
+        entry = _abi_entry(manager_abi, "function", name)
+        if _abi_fields(entry.get("inputs", [])) != fields or entry.get("outputs") != []:
+            raise ValueError(f"compiled manager {name} does not match the owner-controlled migration ABI")
     for abi in (manager_abi, factory_abi):
-        if any(e.get("name") in ("keeperPolicy", "policy", "setPolicy") for e in abi):
-            raise ValueError("compiled manager ABI contains retired external policy")
+        if any(e.get("name") in ("keeperPolicy", "policy", "setPolicy", "renew", "renewalEligible",
+                "renewalState", "renewalFloat", "renewalQuote", "fundingDeficit") for e in abi):
+            raise ValueError("compiled manager ABI contains retired policy or fresh-renewal machinery")
 
 
 def _launch_json(path):

@@ -189,8 +189,6 @@ contract ForkMaxBatchGasTest is ForkBase {
         setPackAsk(0.33 ether);
         VaultLib.Params memory p = defaultParams();
         p.packUnitsMask = uint64(1) << 29;
-        p.renewalMode = VaultLib.RenewalMode.FreshAfterAcquisition;
-        p.renewalFloatCount = 1;
         p.gasCeiling = 0.5 gwei;
         p.reserve = 0.005 ether;
         vm.deal(address(this), 40 ether);

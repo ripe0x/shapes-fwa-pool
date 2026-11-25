@@ -18,15 +18,15 @@ def partition():
         waiting_observations={},randomness_mode='request-keyed-v1',request_events_sha256='pure-accounting-example',
         unknown_owner_gas_calls=0,keeper_unmeasured_operations=[],owner_total_value_before_gas_wei=O.CAPITAL-30,
         owner_exit_reserved_wei=10,owner_exit_spent_wei=7,owner_exit_spend_limit_wei=100,keeper_zero_loss_enabled=True,
-        count_aware_gas_curves_enabled=True,physical_sync_cost_basis_enabled=True,keeper_estimate_acceptance_enabled=True,keeper_receipt_history_enabled=True)
+        count_aware_gas_curves_enabled=True,physical_sync_cost_basis_enabled=True,keeper_estimate_acceptance_enabled=True,keeper_receipt_history_enabled=True,compensation_mode='bounded-measured-v1')
 
 
 class OperatingAssessmentTests(unittest.TestCase):
     def test_fixed_design_covers_requested_cross_product_and_stress_cases(self):
-        self.assertEqual(len(O.CELLS),24)
+        self.assertEqual(len(O.CELLS),12)
         self.assertEqual({c['mint_fee_wei'] for c in O.CELLS},{250000000000000,500000000000000,1000000000000000})
         self.assertEqual({c['backing_bps'] for c in O.CELLS},{10000,70000})
-        self.assertEqual({c['renewal_mode'] for c in O.CELLS},{0,1})
+        self.assertTrue(all('renewal_mode' not in cell for cell in O.CELLS))
         frozen=dict(buyer_regimes=['observed-choices','forced-responsive-bid-stress'],
             windows=[dict(id='first',seeds=[10,11]),dict(id='second',seeds=[12,13])])
         tasks=O.tasks(frozen)
@@ -123,6 +123,81 @@ class OperatingAssessmentTests(unittest.TestCase):
         costs['measurements']['create'][0]['estimateKind']='rpc-estimate'
         with self.assertRaisesRegex(ValueError,'raw RPC estimate'):
             O.verify_measurement_receipts(costs,[actual])
+
+    def test_paid_and_owner_curve_envelopes_use_distinct_arithmetic_inputs(self):
+        # Pure envelope arithmetic, not a successful response from any service.
+        import copy
+        samples={op:[dict(workCount=1,gasUsed=100,gasEstimate=150,estimateKind='rpc-estimate')]
+                 for op in O.REQUIRED_GAS if op!='recover_sync'}
+        samples['recover']=[dict(workCount=1,gasUsed=200,gasEstimate=250,estimateKind='rpc-estimate')]
+        for op in O.METERED_OPERATIONS:samples[op][0]['measuredGas']=80
+        for op in ('recoverUnlist','recoverLiquidate'):
+            samples[op]=[dict(workCount=1,gasUsed=200,gasEstimate=250,estimateKind='rpc-estimate')]
+        curves={op:dict(single_billed_gas=100,single_estimate_gas=150,
+                       billed_per_extra_work=0,estimate_per_extra_work=0) for op in O.REQUIRED_GAS}
+        for op in O.METERED_OPERATIONS:curves[op].update(single_meter_gas=80,meter_per_extra_work=0)
+        unpaid=dict(single_billed_gas=200,single_estimate_gas=250,
+                    billed_per_extra_work=0,estimate_per_extra_work=0)
+        curves['recover_sync']=unpaid.copy()
+        costs=dict(compensation_mode='bounded-measured-v1',measurements=samples,gas_curves=curves,
+                   owner_gas_curves={op:unpaid.copy() for op in ('unlist','liquidate')},
+                   gas_proxy={op:100 for op in O.REQUIRED_GAS},
+                   gas_estimate_proxy={op:250 for op in O.OWNER_OPERATIONS},
+                   gas_meter_proxy={op:80 for op in O.METERED_OPERATIONS},
+                   unmeasured_operations=['larger sync batches'])
+        samples['sync'][0].update(gasAllowance=372000,workUnits=0)
+        samples['recover'][0]['verifiedContext']=dict(gasAllowance=372000,workUnits=0,pairedPaidHash='arithmetic-only')
+        costs.update(fullGasSchedule={'sync':1},
+            sync_contexts={'372000:0':dict(single_billed_gas=100,single_estimate_gas=150,measured_gas=80)},
+            owner_sync_contexts={'372000:0':dict(single_billed_gas=200,single_estimate_gas=250)})
+        O.qualify_costs(costs,True)
+        self.assertEqual(O.F.receipt_gas(curves,'unlist',1,999999),100)
+        self.assertEqual(O.F.receipt_gas(O.owner_curves(costs),'unlist',1),200)
+        self.assertEqual(O.supported_work(costs)['sync'],1)
+        self.assertEqual(O.supported_work(costs,owner=True)['recover_sync'],1)
+        with self.assertRaisesRegex(ValueError,'actual receipt support'):
+            O.F.metered_work_gas(curves,costs['gas_meter_proxy'],'sync',2,O.supported_work(costs))
+        bad=copy.deepcopy(costs);bad['unmeasured_operations'].append('harvest')
+        with self.assertRaisesRegex(ValueError,'unknown or unmeasured'):O.qualify_costs(bad,True)
+        bad=copy.deepcopy(costs);bad['owner_gas_curves']['unlist']['single_billed_gas']=100
+        with self.assertRaisesRegex(ValueError,'complete recorded sample envelope'):O.qualify_costs(bad,True)
+        bad=copy.deepcopy(costs);bad['measurements']['sync'][0].pop('measuredGas')
+        with self.assertRaisesRegex(ValueError,'actual work meter'):O.qualify_costs(bad,True)
+
+    def test_sync_contexts_cannot_reuse_terminal_receipts_for_foreign_tails(self):
+        contexts={'455000:1':dict(single_billed_gas=100,single_estimate_gas=150,measured_gas=80)}
+        self.assertEqual(O.F.sync_context_gas(contexts,455000,1)['measured_gas'],80)
+        for allowance,units,count in ((2919000,0,1),(455000,1,2),(455000,0,1)):
+            with self.subTest(allowance=allowance,units=units,count=count),self.assertRaisesRegex(ValueError,'unmeasured sync context'):
+                O.F.sync_context_gas(contexts,allowance,units,count)
+
+    def test_current_meter_profile_is_bound_to_actual_five_field_events(self):
+        import copy
+        costs=json.loads((O.ROOT/'docs/receipts/manager-measured-cost-calibration.json').read_text())
+        O.qualify_costs(costs,True)
+        refs=costs.get('receipt_inputs') or [dict(path=costs['receipts'],sha256=costs['receipts_sha256'])]
+        packets=[json.loads((O.ROOT/ref['path']).read_text()) for ref in refs]
+        O.verify_measurement_receipts(costs,packets)
+        changed=copy.deepcopy(costs)
+        context=O.operation_samples(changed,'recover_sync',owner=True)[0]['verifiedContext']
+        context['gasAllowance']+=1
+        with self.assertRaisesRegex(ValueError,'paired-state provenance'):O.verify_measurement_receipts(changed,packets)
+        changed=copy.deepcopy(costs)
+        first=next(iter(changed['sync_contexts']))
+        changed['sync_contexts'][first]['single_billed_gas']+=1
+        with self.assertRaisesRegex(ValueError,'sync context envelope'):O.qualify_costs(changed,True)
+        for op in ('unlist','liquidate'):
+            self.assertTrue(O.operation_samples(costs,op,owner=True))
+            self.assertTrue(all('measuredGas' not in row and 'measuredWork' not in row
+                                for row in O.operation_samples(costs,op,owner=True)))
+        self.assertEqual(O.supported_work(costs)['sync'],1)
+        with self.assertRaisesRegex(ValueError,'actual receipt support'):
+            O.F.metered_work_gas(costs['gas_curves'],costs['gas_meter_proxy'],'sync',2,O.supported_work(costs))
+        changed=copy.deepcopy(costs)
+        sample=O.operation_samples(changed,'build')[0]
+        meter=sample.get('measuredWork',sample)
+        meter['measuredGas']+=1
+        with self.assertRaisesRegex(ValueError,'work meter differs'):O.verify_measurement_receipts(changed,packets)
 
     def test_old_cost_packet_cannot_be_promoted_to_final_operating_evidence(self):
         costs=json.loads((O.ROOT/'docs/receipts/manager-r2-cost-calibration.json').read_text())

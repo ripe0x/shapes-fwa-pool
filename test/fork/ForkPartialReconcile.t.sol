@@ -11,7 +11,7 @@ import {ReconcileTrace} from "../utils/ReconcileTrace.sol";
 
 /// @dev Independent Python replay of a real partial fill and complete wind-down, no FWA selection.
 contract ForkPartialReconcileTest is ForkBase {
-    string private constant OUT = "sim/out/reconcile-partial-trace.jsonl";
+    string private constant OUT = "sim/out/reconcile-measured-partial-trace.jsonl";
     uint256 private lastKeeper;
 
     function setUp() public override {
@@ -34,6 +34,7 @@ contract ForkPartialReconcileTest is ForkBase {
         preexisting = address(vault).balance - 0.01 ether;
         vm.deal(owner, 1 ether); vm.deal(keeper, 1 ether); vm.deal(alice, 50 ether); vm.deal(bob, 50 ether);
         lastKeeper = keeper.balance;
+        vm.recordLogs();
     }
 
     function assertGasContext() external {
@@ -43,6 +44,7 @@ contract ForkPartialReconcileTest is ForkBase {
     function _snap(string memory step) private {
         ReconcileTrace.snapshot(vault, alice, bob, keeper.balance - lastKeeper, step, OUT);
         lastKeeper = keeper.balance;
+        vm.recordLogs();
     }
 
     function _listedIds(uint256 count) private returns (uint256[] memory ids) {
@@ -61,8 +63,8 @@ contract ForkPartialReconcileTest is ForkBase {
 
     function test_reconcilePartialRedemptionAndWindDown() public {
         this.assertGasContext();
-        if (vm.exists(OUT)) vm.removeFile(OUT);
-        vm.writeLine(OUT, string.concat('{"step":"setup","actors":', ReconcileTrace.actors(vault, alice, bob, keeper), ',"deployBalance":', vm.toString(address(vault).balance),
+        require(!vm.exists(OUT), "preserve prior measured pooled trace");
+        vm.writeLine(OUT, string.concat('{"compensationMode":"bounded-measured-v1","step":"setup","actors":', ReconcileTrace.actors(vault, alice, bob, keeper), ',"deployBalance":', vm.toString(address(vault).balance),
             ',"initCursor":', vm.toString(vault.acquisitionCursor()), ',"count":6,"units":', vm.toString(UNITS),
             ',"essentialCap":0,"mintFee":', vm.toString(SHAPES.mintFee()), '}'));
         uint256 ck = vault.requestCharge();

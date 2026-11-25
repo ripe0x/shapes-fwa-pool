@@ -9,7 +9,7 @@ OWNER-REQUIREMENTS A5 and [MAIN-POOL-COMPLETION.md](MAIN-POOL-COMPLETION.md).
 | Vault holder | Gross escrow, checkpoint sponsorship and wallet gas | Priced shares, pro-rata redemption/distribution claims, attributed funding refunds |
 | Manager owner | Their own cash and wallet gas | Their manager's cash, packs and immediate settings |
 | Account owner | Economic configuration | No pooled-asset withdrawal; can perform verified keeper work like other callers |
-| Keeper | Actual transaction gas | Account's verified quoted compensation within source/cash/permission limits |
+| Keeper | Actual transaction gas | Account's bounded measured compensation within source/cash/permission limits |
 | Purchaser | FWA acquisition and settlement | Actual pack or actual protocol bid, at their choice |
 | Shapes creator | Primary mint service | Actual paid mint fees, never assumed recycled as sponsorship |
 | FWA | Listing custody, acquisitions and fee accrual | Protocol cuts, bid backing and settlement fees under real deployed rules |
@@ -26,7 +26,6 @@ OWNER-REQUIREMENTS A5 and [MAIN-POOL-COMPLETION.md](MAIN-POOL-COMPLETION.md).
 | Tracked pack principal | Actual owned/allocated/owed redeemable principal, counted once across custody changes |
 | Active FWA backing | Posted cash, removed once at acquisition or withdrawal |
 | Pending fees / fee credit | Exact entitlement, counted once; not cash until actual collection |
-| Renewal eligibility | Single-use verified work permission; zero additional NAV |
 | Unresolved keep uplift | Conservative uncertainty bound; zero additional NAV |
 | FWA token rewards | Zero ETH NAV; public claim-and-burn remains unpaid |
 

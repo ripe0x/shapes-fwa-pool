@@ -8,12 +8,12 @@ PARAM_FIELDS = [
     ('maxTipWei', 'uint64'), ('workFeeWei', 'uint64'), ('routineCapWei', 'uint64'),
     ('routineRatePerDayWei', 'uint64'), ('essentialCapWei', 'uint64'), ('essentialRatePerDayWei', 'uint64'),
     ('reserveWei', 'uint128'), ('tvlCapWei', 'uint128'), ('backingRatioBps', 'uint32'),
-    ('renewalMode', 'uint8'), ('renewalFloatCount', 'uint16'), ('acceptedMintFeeWei', 'uint64'),
+    ('acceptedMintFeeWei', 'uint64'),
     ('minDepositWei', 'uint64'), ('minDistributionWei', 'uint64'),
 ]
 GAS_FIELDS = ('checkpoint allocationEntry allocationRead build buildPack buildShape list listed sync requiredTail '
               'distributionProof journal scan selected synced pruned unlist unlisted liquidate liquidatePack '
-              'redeemShape recoveryBase recoveryShape recoveryUnseal harvest harvested credit fund').split()
+              'redeemShape recoveryBase recoveryShape recoveryUnseal harvest harvested credit fund overhead').split()
 GAS_T = '(' + ','.join(['uint32'] * len(GAS_FIELDS)) + ')'
 PARAMS_T = '(' + ','.join([t for _, t in PARAM_FIELDS] + [GAS_T]) + ')'
 PARAMS_ORDER = [k for k, _ in PARAM_FIELDS]
@@ -21,12 +21,12 @@ GAS_DEFAULTS = dict(zip(GAS_FIELDS, (
     500_000, 6_000, 30_000, 360_000, 300_000, 130_000, 280_000, 825_000,
     125_000, 120_000, 80_000, 22_000, 30_000, 180_000, 120_000, 45_000,
     340_000, 285_000, 75_000, 80_000, 35_000, 100_000, 35_000, 70_000,
-    125_000, 80_000, 40_000, 40_000)))
+    125_000, 80_000, 40_000, 40_000, 100_000)))
 GAS_KEYS = dict(zip(GAS_FIELDS, (
     'checkpoint', 'allocation_entry', 'allocation_read', 'build', 'build_pack', 'build_shape',
     'list', 'listed', 'sync', 'journal_tail', 'distribution_proof', 'journal', 'scan', 'selected',
     'synced', 'pruned', 'unlist', 'unlisted', 'liquidate', 'liq_pack', 'redeem_shape',
-    'recovery_base', 'recovery_shape', 'recovery_unseal', 'harvest', 'harvested', 'sync_credit', 'sync_funding')))
+    'recovery_base', 'recovery_shape', 'recovery_unseal', 'harvest', 'harvested', 'sync_credit', 'sync_funding', 'overhead')))
 
 
 def params_values(values):

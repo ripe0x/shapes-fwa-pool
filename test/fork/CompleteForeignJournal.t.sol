@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
 import {GasQuotes} from "../utils/GasQuotes.sol";
 
 import {SelectionBase} from "./ForkSelection.t.sol";
@@ -79,7 +81,6 @@ contract CompleteForeignJournalTest is SelectionBase {
         VaultLib.Params memory p;
         p.gasSchedule = VaultLib.defaultGasSchedule();
         p.backingRatioBps = 12_000;
-        p.renewalMode = VaultLib.RenewalMode.ReuseReturned;
         p.acceptedMintFee = 0.001 ether;
         p.minDeposit = 0.01 ether;
         p.minDistribution = 0.01 ether;
@@ -149,8 +150,9 @@ contract CompleteForeignJournalTest is SelectionBase {
             ? GasQuotes.Q_REQUIRED_TAIL + open * GasQuotes.Q_SCAN
             : GasQuotes.Q_REQUIRED_TAIL + backlog * GasQuotes.Q_JOURNAL;
         bytes32 _expected2 = TestVaultOps.configurationHash(vault);
+        vm.recordLogs();
         vm.prank(keeper); uint256 pay = vault.sync(new uint256[](0), 0, 1, _expected2);
-        assertEq(pay, gasQ * 0.2 gwei);
+        assertEq(pay, MeasuredPay.gross(vault, gasQ, 0, false, 0.2 gwei));
         assertEq(keeper.balance - before, pay);
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
         assertEq(vault.pendingDepositTotal(), escrow, "journal payment cannot consume deposit escrow");

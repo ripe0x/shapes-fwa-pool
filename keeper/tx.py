@@ -60,7 +60,7 @@ EXPECTED = {  # selector -> name: the vault refused because the work is done, ea
 
 # A competitor may advance the journal, consume a receipt, change the fee witness or reserve a
 # proposed backing between our pinned read and preflight. Refresh the index and quote again.
-REFRESH_ERRORS = {"ConfigurationChanged", "BadWitness", "InvalidBacking", "CatchUpFirst", "PendingReceipts", "NeedsPrune", "SyncFirst"}
+REFRESH_ERRORS = {"ConfigurationChanged", "BadWitness", "InvalidBacking", "CatchUpFirst", "PendingReceipts", "NeedsPrune", "SyncFirst", "UnusedPaidInput"}
 EXPECTED.update({"0x" + keccak(text=f"{name}()").hex()[:8]: name for name in REFRESH_ERRORS})
 
 ADMISSION_WAIT = {"InvalidListing", "InvalidBacking", "InsufficientBacking"}

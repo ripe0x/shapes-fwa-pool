@@ -1,7 +1,13 @@
 # Main pool completion scope, 2026-11-24
 
-This engineering record carries the owner's current implementation request. The chat request is
-authoritative and supersedes older six-unit, compulsory buyer-keep and external-policy assumptions.
+> **Historical A5 implementation brief.** The owner's later A8 decision makes individual managers
+> reuse-only with bounded measured keeper pay and intact pack import. The shared vault remains
+> closed. Current manager behavior and evidence are in [REPORT.md](REPORT.md),
+> [SETTINGS.md](release/SETTINGS.md) and [MANAGER-RUNBOOK.md](release/MANAGER-RUNBOOK.md).
+
+This engineering record carries the owner's A5 implementation request. That chat request superseded
+older six-unit, compulsory buyer-keep and external-policy assumptions, and A8 now supersedes its
+manager renewal and payment requirements.
 Prior evidence and approvals apply only to their original code/configuration.
 
 ## Outcome and boundaries
@@ -66,31 +72,23 @@ pay once; keeper actual gas/margin analyzed separately; holder wallet gas is add
 
 ## Renewal and funding
 
-Two explicit modes: FreshAfterAcquisition and ReuseReturned. Local candidate uses fresh. An acquired
-pack returning permits bounded retirement and replacement with three paid mints and listing WHEN
-funded. Completed acquisition authorizes replacement only ONCE, from verified protocol state and
-actual ownership. Preserve legitimate eligibility through owed/delayed recovery. Ordinary unselected
-withdrawal/kick grants none. Exit inventory is never reminted. Insufficient cash/permission is
-visible waiting, no silent reuse fallback. Eligibility is permission, never extra NAV. Redeem actual
-returned principal. Processing incremental/bounded. No cadence engine, substitute fee or subsidy.
-
-Derive renewal float SEPARATELY from maintenance reserve. Growth preserves both plus liabilities;
-eligible renewal can consume its designated float under documented rules. Accrued NAV is not cash.
-Bounded genuine renewal harvesting may fund need using actual receipt checks; avoid unnecessary
-harvest. Distinguish insufficient cash from exhausted spending permission; raising permission is
-not funding.
+A8 supersedes the earlier two-mode proposal. Returned packs are reused intact, without retiring
+and reminting. There is no renewal eligibility ledger or dedicated float. A purchaser keep removes
+the pack; funded growth can build its replacement through three paid mints. Growth preserves the
+maintenance reserve and holder liabilities. Accrued NAV is not cash; bounded actual fee collection
+may fund necessary work. Cash shortage and exhausted spending permission remain distinct waits.
 
 ## Local economic candidate (not production approval)
 
 - Pack 0.03 ETH; verified current mint fee baseline.
 - Backing ratio 70,000 bps, 0.21 ETH separate backing.
-- Fresh paid replacement after completed acquisitions.
-- One separately funded renewal float; 0.005 ETH maintenance reserve.
+- Reuse returned packs; paid new builds only for opening, growth and kept replacements.
+- No renewal float; 0.005 ETH maintenance reserve.
 - Caller-funded shared unwind and funded checkpoints.
 - Maximum unresolved keep uplift 25 bps of preflow NAV.
 
 Backing 0.21 and uplift25 are provisional evaluation inputs, NOT approved production defaults.
-Recalculate first productive opening, capital, float coverage under early acquisition bursts,
+Recalculate first productive opening, capital and cash coverage under early acquisition bursts,
 checkpoint waiting and low-activity losses using actual implemented configuration/receipt costs.
 Old 0.24/0.465 ETH figures are unvalidated leads. One bounded evaluation of backing/funding around
 fixed0.03 recipe. Preserve owner gate: 10% annual net gas, trailing30day successful activity, tokens0.

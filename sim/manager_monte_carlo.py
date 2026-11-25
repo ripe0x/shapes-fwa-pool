@@ -202,6 +202,7 @@ def run_path(task):
 
 
 def input_manifest(args):
+    raise RuntimeError('Historical fixed/Fresh financial generator requires its pinned revision')
     import forward as F
     from formal import PIN, window
     ends = sorted(args.window_end or [PIN['timestamp']-30*86400, PIN['timestamp']])
@@ -377,6 +378,7 @@ def summarize(rows, manifest):
 
 
 def main():
+    raise SystemExit('Historical fixed/Fresh study: use its pinned revision; active evaluations require manager_operating_assessment.py with a current measured profile')
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--execute',action='store_true');ap.add_argument('--summarize-only',action='store_true')
     ap.add_argument('--check',action='store_true',help='Validate all expected saved paths and regenerate the summary without running paths')

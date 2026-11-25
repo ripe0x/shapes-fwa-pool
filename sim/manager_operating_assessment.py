@@ -16,15 +16,19 @@ from manager_assessment import feasible_burst
 import manager_monte_carlo as MC
 import manager_standard_backing as S
 from keeper import BILLED_PER_ESTIMATE
+from eth_utils import keccak
 
 ROOT = Path(__file__).resolve().parent.parent
 CAPITAL = 5 * 10**17
 REQUIRED_GAS = ('create', 'setExiting', 'withdraw', 'unlist', 'liquidate', 'recover_sync',
-                'processAcquisitions', 'build', 'renew', 'list', 'sync', 'harvest')
-CELLS = tuple(dict(id=f'm{mode}-b{backing}-f{fee}-g{gas}', renewal_mode=mode,
-                  backing_bps=backing, mint_fee_wei=fee, total_gas_gwei=gas)
-              for mode in (0, 1) for backing in (70000, 10000)
-              for fee in (25*10**13, 5*10**14, 10**15) for gas in (.2, .5))
+                'processAcquisitions', 'build', 'list', 'sync', 'harvest')
+METERED_OPERATIONS=('build','list','sync','unlist','liquidate')
+OWNER_OPERATIONS=('create','setExiting','withdraw','unlist','liquidate','recover_sync','processAcquisitions','harvest')
+OWNER_SAMPLE_ALIASES={'recover_sync':'recover','unlist':'recoverUnlist','liquidate':'recoverLiquidate'}
+KNOWN_UNSUPPORTED=('larger sync batches',)
+CELLS = tuple(dict(id=f'b{backing}-f{fee}-g{gas}',backing_bps=backing,
+                  mint_fee_wei=fee,total_gas_gwei=gas)
+              for backing in (70000,10000) for fee in (25*10**13,5*10**14,10**15) for gas in (.2,.5))
 WORKER = None
 
 
@@ -39,9 +43,20 @@ def check_sources(expected):
 
 
 
-def operation_samples(costs, operation):
-    aliases={'recover_sync':'recover','unlist':'recoverUnlist','liquidate':'recoverLiquidate'}
-    return costs['measurements'].get(operation,costs['measurements'].get(aliases.get(operation,''),[]))
+def operation_samples(costs, operation, owner=False):
+    name=OWNER_SAMPLE_ALIASES.get(operation,operation) if owner else operation
+    if not owner and operation=='recover_sync':
+        return costs['measurements'].get(operation,costs['measurements'].get('recover',[]))
+    return costs['measurements'].get(name,[])
+
+
+def owner_curves(costs):
+    return costs.get('gas_curves',{}) | costs.get('owner_gas_curves',{})
+
+
+def supported_work(costs, owner=False):
+    operations=OWNER_OPERATIONS if owner else METERED_OPERATIONS
+    return {op:max(s['workCount'] for s in operation_samples(costs,op,owner)) for op in operations}
 
 
 
@@ -55,10 +70,10 @@ def estimate_samples(samples):
     return selected
 
 
-def verify_gas_curves(costs):
-    curves=costs.get('gas_curves',{})
-    for operation in REQUIRED_GAS:
-        samples=operation_samples(costs,operation)
+def verify_gas_curves(costs, owner=False):
+    curves=owner_curves(costs) if owner else costs.get('gas_curves',{})
+    for operation in (OWNER_OPERATIONS if owner else REQUIRED_GAS):
+        samples=operation_samples(costs,operation,owner)
         if operation not in curves or not samples:
             raise ValueError('missing count-aware gas curve: '+operation)
         for sample in samples:
@@ -79,6 +94,16 @@ def verify_gas_curves(costs):
         est_slope=max([0]+[-(-(sample.get('gasEstimate')-estimate)//(sample['workCount']-1)) for sample in selected if sample['workCount']>1])
         expected=dict(single_billed_gas=billed,single_estimate_gas=estimate,
             billed_per_extra_work=bill_slope,estimate_per_extra_work=est_slope)
+        if costs.get('compensation_mode')=='bounded-measured-v1' and not owner and operation in METERED_OPERATIONS:
+            meter_samples=[sample for sample in samples if 'measuredGas' in sample or isinstance(sample.get('measuredWork'),dict)]
+            if len(meter_samples)!=len(samples):
+                raise ValueError('paid operation sample lacks actual work meter: '+operation)
+            meters=[(sample['workCount'],sample.get('measuredWork',sample)['measuredGas']) for sample in meter_samples]
+            if any(type(value) is not int or value<0 for _,value in meters):
+                raise ValueError('invalid recorded work span: '+operation)
+            single=max(value for count,value in meters if count==1)
+            slope=max([0]+[-(-(value-single)//(count-1)) for count,value in meters if count>1])
+            expected.update(single_meter_gas=single,meter_per_extra_work=slope)
         if curves[operation]!=expected:
             raise ValueError('gas curve does not match complete recorded sample envelope: '+operation)
         for sample in samples:
@@ -90,22 +115,47 @@ def verify_gas_curves(costs):
                 raise ValueError('gas curve understates selected estimate work: '+operation)
 
 
+def verify_sync_contexts(costs):
+    if not isinstance(costs.get('fullGasSchedule'),dict) or not costs['fullGasSchedule']:
+        raise ValueError('sync contexts require recorded full gas schedule')
+    for owner,key in ((False,'sync_contexts'),(True,'owner_sync_contexts')):
+        expected={}
+        for sample in operation_samples(costs,'sync' if not owner else 'recover_sync',owner):
+            context=sample.get('verifiedContext') if owner else sample.get('measuredWork',sample)
+            if not isinstance(context,dict) or any(type(context.get(n)) is not int or context[n]<0 for n in ('gasAllowance','workUnits')):
+                raise ValueError('sync sample lacks verified allowance/units context')
+            if sample['workCount']!=1:
+                raise ValueError('larger sync contexts are unmeasured')
+            if owner and not context.get('pairedPaidHash'):
+                raise ValueError('owner sync context lacks paired paid receipt')
+            name=f"{context['gasAllowance']}:{context['workUnits']}"
+            row=dict(single_billed_gas=sample['gasUsed'],single_estimate_gas=sample['gasEstimate'])
+            if not owner:row['measured_gas']=context['measuredGas']
+            expected[name]={field:max(value,expected.get(name,{}).get(field,0)) for field,value in row.items()}
+        if not expected or costs.get(key)!=expected:
+            raise ValueError('sync context envelope differs from actual recorded samples: '+key)
+
+
 def qualify_costs(costs, final):
+    if final:
+        if costs.get('compensation_mode')!='bounded-measured-v1':
+            raise ValueError('current assessment requires new measured-compensation receipts, not historical fixed quotes')
+        if any(type(costs.get('gas_meter_proxy',{}).get(op)) is not int or costs['gas_meter_proxy'][op]<0 for op in METERED_OPERATIONS):
+            raise ValueError('paid operations require independently recorded work meters')
     if any(not isinstance(costs.get('gas_proxy', {}).get(op), int) or costs['gas_proxy'][op] <= 0 for op in REQUIRED_GAS):
         raise ValueError('positive measured/proxy gas required for all owner and operating operations')
-    if final and costs.get('unmeasured_operations') != []:
-        raise ValueError('final evaluation requires no unmeasured required operations')
+    if final and any(op not in KNOWN_UNSUPPORTED for op in costs.get('unmeasured_operations', [])):
+        raise ValueError('final evaluation has unknown or unmeasured required operations')
     if final:
         verify_gas_curves(costs)
-        owner_operations=('setExiting','withdraw','unlist','liquidate','recover_sync','processAcquisitions','harvest')
-        if any(not isinstance(costs.get('gas_estimate_proxy',{}).get(op),int) or costs['gas_estimate_proxy'][op]<=0 for op in owner_operations):
+        if any(costs['gas_meter_proxy'][op]!=costs['gas_curves'][op]['single_meter_gas'] for op in METERED_OPERATIONS):
+            raise ValueError('work meter proxy differs from recorded single-work envelope')
+        if any(op not in costs.get('owner_gas_curves',{}) for op in ('unlist','liquidate')):
+            raise ValueError('owner recovery requires separate unpaid gas curves')
+        verify_gas_curves(costs,owner=True)
+        verify_sync_contexts(costs)
+        if any(type(costs.get('gas_estimate_proxy',{}).get(op)) is not int or costs['gas_estimate_proxy'][op]<=0 for op in OWNER_OPERATIONS):
             raise ValueError('final evaluation requires separate signed/estimated owner gas envelope')
-        aliases = {'recover_sync': 'recover', 'unlist': 'recoverUnlist', 'liquidate': 'recoverLiquidate'}
-        measurements = costs.get('measurements', {})
-        for op in REQUIRED_GAS:
-            samples = measurements.get(op, measurements.get(aliases.get(op, ''), []))
-            if not samples or any(not isinstance(sample.get('gasUsed'), int) or sample['gasUsed'] <= 0 for sample in samples):
-                raise ValueError('final evaluation missing billed receipt samples: ' + op)
 
 
 
@@ -117,6 +167,10 @@ def verify_measurement_receipts(costs, packets):
     rpc_estimates = {}
     signed_limits = {}
     actual_counts = {}
+    actual_meters = {}
+    raw_contexts = {}
+    raw_prestates = {}
+    meter_topic="0x"+keccak(text="KeeperWorkMeasured(uint256,uint256,uint256,uint256,bool)").hex()
     def visit(value):
         if isinstance(value, list):
             for item in value: visit(item)
@@ -125,6 +179,8 @@ def verify_measurement_receipts(costs, packets):
             transaction=value.get('transaction',{})
             if isinstance(receipt,dict) and receipt.get('transactionHash'):
                 tx_hash=receipt['transactionHash'].lower()
+                if isinstance(value.get('verifiedContext'),dict):raw_contexts[tx_hash]=value['verifiedContext']
+                if value.get('prestateSha256'):raw_prestates[tx_hash]=value['prestateSha256']
                 signed=value.get('signedGasLimit',transaction.get('gas') if isinstance(transaction,dict) else None)
                 if signed is not None:
                     signed_limits[tx_hash]=integer(signed)
@@ -141,7 +197,18 @@ def verify_measurement_receipts(costs, packets):
             if 'transactionHash' in value and 'gasUsed' in value and 'status' in value:
                 if integer(value['status']) == 1:
                     actual[value['transactionHash'].lower()] = integer(value['gasUsed'])
+                    frames=[]
+                    for log in value.get('logs',[]):
+                        if log.get('topics') and log['topics'][0].lower()==meter_topic.lower():
+                            data=bytes.fromhex(log['data'].removeprefix('0x'))
+                            if len(data)!=160:raise ValueError('malformed actual work meter event')
+                            frames.append(tuple(int.from_bytes(data[i:i+32],'big') for i in range(0,160,32)))
+                    actual_meters[value['transactionHash'].lower()]=frames
             for item in value.values(): visit(item)
+    if costs.get('compensation_mode')=='bounded-measured-v1':
+        schedules=[packet['fullGasSchedule'] for packet in packets if 'fullGasSchedule' in packet]
+        if not schedules or any(schedule!=costs.get('fullGasSchedule') for schedule in schedules):
+            raise ValueError('raw sync context gas schedule differs from calibration')
     for packet in packets: visit(packet)
     for operation, samples in costs['measurements'].items():
         for sample in samples:
@@ -151,7 +218,29 @@ def verify_measurement_receipts(costs, packets):
             if tx.lower() in actual_counts and sample.get('workCount')!=actual_counts[tx.lower()]:
                 raise ValueError('measurement workCount differs from receipt: '+operation)
             curve_operation={'recover':'recover_sync','recoverUnlist':'unlist','recoverLiquidate':'liquidate'}.get(operation,operation)
-            if curve_operation in costs.get('gas_curves',{}):
+            if costs.get('compensation_mode')=='bounded-measured-v1' and operation in METERED_OPERATIONS:
+                meter=sample.get('measuredWork',sample)
+                names=('measuredGas','gasAllowance','gasPrice','workUnits','essential')
+                if any(name not in meter for name in names):
+                    raise ValueError('sample lacks genuine five-field work meter: '+operation)
+                frames=actual_meters.get(tx.lower(),[])
+                expected=tuple(int(meter[name]) for name in names)
+                if len(frames)!=1 or frames[0]!=expected:
+                    raise ValueError('sample work meter differs from actual receipt event: '+operation)
+            if costs.get('compensation_mode')=='bounded-measured-v1' and operation in OWNER_SAMPLE_ALIASES.values():
+                if isinstance(sample.get('measuredWork'),dict) or 'measuredGas' in sample or actual_meters.get(tx.lower()):
+                    raise ValueError('unpaid owner recovery cannot supply a paid work meter: '+operation)
+            if costs.get('compensation_mode')=='bounded-measured-v1' and operation=='recover':
+                context=sample.get('verifiedContext')
+                if not isinstance(context,dict) or context!=raw_contexts.get(tx.lower()):
+                    raise ValueError('owner sync context differs from raw paired-state provenance')
+                paired=context.get('pairedPaidHash','').lower()
+                frames=actual_meters.get(paired,[])
+                digest=context.get('prestateSha256')
+                if (len(frames)!=1 or (frames[0][1],frames[0][3])!=(context.get('gasAllowance'),context.get('workUnits'))
+                        or not digest or digest!=raw_prestates.get(paired) or digest!=raw_prestates.get(tx.lower())):
+                    raise ValueError('owner sync context lacks matching paid event and identical prestate')
+            if curve_operation in owner_curves(costs):
                 kind=sample.get('estimateKind')
                 if kind not in ('rpc-estimate','signed-limit-upper'):
                     raise ValueError('measurement requires explicit estimateKind: '+operation)
@@ -175,6 +264,7 @@ def manifest(args):
     reconciliation = json.loads((ROOT/args.reconciliation).read_text())
     observation = json.loads((ROOT/args.live_observation).read_text())
     values = json.loads((ROOT/'deploy/manager.json').read_text())
+    F.configured_state(0,values)  # Reject removed Fresh parameters before any financial evaluation.
     if reconciliation.get('status') != 'PASS':
         raise ValueError('current reconciliation must PASS')
     check_sources(reconciliation['source_sha256'])
@@ -186,6 +276,8 @@ def manifest(args):
             raise ValueError('final gas packet requires writer/helper source bindings')
         check_sources(costs['source_sha256'])
     qualify_costs(costs, args.final)
+    if costs.get("fullGasSchedule")!=values["gasSchedule"]:
+        raise ValueError("sync context calibration gas schedule differs from current settings")
     receipt_inputs = costs.get('receipt_inputs') or [dict(path=costs['receipts'], sha256=costs['receipts_sha256'])]
     bindings = {item['path']: item['sha256'] for item in receipt_inputs}
     check_sources(bindings)
@@ -245,6 +337,10 @@ def manifest(args):
     hashes = {name: sha(ROOT/name) for name in sorted(names)}
     return dict(schema=1, design='Fixed paired descriptive cohort; agent-chosen size, no owner return hurdle',
         source_sha256=hashes, contract_source_sha256=contracts, archive=args.archive,
+        full_gas_schedule=costs['fullGasSchedule'],sync_contexts=costs['sync_contexts'],owner_sync_contexts=costs['owner_sync_contexts'],
+        compensation_mode='bounded-measured-v1',gas_meter_proxy=costs.get('gas_meter_proxy',{}),
+        gas_meter_max_work=supported_work(costs),owner_gas_max_work=supported_work(costs,owner=True),
+        owner_gas_curves=costs.get('owner_gas_curves',{}),
         archive_coverage=dict(first_timestamp=first,last_timestamp=last,top_block=top), windows=windows,
         cells=list(CELLS), paths_per_window=args.paths_per_window, operating_days=30, exit_days=7,
         initial_funding_wei=CAPITAL, owner_exit_spend_limit_wei=args.owner_exit_spend_limit_wei,
@@ -257,8 +353,8 @@ def manifest(args):
                    str(5*10**14):'Observed current mint fee',str(10**15):'Historical/accepted maximum comparison'},
         expected_rows=2*(2*args.paths_per_window+4)*len(CELLS),
         buyer_regimes=['observed-choices','forced-responsive-bid-stress'],
-        physical_sync_cost_basis='Actual base, every consumed journal/scan item, selected/resolved/pruned work and actual fee claims; separate from payment eligibility',
-        keeper_policy='Production billed_ratio defaults then same-label receipt history, with additional known billed/physical cost floor; actual cost ledger uses billed curve; failure/minimum-return/max-loss all zero',
+        physical_sync_cost_basis='Exact verified allowance/units context under recorded full GasSchedule; paid event spans and separately billed paired unpaid recovery receipts. Unknown contexts refuse; quote coefficients are not actual gas expense',
+        keeper_policy='Production billed_ratio defaults then same-label receipt history, with additional independently billed cost floor; actual cost ledger uses billed curve; failure/minimum-return/max-loss all zero',
         keeper_initial_billed_ratios=dict(BILLED_PER_ESTIMATE),keeper_receipt_history_start='Fresh keeper, empty per scenario; no other account receipts',
         response_method='Paired request-keyed response cohort. Observed choices retain first archived keep/bid and delay; stress forces every archived eventual responder to bid within3480seconds. Unresolved stays silent in both.',
         assumptions=[
@@ -268,9 +364,9 @@ def manifest(args):
             'Response cohorts have unequal follow-up/right censoring. Observed choices preserve archived keeps and late delays; the second regime forces every eventual responder to bid by3480seconds, including late/archive-after-window responses. Neither is a forecast or exact VRF replay.',
             'Current protocol fee rules and oracle exemption are applied to historical requests. Historical configuration changes are not individually replayed. The .00025ETH fee is an agent-chosen fork-only half-current sensitivity, not a production recommendation or approval of baseline economics; no public fee changes.',
             'Standard .03 backing relaxes only admission in an isolated worker. Current manager rejects it; it is not an executable candidate configuration.',
-            'Fresh/Reuse use canonical cash holds, reserves, spending budgets, and strict fully paid ordinary work. No account topups or volunteer keeper subsidy.',
-            'Keeper acceptance reuses production billed_ratio: initial per-operation defaults, then after3 same-label receipts min(1,sum billed gas / sum estimates across the last20). Each path starts with a fresh keeper and no other-account history. Accepted ordinary calls add calibrated proxy bill/estimate pairs; owner recovery does not. A separate known billed/physical cost floor forbids assumed losses. Replacement/minPay-specific estimate changes, failed inclusion and external-account history are not modeled. Estimate curves prefer genuine RPC samples with an RPC single-work baseline, otherwise explicit historical signed-limit uppers; billed curves cover all samples. The25percent signing pad belongs only to the owner cap.',
-            'Gas is max(count-aware single-work baseline plus measured per-extra-work slope, canonical work allowance), not exact billed gas for every batch. Creator amounts are gross accrual; global deployment/service costs are outside per-clone owner returns.',
+            'Reuse-only strategy: returned packs are relisted intact, no fresh renewal eligibility or float. Canonical reserves, cash and spending permissions remain; no account topups or volunteer keeper subsidy. Compensation uses independently recorded work-span proxies bounded by operation allowances, plus named overhead; it is not billed gas or a fixed quote. Censored spans remain explicit.',
+            'Keeper acceptance reuses production billed_ratio: initial per-operation defaults, then after3 same-label receipts min(1,sum billed gas / sum estimates across the last20). Each path starts with a fresh keeper and no other-account history. Accepted ordinary calls add calibrated proxy bill/estimate pairs; owner recovery does not. A separate calibrated billed cost floor forbids assumed losses. Replacement/minPay-specific estimate changes, failed inclusion and external-account history are not modeled. Estimate curves prefer genuine RPC samples with an RPC single-work baseline, otherwise explicit historical signed-limit uppers; billed curves cover all samples. The25percent signing pad belongs only to the owner cap.',
+            'Paid meter curves and unpaid owner recovery bill/estimate curves use separate actual samples. Modeled paid and owner work counts above actual receipt support are refused, including larger sync batches. Non-sync gas uses count-aware receipt curves independently of mutable quote allowances. Sync requires an exact recorded allowance/units context under the same full GasSchedule; unknown journal, scan, fee-claim or multiple-position patterns are refused. These are calibrated proxies, not actual receipts for simulated calls. Creator amounts are gross accrual; global deployment/service costs are outside per-clone owner returns.',
             'Owner recovery and pending processing are paid from the owner wallet. Each call must fit the cumulative signed maximum:125percent of max(work allowance,actual estimate or signed-limit upper proxy,21000gas) at2basefee+tip. The default .01ETH exit cap excludes clone creation, stops before unaffordable mutations, and can leave incomplete assets.',
             'Unfinished exits retain returned cash, unresolved cash/inventory/credit, and future-cost uncertainty. No monthly-to-annual extrapolation, APR, production viability or release authority follows.'])
 
@@ -298,7 +394,12 @@ def admission(hypothetical, minimum):
 
 
 def qualify_result(result, fee, cap, final):
-    row = MC.compact_result(result, fee)
+    remaining=MC.validate_finances(result,fee)
+    row={key:value for key,value in result.items() if key!='operating_budget_marks'}
+    row['remaining_assets_wei']=remaining
+    row['owner_realized_cash_net_so_far_wei']=row['owner_withdrawn_wei']-row['owner_funded_wei']-row['owner_wallet_gas_proxy_wei']
+    if final and row.get('compensation_mode')!='bounded-measured-v1':
+        raise ValueError('final model did not use measured compensation')
     if row['initial_funding_wei'] != CAPITAL or row['owner_funded_wei'] != CAPITAL:
         raise ValueError('hidden account topup or changed capital')
     if row.get('randomness_mode') != 'request-keyed-v1':
@@ -318,7 +419,7 @@ def qualify_result(result, fee, cap, final):
     if final and not row.get('keeper_estimate_acceptance_enabled'):
         raise ValueError('final assessment requires estimated-gas keeper acceptance')
     if final and not row.get('physical_sync_cost_basis_enabled'):
-        raise ValueError('final assessment requires physical sync work costing')
+        raise ValueError('final assessment requires verified sync context costing')
     if final and not row.get('count_aware_gas_curves_enabled'):
         raise ValueError('final assessment requires count-aware gas curves')
     if final and (not row.get('keeper_zero_loss_enabled') or row.get('owner_exit_spend_limit_wei') != cap):
@@ -351,14 +452,16 @@ def run_path(task):
         return (delay, kept) if buyer_regime=='observed-choices' or delay is None else (min(delay,3480),False)
     rows = []
     for cell in frozen['cells']:
-        values = frozen['manager_values'] | dict(renewalMode=cell['renewal_mode'],backingRatioBps=cell['backing_bps'])
+        values = frozen['manager_values'] | dict(backingRatioBps=cell['backing_bps'])
         sc = F.Scenario(manager=True, volume=F.const(0), timed=True, start_timestamp=w['start'],
             poll_seconds=60, receipt_seconds=36, replay_events=events,replay_period_seconds=period,
             request_randomness=True, request_response_sampler=response, foreign_pool_weight=1.,exempt=True,
             gwei=cell['total_gas_gwei']-.05, deposit_wei=CAPITAL,mint_fee_wei=cell['mint_fee_wei'],
             exit_all=True,exit_days=frozen['exit_days'], user_gas_proxy=frozen['gas_proxy'],
             holder_rescue_sync=True,self_serve_exits=True,unmeasured_gas_operations=frozen['unmeasured_operations'],
-            user_gas_estimate_proxy=frozen['gas_estimate_proxy'],gas_curves=frozen['gas_curves'],
+            user_gas_estimate_proxy=frozen['gas_estimate_proxy'],gas_curves=frozen['gas_curves'],gas_meter_proxy=frozen['gas_meter_proxy'],gas_meter_max_work=frozen['gas_meter_max_work'],
+            owner_gas_curves=frozen['owner_gas_curves'],owner_gas_max_work=frozen['owner_gas_max_work'],
+            full_gas_schedule=frozen['full_gas_schedule'],sync_contexts=frozen['sync_contexts'],owner_sync_contexts=frozen['owner_sync_contexts'],
             manager_keeper_zero_loss=True,manager_keeper_receipt_history=True, owner_exit_spend_limit_wei=frozen['owner_exit_spend_limit_wei'])
         started = time.monotonic()
         with admission(cell['backing_bps']==10000, frozen['protocol_minimum_backing']['value_wei']):
@@ -403,7 +506,7 @@ def summarize(rows, frozen):
         if c['backing_bps'] != 10000:
             continue
         parent = next(other for other in frozen['cells'] if other['backing_bps']==70000 and
-            all(other[k]==c[k] for k in ('renewal_mode','mint_fee_wei','total_gas_gwei')))
+            all(other[k]==c[k] for k in ('mint_fee_wei','total_gas_gwei')))
         differences=[]
         for row in rows:
             if row['buyer_regime']!=c['buyer_regime'] or row['regime']!=c['regime'] or row['cell']!=c['id']:
@@ -429,7 +532,7 @@ def markdown(report):
     def money(value):return 'suppressed' if value is None else f'{value/F.E:.8f}'
     for c in report['summary']['cells']:
         m=c['mean_wei']
-        lines.append(f"| {c['buyer_regime']} / {c['regime']} | {'Fresh' if c['renewal_mode']==0 else 'Reuse'} | {'.03 hypothetical' if c['backing_bps']==10000 else '.21'} | {c['mint_fee_wei']/F.E:g} | {c['total_gas_gwei']} | {c['qualified_exits']}/{c['expected_paths']} | {money(c['owner_net_mean_wei'])} | {money(m['external_total_earned_wei'])} | {money(m['keeper_compensation_wei'])} / {money(m['keeper_gas_proxy_cost_wei'])} | {money(m['creator_primary_fees_accrued_wei'])} | {money(c['maximum_unresolved_assets_wei'])} |")
+        lines.append(f"| {c['buyer_regime']} / {c['regime']} | {'Reuse'} | {'.03 hypothetical' if c['backing_bps']==10000 else '.21'} | {c['mint_fee_wei']/F.E:g} | {c['total_gas_gwei']} | {c['qualified_exits']}/{c['expected_paths']} | {money(c['owner_net_mean_wei'])} | {money(m['external_total_earned_wei'])} | {money(m['keeper_compensation_wei'])} / {money(m['keeper_gas_proxy_cost_wei'])} | {money(m['creator_primary_fees_accrued_wei'])} | {money(c['maximum_unresolved_assets_wei'])} |")
     lines += ['', 'JSON retains each path and owner/keeper/creator/physical-asset partitions. Owner exit calls stop before cumulative signed maxima exceed the exit cap, excluding clone creation. Unfinished exits retain cash/inventory; the cap does not guarantee completion.', '']
     lines += [paragraph for item in report['manifest']['assumptions'] for paragraph in (item,'')]
     lines += ["Things that don't make sense: a positive conditional mean cannot establish future profitability; an exit-spend cap can stop recovery with assets still held; isolated .03 admission cannot be deployed through this manager.",'']
@@ -440,15 +543,15 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--execute',action='store_true')
     parser.add_argument('--final',action='store_true',help='Reject any unmeasured required/executed operation')
-    parser.add_argument('--costs',default='docs/receipts/manager-r2-cost-calibration.json')
-    parser.add_argument('--reconciliation',default='docs/receipts/manager-funded-reconciliation.json')
+    parser.add_argument('--costs',default='docs/receipts/manager-measured-cost-calibration.json')
+    parser.add_argument('--reconciliation',default='docs/receipts/manager-measured-reconciliation.json')
     parser.add_argument('--live-observation',default='docs/receipts/manager-r2-live-observation.json')
     parser.add_argument('--minimum-continuity',default='docs/receipts/manager-r2-min-backing-continuity.json')
     parser.add_argument('--archive',default='sim/data/fwa.sqlite')
     parser.add_argument('--paths-per-window',type=int,default=8)
     parser.add_argument('--workers',type=int,default=4)
     parser.add_argument('--owner-exit-spend-limit-wei','--wallet-cap-wei',dest='owner_exit_spend_limit_wei',type=int,default=10**16)
-    parser.add_argument('--out',default='sim/out/manager-operating-assessment')
+    parser.add_argument('--out',default='sim/out/manager-measured-operating-assessment')
     args=parser.parse_args()
     if args.paths_per_window<1 or not 1<=args.workers<=4 or args.owner_exit_spend_limit_wei<=0:
         parser.error('positive fixed path count/cap and one to four workers required')

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
 import {GasQuotes} from "../utils/GasQuotes.sol";
 
 import {ForkBase} from "./ForkBase.sol";
@@ -150,6 +152,7 @@ contract ScanSyncSelectionTest is SelectionBase {
     function _clean() internal {
         VaultLib.Params memory p = vault.getParams();
         p.payMarkupBps = 0; p.workFee = 0; p.maxTip = 0; p.keeperShareBps = 0;
+        vm.recordLogs();
         bytes32 _expected8 = TestVaultOps.configurationHash(vault);
         vm.prank(vault.owner()); vault.setParams(p, _expected8);
     }
@@ -187,24 +190,27 @@ contract ScanSyncSelectionTest is SelectionBase {
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
         (uint256 routine,) = vault.budget();
         assertEq(routine, 0.00008 ether, "budget below the scan quote");
-        assertLt(routine, SCAN_Q * 0.5 gwei, "quote exceeds the budget");
+        assertLt(routine, vault.quote(SCAN_Q, 0, false), "upper envelope exceeds the budget");
         bytes32 _expected10 = TestVaultOps.configurationHash(vault);
         uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected10);
+        uint256 gross = MeasuredPay.gross(vault, SCAN_Q, 0, false, 0.5 gwei);
+        assertGe(gross, routine, "fixture reaches the actual budget clipping branch");
         assertEq(paid, routine, "pay is capped at the routine budget");
         (uint256 after_,) = vault.budget();
         assertEq(after_, 0, "budget drained to zero");
     }
 
     // (i) A hostile keeper policy (owner-set, always offers the maximum) cannot raise scan pay above
-    //     the vault's own fixed quote and budget.
-    function test_i_scanPaysSingleConfiguredQuote() public {
+    //     the vault's own work cap and budget.
+    function test_i_scanPaysBoundedActualWork() public {
         _select(primary()); _clean();
         _backlog(45);
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
         uint256 cash = address(vault).balance;
         bytes32 _expected11 = TestVaultOps.configurationHash(vault);
         uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected11);
-        assertEq(paid, SCAN_Q * 0.5 gwei, "the vault caps the max offer at its own scan quote");
+        assertEq(paid, MeasuredPay.gross(vault, SCAN_Q, 0, false, 0.5 gwei));
+        assertLe(paid, vault.quote(SCAN_Q, 0, false), "measured payment stays inside the work envelope");
         assertEq(cash - address(vault).balance, paid, "only the capped quote leaves the vault");
     }
 
@@ -232,10 +238,10 @@ contract ScanSyncSelectionTest is SelectionBase {
         vm.warp(block.timestamp + 12 hours);
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
         (routine,) = vault.budget();
-        assertGe(routine, SCAN_Q * 0.5 gwei, "budget refilled above the scan quote");
+        assertGe(routine, vault.quote(SCAN_Q, 0, false), "budget refilled above the scan envelope");
         bytes32 _expected15 = TestVaultOps.configurationHash(vault);
         uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected15);
-        assertEq(paid, SCAN_Q * 0.5 gwei, "the refilled budget pays the full scan quote");
+        assertEq(paid, MeasuredPay.gross(vault, SCAN_Q, 0, false, 0.5 gwei));
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess(), "the selection is finally applied");
     }
 
@@ -321,10 +327,12 @@ contract ScanSyncSelectionTest is SelectionBase {
         vm.prank(holder); vault.deposit{value: gross}(_expected21);
 
         _backlog(45); // long real backlog: interrupted maintenance the vault clears with one scan
+        vm.recordLogs();
         vm.fee(5 gwei); vm.txGasPrice(5 gwei); // gas far above the 0.5 gwei ceiling
         bytes32 _expected22 = TestVaultOps.configurationHash(vault);
         uint256 paidScan = vault.sync(new uint256[](0), 0, 0, _expected22);
-        assertEq(paidScan, SCAN_Q * 0.5 gwei, "pay is capped at the 0.5 gwei ceiling, not the 5 gwei basefee");
+        assertEq(paidScan, MeasuredPay.gross(vault, SCAN_Q, 0, false, 0.5 gwei));
+        assertLe(paidScan, vault.quote(SCAN_Q, 0, false));
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess(), "one scan caught the cursor up");
 
         // The purchaser keeps the pack; the terminal resolves and the position closes, leaving the

@@ -73,12 +73,12 @@ abstract contract ForkBase is Test {
         vm.deal(alice, 50 ether);
         vm.deal(bob, 50 ether);
         vm.deal(keeper, 1 ether);
+        vm.recordLogs();
     }
 
     function defaultParams() internal pure returns (VaultLib.Params memory p) {
         p.gasSchedule = VaultLib.defaultGasSchedule();
         p.backingRatioBps = 12_000;
-        p.renewalMode = VaultLib.RenewalMode.ReuseReturned;
         p.acceptedMintFee = 0.001 ether;
         p.minDeposit = 0.01 ether;
         p.minDistribution = 0.01 ether;

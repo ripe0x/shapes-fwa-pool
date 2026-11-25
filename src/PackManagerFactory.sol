@@ -40,7 +40,7 @@ contract PackManagerFactory {
     }
 
     function preview(VaultLib.Params calldata p) external view returns (uint256 units, uint256 principal,
-        uint256 backing, uint256 mintCost, uint256 floatRequired, uint256 openingCash, bytes32 expectedConfigHash)
+        uint256 backing, uint256 mintCost, uint256 openingCash, bytes32 expectedConfigHash)
     {
         return VaultLib.preview(p, implementation.shapes().mintFee());
     }

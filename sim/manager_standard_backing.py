@@ -110,6 +110,7 @@ def diagnostic(parent):
 
 
 def campaign_manifest(parent_path,args):
+    raise RuntimeError('Historical fixed/Fresh financial generator requires its pinned revision')
     parent=json.loads(parent_path.read_text())
     if args.paths!=parent['paths_per_cell'] or args.seed_start!=parent['windows'][0]['seed_start'] or args.window_end:
         raise ValueError('standard supplement retains every frozen parent path ID and window')
@@ -202,6 +203,7 @@ def summarize(rows,manifest):
 
 
 def main():
+    raise SystemExit('Historical fixed/Fresh study: use its pinned revision; active evaluations require manager_operating_assessment.py with a current measured profile')
     parser=argparse.ArgumentParser(add_help=False)
     parser.add_argument('--parent-manifest',default='sim/out/manager-monte-carlo-funded/manifest.json')
     args,remaining=parser.parse_known_args()

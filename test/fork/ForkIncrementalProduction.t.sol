@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
 import {GasQuotes} from "../utils/GasQuotes.sol";
 
 import {Vm} from "forge-std/Vm.sol";
@@ -318,13 +320,14 @@ contract ForkProductionReceiptsTest is SelectionBase {
         _cold();
         uint256 start = gasleft();
         bytes32 _expected14 = TestVaultOps.configurationHash(vault);
+        vm.recordLogs();
         uint256 paid = vault.liquidate(16, 0, _expected14);
         uint256 used = start - gasleft() + 21_000;
         emit log_named_uint("recovery thirty Shapes complete gas", used);
         emit log_named_uint("recovery thirty Shapes pay wei", paid);
         assertLt(used * 125 / 100, 16_777_216);
         assertEq(address(vault).balance + paid - before, 0.34 ether, "the whole gift pack recovers in one chunk");
-        assertEq(paid, (75_000 + 100_000 + 70_000 + 30 * 35_000) * 0.2 gwei + vault.getParams().workFee, "quote for one unseal and thirty verified burns");
+        assertEq(paid, MeasuredPay.gross(vault, 75_000 + 100_000 + 70_000 + 30 * 35_000, 1, true, 0.2 gwei));
         assertEq(vault.recoveryPackCount(), 0);
         (tracked, idle,,,,) = vault.totals();
         assertEq(tracked, 0.06 ether, "only the new listed six-unit pack remains");
@@ -386,14 +389,15 @@ contract ForkProductionReceiptsTest is SelectionBase {
         uint64 cursor = vault.acquisitionCursor();
         uint256 creditBefore = FWA.feeCredit(address(vault));
         bytes32 _expected18 = TestVaultOps.configurationHash(vault);
+        vm.recordLogs();
         uint256 paid = vault.sync(_one(selected), 0, 0, _expected18);
         uint256 processed = vault.acquisitionCursor() - cursor;
         // At this selection the fee credit is large enough that the sync economically sweeps it into
         // the vault (withdrawEarnings), adding Q_CREDIT to the quote (D56). Priced from the on-chain
         // fact, not assumed: the terminal reconciliation and its bounded head cleanup are the rest.
         uint256 swept = creditBefore != 0 && FWA.feeCredit(address(vault)) == 0 ? GasQuotes.Q_CREDIT : 0;
-        assertEq(paid, (GasQuotes.Q_SYNC + processed * GasQuotes.Q_JOURNAL + GasQuotes.Q_SELECTED
-            + GasQuotes.Q_SYNCED + GasQuotes.Q_PRUNED + swept) * 0.2 gwei + vault.getParams().workFee);
+        assertEq(paid, MeasuredPay.gross(vault, GasQuotes.Q_SYNC + processed * GasQuotes.Q_JOURNAL + GasQuotes.Q_SELECTED
+            + GasQuotes.Q_SYNCED + GasQuotes.Q_PRUNED + swept, 1, false, 0.2 gwei));
         (uint256 head, uint256 length,,,) = vault.allocationState();
         assertEq(head, length, "terminal work includes bounded head cleanup");
         _drain();

@@ -4,10 +4,15 @@ One Shape-pack strategy on the FWA V2 main pool, two ownership models: the poole
 (`PackVault`) and personal managers (`PackManager` clones from `PackManagerFactory`). Both inherit
 `PackAccount` and run the one strategy implementation in the linked libraries `StrategyLib`,
 `VaultLib` and `ScanLib` against their own storage (D77). Design: `docs/UNIFIED-SYSTEM.md`. Owner
-requirements: `OWNER-REQUIREMENTS.md` (A5 is current; A3/A4 remain where not superseded). Decisions: `docs/DECISIONS.md`. Status: `docs/REPORT.md`. Release: `docs/release/RUNBOOK.md`.
-Keeper operations: `docs/KEEPER.md`. Gas: `docs/UNIFIED-SYSTEM.md` (quoted payment and bounded work) (`docs/GAS.md` is history). Assets: `docs/SYSTEM-MAP.md`, `asset-flow.json`.
+requirements: `OWNER-REQUIREMENTS.md` (A8 is current; prior sections remain where not superseded). Decisions: `docs/DECISIONS.md`. Status: `docs/REPORT.md`. Release: `docs/release/RUNBOOK.md`.
+Keeper operations: `docs/KEEPER.md`. Gas: `docs/UNIFIED-SYSTEM.md` (bounded measured payment; quotes are caps) (`docs/GAS.md` is history). Assets: `docs/SYSTEM-MAP.md`, `asset-flow.json`.
 
 ## Commands
+
+Current A8 individual-manager checks and unsigned package are in
+`docs/receipts/manager-measured-verification.md` and `docs/release/MANAGER-RUNBOOK.md`.
+The broader commands below belong to the separate pooled-vault release or historical model;
+they do not validate reuse-only measured-pay manager returns or authorize opening the vault.
 
 ```sh
 # Fork tests: mainnet fork on Tenderly's public gateway only. It throttles, so pass the retries.
@@ -52,9 +57,8 @@ python3 keeper/rehearse_image.py [--image <tag>]   # CI: .github/workflows/keepe
   short labels map to real mainnet addresses, some with EIP-7702 sweepers. Deploy addresses can
   hold mainnet dust; read balances, do not assume them.
 - New packs come only from `build` (mint Shapes straight into the pack and list it at once, D79);
-  the launch recipe is three paid 0.01 ETH mints per 0.03 ETH pack (mask 8). Acquisition returns
-  follow account-owned FreshAfterAcquisition or ReuseReturned; ordinary kicks and withdrawals
-  never authorize fresh replacement. Backing is an account-owned ratio, not a buyer-choice rule.
+  the launch recipe is three paid 0.01 ETH mints per 0.03 ETH pack (mask 8). Returned packs are
+  reused intact. Fresh mints are only for opening, funded growth and kept inventory replacements. Backing is an account-owned ratio, not a buyer-choice rule.
 - Strategy code changes go in the libraries or `PackAccount`, never duplicated in an account. An
   account defines only `_free`, `_idle` and its own facts (`_checkpointMode`, `_shortfall`, `_need`).
 - FWA pushes keep payments and kick refunds with a 100,000 gas stipend; the clone's receive path
@@ -62,10 +66,10 @@ python3 keeper/rehearse_image.py [--image <tag>]   # CI: .github/workflows/keepe
 - Settlement is classified from FWA's listing record and pack ownership, never from the receipt
   (D84); the receipt only gates pricing. The checkpoint's allocation proof reads at most 32 queue
   entries, and while the ShapePacks oracle exemption is lifted up to 32 open listings (kicks; skipped above 32, never refused); keep any new pricing check bounded (`ForkReceiptRecovery.t.sol`, `ForkAllocationProof.t.sol`).
-- Keeper pay is a fixed quote per operation (D56); never measured gas. The keeper pads the exact
+- Keeper pay uses bounded measured gas plus account-owned overhead (A8); quoted work allowances are caps, not fixed compensation. The keeper pads the exact
   signed-call estimate 25% and enforces the transaction cap; later state can still invalidate an
   estimate. `cast send` exits 0 on a reverted transaction; check receipt status.
-- Keeper quotes, compensation and charges use one calculation and the account's named GasSchedule.
+- Keeper payment caps and charges use the account's named GasSchedule; actual compensation uses measured work within those caps.
   No external keeper policy remains. Old D57/D80/D85 evidence is historical.
 - Rehearsal actors are fresh addresses checked clean on the fork. Never anvil's dev accounts: they
   are real mainnet addresses and #2 carries an EIP-7702 delegation that diverts ETH it receives.

@@ -22,9 +22,7 @@ import {
 interface IAccount {
     function freeEth() external view returns (uint256);
     function idleEth() external view returns (uint256);
-    function renewalCash() external view returns (uint256);
     function keeperCash() external view returns (uint256);
-    function fundingDeficit(bool renewal) external view returns (uint256);
 }
 
 /// @notice PackVault's share-price reads, used only for its distribution checkpoint tail.
@@ -73,15 +71,14 @@ library VaultLib {
         uint32 harvested;
         uint32 credit;
         uint32 fund;
+        uint32 overhead; // transaction and payment-tail allowance, separate from measured work
     }
-
-    enum RenewalMode { FreshAfterAcquisition, ReuseReturned }
 
     struct Params {
         uint16 minEdgeBps; // require k >= 1 + minEdge
         uint16 bufferBps; // list at cap x (1 - buffer), so a small ask cut does not trigger kicks
         uint16 distributionBps; // share of new gains above the high-water mark paid out
-        uint16 payMarkupBps; // markup on quoted routine gas compensation
+        uint16 payMarkupBps; // markup on bounded measured routine gas compensation
         uint16 keeperShareBps; // optional calls are paid only if pay <= this share of value realized
         uint16 upliftBoundBps; // checkpoint skips when Allocated value exceeds this share of NAV
         uint64 packUnitsMask; // bit u set: packs of u x 0.01 ETH may be built and listed
@@ -97,8 +94,6 @@ library VaultLib {
         uint128 reserve; // ETH kept idle
         uint128 tvlCap; // deposits refused above this NAV
         uint32 backingRatioBps; // backing as a ratio of pack face value
-        RenewalMode renewalMode;
-        uint16 renewalFloatCount;
         uint64 acceptedMintFee; // changed only by explicit owner acceptance
         uint64 minDeposit;
         uint64 minDistribution;
@@ -169,7 +164,7 @@ library VaultLib {
         uint256 keepUplift;
     }
 
-    struct Work { uint256 processed; uint256 own; uint256 resolved; uint256 pruned; uint256 scanned; }
+    struct Work { uint256 processed; uint256 own; uint256 resolved; uint256 pruned; uint256 scanned; uint256 used; }
 
     struct BackingTerms {
         uint256 k;
@@ -198,13 +193,9 @@ library VaultLib {
         mapping(uint256 => uint256) countByDebt;
         uint256 allocatedValue;
         uint256 unresolvedKeepUplift;
-        mapping(uint256 => bool) renewalEligible;
-        uint256 renewalEligibleCount;
-        uint256 keptReplacements;
         uint256[31] recipeCounts;
         mapping(uint256 => uint256) packShapeCount;
         uint256 ordinaryShapeCount;
-        bool renewalEnabled;
         mapping(uint256 => uint256) idleIndex;
         uint256[] allocationQueue;
         uint256 allocationHead;
@@ -224,6 +215,7 @@ library VaultLib {
         bool controlled;
     }
 
+    event KeeperWorkMeasured(uint256 measuredGas, uint256 gasAllowance, uint256 gasPrice, uint256 workUnits, bool essential);
     event PositionUpdated(uint256 indexed listingId, uint256 packId, uint256 value, uint256 backing, uint256 feeDebt, uint64 allocatedAt, uint8 state);
     event InventoryUpdated(uint256 indexed packId, uint256 value);
     event PrimaryMinted(uint256 packs, uint256 shapes, uint256 principal, uint256 mintFees);
@@ -245,6 +237,7 @@ library VaultLib {
     error PendingReceipts();
     error InvalidBacking();
     error BadBatch();
+    error UnusedPaidInput();
     error Nothing();
 
     /// @notice One checkpoint's redemption fill. Owed rounds up and a partial fill leaves 2 wei of
@@ -278,17 +271,39 @@ library VaultLib {
     error MintFeeNotAccepted();
     error ExplicitFeeAcceptanceRequired();
 
-    /// @notice The vault's envelope for work: quoted gas at basefee + maxTip, capped at the
-    ///         ceiling, markup on routine work, plus work fees. The most this work may ever pay.
-    function quote(Params storage p, uint256 gasQ, uint256 units, bool essential) internal view returns (uint256) {
-        return calculatePayment(gasQ, units, block.basefee, essential ? p.essentialCeiling : p.gasCeiling,
-            p.maxTip, essential ? 0 : p.payMarkupBps, p.workFee);
+    /// @notice Upper payment envelope: verified work cap plus the separately named overhead.
+    function quote(Params storage p, uint256 gasAllowance, uint256 units, bool essential) internal view returns (uint256) {
+        return quoteCalls(p, gasAllowance, units, essential, 1);
     }
 
-    function calculatePayment(uint256 gasQ, uint256 units, uint256 basefee, uint256 ceiling,
-        uint256 tip, uint256 markupBps, uint256 workFee) internal pure returns (uint256)
+    /// @dev Aggregated lifecycle charges include overhead for each distinct paid transaction.
+    function quoteCalls(Params storage p, uint256 gasAllowance, uint256 units, bool essential,
+        uint256 calls) internal view returns (uint256)
     {
-        return gasQ * M.min(basefee + tip, ceiling) * (BPS + markupBps) / BPS + units * workFee;
+        if (gasAllowance == 0 && units == 0) return 0;
+        return calculatePayment(gasAllowance + calls * p.gasSchedule.overhead, units,
+            M.min(block.basefee + p.maxTip, essential ? p.essentialCeiling : p.gasCeiling),
+            essential ? 0 : p.payMarkupBps, p.workFee);
+    }
+
+    function calculatePayment(uint256 gasUnits, uint256 units, uint256 price, uint256 markupBps,
+        uint256 workFee) internal pure returns (uint256)
+    {
+        return gasUnits * price * (BPS + markupBps) / BPS + units * workFee;
+    }
+
+    /// @dev The account supplies gasStart from before its guard and checks. No caller-selected
+    ///      gas limit or unused allowance is reimbursed. Only verified eligible work earns pay.
+    function measuredPayment(Params storage p, uint256 gasStart, uint256 gasAllowance, uint256 units,
+        bool essential) private returns (uint256)
+    {
+        if (gasAllowance == 0 && units == 0) return 0;
+        uint256 price = M.min(tx.gasprice,
+            M.min(block.basefee + p.maxTip, essential ? p.essentialCeiling : p.gasCeiling));
+        uint256 measured = gasStart - gasleft();
+        emit KeeperWorkMeasured(measured, gasAllowance, price, units, essential);
+        return calculatePayment(M.min(measured, gasAllowance) + p.gasSchedule.overhead,
+            units, price, essential ? 0 : p.payMarkupBps, p.workFee);
     }
 
     function budgetNow(Params storage p, Budget storage b) internal view returns (uint256 r, uint256 e) {
@@ -314,10 +329,11 @@ library VaultLib {
         bool essential,
         uint256 minPay,
         uint256 cap,
-        uint256 free
+        uint256 free,
+        uint256 gasStart
     ) external returns (uint256 amount) {
         (uint256 r, uint256 e) = budgetNow(p, b);
-        amount = M.min(M.min(quote(p, gasQ, units, essential), cap), M.min(free, essential ? e : r));
+        amount = M.min(M.min(measuredPayment(p, gasStart, gasQ, units, essential), cap), M.min(free, essential ? e : r));
         if (amount < minPay) revert Payment();
         (b.routine, b.essential, b.at) =
             (uint128(essential ? r : r - amount), uint128(essential ? e - amount : e), block.timestamp);
@@ -328,9 +344,9 @@ library VaultLib {
     }
 
     function payFunded(Params storage p, uint256 gasQ, uint256 units, bool essential, uint256 minPay,
-        uint256 fundingCap) external returns (uint256 amount)
+        uint256 fundingCap, uint256 gasStart) external returns (uint256 amount)
     {
-        amount = M.min(quote(p, gasQ, units, essential), fundingCap);
+        amount = M.min(measuredPayment(p, gasStart, gasQ, units, essential), fundingCap);
         if (amount < minPay) revert Payment();
         if (amount != 0) {
             (bool ok,) = msg.sender.call{value: amount}("");
@@ -342,11 +358,11 @@ library VaultLib {
     function defaultGasSchedule() internal pure returns (GasSchedule memory g) {
         g = GasSchedule(500_000, 6_000, 30_000, 360_000, 300_000, 130_000, 280_000, 825_000,
             125_000, 120_000, 80_000, 22_000, 30_000, 180_000, 120_000, 45_000, 340_000, 285_000,
-            75_000, 80_000, 35_000, 100_000, 35_000, 70_000, 125_000, 80_000, 40_000, 40_000);
+            75_000, 80_000, 35_000, 100_000, 35_000, 70_000, 125_000, 80_000, 40_000, 40_000, 100_000);
     }
 
     function preview(Params memory p, uint256 mintFee) external view returns (uint256 units, uint256 principal,
-        uint256 backing, uint256 mintCost, uint256 floatRequired, uint256 openingCash, bytes32 expectedConfigHash)
+        uint256 backing, uint256 mintCost, uint256 openingCash, bytes32 expectedConfigHash)
     {
         return ScanLib.preview(p, mintFee);
     }
@@ -377,21 +393,9 @@ library VaultLib {
         return p.gasSchedule.buildPack + shapeCount * p.gasSchedule.buildShape;
     }
 
-    function renewalGas(Params storage p, uint256 count, uint256 retired, uint256 burned)
-        internal view returns (uint256 gasQ)
-    {
-        (, uint256 n) = makeup(refUnits(p));
-        gasQ = uint256(p.gasSchedule.build) + count * (buildGas(p, n) + p.gasSchedule.listed);
-        if (retired != 0) gasQ += uint256(p.gasSchedule.liquidate)
-            + retired * p.gasSchedule.liquidatePack + burned * p.gasSchedule.redeemShape;
-    }
 
-    function renewalFundingGas(Params storage p, uint256 feeClaims, bool withdrawCredit)
-        internal view returns (uint256)
-    {
-        return uint256(p.gasSchedule.fund) + feeClaims * p.gasSchedule.harvested
-            + (withdrawCredit ? p.gasSchedule.credit : 0);
-    }
+
+
 
     /// @notice Building one pack of `units` and listing it, at the envelope now, plus its paid
     ///         primary mint fees (one per Shape).
@@ -412,9 +416,7 @@ library VaultLib {
         return ScanLib.positionValue(p);
     }
 
-    function renewalFloat(Params storage p) public view returns (uint256) {
-        return ScanLib.renewalFloat(p);
-    }
+
 
     function operatingReserve(Params storage p) external view returns (uint256) {
         return ScanLib.operatingReserve(p);
@@ -447,7 +449,7 @@ library VaultLib {
     }
 
     /// @dev Initial reuse pays construction once plus maintenance, without charging a second
-    ///      relisting. A continuing reuse cycle pays no fresh mint. Fresh cycles fund replacement.
+    ///      relisting. A continuing reuse cycle pays no fresh mint.
     function _profitable(BackingTerms memory t, uint256 backing, bool newlyBuilt) internal pure returns (bool) {
         uint256 cost = newlyBuilt ? t.initialCost : t.cycleCost;
         return backing * (t.k - 1e18) / 1e18 > cost
@@ -523,7 +525,6 @@ library VaultLib {
         _removeIdle(b, packId);
         emit InventoryUpdated(packId, 0);
         b.positions[id] = Position(packId, value, backing, debt, 0, ACTIVE, 0);
-        clearRenewal(b, packId);
         b.packToListing[packId] = id;
         b.open.push(id);
         b.openIndex[id] = b.open.length;
@@ -603,8 +604,25 @@ library VaultLib {
         b.idleFunding -= b.idleQuote[packId];
         delete b.idleQuote[packId];
         _removeIdle(b, packId);
-        clearRenewal(b, packId);
         emit InventoryUpdated(packId, 0);
+    }
+
+    /// @notice Remove one sealed oversized pack for an in-kind owner withdrawal.
+    function withdrawRecoveryInventory(Book storage b, uint256 index) internal returns (uint256 packId, uint256 value) {
+        uint256 n = b.recoveryPacks.length;
+        if (index >= n) revert MissingInventory();
+        packId = b.recoveryPacks[index];
+        value = b.idleValueOf[packId];
+        if (value == 0 || b.recoveryUnsealed[packId]) revert MissingInventory();
+        b.recoveryPacks[index] = b.recoveryPacks[n - 1];
+        b.recoveryPacks.pop();
+        b.idleValue -= value;
+        b.trackedValue -= value;
+        b.idleFunding -= b.idleQuote[packId];
+        delete b.idleQuote[packId];
+        delete b.idleValueOf[packId];
+        delete b.packShapeCount[packId];
+        emit RecoveryUpdated(packId, 0, false);
     }
 
     function _removeIdle(Book storage b, uint256 packId) private {
@@ -617,12 +635,7 @@ library VaultLib {
         delete b.idleIndex[packId];
     }
 
-    function clearRenewal(Book storage b, uint256 packId) internal {
-        if (b.renewalEligible[packId]) {
-            delete b.renewalEligible[packId];
-            --b.renewalEligibleCount;
-        }
-    }
+
 
     function updateFeeDebt(Book storage b, uint256 id, uint256 debt) internal {
         Position storage p = b.positions[id];
@@ -743,20 +756,33 @@ library VaultLib {
         external returns (uint256 gasQ, uint256 units)
     {
         bool distributionTail;
-        (gasQ, units, distributionTail) = _syncChanges(p, b, f, packs, ids, checkpointMode, witnessId);
-        if (gasQ != 0) gasQ = _fundSync(p, budget, b, f, ids, gasQ, units, distributionTail, witnessId);
+        uint256 used;
+        (gasQ, units, distributionTail, used) = _syncChanges(p, b, f, packs, ids, checkpointMode, witnessId);
+        if (gasQ != 0 || units != 0) {
+            uint256 claimed;
+            (gasQ, claimed) = _fundSync(p, budget, b, f, ids, gasQ, units, distributionTail, witnessId);
+            _requireUsedInputs(ids, used | claimed);
+        }
     }
 
     function syncUnfunded(Params storage p, Book storage b, IFWAV2 f, IShapePacks packs,
-        uint256[] calldata ids, uint256 checkpointMode, uint256 witnessId)
+        uint256[] calldata ids, uint256 checkpointMode, uint256 witnessId, bool paid)
         external returns (uint256 gasQ, uint256 units)
     {
-        (gasQ, units,) = _syncChanges(p, b, f, packs, ids, checkpointMode, witnessId);
+        uint256 used;
+        (gasQ, units,, used) = _syncChanges(p, b, f, packs, ids, checkpointMode, witnessId);
+        if (paid && (gasQ != 0 || units != 0)) _requireUsedInputs(ids, used);
+    }
+
+    /// @dev Measured reimbursement cannot pay for padded or duplicated terminal/fee hints.
+    ///      Unpaid recovery remains tolerant of stale inputs and state races.
+    function _requireUsedInputs(uint256[] calldata ids, uint256 used) private pure {
+        if (used != (uint256(1) << ids.length) - 1) revert UnusedPaidInput();
     }
 
     function _syncChanges(Params storage p, Book storage b, IFWAV2 f, IShapePacks packs,
         uint256[] calldata ids, uint256 checkpointMode, uint256 witnessId)
-        private returns (uint256 gasQ, uint256 units, bool distributionTail)
+        private returns (uint256 gasQ, uint256 units, bool distributionTail, uint256)
     {
         if (ids.length > MAX_TERMINALS) revert BadBatch();
         Work memory work;
@@ -771,12 +797,17 @@ library VaultLib {
             (rebased, work.scanned, work.own) = ScanLib.rebase(b, f, p.gasSchedule);
             if (!rebased) (work.processed, work.own) = _syncJournal(b, f, packs);
         }
-        for (uint256 i; i < ids.length; ++i) if (_syncTerminal(b, f, packs, ids[i])) ++work.resolved;
+        for (uint256 i; i < ids.length; ++i) {
+            if (_syncTerminal(b, f, packs, ids[i])) {
+                ++work.resolved;
+                work.used |= uint256(1) << i;
+            }
+        }
         work.pruned = prune(b, MAX_PRUNES);
         if (work.processed + work.resolved + work.pruned == 0 && !rebased) revert Nothing();
         // Rebase is unpaid. Empty-vault head cleanup also cannot consume its bootstrap cash.
         if ((unexposed && b.trackedValue == 0) || work.processed + work.scanned + work.resolved + work.pruned == 0) {
-            return (0, 0, false);
+            return (0, 0, false, work.used);
         }
         bool journalPaid = work.processed == MAX_JOURNAL || work.own + work.resolved != 0;
         bool requiredTail;
@@ -790,7 +821,7 @@ library VaultLib {
             }
             requiredTail = journalPaid;
         }
-        if (!journalPaid && work.own + work.resolved + work.pruned == 0) return (0, 0, false);
+        if (!journalPaid && work.own + work.resolved + work.pruned == 0) return (0, 0, false, work.used);
         // A scan is paid only when it applied an own selection or is the required checkpoint proof:
         // splitting a cycle's terminal work into later calls cannot earn a second scan.
         gasQ = (requiredTail ? tailBase : p.gasSchedule.sync) + (journalPaid ? work.processed * p.gasSchedule.journal : 0)
@@ -798,17 +829,18 @@ library VaultLib {
             + work.resolved * p.gasSchedule.synced + work.pruned * p.gasSchedule.pruned;
         units = work.resolved;
         distributionTail = requiredTail && checkpointMode == 2;
+        return (gasQ, units, distributionTail, work.used);
     }
 
     /// @dev Terminal proceeds arrive first. Only real paid work may sweep economical credit or
     ///      claim the first bounded fee prefix needed to fund its complete payment envelope.
     function _fundSync(Params storage p, Budget storage budget, Book storage b, IFWAV2 f,
         uint256[] calldata ids, uint256 gasQ, uint256 units, bool distributionTail, uint256 witnessId)
-        private returns (uint256)
+        private returns (uint256, uint256)
     {
         (uint256 routine,) = budgetNow(p, budget);
         uint256 cost = quote(p, gasQ, units, false);
-        if (routine < cost) return gasQ;
+        if (routine < cost) return (gasQ, 0);
         uint256 credit = f.feeCredit(address(this));
         uint256 combined = quote(p, gasQ + p.gasSchedule.credit, units, false);
         if (credit != 0 && combined <= routine && (combined - cost) * BPS <= credit * p.keeperShareBps
@@ -819,10 +851,10 @@ library VaultLib {
             credit = 0;
         }
         uint256 free = ISyncVault(address(this)).keeperCash();
-        if (free >= cost) return gasQ;
-        uint256 deficit = ISyncVault(address(this)).fundingDeficit(false);
+        if (free >= cost) return (gasQ, 0);
         uint256[] memory claims = new uint256[](ids.length);
         uint256 count;
+        uint256 claimed;
         uint256 fees = credit;
         for (uint256 i; i < ids.length; ++i) {
             uint256 id = ids[i];
@@ -833,22 +865,23 @@ library VaultLib {
             uint256 pending = f.pendingFees(id);
             if (pending == 0) continue;
             claims[count++] = id;
+            claimed |= uint256(1) << i;
             fees += pending;
             uint256 fundedGas = gasQ + p.gasSchedule.fund + count * p.gasSchedule.harvested + (credit != 0 ? p.gasSchedule.credit : 0);
             combined = quote(p, fundedGas, units, false);
-            if (free + fees < deficit + combined) continue;
+            if (free + fees < combined) continue;
             // Once enough cash was found, extra IDs cannot increase the claim or its payment.
             if (combined > routine || (combined - cost) * BPS > fees * p.keeperShareBps
-                || (distributionTail && !_distributionTail(p, b, f, witnessId, fundedGas))) return gasQ;
+                || (distributionTail && !_distributionTail(p, b, f, witnessId, fundedGas))) return (gasQ, 0);
             assembly ("memory-safe") { mstore(claims, count) }
             uint256 before = address(this).balance;
-            if (!_claimFees(b, f, claims)) return gasQ;
+            if (!_claimFees(b, f, claims)) return (gasQ, 0);
             if (credit != 0) _withdrawCredit(b, f);
             uint256 received = address(this).balance - before;
             if (ISyncVault(address(this)).keeperCash() < combined || (combined - cost) * BPS > received * p.keeperShareBps) revert Payment();
-            return fundedGas;
+            return (fundedGas, claimed);
         }
-        return gasQ;
+        return (gasQ, 0);
     }
 
     function _distributionTail(Params storage p, Book storage b, IFWAV2 f, uint256 witnessId, uint256 gasQ)
@@ -938,7 +971,6 @@ library VaultLib {
             if (b.receipts[id].kind == 1 || !returned) {
                 release(b, id, p.backing);
                 keep(b, id);
-                if (b.renewalEnabled) ++b.keptReplacements;
                 if (owned) addInventory(b, p.packId, packs.valueOf(p.packId));
                 return true;
             }
@@ -946,10 +978,6 @@ library VaultLib {
             // Only a kick withdraws a listing outside this account's own calls: B refunded, pack returned.
             if (p.state != ACTIVE || !returned) revert InvalidListing();
         } else return false;
-        if (b.renewalEnabled && l.status == LISTING_SETTLED && !b.renewalEligible[p.packId]) {
-            b.renewalEligible[p.packId] = true;
-            ++b.renewalEligibleCount;
-        }
         release(b, id, p.backing);
         returnPack(b, id, owned);
         return true;

@@ -1,11 +1,14 @@
 # Completion candidate acceptance
 
+> The shared vault remains closed. Individual-manager A8 evidence and unsigned status are in
+> [MANAGER-RUNBOOK.md](MANAGER-RUNBOOK.md), [manager-acceptance.json](manager-acceptance.json)
+> and [REPORT.md](../REPORT.md). Earlier pooled-vault outcome numbers below do not evaluate A8.
+
 **Unsigned. No production launch approval.** Launch uses 0.03 ETH packs, three paid 0.01 ETH primary
-mints. Numerical settings, backing and renewal mode remain account-owned and immediate. The prior
+mints. Numerical settings, backing and gas calibration remain account-owned and immediate. The prior
 package is preserved under `history/e94fd99/` with its original identities.
 
-The local candidate uses 70,000 bps backing, 25 bps unresolved uplift, FreshAfterAcquisition, one
-renewal float and a 0.005 ETH maintenance reserve. Backing and uplift are provisional evaluation
+The local candidate uses 70,000 bps backing, 25 bps unresolved uplift, reuse-only returned packs and a 0.005 ETH maintenance reserve. Backing and uplift are provisional evaluation
 inputs. `acceptance.json` records measured engineering and economic status. A passing compilation,
 test, reconciliation or local rehearsal does not approve production or prove safety.
 
@@ -23,7 +26,7 @@ Future owner decisions concern measured outcome changes and production backing/f
 Broadcast, production fee changes, live cutover and merges retain separate authority requirements.
 No old signature applies to changed code.
 
-The completed bounded assessment fails the unchanged return gate. At 1.9601 ETH/current fee/0.5
+Historical pre-A8 assessment (fixed quoted pay and fresh renewal): the completed bounded assessment fails the unchanged return gate. At 1.9601 ETH/current fee/0.5
 gwei, the standard median is -53.68%, the worst draw -83.80%, and three of four draws lose. The
 half-fee cases also fail. Four draws do not justify a new minimum TVL or a production return promise.
 
@@ -39,3 +42,8 @@ production keystore transport remain evidence gaps, separately from the economic
 
 Things that don't make sense: creator fees can earn revenue while fresh replacement and holder
 processing leave depositors losing money. Both sides must be measured together.
+
+A8 removes fresh-return reminting and changes actual compensation to bounded measured work.
+The preceding returns and checkpoint costs are historical, not results for A8. Current manager-only
+engineering and economic status lives in `manager-acceptance.json` and the new measured scorecard.
+The shared vault remains undeployed and its app closed.

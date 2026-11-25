@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
 import {GasQuotes} from "../utils/GasQuotes.sol";
 
 import {ForkBase} from "./ForkBase.sol";
@@ -87,6 +89,7 @@ contract ScanGasTest is ForkBase {
         bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0), vault.configurationHash()));
         uint256 intrinsic = _intrinsic(input);
         _cold();
+        vm.recordLogs();
         vm.prank(keeper);
         uint256 start = gasleft();
         (bool ok, bytes memory ret) = address(vault).call(input);
@@ -130,13 +133,14 @@ contract ScanGasTest is ForkBase {
         bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(1), vault.configurationHash()));
         uint256 intrinsic = _intrinsic(input);
         vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(address(PACKS)); vm.cool(keeper);
+        vm.recordLogs();
         vm.prank(keeper);
         uint256 start = gasleft();
         (bool ok, bytes memory ret) = address(vault).call(input);
         uint256 used = start - gasleft() + intrinsic;
         if (!ok) assembly ("memory-safe") { revert(add(ret, 32), mload(ret)) }
         uint256 pay = abi.decode(ret, (uint256));
-        assertEq(pay, (GasQuotes.Q_SYNC + 128 * GasQuotes.Q_JOURNAL) * 0.2 gwei, "paid 128-record journal job");
+        assertEq(pay, MeasuredPay.gross(vault, GasQuotes.Q_SYNC + 128 * GasQuotes.Q_JOURNAL, 0, false, 0.2 gwei));
         assertEq(vault.acquisitionCursor(), end, "one call drains the full 128-record journal");
         emit log_named_uint("full 128-record foreign journal receipt-equivalent gas (94 own)", used);
         assertLt((used * 125 + 99) / 100, 16_777_216, "128-record journal plus 25% keeper gas margin fits EIP-7825");
@@ -154,6 +158,7 @@ contract ScanGasTest is ForkBase {
         bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0), vault.configurationHash()));
         uint256 intrinsic = _intrinsic(input);
         _cold();
+        vm.recordLogs();
         vm.prank(keeper);
         uint256 start = gasleft();
         (bool ok, bytes memory ret) = address(vault).call(input);
@@ -211,6 +216,7 @@ contract ScanPaidGasTest is SelectionBase {
         vm.cool(address(vault));
         vm.cool(address(FWA));
         vm.cool(address(VaultLib));
+        vm.recordLogs();
         uint256 start = gasleft();
         (bool ok, bytes memory ret) = address(vault).call(input);
         uint256 billed = start - gasleft() + intrinsic;
@@ -223,8 +229,8 @@ contract ScanPaidGasTest is SelectionBase {
         emit log_named_uint("paid scan billed gas", billed);
         emit log_named_uint("paid scan quoted gasQ", gasQ);
         emit log_named_uint("paid scan pay wei (0.5 gwei)", pay);
-        assertEq(pay, gasQ * 0.5 gwei, "paid scan pays the fixed quote");
+        assertEq(pay, MeasuredPay.gross(vault, gasQ, 0, false, 0.5 gwei));
         assertGt(billed, 0);
-        assertGe(gasQ, billed, "fixed quote covers the keeper's billed gas: scan stays profitable");
+        assertGe(pay, billed * 0.5 gwei, "actual compensation covers this measured gross caller cost");
     }
 }

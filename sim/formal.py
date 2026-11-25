@@ -226,6 +226,7 @@ def receipt_costs():
 
 
 def main():
+    raise SystemExit('Historical fixed/Fresh assessment: use the preserved evidence and its pinned revision; current measured reuse evaluations use manager_operating_assessment.py and manager_reconcile.py')
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--seeds", type=int, default=16)
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2))

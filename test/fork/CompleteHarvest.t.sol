@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
 import {GasQuotes} from "../utils/GasQuotes.sol";
 
 import {ForkBase, IOwnable, IFwaAdmin} from "./ForkBase.sol";
@@ -21,9 +23,9 @@ contract CompleteHarvestTest is ForkBase {
 
     receive() external payable {}
 
-    function seedTwoListings() external {
+    function seedTwoListings() external returns (uint256) {
         // build mints and lists both 6-unit packs at once; no idle pack remains to relist.
-        TestVaultOps.restock(vault, 2, UNITS, 0);
+        return TestVaultOps.restock(vault, 2, UNITS, 0);
     }
 
     function setUp() public override {
@@ -44,12 +46,15 @@ contract CompleteHarvestTest is ForkBase {
         uint256 baseGas = uint256(p.gasSchedule.build) + 2 * (uint256(p.gasSchedule.buildPack)
             + 2 * p.gasSchedule.buildShape + p.gasSchedule.listed);
         uint256 exactOpening = 2 * (P + FEE_PER_PACK + P * p.backingRatioBps / 10_000)
-            + baseGas * 0.2 gwei + 10_000; // second live backing needs its own 10,000-wei tag
+            + (baseGas + p.gasSchedule.overhead) * 0.2 gwei + 10_000; // second live backing needs its own 10,000-wei tag
         address predicted = vm.computeCreateAddress(address(this), vm.getNonce(address(this)));
         uint256 dust = predicted.balance;
         vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, exactOpening - dust, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         // External self-call: keeps restock/list out of setUp's stack frame (via_ir stack depth).
-        this.seedTwoListings();
+        vm.recordLogs();
+        uint256 seedPay = this.seedTwoListings();
+        assertEq(seedPay, MeasuredPay.gross(vault, baseGas, 4, false, 0.2 gwei));
+        assertEq(seedPay, (baseGas + p.gasSchedule.overhead) * 0.2 gwei, "real two-pack work saturates the funding fixture cap");
         assertEq(vault.freeEth(), 0, "real construction spends exact opening cash");
         first = vault.openListingAt(0); second = vault.openListingAt(1);
         ReceiptFixtureFiller filler = new ReceiptFixtureFiller{value: 3 ether}(
@@ -73,6 +78,7 @@ contract CompleteHarvestTest is ForkBase {
         vm.prank(owner); vault.setParams(p, _expected0);
         // Tiny genuine accruals suffice at one wei. Receipt calibration uses production prices.
         vm.fee(1); vm.txGasPrice(1);
+        vm.recordLogs();
     }
 
     function _replay(string memory fixture, string memory leg) private {
@@ -166,7 +172,8 @@ contract CompleteHarvestTest is ForkBase {
         uint256 billed = vm.lastCallGas().gasTotalUsed;
         assertGt(paid, 0, "required holder work is paid from explicit contributions");
         emit log_named_uint("contribution-funded required refunded singleton isolated billed gas", billed);
-        assertLe(billed, GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_JOURNAL);
+        assertLe(billed, GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_JOURNAL + p.gasSchedule.overhead,
+            "candidate allowance plus named transaction tail covers this actual receipt");
     }
 
     function test_distributionTailProvesTheFullCollectionCostBeforePayingIt() public {
@@ -197,14 +204,17 @@ contract CompleteHarvestTest is ForkBase {
         p.essentialRate = 0;
         bytes32 _expected9 = TestVaultOps.configurationHash(vault);
         vm.prank(owner); vault.setParams(p, _expected9);
-        uint256 cost = GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_DISTRIBUTION_PROOF + GasQuotes.Q_JOURNAL;
+        uint256 allowance = GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_DISTRIBUTION_PROOF + GasQuotes.Q_JOURNAL;
+        uint256 cost = allowance + p.gasSchedule.overhead;
         uint256 supply = vault.totalShares();
         uint256 target = (vault.highWaterMark() * supply + 1e18 - 1) / 1e18
             + 0.02 ether + cost + GasQuotes.Q_CREDIT / 2;
         (uint256 tracked,, uint256 backing,,,) = vault.totals();
         TestVaultOps.fundTo(vault, target - tracked - backing - FWA.pendingFees(second) - credit);
         bytes32 _expected10 = TestVaultOps.configurationHash(vault);
-        assertEq(vault.sync(new uint256[](0), second, 1, _expected10), cost);
+        uint256 paid = vault.sync(new uint256[](0), second, 1, _expected10);
+        assertEq(paid, MeasuredPay.gross(vault, allowance, 0, false, 1));
+        assertLe(paid, cost);
         assertEq(FWA.feeCredit(address(vault)), credit, "extra fee collection would erase the qualifying distribution");
         bytes32 _expected11 = TestVaultOps.configurationHash(vault);
         assertGt(vault.checkpoint(second, 1, _expected11), 0,
@@ -408,6 +418,7 @@ contract CompleteCreditTest is SelectionBase {
         bytes32 _expected33 = TestVaultOps.configurationHash(vault);
         vm.prank(vault.owner()); vault.setParams(p, _expected33);
         vm.fee(price); vm.txGasPrice(price);
+        vm.recordLogs();
     }
 
     function test_economicCreditIsSweptOnceWithVerifiedOwnWork() public {
@@ -416,7 +427,7 @@ contract CompleteCreditTest is SelectionBase {
         uint256 cash = address(vault).balance;
         bytes32 _expected34 = TestVaultOps.configurationHash(vault);
         uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected34);
-        assertEq(paid, GasQuotes.Q_SYNC + GasQuotes.Q_JOURNAL + GasQuotes.Q_SELECTED + GasQuotes.Q_CREDIT);
+        assertEq(paid, MeasuredPay.gross(vault, GasQuotes.Q_SYNC + GasQuotes.Q_JOURNAL + GasQuotes.Q_SELECTED + GasQuotes.Q_CREDIT, 0, false, 1));
         assertEq(FWA.feeCredit(address(vault)), 0);
         assertEq(address(vault).balance, cash + credit - paid);
         bytes32 _expected35 = TestVaultOps.configurationHash(vault);
@@ -462,8 +473,8 @@ contract CompleteCreditTest is SelectionBase {
         uint256[] memory ids = new uint256[](1); ids[0] = selected;
         bytes32 _expected39 = TestVaultOps.configurationHash(vault);
         uint256 paid = vault.sync(ids, 0, 1, _expected39);
-        assertEq(paid, (GasQuotes.Q_SYNC + GasQuotes.Q_JOURNAL + GasQuotes.Q_SELECTED
-            + GasQuotes.Q_SYNCED + GasQuotes.Q_PRUNED) * 0.5 gwei);
+        assertEq(paid, MeasuredPay.gross(vault, GasQuotes.Q_SYNC + GasQuotes.Q_JOURNAL + GasQuotes.Q_SELECTED
+            + GasQuotes.Q_SYNCED + GasQuotes.Q_PRUNED, 1, false, 0.5 gwei));
         assertEq(FWA.feeCredit(address(vault)), credit);
         assertEq(address(vault).balance, cash - paid);
         assertEq(vault.openListingCount(), 0);

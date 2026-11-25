@@ -22,8 +22,6 @@
  "essentialRatePerDayWei": 0,
  "upliftBoundBps": 25,
  "backingRatioBps": 70000,
- "renewalMode": 0,
- "renewalFloatCount": 1,
  "acceptedMintFeeWei": 1000000000000000,
  "minDepositWei": 10000000000000000,
  "minDistributionWei": 10000000000000000,
@@ -55,7 +53,8 @@
   "harvest": 125000,
   "harvested": 80000,
   "credit": 40000,
-  "fund": 40000
+  "fund": 40000,
+  "overhead": 100000
  },
  "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
  "expectedMintFeeWei": 1000000000000000

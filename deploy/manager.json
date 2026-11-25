@@ -1,5 +1,5 @@
 {
- "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
+ "comment": "Unsigned reuse-only evaluation candidate; not approved production economics. 0.03 ETH packs, three paid 0.01 ETH mints; 70000 bps backing, 25 bps pooled uplift, 0.005 ETH reserve. Measured-work cap plus receipt-calibrated 50000 gas overhead; all numerical inputs remain owner adjustable.",
  "minEdgeBps": 100,
  "bufferBps": 0,
  "distributionBps": 0,
@@ -18,8 +18,6 @@
  "essentialRatePerDayWei": 5000000000000000,
  "upliftBoundBps": 25,
  "backingRatioBps": 70000,
- "renewalMode": 0,
- "renewalFloatCount": 1,
  "acceptedMintFeeWei": 1000000000000000,
  "minDepositWei": 10000000000000000,
  "minDistributionWei": 10000000000000000,
@@ -51,7 +49,8 @@
   "harvest": 125000,
   "harvested": 80000,
   "credit": 40000,
-  "fund": 40000
+  "fund": 40000,
+  "overhead": 50000
  },
- "expectedMintFeeWei": 1000000000000000
+ "expectedMintFeeWei": 500000000000000
 }

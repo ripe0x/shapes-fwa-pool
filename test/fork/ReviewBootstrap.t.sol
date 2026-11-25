@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
 import {GasQuotes} from "../utils/GasQuotes.sol";
@@ -125,12 +127,15 @@ contract ReviewBootstrapTest is ForkBase {
         assertEq(vault.acquisitionCursor(), beforeCursor, "deposit does not pretend exposure history is current");
         uint256 beforeGas = gasleft();
         bytes32 _expected5 = TestVaultOps.configurationHash(vault);
+        vm.recordLogs();
         vm.prank(keeper); uint256 pay = vault.checkpoint(0, 0, _expected5);
         uint256 used = beforeGas - gasleft();
         emit log_named_uint("bootstrap checkpoint call gas, excluding intrinsic", used);
         assertLe(used, GasQuotes.Q_CHECKPOINT, "shared fixed checkpoint charge covers automatic empty-history advance");
-        assertEq(pay, ck, "only the existing shared request charge funds checkpoint");
-        assertEq(address(vault).balance, seed + 0.1 ether);
+        uint256 gross = MeasuredPay.gross(vault, GasQuotes.Q_CHECKPOINT, 1, true, 0.5 gwei);
+        assertEq(pay, gross < ck ? gross : ck, "only the request source funds measured checkpoint pay");
+        assertEq(vault.chargeRefundReserve(), ck - pay, "unused contribution remains owed to its payer");
+        assertEq(address(vault).balance, seed + 0.1 ether + ck - pay);
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
         assertGt(vault.shareBalance(alice), 0);
         assertEq(vault.pendingDepositTotal(), 0);

@@ -56,8 +56,6 @@ contract Deploy is Script {
         p.reserve = uint128(fit(v, ".reserveWei", type(uint128).max));
         p.tvlCap = uint128(fit(v, ".tvlCapWei", type(uint128).max));
         p.backingRatioBps = uint32(fit(v, ".backingRatioBps", type(uint32).max));
-        p.renewalMode = VaultLib.RenewalMode(fit(v, ".renewalMode", 1));
-        p.renewalFloatCount = uint16(fit(v, ".renewalFloatCount", type(uint16).max));
         p.acceptedMintFee = uint64(fit(v, ".acceptedMintFeeWei", type(uint64).max));
         p.minDeposit = uint64(fit(v, ".minDepositWei", type(uint64).max));
         p.minDistribution = uint64(fit(v, ".minDistributionWei", type(uint64).max));
@@ -89,6 +87,7 @@ contract Deploy is Script {
         p.gasSchedule.harvested = uint32(fit(v, ".gasSchedule.harvested", type(uint32).max));
         p.gasSchedule.credit = uint32(fit(v, ".gasSchedule.credit", type(uint32).max));
         p.gasSchedule.fund = uint32(fit(v, ".gasSchedule.fund", type(uint32).max));
+        p.gasSchedule.overhead = uint32(fit(v, ".gasSchedule.overhead", type(uint32).max));
         address owner_ = vm.parseJsonAddress(v, ".owner");
         require(uint160(owner_) > 0xffff, "owner must be a real account, not a placeholder or precompile");
         vm.startBroadcast();

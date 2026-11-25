@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
 import {GasQuotes} from "../utils/GasQuotes.sol";
 
 import {ForkBase} from "./ForkBase.sol";
@@ -112,7 +114,7 @@ contract EfficientJournalTest is ForkBase {
         // (Q_REQUIRED_TAIL + scanned*Q_SCAN, scanned == openListingCount == 1).
         bytes32 _expected8 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected8);
-        assertEq(paid, (GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_SCAN) * 0.2 gwei);
+        assertEq(paid, MeasuredPay.gross(vault, GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_SCAN, 0, false, 0.2 gwei));
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
         assertEq(vault.processingPool(), pool);
         assertEq(vault.pendingDepositTotal(), escrow);
@@ -139,7 +141,7 @@ contract EfficientJournalTest is ForkBase {
         bytes32 _expected10 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected10);
         (uint256 routineAfter, uint256 essentialAfter) = vault.budget();
-        assertEq(paid, (GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_SCAN) * 0.2 gwei);
+        assertEq(paid, MeasuredPay.gross(vault, GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_SCAN, 0, false, 0.2 gwei));
         assertEq(routineBefore - routineAfter, paid);
         assertEq(essentialAfter, 0);
         assertEq(vault.processingPool(), pool);
@@ -184,7 +186,7 @@ contract EfficientJournalTest is ForkBase {
         assertTrue(vm.revertToState(snapshot));
         bytes32 _expected17 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), witness, 1, _expected17);
-        assertEq(paid, (GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_DISTRIBUTION_PROOF + GasQuotes.Q_JOURNAL) * 0.2 gwei);
+        assertEq(paid, MeasuredPay.gross(vault, GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_DISTRIBUTION_PROOF + GasQuotes.Q_JOURNAL, 0, false, 0.2 gwei));
         assertEq(vault.pendingDepositTotal(), 0); assertEq(vault.lockedShares(), 0);
         bytes32 _expected18 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper); vault.checkpoint(witness, 0, _expected18);

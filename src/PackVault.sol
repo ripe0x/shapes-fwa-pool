@@ -17,7 +17,7 @@ import {IShapes, IShapePacks, IFWAV2} from "./interfaces/External.sol";
 ///      a listing with backing B earns expected fees k B before selection, where
 ///      k = (1 + surcharge)(1 - protocolCut)(1 - crownShare). On selection the purchaser either keeps
 ///      the pack (the vault gets B (1 - s) back) or takes the bid (the vault gets the pack back).
-///      Account-owned backing and renewal settings price both outcomes without assuming a choice.
+///      Account-owned backing settings price both outcomes without assuming a choice.
 ///
 ///      Keepers are paid from vault ETH (a holder expense, NAV-visible), never from a fee skim, by
 ///      quote (D56). Checkpoints are funded by charges on the deposit and redemption requests that
@@ -190,13 +190,11 @@ contract PackVault is PackAccount {
     ///      redemptions will need, so ETH freed for redeemers cannot be relisted.
     function _idle() internal view override returns (uint256) {
         uint256 free = _free();
-        uint256 keep = s.params.reserve + renewalFloat() + _owedEstimate();
+        uint256 keep = s.params.reserve + _owedEstimate();
         return free > keep ? free - keep : 0;
     }
 
-    function _renewalHold() internal view override returns (uint256) {
-        return s.params.reserve + _owedEstimate();
-    }
+
 
     /// @dev ETH locked shares will need at the last checkpoint's price, rounded up.
     function _owedEstimate() internal view returns (uint256) {
@@ -323,12 +321,14 @@ contract PackVault is PackAccount {
     }
 
     /// @notice Required pricing work uses its explicit contribution source, never routine cash.
-    function syncCheckpoint(uint256[] calldata ids, uint256 witnessId, uint256 minPay, bytes32 expected)
-        external nonReentrant returns (uint256 paid)
-    {
+    function syncCheckpoint(uint256[] calldata ids, uint256 witnessId, uint256 minPay, bytes32 expected) external returns (uint256) {
+        return _syncCheckpoint(ids, witnessId, minPay, expected, gasleft());
+    }
+
+    function _syncCheckpoint(uint256[] calldata ids, uint256 witnessId, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256 paid) {
         _checkConfiguration(expected);
         if (pendingDepositTotal == 0 && lockedShares == 0) revert Nothing();
-        paid = StrategyLib.syncFunded(s, fwa, packs, ids, witnessId, 1, minPay, processingPool);
+        paid = StrategyLib.syncFunded(s, fwa, packs, ids, witnessId, 1, minPay, processingPool, gasStart);
         processingPool -= paid;
     }
 
@@ -404,7 +404,11 @@ contract PackVault is PackAccount {
     ///         every Active position is worth exactly what a withdrawal would return.
     ///         Paid at cost plus one work unit, from the request charges of the flows it settles
     ///         (`processingPool`); with no flows, from the routine budget for a distribution.
-    function checkpoint(uint256 witnessId, uint256 minPay, bytes32 expected) external nonReentrant returns (uint256) {
+    function checkpoint(uint256 witnessId, uint256 minPay, bytes32 expected) external returns (uint256) {
+        return _checkpoint(witnessId, minPay, expected, gasleft());
+    }
+
+    function _checkpoint(uint256 witnessId, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256) {
         // Zero expectation selects the unpaid redemption-only recovery path. It cannot commit
         // pending deposits, distribute gains or earn compensation.
         bool recoveryOnly = expected == bytes32(0);
@@ -502,13 +506,13 @@ contract PackVault is PackAccount {
         if (work) {
             // Source classification survives the final redemption. Contributions never become
             // general free cash; unused wei move directly to their payers' protected reserve.
-            uint256 paidKeeper = StrategyLib.payFunded(s, OP_CHECKPOINT, gasQ, 1, true, minPay, processingPool);
+            uint256 paidKeeper = StrategyLib.payFunded(s, OP_CHECKPOINT, gasQ, 1, true, minPay, processingPool, gasStart);
             processingPool -= paidKeeper;
             _closeChargeEra();
             return paidKeeper;
         }
         if (distributed != 0) {
-            return StrategyLib.pay(s, OP_CHECKPOINT, gasQ, 1, false, minPay, type(uint256).max);
+            return StrategyLib.pay(s, OP_CHECKPOINT, gasQ, 1, false, minPay, type(uint256).max, gasStart);
         }
         // No flows and nothing distributed: revert, so the interval's one slot stays free (audit E3).
         revert Nothing();
@@ -577,8 +581,6 @@ contract PackVault is PackAccount {
 
     function startWindDown() external onlyOwner {
         s.windingDown = true;
-        s.book.renewalEnabled = false;
-        s.book.keptReplacements = 0;
         depositsPaused = true;
         s.listingPaused = true;
         emit WindDownStarted();

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
 import {GasQuotes} from "../utils/GasQuotes.sol";
 
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
@@ -110,9 +112,8 @@ contract ForkVaultAdversarialTest is ForkBase {
         uint256 pay = TestVaultOps.restock(vault, 1, UNITS, 0);
         assertEq(TestVaultOps.open(vault).length, open0 + 1, "built and listed above the ceiling");
         assertEq(keeper.balance - kb, pay);
-        assertEq(pay,
-            (GasQuotes.Q_BUILD + GasQuotes.buildGas(2) + GasQuotes.Q_LISTED) * 0.25 gwei + 2 * vault.getParams().workFee,
-            "quote at the ceiling price + two work-unit fees");
+        assertEq(pay, MeasuredPay.gross(vault,
+            GasQuotes.Q_BUILD + GasQuotes.buildGas(2) + GasQuotes.Q_LISTED, 2, false, 0.25 gwei));
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
     }

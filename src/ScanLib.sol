@@ -90,17 +90,17 @@ library ScanLib {
                 || p.routineCap > VaultLib.MAX_ROUTINE_CAP || p.routineRate > VaultLib.MAX_ROUTINE_RATE || p.essentialCap > VaultLib.MAX_ESSENTIAL_CAP
                 || p.essentialRate > VaultLib.MAX_ESSENTIAL_RATE
                 || p.backingRatioBps < VaultLib.BPS || p.backingRatioBps > VaultLib.MAX_BACKING_RATIO_BPS
-                || p.renewalFloatCount > VaultLib.MAX_BATCH || p.minDeposit > 1 ether || p.minDistribution > 1 ether
+                || p.minDeposit > 1 ether || p.minDistribution > 1 ether
                 || p.packUnitsMask >> (VaultLib.MAX_PACK_UNITS + 1) != 0 || p.packUnitsMask & ((1 << VaultLib.MIN_PACK_UNITS) - 1) != 0
         ) revert VaultLib.OutOfBounds();
         VaultLib.GasSchedule memory g = p.gasSchedule;
-        uint32[28] memory entries;
+        uint32[29] memory entries;
         assembly ("memory-safe") { entries := g }
         for (uint256 i; i < entries.length; ++i) if (entries[i] > VaultLib.MAX_GAS_QUOTE) revert VaultLib.OutOfBounds();
     }
 
     function preview(VaultLib.Params memory p, uint256 mintFee) external view returns (uint256 units, uint256 principal,
-        uint256 backing, uint256 mintCost, uint256 floatRequired, uint256 openingCash, bytes32 expectedConfigHash)
+        uint256 backing, uint256 mintCost, uint256 openingCash, bytes32 expectedConfigHash)
     {
         units = p.packUnitsMask == 0 ? VaultLib.REF_UNITS : LibBit.ffs(p.packUnitsMask);
         principal = units * VaultLib.UNIT;
@@ -109,23 +109,9 @@ library ScanLib {
         mintCost = n * mintFee;
         uint256 gasQ = uint256(p.gasSchedule.build) + p.gasSchedule.buildPack
             + n * p.gasSchedule.buildShape + p.gasSchedule.listed;
-        uint256 compensation = VaultLib.calculatePayment(gasQ, 2, block.basefee, p.gasCeiling,
-            p.maxTip, p.payMarkupBps, p.workFee);
-        if (p.renewalMode == VaultLib.RenewalMode.FreshAfterAcquisition && p.packUnitsMask != 0) {
-            for (uint256 u = VaultLib.MIN_PACK_UNITS; u <= VaultLib.MAX_PACK_UNITS; ++u) {
-                if ((p.packUnitsMask >> u) & 1 == 0) continue;
-                (, uint256 shapeCount) = VaultLib.makeup(u);
-                uint256 renewalGas = uint256(p.gasSchedule.build) + p.gasSchedule.buildPack
-                    + shapeCount * p.gasSchedule.buildShape + p.gasSchedule.listed
-                    + p.gasSchedule.liquidate + p.gasSchedule.liquidatePack + shapeCount * p.gasSchedule.redeemShape;
-                uint256 required = u * VaultLib.UNIT * p.backingRatioBps / VaultLib.BPS
-                    + shapeCount * p.acceptedMintFee
-                    + VaultLib.calculatePayment(renewalGas, 3, p.gasCeiling, p.gasCeiling, 0, p.payMarkupBps, p.workFee);
-                floatRequired = M.max(floatRequired, required);
-            }
-            floatRequired *= p.renewalFloatCount;
-        }
-        openingCash = principal + backing + mintCost + compensation + p.reserve + floatRequired;
+        uint256 compensation = VaultLib.calculatePayment(gasQ + p.gasSchedule.overhead, 2,
+            M.min(block.basefee + p.maxTip, p.gasCeiling), p.payMarkupBps, p.workFee);
+        openingCash = principal + backing + mintCost + compensation + p.reserve;
         expectedConfigHash = keccak256(abi.encode(p, mintFee, false, false));
     }
 
@@ -141,24 +127,12 @@ library ScanLib {
         return value + value * p.backingRatioBps / VaultLib.BPS;
     }
 
-    function renewalFloat(VaultLib.Params storage p) external view returns (uint256) { return _renewalFloat(p); }
 
-    function _renewalFloat(VaultLib.Params storage p) private view returns (uint256 required) {
-        if (p.renewalMode != VaultLib.RenewalMode.FreshAfterAcquisition || p.packUnitsMask == 0) return 0;
-        for (uint256 u = VaultLib.MIN_PACK_UNITS; u <= VaultLib.MAX_PACK_UNITS; ++u) {
-            if ((p.packUnitsMask >> u) & 1 == 0) continue;
-            (, uint256 n) = VaultLib.makeup(u);
-            uint256 gasQ = uint256(p.gasSchedule.build) + VaultLib.buildGas(p, n) + p.gasSchedule.listed
-                + p.gasSchedule.liquidate + p.gasSchedule.liquidatePack + n * p.gasSchedule.redeemShape;
-            uint256 candidate = u * VaultLib.UNIT * p.backingRatioBps / VaultLib.BPS + n * p.acceptedMintFee
-                + VaultLib.calculatePayment(gasQ, 3, p.gasCeiling, p.gasCeiling, 0, p.payMarkupBps, p.workFee);
-            required = M.max(required, candidate);
-        }
-        return required * p.renewalFloatCount;
-    }
+
+
 
     function operatingReserve(VaultLib.Params storage p) external view returns (uint256) {
-        return uint256(p.reserve) + _renewalFloat(p);
+        return p.reserve;
     }
 
     function deployCharge(VaultLib.Params storage p, uint256 mintFee) external view returns (uint256 cost) {
@@ -197,6 +171,8 @@ library ScanLib {
                 + ((b.activeCount + VaultLib.MAX_BATCH - 1) / VaultLib.MAX_BATCH) * p.gasSchedule.unlist
                 + ((count + perCall - 1) / perCall) * p.gasSchedule.liquidate;
             uint256 serviceUnits = b.activeCount + count;
+            uint256 calls = (b.activeCount + VaultLib.MAX_BATCH - 1) / VaultLib.MAX_BATCH
+                + (count + perCall - 1) / perCall;
             if (recoveryPacks != 0) {
                 // ShapePacks rejects unbacked Shapes; every packed Shape has at least UNIT.
                 // No contents enumeration: value bounds remaining Shapes, and all remaining
@@ -207,8 +183,9 @@ library ScanLib {
                 gasQ += shapes * p.gasSchedule.recoveryShape + recoveryPacks * p.gasSchedule.recoveryUnseal
                     + chunks * (uint256(p.gasSchedule.liquidate) + p.gasSchedule.recoveryBase);
                 serviceUnits += chunks;
+                calls += chunks;
             }
-            return M.mulDivUp(VaultLib.quote(p, gasQ, serviceUnits, true), refCapital, capital);
+            return M.mulDivUp(VaultLib.quoteCalls(p, gasQ, serviceUnits, true, calls), refCapital, capital);
         }
         // No ordinary book yet: compare permitted recipes using their actual mint counts.
         for (uint256 u = VaultLib.MIN_PACK_UNITS; u <= VaultLib.MAX_PACK_UNITS; ++u) {
@@ -217,7 +194,7 @@ library ScanLib {
             uint256 gasQ = uint256(p.gasSchedule.unlist) + p.gasSchedule.unlisted + p.gasSchedule.liquidate
                 + p.gasSchedule.liquidatePack + n * p.gasSchedule.redeemShape;
             uint256 recipeCapital = u * VaultLib.UNIT * (VaultLib.BPS + p.backingRatioBps) / VaultLib.BPS;
-            cost = M.max(cost, M.mulDivUp(VaultLib.quote(p, gasQ, 2, true), refCapital, recipeCapital));
+            cost = M.max(cost, M.mulDivUp(VaultLib.quoteCalls(p, gasQ, 2, true, 2), refCapital, recipeCapital));
         }
     }
 
@@ -316,7 +293,7 @@ library ScanLib {
         uint256 high = v.highWaterMark();
         if (supply <= VaultLib.DEAD_SHARES || perShare <= high) return false;
         uint256 liquid = v.freeEth() + f.feeCredit(address(this));
-        uint256 reserve = uint256(p.reserve) + _renewalFloat(p);
+        uint256 reserve = p.reserve;
         if (liquid <= reserve) return false;
         liquid -= reserve;
         if (liquid <= cost) return false;
@@ -367,26 +344,11 @@ library ScanLib {
     }
 
     /// @notice One replacement's verified-work envelope; optional funding work is quoted separately.
-    function renewalQuote(VaultLib.Params storage p, VaultLib.Book storage b, uint256 returnedPackId,
-        uint256 feeClaims, bool withdrawCredit) external view returns (uint256)
-    {
-        if (feeClaims > VaultLib.MAX_BATCH) revert VaultLib.BadBatch();
-        uint256 retired;
-        uint256 burned;
-        if (returnedPackId != 0) {
-            if (b.idleIndex[returnedPackId] == 0 || !b.renewalEligible[returnedPackId]) revert VaultLib.MissingInventory();
-            retired = 1;
-            burned = b.packShapeCount[returnedPackId];
-        } else if (b.keptReplacements == 0) revert VaultLib.Nothing();
-        uint256 gasQ = VaultLib.renewalGas(p, 1, retired, burned);
-        uint256 units = 2 + retired;
-        if (feeClaims != 0 || withdrawCredit) gasQ += VaultLib.renewalFundingGas(p, feeClaims, withdrawCredit);
-        return VaultLib.quote(p, gasQ, units, false);
-    }
 
 
 
-    function backingTerms(VaultLib.Params storage p, IFWAV2 f, address packs, uint256 units, uint256 mintFee, uint256 retiredShapes)
+
+    function backingTerms(VaultLib.Params storage p, IFWAV2 f, address packs, uint256 units, uint256 mintFee, uint256)
         external view returns (VaultLib.BackingTerms memory t)
     {
         (t.k, t.cap, t.settlementFee) = economics(f, packs);
@@ -399,18 +361,9 @@ library ScanLib {
         uint256 gasQ = uint256(p.gasSchedule.sync) + p.gasSchedule.journal + p.gasSchedule.selected
             + p.gasSchedule.synced + p.gasSchedule.pruned + p.gasSchedule.fund + p.gasSchedule.harvested
             + p.gasSchedule.credit;
-        if (p.renewalMode == VaultLib.RenewalMode.ReuseReturned) {
-            t.initialCost = VaultLib.quote(p, gasQ, 1, false) + _buildCost(p, units, mintFee);
-            gasQ += uint256(p.gasSchedule.list) + p.gasSchedule.listed;
-        } else {
-            gasQ += uint256(p.gasSchedule.liquidate) + p.gasSchedule.liquidatePack
-                + retiredShapes * p.gasSchedule.redeemShape;
-        }
-        t.cycleCost = VaultLib.quote(p, gasQ, 2, false);
-        if (p.renewalMode == VaultLib.RenewalMode.FreshAfterAcquisition) {
-            t.initialCost = t.cycleCost + _buildCost(p, units, mintFee);
-            t.cycleCost += _buildCost(p, VaultLib.refUnits(p), mintFee);
-        }
+        t.initialCost = VaultLib.quote(p, gasQ, 1, false) + _buildCost(p, units, mintFee);
+        t.cycleCost = VaultLib.quote(p, gasQ, 1, false)
+            + VaultLib.quote(p, uint256(p.gasSchedule.list) + p.gasSchedule.listed, 1, false);
         t.ok = t.cap != 0 && t.k >= 1e18 + uint256(p.minEdgeBps) * 1e14 && t.desired >= t.floor
             && VaultLib._profitable(t, t.desired, false);
         if (!t.ok) t.desired = 0;

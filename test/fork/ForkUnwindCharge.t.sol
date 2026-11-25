@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
 import {ForkBase} from "./ForkBase.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
@@ -38,6 +40,7 @@ contract ForkUnwindChargeTest is ForkBase {
         vm.warp(vm.getBlockTimestamp() + 13 hours);
         vm.prank(owner);
         vault.startWindDown();
+        vm.recordLogs();
         uint256 paid = vault.unlist(ids, 0, vault.configurationHash());
         uint256 calls;
         while (vault.idlePackCount() != 0) {
@@ -45,10 +48,15 @@ contract ForkUnwindChargeTest is ForkBase {
             ++calls;
         }
         assertEq(calls, mixed ? 4 : 2, "actual LIFO calls obey sixty-unit work bound");
-        assertEq(paid, mixed ? 0.001172 ether : 0.000634 ether,
-            "absolute verified keeper payments include each real base exactly once");
+        (uint256 eventPaid, uint256 work,) = MeasuredPay.total(vault, address(this), 0.2 gwei);
+        assertEq(paid, eventPaid, "actual compensation reconciles every bounded exit call");
+        assertEq(work, mixed ? 16 : 8, "one work fee for each actual unlist and liquidation");
+        uint256 envelope = mixed ? 0.001272 ether : 0.000694 ether;
+        assertEq(perReference, (envelope * referenceCapital + capital - 1) / capital,
+            "independent cap envelope counts overhead for five or three actual calls");
+        assertLe(paid, envelope);
         uint256 required = (paid * referenceCapital + capital - 1) / capital;
-        assertEq(perReference, required, "normalized charge covers all actual bounded calls");
+        assertGe(perReference, required, "upper charge covers actual bounded measured payments");
         assertEq(vault.openListingCount() + vault.idlePackCount(), 0);
     }
 

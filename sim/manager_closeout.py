@@ -42,6 +42,7 @@ def verify_sources(root, sources):
 
 
 def build_report(root=ROOT):
+    raise RuntimeError('Historical fixed/Fresh scorecard: read the preserved artifact or use its pinned revision; do not recompute with the active reuse-only model')
     inputs = {name: checked_json(root / name, sha) for name, sha in PINS.items()}
     costs, receipts, observation, standard, reconciliation = inputs.values()
     verify_sources(root, SOURCE_PINS)

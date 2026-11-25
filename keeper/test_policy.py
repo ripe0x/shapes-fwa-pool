@@ -103,18 +103,19 @@ def main():
 
     # Absolute envelope cash at0.5gwei: list8=(280k+8*825k)*0.55gwei=0.003784ETH;
     # routine journal128+prune16=(125k+128*22k+16*45k)*0.55gwei=0.00201355ETH.
-    assert reserve_need(state()) == 5_797_550_000_000_000
+    assert reserve_need(state()) == 5_907_550_000_000_000
     s = state(essential_ceiling=2 * G, work_fee=20_000_000_000_000)
-    assert reserve_need(s) == 5_957_550_000_000_000
+    assert reserve_need(s) == 6_067_550_000_000_000
     unpaid = state(essential_ceiling=2 * G, work_fee=20_000_000_000_000, essential_cap=0)
-    assert reserve_need(unpaid) == 5_957_550_000_000_000  # Sync is routine even with unpaid exits.
+    assert reserve_need(unpaid) == 6_067_550_000_000_000  # Sync is routine even with unpaid exits.
     assert "RESERVE_BELOW_NEED" in {c for c, _, _ in status(state(reserve=10**15))}
     assert P.checkpoint_cost(state(open_positions=301)) == P.checkpoint_cost(state(open_positions=10_000))
     assert P.request_charge(state(open_positions=1000)) == P.request_charge(state(open_positions=10_000))
     # Current provisional 500k checkpoint calibration, plus the work fee, at the routine ceiling.
     spike_checkpoint = state(base_fee=1_950_000_000, gas_price=2 * G,
                              markup_bps=0, work_fee=20_000_000_000_000)
-    assert P.payment(spike_checkpoint, P.Q["checkpoint"], 1) == 270_000_000_000_000
+    assert P.quote(spike_checkpoint, P.Q['checkpoint'], 1, True) == 320_000_000_000_000
+    assert P.payment(spike_checkpoint,P.Q['checkpoint'],1,True,measured_gas=200_000)==170_000_000_000_000
 
     # Global reads and terminal IDs have independent bounds; small unrelated tails wait.
     s = state(journal_cursor=7, completed_prefix=100_007, open_positions=100, active_count=100)
@@ -131,7 +132,7 @@ def main():
                                    distribution_bps=5000, distribution_due=False, witness_id=91)))
     blocked = state(journal_cursor=0, completed_prefix=128, open_positions=100, free=E,
                     idle_eth=E, idle_packs=1, routine_budget=1, markup_bps=0)
-    assert P.journal_backlog_floor(blocked) == 588_200_000_000_000
+    assert P.journal_backlog_floor(blocked) == 608_200_000_000_000
     assert "sync" in fns(plan(blocked))
     assert not {"build", "list"} & set(fns(plan(blocked)))
     assert "MAINTENANCE_UNFUNDED" in {c for c, _, _ in status(blocked)}
@@ -168,7 +169,7 @@ def main():
         "holders waiting are served even when the scan is unpaid"
     assert plan(state(listings=[kicked], pending_deposits=E, **scan))[0] == ("syncCheckpoint", [], 0), \
         "in a checkpoint window the paid scan runs first, the terminal after it without a scan"
-    assert P.journal_backlog_floor(state(markup_bps=0, routine_budget=1, **scan)) == (120_000 + 28 * 30_000) * 200_000_000
+    assert P.journal_backlog_floor(state(markup_bps=0, routine_budget=1, **scan)) == (120_000 + 28 * 30_000 + 100_000) * 200_000_000
     assert "checkpoint" in fns(plan(state(journal_cursor=7, completed_prefix=100_007, pending_deposits=E)))
     assert "sync" not in fns(plan(state(journal_cursor=7, completed_prefix=100_007)))
     assert "checkpoint" not in fns(plan(state(pending_receipts=1, pending_deposits=E)))
@@ -194,7 +195,7 @@ def main():
     gift = state(idle_packs=1, idle_value=4 * P.UNIT, backing_proposals=[], **build)
     assert "build" in fns(plan(gift))
     gift.idle_funding = E
-    assert "build" in fns(plan(gift)), "old idle quotes do not reserve cash beside renewal float"
+    assert "build" in fns(plan(gift)), "old idle quotes do not reserve an extra float"
     gift.idle_funding = 0
     gift.backing_proposals = [2 * E]
     assert "build" not in fns(plan(gift)), "viable inventory retains cash priority"
@@ -264,18 +265,10 @@ def main():
     assert ("EXPOSURE_SHARE_HIGH", "action") in {(c, k) for c, k, _ in high}
     assert P.exposure_share_bps([b] * 2, 20 * w1) == P.EXPOSURE_SHARE_HIGH_BPS
 
-    renewal = state(pooled=False, markup_bps=0, mint_fee=5*10**14, work_fee=20_000_000_000_000,
-        free=0, operating_reserve=10**16, idle_packs=1, idle_value=8*10**16, relistable_idle=0,
-        renewal_eligible=1, renewal_pack_ids=[1], renewal_pack_values=[8*10**16],
-        renewal_pack_shapes=[2], renewal_proposals=[21*10**16])
-    # A legacy .08 return is incoming principal; the .01 cash hold still applies to it.
-    # .171996 fees cover the exact .241996 capital/payment requirement after that hold.
-    renewal.fee_credit=166_996_000_000_000_000
-    assert "renew" not in fns(plan(renewal)), "pre-clamping cash must not erase the reserve"
-    renewal.fee_credit=171_996_000_000_000_000
-    steps=plan(renewal)
-    assert steps[0]==('renew',[1],[21*10**16],[]), steps
-
+    reused = state(pooled=False,free=5*10**17,idle_eth=495*10**15,
+        idle_packs=1,idle_value=3*P.UNIT,relistable_idle=1)
+    assert 'list' in fns(plan(reused))
+    assert all(step[0]!='renew' for step in plan(reused))
     print("keeper/test_policy.py: pass (economic gates, build gate, manager vs pool, per-account isolation, "
           "constant checkpoint charge, bounded catchup/proposals, reserve amounts)")
 

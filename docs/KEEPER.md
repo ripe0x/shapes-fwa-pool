@@ -4,9 +4,12 @@ One keeper codebase services the pooled vault and discovered personal managers i
 `keeper/policy.py` is the canonical planner; the simulation imports it. Every account supplies its
 own Params/GasSchedule and configuration hash. The external main payment policy is removed.
 
-Normal work is paid by verified counts and quoted allowances, not measured gas reimbursement.
+Normal work is paid for bounded measured gas. Verified counts cap the gas span; account-owned
+overhead covers the unmetered transaction tail. Quotes are maximum envelopes.
 The keeper estimates the exact signed calldata, pads 25%, enforces the transaction cap, simulates
-minPay and inspects receipt status. Actual billed gas is a separate calibration/viability measure.
+minPay and inspects receipt status. Receipt gasUsed is the keeper expense; the gasleft span is gross before refunds. Both must be
+reported. Actual compensation also respects tx.gasprice, class ceiling, configured priority, routine
+markup, actual service units and source/cash/budget limits.
 Configuration hydration and pending preflight must agree. Each receipt triggers a fresh read/plan.
 
 ```sh
@@ -16,7 +19,7 @@ python3 keeper/keeper.py <vault> [<manager>...] --factory <factory> --send --acc
 
 Each account has a durable bounded event index; factory discovery advances incrementally.
 Failed accounts retain visible status and do not stop the others. Pending deposit escrow, holder
-claims, contribution pools/refunds and renewal float remain distinct from ordinary keeper cash.
+claims and contribution pools/refunds remain distinct from ordinary keeper cash.
 Cash shortage and exhausted spending permission are separate waits. A zero recipe mask never
 falls back to minting; old inventory may relist unless listing is paused.
 
@@ -70,3 +73,18 @@ same DeployCore path. Public broadcast/cutover stays outside this task.
 
 Things that don't make sense until measured: permission can exceed available cash; required tiny
 jobs can be uneconomic; a full exit needs an actual willing gas payer and may cross real FWA windows.
+
+## Minimal paid work and migration
+
+Paid actions are fresh pack build/listing, relisting actually returned packs, incremental discovery
+of own allocations, terminal settlement reconciliation, bounded allocation pruning, necessary fee
+collection inside sync, and necessary unlisting/redemption. The pooled vault additionally funds
+required pricing/checkpoint work from request contributions. Standalone harvest, NFT recovery and
+owner migration are unpaid. FWA's own acquisition processing is not an account keeper reward.
+Pure no-op calls earn nothing; paid unused inputs revert. The ordinary bot retains a zero-loss
+acceptance rule and does not assume that an owner will subsidize its gas.
+
+Intact manager migration uses owner-paid `unlistForWithdrawal`, `withdrawPacks` (or checked
+`withdrawRecoveryPack` for a sealed recovery entry) and `importPacks`. Keep both managers paused;
+do not enter exit mode, which authorizes liquidation. The app checks ownership and destination
+identity before each transaction and does not silently transfer wallet ETH.

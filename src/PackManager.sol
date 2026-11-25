@@ -4,7 +4,13 @@ pragma solidity 0.8.30;
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {PackAccount} from "./PackAccount.sol";
 import {VaultLib} from "./VaultLib.sol";
+import {StrategyLib} from "./StrategyLib.sol";
 import {IShapes, IShapePacks, IFWAV2, IERC721Min} from "./interfaces/External.sol";
+
+interface IImportPackCustody {
+    function shapes() external view returns (address);
+    function packOf(uint256 shapeId) external view returns (uint256);
+}
 
 /// @title PackManager
 /// @notice A personal FWA pack manager: one owner's ETH, Shape packs and FWA listings, run by the
@@ -13,7 +19,7 @@ import {IShapes, IShapePacks, IFWAV2, IERC721Min} from "./interfaces/External.so
 ///         exit FWA positions through the ordinary unlist and settlement path. Deployed as an
 ///         ERC-1167 clone by PackManagerFactory, which initializes it atomically and keeps no
 ///         authority over it afterwards.
-/// @dev Maintenance is permissionless and paid by quote from this manager's own budgets and ETH
+/// @dev Maintenance is permissionless and paid for bounded measured work from this manager's budgets and ETH
 ///      only; the owner may run any of it unpaid. The owner can raise keeper pay to the bytecode
 ///      maxima, which only moves the owner's own ETH. Committed FWA positions are never withdrawn
 ///      instantly: exiting unlists Active positions (outside the crown window) and waits for
@@ -30,8 +36,12 @@ contract PackManager is PackAccount {
     event Rescued(address indexed collection, uint256 indexed tokenId, address indexed to);
     event ListingPaused(bool paused);
     event Exiting(bool exiting);
+    event PackImported(uint256 indexed packId, uint256 value, uint256 shapeCount);
 
     error Tracked();
+    error InvalidPack();
+
+    uint256 private constant PACK_CONTENTS_GAS = 150_000;
 
     constructor(IFWAV2 fwa_, IShapes shapes_, IShapePacks packs_) PackAccount(fwa_, shapes_, packs_) {
         factory = msg.sender;
@@ -69,20 +79,105 @@ contract PackManager is PackAccount {
         emit Withdrawn(to, amount);
     }
 
-    /// @notice Take up to `count` idle packs (the most recently returned first) out of the book
-    ///         and transfer them to `to`.
+    /// @notice Transfer up to `count` intact packs: idle first, then sealed recovery inventory.
+    ///         Unsealed recovery is a claim, not a transferable pack NFT.
     function withdrawPacks(address to, uint256 count) external onlyOwner nonReentrant {
         if (count > MAX_BATCH) revert VaultLib.BadBatch();
         VaultLib.Book storage b = s.book;
         uint256 n;
-        while (n < count && b.idlePacks.length != 0) {
-            uint256 packId = b.idlePacks[b.idlePacks.length - 1];
-            VaultLib.redeemInventory(b, packId);
+        while (n < count && (b.idlePacks.length != 0 || b.recoveryPacks.length != 0)) {
+            uint256 packId;
+            if (b.idlePacks.length != 0) {
+                packId = b.idlePacks[b.idlePacks.length - 1];
+                VaultLib.redeemInventory(b, packId);
+            } else {
+                packId = b.recoveryPacks[b.recoveryPacks.length - 1];
+                if (b.recoveryUnsealed[packId] || packs.claimantOf(packId) != address(0)
+                    || packs.ownerOf(packId) != address(this)) revert InvalidPack();
+                VaultLib.withdrawRecoveryInventory(b, b.recoveryPacks.length - 1);
+            }
             packs.transferFrom(address(this), to, packId);
             ++n;
         }
         if (n == 0) revert Tracked();
         emit PacksWithdrawn(to, n);
+    }
+
+    /// @notice Withdraw a sealed recovery pack without being blocked by another unsealed claim.
+    function withdrawRecoveryPack(address to, uint256 index, uint256 expectedPackId) external onlyOwner nonReentrant {
+        VaultLib.Book storage b = s.book;
+        if (index >= b.recoveryPacks.length || b.recoveryPacks[index] != expectedPackId) revert InvalidPack();
+        if (b.recoveryUnsealed[expectedPackId] || packs.claimantOf(expectedPackId) != address(0)
+            || packs.ownerOf(expectedPackId) != address(this)) revert InvalidPack();
+        VaultLib.withdrawRecoveryInventory(b, index);
+        packs.transferFrom(address(this), to, expectedPackId);
+        emit PacksWithdrawn(to, 1);
+    }
+
+    /// @notice Adopt sealed canonical packs held here, or pull approved packs from this owner.
+    ///         Import records existing principal and actual Shapes; it never mints or pays a keeper.
+    function importPacks(uint256[] calldata ids, bytes32 expected) external onlyOwner nonReentrant {
+        _checkConfiguration(expected);
+        if (ids.length == 0 || ids.length > MAX_BATCH) revert VaultLib.BadBatch();
+        IImportPackCustody custody = IImportPackCustody(address(packs));
+        if (custody.shapes() != address(shapes)) revert InvalidPack();
+        VaultLib.Book storage b = s.book;
+        for (uint256 i; i < ids.length; ++i) {
+            uint256 packId = ids[i];
+            if (b.idleValueOf[packId] != 0 || b.packToListing[packId] != 0) revert Tracked();
+            address holder = packs.ownerOf(packId);
+            if ((holder != msg.sender && holder != address(this)) || packs.claimantOf(packId) != address(0)) {
+                revert InvalidPack();
+            }
+            uint256 value = packs.valueOf(packId);
+            if (value == 0 || value % VaultLib.UNIT != 0) revert InvalidPack();
+            uint256[] memory contents = _importContents(packId);
+            uint256 actualValue;
+            for (uint256 j; j < contents.length; ++j) {
+                uint256 shapeId = contents[j];
+                if (shapes.ownerOf(shapeId) != address(packs) || custody.packOf(shapeId) != packId) revert InvalidPack();
+                uint256 backing = shapes.backingOf(shapeId);
+                if (backing == 0) revert InvalidPack();
+                actualValue += backing;
+            }
+            if (actualValue != value) revert InvalidPack();
+            if (holder == msg.sender) packs.transferFrom(msg.sender, address(this), packId);
+            VaultLib.addInventory(b, packId, value);
+            // addInventory assumes one .01 Shape per unit for ordinary external returns.
+            if (value <= VaultLib.MAX_PACK_UNITS * VaultLib.UNIT) {
+                b.ordinaryShapeCount = b.ordinaryShapeCount - b.packShapeCount[packId] + contents.length;
+            }
+            b.packShapeCount[packId] = contents.length;
+            emit PackImported(packId, value, contents.length);
+        }
+    }
+
+    /// @dev Canonical unseal burns the NFT. The live NFT, zero claimant and Shape custody prove
+    ///      sealed inventory. Bound both execution and returndata before copying a contents array.
+    function _importContents(uint256 packId) private view returns (uint256[] memory ids) {
+        bytes memory input = abi.encodeWithSelector(IShapePacks.contentsOf.selector, packId);
+        address target = address(packs);
+        bool success;
+        uint256 size;
+        assembly ("memory-safe") {
+            success := staticcall(PACK_CONTENTS_GAS, target, add(input, 32), mload(input), 0, 0)
+            size := returndatasize()
+        }
+        if (!success || size < 96 || size > 64 + 32 * VaultLib.MAX_REDEEM_SHAPES) revert InvalidPack();
+        bytes memory result = new bytes(size);
+        assembly ("memory-safe") {
+            returndatacopy(add(result, 32), 0, size)
+        }
+        ids = abi.decode(result, (uint256[]));
+        if (ids.length == 0 || ids.length > VaultLib.MAX_REDEEM_SHAPES) revert InvalidPack();
+    }
+
+    /// @notice Owner-funded unlisting preserves packs for withdrawal without enabling liquidation.
+    function unlistForWithdrawal(uint256[] calldata listingIds) external onlyOwner nonReentrant {
+        if (listingIds.length == 0 || listingIds.length > MAX_BATCH) revert VaultLib.BadBatch();
+        s.callerFunded = true;
+        StrategyLib.unlist(s, fwa, packs, listingIds, 0, type(uint256).max, 0);
+        s.callerFunded = false;
     }
 
     /// @notice Transfer an ERC-721 the book does not track (sent here from outside) to `to`.
@@ -104,8 +199,6 @@ contract PackManager is PackAccount {
     ///         Reversible; leaving exit mode keeps listing paused until the owner resumes it.
     function setExiting(bool exiting) external onlyOwner {
         s.windingDown = exiting;
-        s.book.renewalEnabled = !exiting;
-        if (exiting) s.book.keptReplacements = 0;
         if (exiting) s.listingPaused = true;
         emit Exiting(exiting);
     }

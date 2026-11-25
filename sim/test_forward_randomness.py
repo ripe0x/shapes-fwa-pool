@@ -17,17 +17,21 @@ def scenario(**changes):
     for i in range(12):
         successful=i%4!=0
         events += [(120+i*500,'request',None),(156+i*500,'acquisition',(successful,1.0))]
-    return F.Scenario(manager=True,volume=F.const(0),timed=True,start_timestamp=1795521275,poll_seconds=60,
-        receipt_seconds=36,replay_events=events,replay_period_seconds=3*F.DAY,foreign_pool_weight=1.0,
-        exempt=True,gwei=.15,deposit_wei=10**18,mint_fee_wei=5*10**14,exit_all=True,exit_days=1,
-        user_gas_proxy=dict(create=606172,setExiting=53214,withdraw=38904,unlist=1085668,
-            liquidate=593594,recover_sync=199047,processAcquisitions=115941,harvest=300000),
-        holder_rescue_sync=True,self_serve_exits=True,**changes)
+    sc=F.Scenario(volume=F.const(0),timed=True,start_timestamp=1795521275,
+        replay_events=events,replay_period_seconds=3*F.DAY)
+    sc.update(changes)
+    return sc
+
 
 
 def keyed_path(seed):
-    return F.run(scenario(request_randomness=True,request_response_sampler=lambda u:(120,False)),
-        1,seed,days=1,values=json.loads((ROOT/'deploy/manager.json').read_text()))
+    clock=F.OperatingClock(scenario(request_randomness=True),seed,1,1)
+    return clock.request_events_sha256,clock.request_draws.tolist()
+
+
+def quiet_scenario(**changes):
+    from test_manager import current_scenario
+    return current_scenario(deposit_wei=3*10**17,**changes)
 
 
 class RequestRandomnessTest(unittest.TestCase):
@@ -49,74 +53,47 @@ class RequestRandomnessTest(unittest.TestCase):
         self.assertEqual(alone,reverse[1])
 
     def test_conditional_selections_do_not_move_later_request_or_response_draws(self):
-        values=json.loads((ROOT/'deploy/manager.json').read_text())
-        sinks=[];response_uniforms=[];results=[]
-        # Different account configurations deliberately consume different selected responses.
-        for mask in (0,8):
-            sink=[];responses=[]
-            def response(u):
-                responses.append(u)
-                return 120,False
-            results.append(F.run(scenario(request_randomness=True,randomness_sink=sink,
-                request_response_sampler=response),1,7,days=1,values=values|{'packUnitsMask':mask}))
-            sinks.append(sink);response_uniforms.append(responses)
-        self.assertEqual(sinks[0],sinks[1])
+        clocks=[F.OperatingClock(scenario(request_randomness=True),7,1,1) for _ in range(3)]
+        sinks=[];responses=[]
+        for clock,select in zip(clocks,(lambda i:False,lambda i:i%2==0,lambda i:True)):
+            sink=[];selected=[]
+            for i,draws in enumerate(clock.request_draws):
+                sink.append((i,*map(float,draws)))
+                if select(i):selected.append(float(draws[2]))
+            sinks.append(sink);responses.append(selected)
+        self.assertEqual(sinks[0],sinks[1]);self.assertEqual(sinks[1],sinks[2])
         self.assertEqual(len(sinks[0]),12)
-        self.assertEqual(response_uniforms[0],[])
-        self.assertGreater(len(response_uniforms[1]),0)
-        self.assertEqual(results[0]['request_events_sha256'],results[1]['request_events_sha256'])
-        expected={row[2] for row in sinks[1]}
-        self.assertTrue(all(u in expected for u in response_uniforms[1]))
-        # A path repeated after another configuration is exactly the same path.
-        repeated=F.run(scenario(request_randomness=True,request_response_sampler=lambda u:(120,False)),
-            1,7,days=1,values=values|{'packUnitsMask':8})
-        self.assertEqual(results[1],repeated)
+        self.assertEqual(responses[0],[])
+        self.assertEqual(responses[1],responses[2][::2])
+        self.assertEqual([c.request_events_sha256 for c in clocks],[clocks[0].request_events_sha256]*3)
 
     def test_keyed_mode_rejects_conditional_legacy_response_rng(self):
         with self.assertRaisesRegex(ValueError,'request_response_sampler'):
-            F.run(scenario(request_randomness=True,response_sampler=lambda rng:(120,False)),1,7,days=1)
+            F.run(quiet_scenario(request_randomness=True,response_sampler=lambda rng:(120,False)),1,7,days=1)
 
     def test_cached_pure_economics_preserves_every_result_and_financial_trace(self):
         values=json.loads((ROOT/'deploy/manager.json').read_text())
-        for mode in (0,1):
-            plain_trace=[];cached_trace=[]
-            common=scenario(response_sampler=lambda rng:(120,bool(rng.integers(2))))
-            plain=F.run(common|{'cache_economics':False,'trace_sink':plain_trace},1,7,days=1,
-                values=values|{'renewalMode':mode})
-            cached=F.run(common|{'cache_economics':True,'trace_sink':cached_trace},1,7,days=1,
-                values=values|{'renewalMode':mode})
-            self.assertEqual(plain,cached)
-            self.assertEqual(plain_trace,cached_trace)
-            self.assertEqual(cached['ledger_gap_wei'],0)
+        plain_trace=[];cached_trace=[]
+        common=quiet_scenario()
+        plain=F.run(common|{'cache_economics':False,'trace_sink':plain_trace},1,7,days=1,values=values)
+        cached=F.run(common|{'cache_economics':True,'trace_sink':cached_trace},1,7,days=1,values=values)
+        self.assertEqual(plain,cached)
+        self.assertEqual(plain_trace,cached_trace)
+        self.assertEqual(cached['ledger_gap_wei'],0)
 
     def test_price_changes_preserve_cached_and_uncached_execution(self):
         values=json.loads((ROOT/'deploy/manager.json').read_text())
-        sc=scenario()|{'gwei':lambda day:.15 if day==0 else .45}
+        sc=quiet_scenario(gwei=lambda day:.15 if day==0 else .45)
         plain=F.run(sc|{'cache_economics':False},1,7,days=2,values=values)
         cached=F.run(sc|{'cache_economics':True},1,7,days=2,values=values)
         self.assertEqual(plain,cached)
 
-    @unittest.skipUnless((ROOT/'sim/data/fwa.sqlite').exists(),'real FWA archive unavailable')
-    def test_real_month_underfunded_float_never_uses_unpaid_keeper_progress(self):
-        from formal import PIN,WINDOW,window
-        from manager_assessment import scenario as recorded_scenario
-        recorded=window(ROOT/'sim/data/fwa.sqlite',PIN['timestamp'])
-        costs=json.loads((ROOT/'docs/receipts/manager-cost-calibration.json').read_text())
-        values=json.loads((ROOT/'deploy/manager.json').read_text())
-        trace=[]
-        sc=recorded_scenario(recorded,recorded['events'],WINDOW,.2,5*10**17,5*10**14,costs['gas_proxy'])
-        result=F.run(sc|{'trace_sink':trace},1,1,days=30,values=values)
-        initial=F.configured_state(150_000_000,values)
-        held=F.policy.renewal_float(initial,values['renewalFloatCount'])
-        self.assertTrue(any(row['action']=='renew' and row['cash']<held for row in trace))
-        self.assertGreater(result['routine_unfunded_attempts'],0)
-        self.assertEqual(result['unpaid_routine_calls'],0)
-        self.assertGreater(result['owner_calls_sync'],0)
-        self.assertTrue(result['exit_complete'])
-        self.assertEqual(result['ledger_gap_wei'],0)
-        self.assertGreater(result['keeper_gas_proxy_cost_wei'],0)
-        self.assertEqual(result['keeper_calls_unlist'],0)
-        self.assertGreater(result['owner_calls_unlist']+result['owner_calls_liquidate'],0)
+    def test_removed_fresh_configuration_cannot_be_silently_reinterpreted(self):
+        historical=json.loads((ROOT/'docs/receipts/manager-r2-closeout.json').read_text())['managerValues']
+        with self.assertRaisesRegex(ValueError,'pinned revision'):F.configured_state(150000000,historical)
+        from manager_operating_assessment import qualify_costs
+        old=json.loads((ROOT/'docs/receipts/manager-r2-cost-calibration.json').read_text())
+        with self.assertRaisesRegex(ValueError,'measured-compensation'):qualify_costs(old,True)
 
 
 if __name__=='__main__':unittest.main()

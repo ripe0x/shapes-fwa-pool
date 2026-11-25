@@ -252,13 +252,14 @@ def proposal_limits(s, value, settlement_fee, discount, cap, build=False, units=
         return 1, 0
     up = lambda a, b: -(-a // b)
     pricing = replace(s, build_units=units)
-    if build and s.renewal_mode == 1:
+    if build:
         q = s.gas_schedule
         common = sum(q[k] for k in ('sync','journal','selected','synced','pruned','sync_funding','harvested','sync_credit'))
         cycle = policy.quote(pricing, common, 1)
     else:
-        cycle = policy.quote(pricing, policy.cycle_gas(pricing, retirement_shapes), 2)
-    extra = policy.build_cost(s, units if build else (s.build_units or policy.REF_UNITS)) if build or s.renewal_mode == 0 else 0
+        q = s.gas_schedule
+        cycle = policy.quote(pricing, policy.cycle_gas(pricing)-q['list']-q['listed'], 1) + policy.quote(pricing,q['list']+q['listed'],1)
+    extra = policy.build_cost(s, units if build else (s.build_units or policy.REF_UNITS)) if build else 0
     minimum = max(up(value * 10_000, 9500),  # NAV face coverage at the maximum settlement fee
                   (cycle + extra) * 10**18 // (s.k - 10**18) + 1,              # bid outcome: B(k-1) > cycle
                   up((value + cycle + extra) * 10**18, s.k - settlement_fee * 10**14))  # keep outcome
@@ -342,7 +343,7 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         pending_deposits=pending, locked_shares=locked, total_shares=supply, pack_units_mask=mask,
         build_units=build_units, pooled=pooled, settlement_fee_bps=num(at(FWA, "ownerSettlementFeeBps()(uint256)")),
         essential_ceiling=ess_ceiling, essential_cap=_ec, processing_pool=processing_pool,
-        gas_schedule=gas_schedule(p), backing_ratio_bps=p["backingRatioBps"], renewal_mode=p["renewalMode"],
+        gas_schedule=gas_schedule(p), backing_ratio_bps=p["backingRatioBps"],
         accepted_mint_fee=p["acceptedMintFeeWei"],
         fee_credit=num(at(FWA, "feeCredit(address)(uint256)", vault)),
         open_positions=num(at(vault, "openListingCount()(uint256)")), active_count=total[3], witness_id=witness,
@@ -355,10 +356,7 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         recent_volume=index.recent_volume(now), slowdown_volume=slowdown, burn_tokens=burn,
         reserve=res, work_fee=wfee, routine_budget=num(rbud), essential_budget=num(ebud), **tokens,
     )
-    renewal = [num(x) for x in lines(at(vault, "renewalState()(uint256,uint256,uint256,uint256)"))]
     state.keeper_cash = num(at(vault, "keeperCash()(uint256)"))
-    state.renewal_eligible = renewal[0] + renewal[1]
-    state.renewal_float = renewal[2]
     state.operating_reserve = res
     state.configuration_hash = at(vault, "configurationHash()(bytes32)")
     state.account_owner = account_owner
@@ -403,12 +401,8 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         state.build_proposals = policy.propose_backings(state.backing, reserved, policy.MAX_BATCH["build"],
                                                         index.reserved, lo, hi, head) if build_units else []
         chosen = []
-        eligibility = {i: at(vault, 'renewalEligible(uint256)(bool)', i) == 'true' for i, _ in idle_candidates}
-        eligible = [i for i, _ in idle_candidates if eligibility[i]]
         state.relistable_idle = 0
         for pack_id, value in idle_candidates:
-            if state.renewal_mode == 0 and eligibility[pack_id]:
-                break
             state.relistable_idle += 1
             units = value // policy.UNIT
             _, target, ok = lines(prospective(vault, "relistEdgeFor(uint256)(uint256,uint256,bool)", pack_id))
@@ -425,11 +419,6 @@ def read_state(vault, slowdown, burn=False, pooled=True):
                 break
             chosen += proposal
         state.backing_proposals = chosen
-        if state.renewal_mode == 0 and build_units:
-            state.renewal_pack_ids = (eligible + [0] * min(renewal[1], 4))[:4]
-            state.renewal_proposals = state.build_proposals[:len(state.renewal_pack_ids)]
-            state.renewal_pack_values = [num(at(vault, "idleValueOf(uint256)(uint256)", i)) if i else 0 for i in state.renewal_pack_ids]
-            state.renewal_pack_shapes = [num(at(vault, "inventoryShapeCount(uint256)(uint256)", i)) if i else 0 for i in state.renewal_pack_ids]
     if block_hash(head) != header["hash"]:
         raise txm.StaleContext("pinned state block was reorganized; retry snapshot")
     if rpc("eth_getBlockByNumber", "latest", False)["hash"] != prospective_parent["hash"]:
@@ -478,8 +467,6 @@ def to_cast(step, min_pay=0, expected=None, caller_funded=False):
         return ["liquidate(uint256,uint256,bytes32)", args[0], min_pay, expected]
     if fn == "build":
         return ["build(uint256,uint256[],uint256,bytes32)", args[0], array(args[1]), min_pay, expected]
-    if fn == "renew":
-        return ["renew(uint256[],uint256[],uint256[],uint256,bytes32)", array(args[0]), array(args[1]), array(args[2]), min_pay, expected]
     if fn == "checkpoint":
         return ["checkpoint(uint256,uint256,bytes32)", args[0], min_pay, expected]
     raise ValueError(f"unknown keeper operation: {fn}")
@@ -497,7 +484,7 @@ def fee_args(base_fee, tip):
 
 def compensation(vault, args, sender, fees=()):
     """What the vault promises for this exact call now: every paid function returns its payment,
-    so simulating it from the keeper's address reads the contract's own quote (0 for burnTokens)."""
+    so simulating it from the keeper's address reads measured compensation under that pending call's fee context (0 for unpaid work)."""
     if args[0].startswith(("burnTokens", "fundCheckpoint", "recover", "requestRedeem", "claim", "cancelDeposit", "setExiting", "withdraw", "processAcquisitions")):
         return 0
     sig = args[0].replace(")", ")(uint256)", 1) if args[0].endswith(")") else args[0]
@@ -644,7 +631,7 @@ def run_account(a, tm, account, pooled):
         state.caller_funded_exit = a.caller_funded_exit
         steps = [st for st in policy.plan(state) if plan_key(st) not in skip]
         if a.caller_funded_exit:
-            steps = [step for step in steps if step[0] not in ('build', 'list', 'renew', 'burnTokens')]
+            steps = [step for step in steps if step[0] not in ('build', 'list', 'burnTokens')]
             if not pooled:
                 sender = tm.sender if tm else a.sender or state.account_owner
                 steps = manager_exit_steps(state, sender, steps)
@@ -730,7 +717,7 @@ def run_account(a, tm, account, pooled):
         pay = compensation(target, args, tm.sender, fees)
         cost_, need, accepted = profitability_gate(est, bid, pay, a.fail_rate_bps, a.min_return_bps,
                                                   max_loss, billed_ratio(tm, step[0]))
-        if a.caller_funded_exit and step[0] not in ('build', 'list', 'renew', 'burnTokens'):
+        if a.caller_funded_exit and step[0] not in ('build', 'list', 'burnTokens'):
             contribution = int(step[1]) if step[0] == 'fundCheckpoint' else int(step[2]) if step[0] == 'requestRedeem' else 0
             accepted=tm.can_reserve(tm.nonce('pending'),(est*5+3)//4,2*state.base_fee+state.max_tip,contribution)
             max_loss=max(0,a.exit_spend_limit_wei-(tm.state['signed_upper_wei']-tm.signed_start)) if accepted else 0

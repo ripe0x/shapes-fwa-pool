@@ -1,142 +1,96 @@
-# Individual manager: unsigned release path
+# Manager-only unsigned deployment and operations
 
-The individual manager is one owner's account, with no shares, depositor checkpoint or
-contribution era. It uses the same PackAccount and linked strategy libraries as the pooled vault.
-The factory cannot withdraw, change settings or replace the owner of an existing manager.
-The new shared vault remains undeployed and its app launch stays disabled. This package authorizes no public transaction, mint-fee change,
-application cutover, merge or signature. The owner's no-canary decision remains intact.
+**Current step: prepare and review an unsigned manager-only package.** The strategy is reuse-only with bounded measured keeper compensation. The numerical candidate, including **50,000 gas overhead**, remains provisional. No public transaction, signature, acceptance, live keeper cutover or merge is authorized by this record. The shared vault is undeployed and its application remains closed.
 
-## One deployment path, explicit target
+The complete 21-scalar/29-gas schema, values, bounds and opening arithmetic are in [SETTINGS.md](SETTINGS.md). [OWNER-REQUIREMENTS.md](../../OWNER-REQUIREMENTS.md) supersedes the historical fixed-quote and Fresh renewal design. [REPORT.md](../REPORT.md) records current verification; receipt claims must retain their exact source and configuration.
 
-The existing `script/Deploy.s.sol` / `script/deploy.sh` path accepts `--target manager`.
-Its dependencies-only input is `deploy/manager-factory.json`: the main FWA, main Shapes and main
-ShapePacks addresses, plus the explicit target. It creates the factory and implementation and
-deploys or reuses the three correctly linked libraries. It does not create PackVault or fund a
-vault seed. The default combined deployment remains available through the same path.
+## Scope and money
 
-`deploy/manager.json` supplies each future owner's full creation parameters. It is not stored in
-the factory and does not grant the factory later authority. Launch mask 8 means three directly
-paid 0.01 ETH primary Shape mints in each 0.03 ETH pack. Numerical settings remain owner-adjustable.
-The 70,000 bps backing, fresh renewal mode, one float and 0.005 ETH reserve are evaluation inputs,
-not approved production economics. The pooled 10% acceptance gate and unresolved checkpoint
-uplift threshold do not establish manager returns or impose manager share-pricing waits.
+One manager owns its assets and uses the shared PackAccount/StrategyLib/VaultLib/ScanLib strategy. The ownerless factory creates an immutable implementation and personal clones; it has no authority to change an existing manager's owner or economics. Owner numerical controls act immediately within bounds. Algorithm changes require a new deployment and actual asset migration.
 
-The R2 live observation read a 0.0005 ETH mint fee at block 26,488,707; the accepted maximum remains 0.001 ETH. See `docs/receipts/manager-r2-live-observation.json` and the adjacent min-backing continuity record. At the candidate 0.5 gwei ceiling the current conditional opening estimate is 0.461605 ETH, including the conservative 0.2141275 ETH renewal float and 0.005 ETH maintenance reserve. At 0.2 gwei it is 0.4610425 ETH. Both exclude wallet creation gas and remain conditional on FWA admission. With the candidate schedule and historical 0.001 ETH mint fee, the conditional first productive
-account funding is 0.463105 ETH at the 0.5 gwei routine ceiling, excluding wallet creation gas. This includes pack
-principal, backing, actual paid mint fees at that historical fee, initial work, maintenance
-reserve and one separate renewal float. It is not a minimum permitted manager creation value.
-The contract and unsigned creation template allow an idle manager with smaller funding; it may wait for more cash before building. The app currently requires its quoted opening funding to create through the UI. That UI restriction is not a contract minimum.
+The current recipe is 0.03 ETH principal from three primary Shapes, with mask bit 3 and nominal separate backing of 0.21 ETH. Returned packs are relisted intact. A kept pack leaves inventory, and any replacement is a normal build using actual cash and permission. There is no Fresh mode, renewal float, replacement-eligibility balance or paid retirement/remint path.
 
-## Prepare, without signing
+The accepted fee is 0.001 ETH per Shape. Read-only public refresh at block 26,493,799 and the creation template at block 26,493,803 show an actual fee of 0.0005 ETH. These reads change no fee. The 0.5 ETH creation template is an evaluation funding amount, not a contract minimum or return recommendation.
 
-From the repository root with its pinned dependencies:
+At zero markup, the maximum one-pack build/list funding envelope plus reserve is 0.246925 ETH at 0.2 gwei or 0.2475025 ETH at 0.5 gwei using the observed fee. Using the accepted maximum gives 0.248425 / 0.2490025 ETH. Wallet creation gas is separate. Actual compensation uses bounded measured work and can be lower; these envelopes are not billed costs or profit predictions.
+
+## Production path and recorded unsigned result
+
+Deployment inputs are [manager-factory.json](../../deploy/manager-factory.json) for dependencies and [manager.json](../../deploy/manager.json) for manager economics. The manager target deploys libraries and PackManagerFactory with its implementation. It deploys no PackVault, transfers no seed and creates no funded manager.
+
+The wrapper compiles its actual deploy inputs, checks the manifest, and then simulates through the same DeployCore production path. A simulation reports a failed release gate and continues; it is not release acceptance. Do not add a second build merely for documentation changes.
+
+Recorded preparation commands, using the existing Git and deployment identities and Python 3.11.8:
 
 ```sh
-CANDIDATE_RUN=1 forge build script/Deploy.s.sol --skip test
 python3 script/release.py manifest --target manager
-RPC_URL=https://mainnet.gateway.tenderly.co \
-  FORGE_WALLET_ARGS="--sender <existing-deployment-address>" \
+
+CANDIDATE_RUN=1 RPC_URL=https://mainnet.gateway.tenderly.co \
+  FORGE_WALLET_ARGS="--sender 0xCB43078C32423F5348Cab5885911C3B5faE217F9" \
   script/deploy.sh deploy/manager-factory.json --target manager
-python3 script/release.py manager-package broadcast/Deploy.s.sol/1/dry-run/run-latest.json
-python3 script/release.py manager-create <predicted-factory> <individual-owner> <funding-wei> \
-  > deploy/manager-create-unsigned.json
+
+python3 script/release.py manager-package deploy/manager-measured-dry-run.json
+
+RPC_URL=https://mainnet.gateway.tenderly.co python3 script/release.py manager-create \
+  0x308f258b47c406a820790fa8a8894e92b02cc3ab \
+  0xCB43078C32423F5348Cab5885911C3B5faE217F9 500000000000000000
 ```
 
-There is no `--broadcast` in the public command. The package contains unsigned calldata only.
-The factory's constructor bytecode and dependency arguments are independently compared with the
-compiled artifacts; unexpected vault/seed transactions, changed libraries, chain, nonce order or
-signed fields fail. Reused libraries require actual current runtime/link verification. All mainnet
-reads use `https://mainnet.gateway.tenderly.co`. The public simulation does not spend real gas.
+The wrapper was run **without broadcast**, with exit status 0 in **11.67 seconds**. Its only reported release-gate failure was uncommitted release inputs in the shared draft worktree. The candidate manifest is intermediate; the lead refreshes it after final source-bound artifacts. No acceptance or signature was generated or reused.
 
-The unsigned manager-creation template is a fresh pinned preview binding the owner's settings and
-actual live mint fee. It reports both the historical fixture fee and live fee when they differ,
-without raising the accepted maximum. A fee above that maximum refuses generation, and any later
-fee change makes the generated creation expectation stale. Creation does not
-prove profitable operation. Before any separately authorized signing, refresh the nonce, balance,
-fee, gas estimate and dependency code; postflight the actual factory before sending funds to it.
+The validated public Forge dry-run was preserved as [manager-measured-dry-run.json](../../deploy/manager-measured-dry-run.json), SHA-256 `46d737aeb953a2ee156b0bee7cbbb87325ff1f1127a4eb58608d0b4fc09fc660`. The preparation log is [manager-measured-unsigned-dry-run.log](../receipts/manager-measured-unsigned-dry-run.log). Forge's sensitive cache is not an input to this package and was not copied.
 
-The target has its own `deploy/manager-release-manifest.json`,
-`docs/release/manager-acceptance.json` and `deploy/manager-release-acceptance.sig` path.
-The acceptance must name target `manager` and that manifest's hash. A combined-product approval
-cannot authorize this deployment. No new signature is generated by this work.
+[manager-unsigned-cutover.json](../../deploy/manager-unsigned-cutover.json) records Ethereum chain 1, refreshed nonce readback **4180** at block **26,493,843**, contiguous unsigned nonces 4180–4183, validated compiled links and dependency values:
 
-## Isolated rehearsal and independent readback
+| Contract | Predicted address | Transaction gas limit |
+|---|---|---:|
+| ScanLib | `0x8148d8b4621ce009275d88e5dfdf1302a700cbc0` | 6,827,830 |
+| VaultLib | `0x1e7a9cd8acf72f5dffda172497d41f5471d15317` | 7,181,954 |
+| StrategyLib | `0xc3ab28505d386ea4f77b4b121e0e8c4b8b828a30` | 4,399,705 |
+| PackManagerFactory | `0x308f258b47c406a820790fa8a8894e92b02cc3ab` | 7,348,688 |
 
-Use an owned Anvil instance on chain 31337, `--accounts 0`, forked from the required public gateway.
-Check a fresh actor's code, nonce and balance before funding its wallet and impersonating it.
-Never use Anvil's default dev accounts or alter a protocol/account's own balance or storage.
-Do not reset or stop another session's node. Reuse verified library deployments when present.
+The implementation predicted by the factory is `0xb8d36f767363e16ae9775c22a03de14d24ba8e06`. Every transaction is below EIP-7825's 16,777,216 limit. The script's aggregate estimate is 25,758,177 gas across transactions, not one transaction. Its estimated required total of 0.018060026196089784 ETH at a 0.701137592 gwei estimate is simulation output, not gas spent or a fixed future price.
 
-```sh
-RPC_URL=http://127.0.0.1:<owned-port> \
-  FORGE_WALLET_ARGS="--unlocked --sender <fresh-checked-actor>" \
-  script/deploy.sh deploy/manager-factory.json --target manager --broadcast
-RPC_URL=http://127.0.0.1:<owned-port> \
-  python3 script/release.py postflight-manager <factory> deploy/manager-factory.json
-RPC_URL=http://127.0.0.1:<owned-port> \
-  python3 script/release.py postflight-manager <factory> deploy/manager-factory.json \
-    <new-manager> <individual-owner> <funding-wei>
-```
+Compiled runtime sizes in this package are PackManager 20,707 bytes, factory 4,876, StrategyLib 14,456, VaultLib 22,422 and ScanLib 21,310. The package binds their exact runtime/initcode hashes. Historical unsigned inputs and the earlier public dry-run are retained in [manager-unsigned-history](../../deploy/manager-unsigned-history/); their predicted addresses and nonces are not current.
 
-Postflight pins one block and independently checks factory/implementation/library runtimes,
-every link, the main dependencies plus live FWA token/rewards dependencies, the ownerless locked
-implementation, and factory membership. For a newly created manager it also checks the exact
-clone runtime, owner, all 23 scalar settings and 28 gas fields, configuration hash, accepted/live
-fee, initial budgets, pause/exit flags, inventory and optional initial funding. Pre-existing dust
-is read and reported rather than assumed absent. These are initial-creation checks, not assertions
-that an active manager's budgets and inventory stay unchanged.
+## Creation template and final refresh
 
-## Keeper and owner-funded exit
+[manager-create-unsigned.json](../../deploy/manager-create-unsigned.json) is unsigned calldata to the current predicted factory. At block **26,493,803**, the factory is not deployed, the reviewed owner is `0xCB43078C32423F5348Cab5885911C3B5faE217F9`, funding is 500,000,000,000,000,000 wei, and the configuration expectation is `0x2c8bed5338b295b8aa543711ce5b97f774557239742a91ec1e96702b7f66b0c6`. Manager values SHA-256 is `66423b7ed03e758fafe3b0a0b79a861f7894e97bf1885a8f13cfe887f38385cc`; template SHA-256 is `12c871f80c554d9f56e24be2ecc9667d2b8942fd7ed05370f1313c1e6c3413d4`. The prior template is preserved in [manager-unsigned-history](../../deploy/manager-unsigned-history/).
 
-`manager-package` emits `deploy/manager-keeper-unsigned.json` as data. Factory-only discovery uses
-`FACTORY`, with no VAULT. It must not change the existing Fly targets or open the pooled app gate.
-Production signer paths refer to existing read-only keystore/password mounts; the package contains
-no secret values. It does not materialize JSON/password secrets into new files. Unlocked actors
-are restricted by the keeper to the checked local Anvil chain, not production signing.
+A prior template attempt timed out during the pinned live mint-fee read before replacing its output. [The failure record](../receipts/manager-measured-unsigned-create-attempt1.json) is retained. Only template generation was retried; the successful deployment simulation was not repeated. The final template uses the current package's factory, rather than a historical predicted address.
 
-An owner-paid exit first stops new exposure, then performs bounded settlement/recovery, unlisting
-and pack redemption before withdrawing actual cash. It can wait for real protocol settlement and
-listing windows. No keeper profit or replenished allowance is assumed. The UI/CLI must display
-wallet spending and enforce the owner's stated limit, retaining signed maxima through replacement
-and reorganization. Leaving exit mode does not automatically resume listings.
+Before any separately authorized signing, refresh nonce, dependency/code identity, live fee, preview and exact-calldata estimate. Source or linker changes require a matching compiled package; metadata-only manifest refreshes can reuse the preserved validated dry-run while those compiled inputs remain identical. Numerical manager changes require regenerating the creation expectation. Final manifest preparation does not itself authorize a transaction.
 
-## Validation and acceptance
+The release ABI guard requires the exact owner APIs `importPacks(uint256[],bytes32)`, `unlistForWithdrawal(uint256[])` and `withdrawRecoveryPack(address,uint256,uint256)`, with no return values. Missing or wrongly typed methods fail package preparation. The measured event is additive; `KeeperPaid(address,uint256)` remains unchanged.
 
-The corrected Solidity source is `1bbe54c94eed34818d5e2c7ccd95d5f83a892b90`. Its current proof includes
-the R2 closeout, 69 baseline Osaka observations (53 distinct hashes), 43 corrected-candidate
-observations (29 distinct hashes), authenticated
-fresh renewal and explicit reuse, paid listing sizes 1/3/8, the current production-image manager-only
-rehearsal, 43 funded plus 32 historical accounting steps, and independent source/calibration review.
-See `docs/receipts/manager-operating-verification.md` for exact revisions, commands and limits. Incoming fees and returned principal refill their full protected
-cash hold before becoming spendable. These changes invalidate prior source-specific acceptance;
-an earlier approval or signature does not authorize this code.
+## Owner migration and recovery
 
-The manager manifest binds `manager-r2-closeout.json`, `manager-r2-cost-calibration.json`, the R2
-live observation and min-backing continuity record, `manager-funded-reconciliation.json`,
-`manager-funded-verification.md` and `manager-funded-checks/input-manifest.json` under
-`docs/receipts/`. It also binds the corrected study manifests in
-`sim/out/manager-monte-carlo-funded/` and `sim/out/manager-standard-funded/`, and their final
-`summary.json` files when present. Pending or incomplete study output is not an accepted return
-forecast. Those interrupted campaigns are historical; their sample size was agent-selected and is not a release or completion requirement. The manager manifest now also binds the final bounded economic scorecard, fresh dependency/fee observation and focused closeout review. No partial campaign returns are used.
+`importPacks(ids, expected)` is owner-only and accepts at most 16 canonical sealed packs per call. It pulls approved owner-held packs or adopts eligible account-held packs. Each actual composition is bounded to 30 Shapes, a 150,000-gas contents read and 1,024 bytes of returndata. Custody, membership, exact backing and bookkeeping are checked. Import mints nothing, redeems nothing and pays no keeper.
 
-The earlier two-draw economics and source `8e8d5e0` campaigns are withdrawn as financial evidence.
-Their files remain history and are excluded from the current financial inventory. The R1
-`manager-ui.json` and `manager-image.json` records are retained only as historical UI/container
-compatibility evidence; they do not prove R2 funding behavior or current billed gas. Prior pooled
-receipts likewise retain their original revision and do not supply a manager return forecast.
-Owner, creator and keeper cash flows must be stated separately with every direct wallet cost counted.
+Imported principal up to 0.30 ETH is ordinary inventory; larger principal is recovery inventory. More than 30 Shapes is unsupported by bounded import, with the untracked-NFT rescue path retained. Existing inventory and actual Shape counts remain preserved.
 
-After final evidence is ready, regenerate the manager manifest and prepare a fresh unsigned
-package through the same target-manager deployment path. This preparation grants no live
-approval, public broadcast, settings change, cutover or merge. The earlier bounded scorecard remains historical single-cycle evidence. The new recorded-period assessment is `docs/receipts/manager-operating-economics.md`; its frozen inputs and all completed or incomplete exits must be read together. Billed authenticated single-pack renewal, standalone harvesting and listing sizes 1/3/8 are measured. The corrected gas allowances also pass all twelve one-work ordinary execution cases and a zero-budget owner exit. Larger sync and fresh-renewal batches remain unmeasured, and curve/work-allowance costs outside those samples remain explicit estimates. This package grants no production recommendation or acceptance.
+The old account must first release actual assets through its own supported APIs. Then its owner approves and imports those assets into the new manager. This does not rewrite old storage, fabricate historical events or transfer someone else's authority.
 
-Things that don't make sense until evaluated: an idle manager's creation funding can be below the
-productive opening threshold; increasing permission supplies no ETH; one finite renewal float does
-not cover an arbitrary acquisition burst. These are visible waits, not a return promise.
+For intact migration, the owner can pause listings or enter exit mode, call `unlistForWithdrawal(ids)` when real FWA settlement/crown windows permit, then `withdrawPacks(to, count)` for up to 16 packs. Owner unlisting is caller-funded, changes no pause/exit flags, and performs no liquidation. Checked `withdrawRecoveryPack(to, index, expectedPackId)` selects one sealed recovery item even when an unrelated unsealed gift remains elsewhere. An unsealed item is a claim and uses bounded recovery instead of an NFT transfer.
 
-Recorded focused candidate rehearsal command: `CANDIDATE_RUN=1 /Users/dd/.pyenv/versions/3.11.8/bin/python keeper/rehearse_manager_calibration.py --execute --port <new-free-port>`.
-Its existing receipt path is protected against overwrite. Reproduction requires an isolated
-checkout with the existing candidate outputs preserved and archived before execution; the helper
-does not accept a different output directory. Historical R2/baseline reproduction uses the named
-original revision and configuration. Do not replace their evidence with current settings. The current
-scorecard and corrected full-period assessment are separate from those historical receipts.
+An owner-paid cash exit stops new exposure, performs necessary bounded settlement/recovery, unlisting and redemption, collects real fee credit, then withdraws actual cash. It can wait for protocol settlement. Leaving exit mode does not automatically resume listing. Wallet gas is separate from account compensation; an owner-selected wallet limit must include still-live signed reservations through replacement and reorganization. An evaluation's 0.01 ETH limit is not a universal contract rule.
+
+## Measured compensation and keeper operations
+
+The account captures gas before the guard/prechecks. Payment uses `min(measuredGas, verifiedOperationAllowance) + overhead`, multiplied by `min(tx.gasprice, basefee + maxTip, classCeiling)`, with routine markup and actual work fees. Cash/source/permission and caller minimum protection still apply. The meter is gross before refunds; actual wallet gas is the receipt's billed gas. Quotes use the upper envelope, with overhead once per actual paid call.
+
+`KeeperWorkMeasured(uint256 measuredGas,uint256 gasAllowance,uint256 gasPrice,uint256 workUnits,bool essential)` records the work frame; `KeeperPaid` records payment after clipping. Paid padding, duplicates and unused fee hints are rejected. Unpaid owner recovery can tolerate stale hints. Import and standalone harvest pay no keeper.
+
+[manager-keeper-unsigned.json](../../deploy/manager-keeper-unsigned.json) is address/environment data only: current predicted FACTORY, explicit Tenderly RPC, no VAULT and placeholders for existing read-only keystore/password mounts. It contains no secrets and changes no live service. Discovery begins at the separately authorized factory receipt block, not a guessed historical block.
+
+After an authorized real deployment, independent postflight must verify the factory runtime, implementation, links and dependencies before discovery. A newly created manager must be checked for actual owner, all Params, accepted/live fee expectation, flags, balance, initial permissions and zero initial liabilities/inventory. Do not apply modern selectors to old contracts and silently turn read errors into zero.
+
+Production signer transport, service start/restart and live discovery remain unexecuted until that factory exists and the applicable authority is given. The [local production-path postflight](../receipts/manager-measured-postflight-readback.json) checked a fresh zero-funded clone against the complete settings and linked code. The unsigned public dry-run is separate; neither deployed anything publicly.
+
+## Evidence limits
+
+The 50,000 overhead is an evaluation candidate. Earlier 100,000-overhead packets keep their executed metadata. Fixed-quote/Fresh studies and their old native checkpoints do not validate the new storage, reuse-only behavior, meter, operating returns or current overhead. The [focused verification](../receipts/manager-measured-verification.md) and [economic scorecard](../receipts/manager-measured-economics.md) identify current inputs and limits. No current annual return or live keeper image run is claimed.
+
+The preserved [legacy readback](../../deploy/manager-existing-main-readback.json) records the old vault's 0.01 ETH and old factory's manager count zero. Unsupported selectors and RPC errors remain explicit; this does not establish modern postflight or open the shared vault. No conditional mean, source review or calibration is a production recommendation.
+
+Things that don't make sense: increasing permission supplies no cash; the current 0.005 ETH reserve is below the 0.0055305 ETH maximum-work keeper envelope; gross metered gas differs from refunded billed gas; a profitable or accepted isolated job does not establish full-cycle economic viability.

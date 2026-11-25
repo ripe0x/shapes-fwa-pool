@@ -134,8 +134,6 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         p.essentialCap = uint64(vm.parseJsonUint(v, ".essentialCapWei"));
         p.essentialRate = uint64(vm.parseJsonUint(v, ".essentialRatePerDayWei"));
         p.backingRatioBps = uint32(vm.parseJsonUint(v, ".backingRatioBps"));
-        p.renewalMode = VaultLib.RenewalMode(vm.parseJsonUint(v, ".renewalMode"));
-        p.renewalFloatCount = uint16(vm.parseJsonUint(v, ".renewalFloatCount"));
         p.acceptedMintFee = uint64(vm.parseJsonUint(v, ".acceptedMintFeeWei"));
         p.minDeposit = uint64(vm.parseJsonUint(v, ".minDepositWei"));
         p.minDistribution = uint64(vm.parseJsonUint(v, ".minDistributionWei"));
@@ -167,6 +165,7 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         p.gasSchedule.harvested = uint32(vm.parseJsonUint(v, ".gasSchedule.harvested"));
         p.gasSchedule.credit = uint32(vm.parseJsonUint(v, ".gasSchedule.credit"));
         p.gasSchedule.fund = uint32(vm.parseJsonUint(v, ".gasSchedule.fund"));
+        p.gasSchedule.overhead = uint32(vm.parseJsonUint(v, ".gasSchedule.overhead"));
     }
 
     function _deploy(uint256 seed, VaultLib.Params memory p) internal {
@@ -765,7 +764,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _deposit(alice, 0.01 ether); // touch: her entitlement settles to claimableEth
         uint256 liabilities = vault.pendingDepositTotal() + vault.redemptionReserve()
             + vault.distributionReserve() + vault.claimableTotal();
-        // Bob's capital funds three launch packs while preserving the designated renewal float.
+        // Bob's capital funds three launch packs without reserving a removed renewal float.
         _kRestock(keeper, 3, 3);
         _kList(keeper, 3);
         // Checked before the claim, while the entitlement is still a liability: idle ETH excludes

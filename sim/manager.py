@@ -15,7 +15,6 @@ class Manager(Vault):
     owner_funded: int = None
     external_gifts: int = 0
     owner_withdrawn: int = 0
-    configured_float: int = 0
 
     def __post_init__(self):
         if self.seed != 0:
@@ -27,7 +26,6 @@ class Manager(Vault):
         if not 0 <= self.owner_funded <= self.balance:
             raise ValueError('initial owner funding cannot exceed observed balance')
         self.external_gifts += self.balance-self.owner_funded
-        self.configured_float = self.renewal_float
 
     def sync_budget(self, now):
         # Contract budget views accrue from the last payment/settings update, not each read.
@@ -59,12 +57,8 @@ class Manager(Vault):
     def owed_estimate(self):
         return 0
 
-    def renewal_float_needed(self):
-        # Public renewalFloat() stays conservative during exit; keeperCash releases its hold.
-        return self.configured_float if self.exiting else self.renewal_float
-
     def idle(self):
-        return max(0, self.balance - self.reserve - self.renewal_float_needed())
+        return max(0,self.balance-self.reserve)
 
     def fund(self, amount, caller='owner'):
         if amount <= 0:
@@ -87,24 +81,9 @@ class Manager(Vault):
     def set_exiting(self, enabled, caller='owner'):
         if caller != self.owner:
             raise RuntimeError('Unauthorized')
-        if enabled and not self.exiting:
-            self.configured_float = self.renewal_float
         self.exiting = enabled
-        self.renewal_float = 0 if enabled else self.configured_float
         if enabled:
             self.listing_paused = True
-            self.kept_replacements = 0
-
-    def sync_owned(self, listing_id, owned=True):
-        # PackManager.setExiting disables new renewal eligibility in the shared book.
-        if self.exiting:
-            self.positions[listing_id].acquired = False
-        return super().sync_owned(listing_id, owned)
-
-    def consume_keep(self, listing_id):
-        if self.exiting:
-            self.positions[listing_id].acquired = False
-        return super().consume_keep(listing_id)
 
     def _pool_only(self, *args, **kwargs):
         raise RuntimeError('PersonalManagerHasNoHolderAccounting')

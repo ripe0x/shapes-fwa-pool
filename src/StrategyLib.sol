@@ -48,7 +48,6 @@ library StrategyLib {
     error Payment();
     error UnlistNotAllowed();
 
-    struct FundingWork { uint256 cash; uint256 cost; uint256 credit; uint256 fees; uint256 count; uint256[] selected; }
     struct LiquidationWork { uint256 n; uint256 units; uint256 recovery; uint256 recoveryGas; }
 
     // ------------------------------------------------------------------ economics
@@ -84,7 +83,7 @@ library StrategyLib {
     ///         backing proposal per pack. Only while listing is open and a keep cycle repays the
     ///         build at today's quoted price (VaultLib.buildAndList).
     function build(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, IShapes shapes, uint256 units,
-        uint256[] calldata proposals, uint256 minPay) external returns (uint256)
+        uint256[] calldata proposals, uint256 minPay, uint256 gasStart) external returns (uint256)
     {
         _requireListing(s, f);
         _precheck(s, minPay, false);
@@ -93,13 +92,13 @@ library StrategyLib {
         emit Built(count, units);
         (, uint256 n) = VaultLib.makeup(units);
         return _pay(s, OP_BUILD, s.params.gasSchedule.build + count * (VaultLib.buildGas(s.params, n) + s.params.gasSchedule.listed), 2 * count,
-            false, minPay, type(uint256).max);
+            false, minPay, type(uint256).max, gasStart);
     }
 
     /// @notice Relist idle packs (returned by bids, withdrawals or expiry) at bounded proposals,
     ///         checked against live economics. No mint: a returned pack is reused as is.
     function list(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, IShapes shapes,
-        uint256[] calldata proposals, uint256 minPay) external returns (uint256)
+        uint256[] calldata proposals, uint256 minPay, uint256 gasStart) external returns (uint256)
     {
         _requireListing(s, f);
         _precheck(s, minPay, false);
@@ -110,7 +109,6 @@ library StrategyLib {
         uint256 listed;
         while (listed < proposals.length && b.idlePacks.length != 0) {
             uint256 packId = b.idlePacks[b.idlePacks.length - 1];
-            if (s.params.renewalMode == VaultLib.RenewalMode.FreshAfterAcquisition && b.renewalEligible[packId]) revert Nothing();
             uint256 units = b.idleValueOf[packId] / UNIT;
             uint256 backing = proposals[listed];
             VaultLib.validateBacking(s.params, b, f, address(packs), units, backing,
@@ -123,112 +121,25 @@ library StrategyLib {
             ++listed;
         }
         if (listed == 0) revert Nothing();
-        return _pay(s, OP_LIST, s.params.gasSchedule.list + listed * s.params.gasSchedule.listed, listed, false, minPay, type(uint256).max);
+        if (listed != proposals.length) revert VaultLib.UnusedPaidInput();
+        return _pay(s, OP_LIST, s.params.gasSchedule.list + listed * s.params.gasSchedule.listed, listed, false, minPay, type(uint256).max, gasStart);
     }
 
-    function renew(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, IShapes shapes,
-        uint256[] calldata returnedIds, uint256[] calldata proposals, uint256[] calldata feeIds, uint256 minPay)
-        external returns (uint256)
-    {
-        _requireListing(s, f);
-        // Renewal may use its designated float and verified proceeds from retirement/collection.
-        // Check permission first, then capital plus compensation against actual renewal cash
-        // before building. Final payment retains its actual cash and minPay protection.
-        _precheckPermission(s, minPay, false);
-        uint256 count = proposals.length;
-        if (s.params.renewalMode != VaultLib.RenewalMode.FreshAfterAcquisition || count == 0
-            || count > 4 || returnedIds.length != count || feeIds.length > VaultLib.MAX_BATCH
-            || s.params.packUnitsMask == 0) revert Amount();
-        if (shapes.mintFee() > s.params.acceptedMintFee) revert VaultLib.MintFeeNotAccepted();
-        VaultLib.Book storage b = s.book;
-        uint256 units = VaultLib.refUnits(s.params);
-        (, uint256 n) = VaultLib.makeup(units);
-        uint256 retired;
-        uint256 burned;
-        for (uint256 i; i < count; ++i) {
-            uint256 id = returnedIds[i];
-            if (id == 0) {
-                if (b.keptReplacements == 0) revert Nothing();
-                --b.keptReplacements;
-            } else {
-                if (!b.renewalEligible[id] || !VaultLib.owns(packs, id)) revert Nothing();
-                uint256 value = VaultLib.redeemInventory(b, id);
-                uint256 before = address(this).balance;
-                uint256 supply = shapes.totalSupply();
-                packs.redeem(id);
-                if (address(this).balance - before != value) revert Amount();
-                uint256 actualBurned = supply - shapes.totalSupply();
-                if (actualBurned == 0 || actualBurned > VaultLib.MAX_REDEEM_SHAPES) revert Amount();
-                burned += actualBurned;
-                if (burned > MAX_LIQUIDATE_UNITS) revert Amount();
-                ++retired;
-            }
-        }
-        uint256 gasQ = VaultLib.renewalGas(s.params, count, retired, burned);
-        uint256 need = count * (units * UNIT + n * shapes.mintFee());
-        for (uint256 i; i < count; ++i) need += proposals[i];
-        uint256 serviceUnits = 2 * count + retired;
-        gasQ = _fundRenewal(s, f, feeIds, gasQ, serviceUnits, need);
-        uint256 compensation = VaultLib.quote(s.params, gasQ, serviceUnits, false);
-        (uint256 routine,) = VaultLib.budgetNow(s.params, s.budget);
-        if (routine < compensation || IAccount(address(this)).renewalCash() < need + compensation) revert Payment();
-        VaultLib.buildAndList(s.params, b, f, packs, shapes, units, proposals, IAccount(address(this)).renewalCash());
-        emit Built(count, units);
-        return VaultLib.pay(s.params, s.budget, gasQ, serviceUnits, false, minPay, type(uint256).max,
-            IAccount(address(this)).renewalCash());
-    }
 
-    function _fundRenewal(VaultLib.Strategy storage s, IFWAV2 f, uint256[] calldata ids,
-        uint256 gasQ, uint256 units, uint256 need) private returns (uint256)
-    {
-        FundingWork memory w;
-        w.cash = IAccount(address(this)).renewalCash();
-        w.cost = VaultLib.quote(s.params, gasQ, units, false);
-        if (w.cash >= need + w.cost) return gasQ;
-        uint256 deficit = IAccount(address(this)).fundingDeficit(true);
-        w.credit = f.feeCredit(address(this));
-        w.fees = w.credit;
-        w.selected = new uint256[](ids.length);
-        for (uint256 i; i <= ids.length; ++i) {
-            uint256 fundedGas = gasQ + VaultLib.renewalFundingGas(s.params, w.count, w.credit != 0);
-            uint256 fundedCost = VaultLib.quote(s.params, fundedGas, units, false);
-            (uint256 routine,) = VaultLib.budgetNow(s.params, s.budget);
-            if (w.fees != 0 && w.cash + w.fees >= deficit + need + fundedCost && routine >= fundedCost
-                && (fundedCost - w.cost) * BPS <= w.fees * s.params.keeperShareBps) {
-                uint256[] memory selected = w.selected;
-                uint256 count = w.count;
-                assembly ("memory-safe") { mstore(selected, count) }
-                uint256 before = address(this).balance;
-                if (w.count != 0 && !VaultLib.claimFundingFees(s.book, f, w.selected)) revert Payment();
-                if (w.credit != 0) VaultLib.withdrawCredit(s.book, f);
-                uint256 received = address(this).balance - before;
-                if (received < w.fees || IAccount(address(this)).renewalCash() < need + fundedCost) revert Payment();
-                return fundedGas;
-            }
-            if (i == ids.length) break;
-            if (i != 0 && ids[i] <= ids[i - 1]) revert Amount();
-            uint256 id = ids[i];
-            if (s.book.positions[id].state != VaultLib.ACTIVE
-                || IFWAView(address(f)).listings(id).status != LISTING_ACTIVE) continue;
-            uint256 pending = f.pendingFees(id);
-            if (pending == 0) continue;
-            w.selected[w.count++] = id;
-            w.fees += pending;
-        }
-        return gasQ;
-    }
+
+
 
     function recover(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, uint256[] calldata ids,
         uint256 witness, uint256 checkpointMode) external {
-        VaultLib.syncUnfunded(s.params, s.book, f, packs, ids, checkpointMode, witness);
+        VaultLib.syncUnfunded(s.params, s.book, f, packs, ids, checkpointMode, witness, false);
     }
 
     function syncFunded(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, uint256[] calldata ids,
-        uint256 witness, uint256 checkpointMode, uint256 minPay, uint256 fundingCap) external returns (uint256)
+        uint256 witness, uint256 checkpointMode, uint256 minPay, uint256 fundingCap, uint256 gasStart) external returns (uint256)
     {
         if (checkpointMode != 1) revert Nothing();
-        (uint256 gasQ, uint256 units) = VaultLib.syncUnfunded(s.params, s.book, f, packs, ids, checkpointMode, witness);
-        return VaultLib.payFunded(s.params, gasQ, units, true, minPay, fundingCap);
+        (uint256 gasQ, uint256 units) = VaultLib.syncUnfunded(s.params, s.book, f, packs, ids, checkpointMode, witness, true);
+        return VaultLib.payFunded(s.params, gasQ, units, true, minPay, fundingCap, gasStart);
     }
 
     function _requireListing(VaultLib.Strategy storage s, IFWAV2 f) private view {
@@ -243,11 +154,11 @@ library StrategyLib {
     /// @notice Bounded journal or scan job, terminal resolutions and allocation cleanup.
     ///         `checkpointMode` is 0 for an account without checkpoints.
     function sync(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, uint256[] calldata listingIds,
-        uint256 witnessId, uint256 checkpointMode, uint256 minPay) external returns (uint256)
+        uint256 witnessId, uint256 checkpointMode, uint256 minPay, uint256 gasStart) external returns (uint256)
     {
         (uint256 gasQ, uint256 units) =
             VaultLib.syncChanges(s.params, s.budget, s.book, f, packs, listingIds, checkpointMode, witnessId);
-        return _pay(s, OP_SYNC, gasQ, units, false, minPay, type(uint256).max);
+        return _pay(s, OP_SYNC, gasQ, units, false, minPay, type(uint256).max, gasStart);
     }
 
     /// @notice Withdraw active listings: in wind-down (exit), when `shortfall` ETH is owed beyond
@@ -255,7 +166,7 @@ library StrategyLib {
     ///         (routine). A stale quote or a gas spike stops new listings but never unwinds earning
     ///         ones. Exits never read FWA's economics, so a hostile oracle or fee cannot block them.
     function unlist(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, uint256[] calldata listingIds,
-        uint256 minPay, uint256 shortfall) external returns (uint256)
+        uint256 minPay, uint256 shortfall, uint256 gasStart) external returns (uint256)
     {
         if (listingIds.length > VaultLib.MAX_BATCH) revert Amount();
         bool essential = s.windingDown || shortfall != 0;
@@ -281,19 +192,21 @@ library StrategyLib {
             if (!s.windingDown && shortfall != 0 && realized >= shortfall) break;
         }
         if (realized == 0) revert Nothing();
+        if (!s.callerFunded && moved != listingIds.length) revert VaultLib.UnusedPaidInput();
         return _pay(s, OP_UNLIST, s.params.gasSchedule.unlist + moved * s.params.gasSchedule.unlisted, moved, essential, minPay,
-            type(uint256).max);
+            type(uint256).max, gasStart);
     }
 
     /// @notice Redeem up to `maxCount` idle packs to ETH at their exact backing, or one bounded
     ///         recovery chunk, while `need` ETH is still owed beyond free ETH, or freely in wind-down.
     function liquidate(VaultLib.Strategy storage s, IShapePacks packs, IShapes shapes, uint256 maxCount,
-        uint256 minPay, uint256 need) external returns (uint256)
+        uint256 minPay, uint256 need, uint256 gasStart) external returns (uint256)
     {
         if (!s.windingDown && need == 0) revert Nothing();
         _precheckPermission(s, minPay, true);
         VaultLib.Book storage b = s.book;
-        maxCount = M.min(maxCount, VaultLib.MAX_BATCH);
+        maxCount = M.min(M.min(maxCount, VaultLib.MAX_BATCH),
+            b.idlePacks.length + (b.recoveryPacks.length != 0 ? 1 : 0));
         uint256 before = address(this).balance;
         uint256 supplyBefore = shapes.totalSupply();
         LiquidationWork memory w;
@@ -322,7 +235,7 @@ library StrategyLib {
         if (w.n != 0 && (burned == 0 || burned > MAX_LIQUIDATE_UNITS)) revert Amount();
         emit Liquidated(w.n + w.recovery, burned, address(this).balance - before);
         return _pay(s, OP_LIQUIDATE, s.params.gasSchedule.liquidate + w.n * s.params.gasSchedule.liquidatePack + burned * s.params.gasSchedule.redeemShape
-            + w.recoveryGas, w.n + w.recovery, true, minPay, type(uint256).max);
+            + w.recoveryGas, w.n + w.recovery, true, minPay, type(uint256).max, gasStart);
     }
 
     // ------------------------------------------------------------------ fees, tokens, receipts
@@ -387,9 +300,9 @@ library StrategyLib {
 
     /// @notice Pay the caller for verified work (VaultLib.pay): the least of the quote, `cap`, the account's free ETH and its budget.
     function pay(VaultLib.Strategy storage s, uint256 op, uint256 gasQ, uint256 units, bool essential,
-        uint256 minPay, uint256 cap) external returns (uint256)
+        uint256 minPay, uint256 cap, uint256 gasStart) external returns (uint256)
     {
-        return _pay(s, op, gasQ, units, essential, minPay, cap);
+        return _pay(s, op, gasQ, units, essential, minPay, cap, gasStart);
     }
 
     /// @notice Revert before the work when `minPay` already exceeds what could be paid.
@@ -398,17 +311,17 @@ library StrategyLib {
     }
 
     function _pay(VaultLib.Strategy storage s, uint256, uint256 gasQ, uint256 units, bool essential,
-        uint256 minPay, uint256 cap) private returns (uint256)
+        uint256 minPay, uint256 cap, uint256 gasStart) private returns (uint256)
     {
         if (s.callerFunded) return 0;
         return VaultLib.pay(s.params, s.budget, gasQ, units, essential, minPay, cap,
-            essential ? IAccount(address(this)).freeEth() : IAccount(address(this)).keeperCash());
+            essential ? IAccount(address(this)).freeEth() : IAccount(address(this)).keeperCash(), gasStart);
     }
 
     function payFunded(VaultLib.Strategy storage s, uint256, uint256 gasQ, uint256 units, bool essential,
-        uint256 minPay, uint256 fundingCap) external returns (uint256)
+        uint256 minPay, uint256 fundingCap, uint256 gasStart) external returns (uint256)
     {
-        return VaultLib.payFunded(s.params, gasQ, units, essential, minPay, fundingCap);
+        return VaultLib.payFunded(s.params, gasQ, units, essential, minPay, fundingCap, gasStart);
     }
 
     function _precheck(VaultLib.Strategy storage s, uint256 minPay, bool essential) private view {

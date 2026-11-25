@@ -1,3 +1,13 @@
+# Manager reuse/payment/migration follow-up, 2026-11-25
+
+**Individual-manager implementation and unsigned manager-only package are prepared; production return acceptance is open.** Owner A8 supersedes the prior fixed-quote/two-mode closeout. The manager is reuse-only, pays keepers for verified bounded measured work, and can import eligible intact packs from an old personal manager. The app exposes an owner-controlled migration and caller-funded exit. The factory remains ownerless and cannot retune old managers. The shared vault remains closed; no public transaction, signature, live cutover or merge was performed.
+
+The [current verification record](receipts/manager-measured-verification.md) covers real-counterparty forks, actual 50,000-overhead receipts, paired owner recovery, a zero-budget owner exit, a local UI migration, release postflight and focused tests. The [one-screen economic scorecard](receipts/manager-measured-economics.md) reconciles an actual four-pack opening and separate owner exit. **It does not establish an annual return or production viability.** The old −28.5% and later positive modeled outputs used different code or payment rules and cannot answer this decision. The 0.21 ETH backing, pooled 25 bps uplift and 50,000 overhead remain provisional evaluation values. The 0.005 ETH reserve is below a 0.0055305 ETH conservative maximum-work need at 0.5 gwei.
+
+The read-only public refresh at block **26,493,799** found a 0.0005 ETH live Shapes mint fee, legacy vault balance 0.01 ETH, old factory manager count zero and known claim/credit fields zero. The creation template was refreshed at block **26,493,803**; the deployment sender's nonce remained 4180. Existing unsigned deployment simulation remains valid for the same compiled code and linked libraries. No old approval or signature is promoted. Prior assessments below are historical for their named revision/configuration, even where their prose says “current.”
+
+---
+
 # Individual manager operating validation, 2026-11-25
 
 **Individual-manager engineering and unsigned preparation are complete; production economics remain unaccepted.** The owner removed the validation-time cap (A7). Authenticated billed operating costs, the recorded-period assessment and current keeper runtime checks are complete within the scope below. The new shared vault is **undeployed**, its app launch remains disabled, and no public transaction, production fee change, live cutover, signature or merge is authorized. The old fixed 8,192-path campaigns stay preserved and incomplete; they are not resumed or promoted into acceptance requirements.

@@ -180,7 +180,7 @@ def expectation(n, volume, gwei, B=None, crown=0.001, premium=0.0):
     cycles = 365 * volume * (1 / B) / W
     # A bid cycle's keeper pay as the vault quotes it (D56): quoted gas at basefee + 0.05 gwei tip,
     # capped at the ceiling, with the configured routine markup and verified service fees.
-    gas = (policy.quote(st, policy.cycle_gas(st), 2) + (policy.build_cost(st) if st.renewal_mode == 0 else 0)) / E
+    gas = policy.quote(st, policy.cycle_gas(st), 2) / E
     net = B * (k_of(crown) - 1) - gas
     capital = n * (B + P / E)
     return dict(cycle_days=365 / cycles, net_meth=net * 1e3, apr=cycles * net / (B + P / E),
@@ -204,7 +204,7 @@ def backtest(h, n, gwei, t0, t1, B=None, runs=400, seed=1, premium=0.0):
     fee2 = fee * H2 / H  # the vault's listings move the harmonic backing, so the fee
     vault_fees = fee2 * (1 - cut) * (1 - crown) * n / (N + n)
     p_sel = (n / B) / (w + n / B)
-    cycle_cost = B + (policy.quote(st, policy.cycle_gas(st), 2) + (policy.build_cost(st) if st.renewal_mode == 0 else 0)) / E
+    cycle_cost = B + policy.quote(st, policy.cycle_gas(st), 2) / E
     days = (t1 - t0) / DAY
     capital = n * (B + P / E)
     exp_pnl = vault_fees.sum() - p_sel.sum() * cycle_cost
@@ -238,7 +238,9 @@ def configured_state(base_fee, values=None):
     values = values or json.loads((ROOT.parent / 'deploy/mainnet.json').read_text())
     s = charge_state(base_fee, 0)
     s.gas_schedule = gas_schedule(values)
-    s.backing_ratio_bps, s.renewal_mode = values['backingRatioBps'], values['renewalMode']
+    if 'renewalMode' in values or 'renewalFloatCount' in values:
+        raise ValueError('historical Fresh settings require their pinned revision; active strategy is reuse-only')
+    s.backing_ratio_bps = values['backingRatioBps']
     s.gas_ceiling, s.essential_ceiling = values['gasCeilingWei'], values['essentialCeilingWei']
     s.max_tip, s.work_fee, s.markup_bps = values['maxTipWei'], values['workFeeWei'], values['payMarkupBps']
     s.pack_units_mask, s.accepted_mint_fee = values['packUnitsMask'], values['acceptedMintFeeWei']
@@ -381,7 +383,7 @@ def bounded_policy_positions(v, now, settlement_window, returned_order, selected
 
 
 RECEIPT_WORK_LIMITS = dict(create=1,setExiting=1,withdraw=1,processAcquisitions=16,
-    build=4,renew=4,list=8,sync=16,recover_sync=16,unlist=16,liquidate=16,harvest=16)
+    build=4,list=8,sync=16,recover_sync=16,unlist=16,liquidate=16,harvest=16)
 
 
 def receipt_gas(curves, operation, work_count, work_gas=0, *, estimate=False, legacy_floor=0):
@@ -394,8 +396,35 @@ def receipt_gas(curves, operation, work_count, work_gas=0, *, estimate=False, le
     slope='estimate_per_extra_work' if estimate else 'billed_per_extra_work'
     if type(curve.get(base)) is not int or curve[base]<=0 or type(curve.get(slope)) is not int or curve[slope]<0:
         raise ValueError(('invalid receipt gas curve',operation))
-    return max(work_gas,curve[base]+curve[slope]*(work_count-1))
+    return curve[base]+curve[slope]*(work_count-1)
 
+
+
+
+def metered_work_gas(curves, meters, operation, work_count=1, max_work=None):
+    if max_work is not None and (operation not in max_work or work_count>max_work[operation]):
+        raise ValueError('metered batch exceeds actual receipt support: '+operation)
+    curve=curves.get(operation,{})
+    if 'single_meter_gas' in curve and 'meter_per_extra_work' in curve:
+        receipt_gas(curves,operation,work_count)  # enforce verified operation/count bounds
+        base,slope=curve['single_meter_gas'],curve['meter_per_extra_work']
+        if type(base) is not int or base<0 or type(slope) is not int or slope<0:
+            raise ValueError('invalid measured work-span curve: '+operation)
+        return base+slope*(work_count-1)
+    if work_count!=1 or type(meters.get(operation)) is not int or meters[operation]<0:
+        raise ValueError('missing independently measured work span: '+operation)
+    return meters[operation]
+
+
+def sync_context_gas(contexts, allowance, units, work_count=1):
+    key=f'{allowance}:{units}'
+    if work_count!=1 or key not in contexts:
+        raise ValueError('unmeasured sync context: '+key+f' count={work_count}')
+    context=contexts[key]
+    if any(type(context.get(name)) is not int or context[name]<=0
+           for name in ('single_billed_gas','single_estimate_gas')):
+        raise ValueError('invalid sync receipt context: '+key)
+    return context
 
 
 def receipt_acceptance_gas(curves, operation, work_count, work_gas=0, legacy_floor=0):
@@ -441,7 +470,7 @@ def run(sc, n_target, seed, days=365, values=None):
         if not cached_economics or key not in edge_cache:
             result=policy.edge_backing(k,limit,int(S_FEE*10_000),units,ceiling,values['payMarkupBps'],work_fee,
                 price=min(gas+tip,ceiling),mint_fee=mint_fee,buffer_bps=values['bufferBps'],min_edge_bps=values['minEdgeBps'],
-                backing_ratio_bps=values['backingRatioBps'],gas_schedule=schedule,renewal_mode=values['renewalMode'],
+                backing_ratio_bps=values['backingRatioBps'],gas_schedule=schedule,
                 newly_built=newly_built,reference_units=build_units,retirement_shapes=retirement_shapes)
             if not cached_economics:return result
             edge_cache[key]=result
@@ -450,7 +479,7 @@ def run(sc, n_target, seed, days=365, values=None):
     face_value = build_units * policy.UNIT
     opening = configured_state(int((g_of(0) if callable(g_of) else g_of) * GWEI), values)
     opening.mint_fee = mint_fee
-    deposit = sc.get('deposit_wei', n_target * (policy.position_value(opening) + policy.shape_count(build_units) * mint_fee) + values['reserveWei'] + policy.renewal_float(opening, values['renewalFloatCount']) + policy.build_cost(opening))
+    deposit = sc.get('deposit_wei', n_target * (policy.position_value(opening) + policy.shape_count(build_units) * mint_fee) + values['reserveWei'] + policy.build_cost(opening))
     if not manager and deposit > values["tvlCapWei"]:
         raise ValueError("model deposit exceeds configured TVL cap")
     account_type = Vault
@@ -459,7 +488,7 @@ def run(sc, n_target, seed, days=365, values=None):
         account_type = Manager
     v = account_type(seed=0 if manager else 10**16, balance=deposit if manager else 10**16, reserve=values["reserveWei"],
               distribution_bps=values["distributionBps"], uplift_bound_bps=values["upliftBoundBps"], pack_units_mask=values["packUnitsMask"],
-              renewal_mode=values["renewalMode"], accepted_mint_fee=values["acceptedMintFeeWei"],
+              accepted_mint_fee=values["acceptedMintFeeWei"],
               live_mint_fee=mint_fee, min_distribution=values["minDistributionWei"])
     v.routine_budget = v.routine_cap = values["routineCapWei"]
     v.essential_budget = v.essential_cap = values["essentialCapWei"]
@@ -479,10 +508,9 @@ def run(sc, n_target, seed, days=365, values=None):
     st0.gas_schedule = schedule
     st0.build_units, st0.pack_units_mask = build_units, values["packUnitsMask"]
     st0.backing_ratio_bps = values['backingRatioBps']
-    st0.renewal_mode, st0.accepted_mint_fee = values['renewalMode'], values['acceptedMintFeeWei']
+    st0.accepted_mint_fee = values['acceptedMintFeeWei']
     ck0, d0 = policy.request_charge(st0), policy.deploy_charge(st0)
     v.construction_cost, v.reference_capital = d0, policy.position_value(st0)
-    v.renewal_float = policy.renewal_float(st0, values['renewalFloatCount'])
     if not manager:
         v.deposit("h", deposit, ck0)
     paid_in = deposit if manager else deposit + ck0
@@ -490,10 +518,30 @@ def run(sc, n_target, seed, days=365, values=None):
     exit_days = sc.get("exit_days", 30) if exit_all else 0
     user_gas = sc.get("user_gas_proxy", {})
     gas_curves = sc.get("gas_curves", {}) if manager else {}
+    owner_gas_curves = gas_curves | sc.get("owner_gas_curves", {})
+    owner_gas_max_work = sc.get("owner_gas_max_work")
+    gas_meter_proxy = sc.get("gas_meter_proxy", {})
+    gas_meter_max_work = sc.get("gas_meter_max_work")
+    def sync_context(allowance, units, count=1, owner=False):
+        if sc.get('full_gas_schedule')!=values['gasSchedule']:
+            raise ValueError('sync context calibration gas schedule differs from current settings')
+        return sync_context_gas(sc.get('owner_sync_contexts' if owner else 'sync_contexts',{}),allowance,units,count)
+    def work_meter(operation,count=1,allowance=None,units=0):
+        if operation=='sync':
+            context=sync_context(allowance,units,count)
+            meter=context.get('measured_gas')
+            if type(meter) is not int or meter<0:raise ValueError('sync context lacks measured span')
+            return meter
+        return metered_work_gas(gas_curves,gas_meter_proxy,operation,count,gas_meter_max_work)
+    def operation_gas(operation,count,allowance,units=0,estimate=False):
+        if operation=='sync':
+            return sync_context(allowance,units,count)['single_estimate_gas' if estimate else 'single_billed_gas']
+        return receipt_gas(gas_curves,operation,count,allowance,estimate=estimate,legacy_floor=user_gas.get(operation,0))
+    meter_censored_calls = 0
     user_estimates = sc.get("user_gas_estimate_proxy", {})
     owner_estimate_fallback = set()
     entry_method = 'create' if manager else 'deposit'
-    holder_gas = (int(g0 * GWEI) + tip) * receipt_gas(gas_curves,entry_method,1,legacy_floor=user_gas.get(entry_method,0))
+    holder_gas = (int(g0 * GWEI) + tip) * receipt_gas(owner_gas_curves,entry_method,1,legacy_floor=user_gas.get(entry_method,0))
     unknown_user_gas = int(exit_all and entry_method not in user_gas)
     keeper_gas_proxy_cost = 0
     keeper_unmeasured = set()
@@ -542,7 +590,7 @@ def run(sc, n_target, seed, days=365, values=None):
     routine_unfunded = unpaid_routine_calls = zero_quote_sync_calls = 0
     sync_credit_sweeps = sync_active_fee_claims = sync_fee_receipts = sync_collection_quote = 0
     last_unfunded_offer = last_cash_shortfall = last_permission_shortfall = 0
-    op_names = ("syncCheckpoint", "renew", "sync", "harvest", "unlist", "liquidate", "checkpoint", "build", "list")
+    op_names = ("syncCheckpoint", "sync", "harvest", "unlist", "liquidate", "checkpoint", "build", "list")
     op_paid = dict.fromkeys(op_names, 0)
     op_calls = dict.fromkeys(op_names, 0)
     holder_calls = dict.fromkeys(op_names, 0)
@@ -559,17 +607,28 @@ def run(sc, n_target, seed, days=365, values=None):
                               protected=v.redemption_reserve + v.distribution_reserve + v.claimable_total + v.processing_pool + v.charge_refund_reserve,
                               locked=locked_holder(), global_locked=v.locked_shares, positions=len(v.positions),
                               returned_value=sum(p.value for p in v.positions.values() if p.status == SETTLED and p.pack_owned),
-                              journal=len(journal), claimed=holder_claimed))
+                              journal=len(journal), claimed=holder_claimed,market_pending=market_pending))
 
     def owner_gas(estimate):
         return max(21_000, estimate) if owner_exit_limit is not None else estimate
 
-    def owner_billed(operation, work_gas=0, work_count=1):
-        return owner_gas(receipt_gas(gas_curves,operation,work_count,work_gas,legacy_floor=user_gas.get(operation,0)))
+    def owner_supported(operation, work_count):
+        if owner_gas_max_work is not None and work_count > owner_gas_max_work.get(operation,0):
+            raise ValueError("owner batch exceeds actual receipt support: " + operation)
 
-    def owner_estimate(operation, work_gas, work_count=1):
-        if gas_curves:
-            return max(21_000,receipt_acceptance_gas(gas_curves,operation,work_count,work_gas))
+    def owner_billed(operation, work_gas=0, work_count=1, units=0):
+        owner_supported(operation,work_count)
+        if operation=='recover_sync':
+            return sync_context(work_gas,units,work_count,owner=True)['single_billed_gas']
+        return owner_gas(receipt_gas(owner_gas_curves,operation,work_count,work_gas,legacy_floor=user_gas.get(operation,0)))
+
+    def owner_estimate(operation, work_gas, work_count=1, units=0):
+        owner_supported(operation,work_count)
+        if operation=='recover_sync':
+            context=sync_context(work_gas,units,work_count,owner=True)
+            return max(context['single_billed_gas'],context['single_estimate_gas'])
+        if owner_gas_curves:
+            return max(21_000,receipt_acceptance_gas(owner_gas_curves,operation,work_count,work_gas))
         if operation not in user_estimates:
             owner_estimate_fallback.add(operation)
         return max(21_000, work_gas, user_estimates.get(operation, user_gas.get(operation, 0)))
@@ -661,7 +720,7 @@ def run(sc, n_target, seed, days=365, values=None):
             operating_budget_marks[str(d)] = dict(elapsed_seconds=now, routine_budget_wei=v.routine_budget,
                 routine_paid_wei=routine_paid, free_wei=v.free(), positions=len(v.positions),
                 fees_wei=v.fees_received, lost_wei=v.backing_lost, selections=selected, cash_wei=v.balance,
-                keeper_cash_wei=max(0,v.free()-v.renewal_float),renewal_cash_wei=max(0,v.free()-v.reserve-v.owed_estimate()),
+                keeper_cash_wei=v.keeper_cash_after(),
                 mint_fees_wei=v.mint_fees,fee_credit_wei=credit,protected_refund_wei=v.charge_refund_reserve)
         gas = int((g_of(d) if callable(g_of) else g_of) * GWEI)
         for day, key, val in sc.get("changes", []):
@@ -844,9 +903,9 @@ def run(sc, n_target, seed, days=365, values=None):
                     settlement_window=clock.SETTLEMENT if timed else 10**12,
                     blackout=blackout, queue_drained=(market_pending == 0 if timed else (blackout_ok or not blackout) and d >= listing_ready_day),
                     checkpoint_done_this_interval=checkpoint_done, caller_funded_exit=self_serve and exit_all and exit_requested, listings=listings, idle_packs=len(v.idle_packs),
-                    relistable_idle=next((i for i, eligible in enumerate(reversed(v.idle_acquired)) if eligible and values["renewalMode"] == 0), len(v.idle_packs)),
+                    relistable_idle=len(v.idle_packs),
                     recovery_packs=len(v.recovery_packs),
-                    free=v.free(), keeper_cash=max(0, v.free() - v.renewal_float), idle_eth=v.idle(), owed_estimate=v.owed_estimate(),
+                    free=v.free(), keeper_cash=v.keeper_cash_after(), idle_eth=v.idle(), owed_estimate=v.owed_estimate(),
                     pending_deposits=v.pending_total, locked_shares=v.locked_shares,
                     total_shares=v.total_shares, fee_credit=credit,
                     open_positions=len(v.positions), active_count=v.active_count, idle_value=v.idle_value,
@@ -863,9 +922,7 @@ def run(sc, n_target, seed, days=365, values=None):
                     slowdown_volume=sc.get("slowdown", 0.0), essential_ceiling=essential_ceiling,
                     pack_units_mask=values["packUnitsMask"], build_units=build_units,
                     gas_schedule=schedule, backing_ratio_bps=values['backingRatioBps'],
-                    renewal_mode=values['renewalMode'], accepted_mint_fee=values['acceptedMintFeeWei'],
-                    renewal_float=v.renewal_float_needed() if manager else v.renewal_float, operating_reserve=v.reserve,
-                    renewal_eligible=len(v.renewal_eligible) + v.kept_replacements,
+                    accepted_mint_fee=values['acceptedMintFeeWei'], operating_reserve=v.reserve,
                     reserve=values["reserveWei"],
                     processing_pool=v.processing_pool, distribution_bps=0 if manager else v.distribution_bps,
                     checkpoint_proof_entries=min(32,len(v.allocation_queue)-v.allocation_head) + (len(v.positions) if not sc.get("exempt",True) and len(v.positions)<=32 and v.active_count else 0),
@@ -879,10 +936,10 @@ def run(sc, n_target, seed, days=365, values=None):
                     minimum, maximum = proposal_limits(st,face_value,int(S_FEE*10_000),int(BID_RATE*10_000),maximum,units=build_units)
                     # Speed only: with no idle pack and idle ETH below one backing, the planner can
                     # use neither list nor build proposals, so skipping them changes no decision.
-                    if v.idle_packs or st.renewal_eligible or st.idle_eth >= minimum:
+                    if v.idle_packs or st.idle_eth >= minimum:
                         chosen = []
-                        for value, old_shapes, acquired in zip(reversed(v.idle_packs), reversed(v.idle_shapes), reversed(v.idle_acquired)):
-                            if len(chosen) == policy.MAX_BATCH['list'] or (values['renewalMode'] == 0 and acquired):
+                        for value, old_shapes in zip(reversed(v.idle_packs), reversed(v.idle_shapes)):
+                            if len(chosen) == policy.MAX_BATCH['list']:
                                 break
                             old_units = value // policy.UNIT
                             target = edge_for(old_units,False,old_shapes)
@@ -898,12 +955,6 @@ def run(sc, n_target, seed, days=365, values=None):
                         build_minimum, _ = proposal_limits(st,face_value,int(S_FEE*10_000),int(BID_RATE*10_000),maximum,build=True,units=build_units)
                         build_quote = backing_proposals(backing, v.positions, build_minimum, maximum, policy.MAX_BATCH["build"])
                         st.build_proposals = build_quote
-                if st.backing and st.build_proposals:
-                    count = min(4, len(v.renewal_eligible) + v.kept_replacements)
-                    st.renewal_pack_ids = list(range(1, min(len(v.renewal_eligible), count) + 1)) + [0] * max(0, count - len(v.renewal_eligible))
-                    st.renewal_proposals = st.build_proposals[:count]
-                    st.renewal_pack_values = v.renewal_eligible[:count] + [0] * max(0, count - len(v.renewal_eligible))
-                    st.renewal_pack_shapes = v.renewal_shapes()[:count] + [0] * max(0,count-len(v.renewal_eligible))
                 # Other quote inputs are fixed for this run; price changes still get a fresh quote.
                 construction_key = st.base_fee, st.gas_price
                 if not cached_economics or construction_key not in construction_cache:
@@ -916,12 +967,11 @@ def run(sc, n_target, seed, days=365, values=None):
                 planned = policy.plan(st)
                 if manager and not v.exiting:
                     for code,kind,detail in policy.status(st,planned):
-                        if code not in ('RENEWAL_CASH_SHORT','RENEWAL_PERMISSION_SHORT','ROUTINE_BUDGET_EMPTY','MAINTENANCE_UNFUNDED'):
+                        if code not in ('ROUTINE_BUDGET_EMPTY','MAINTENANCE_UNFUNDED'):
                             continue
                         manager_waits[code]=manager_waits.get(code,0)+1
-                        manager_wait_examples.setdefault(code,dict(time=now,free=v.free(),keeper_cash=max(0,v.free()-v.renewal_float),
-                            renewal_cash=max(0,v.free()-v.reserve),fee_credit=credit,routine_budget=v.routine_budget,
-                            reserve=v.reserve,renewal_float=v.renewal_float,eligible=st.renewal_eligible,detail=detail))
+                        manager_wait_examples.setdefault(code,dict(time=now,free=v.free(),keeper_cash=v.keeper_cash_after(),
+                            fee_credit=credit,routine_budget=v.routine_budget,reserve=v.reserve,detail=detail))
                 if timed and calls == 0 and d < days:
                     waiting = v.idle_packs or any(l.status in (SETTLED, WITHDRAWN) or (l.status == ALLOCATED and
                                                   absolute_now >= l.allocated_at + clock.SETTLEMENT) for l in listings)
@@ -939,23 +989,21 @@ def run(sc, n_target, seed, days=365, values=None):
                     if fn == 'syncCheckpoint':
                         ess, funding_cap = True, v.processing_pool
                     cost_basis = physical_gas if gas_curves and physical_gas is not None else gas_q
-                    offer = policy.payment(st, gas_q, units, ess)
+                    recovery = self_serve and exit_all and exit_requested and liability and fn in ('sync','syncCheckpoint','unlist','liquidate','checkpoint')
+                    offer = 0 if recovery or fn=='harvest' else policy.payment(st,gas_q,units,ess,measured_gas=0 if gas_q==0 and units==0 else work_meter(fn,work_count,gas_q,units))
                     funds = funding_cap if funding_cap is not None else (v.essential_budget if ess else v.routine_budget)
                     cash = max(0, v.free() + cash_delta) if ess else v.keeper_cash_after(cash_delta)
-                    if fn == 'renew':
-                        cash = v.renewal_cash_after(cash_delta)
                     paid = min(offer, funds) if fn == 'syncCheckpoint' else min(offer, funds, cash)
                     holder_fallback = self_serve and liability and (not exit_all or fn != "sync"
                         or (rescue_sync and exit_requested and (v.locked_shares or manager)))
-                    recovery = self_serve and exit_all and exit_requested and liability and fn in ('sync','syncCheckpoint','unlist','liquidate','checkpoint')
                     if manager and recovery:
                         gas_key = 'recover_checkpoint' if fn=='checkpoint' else 'recover_sync' if fn in ('sync','syncCheckpoint') else fn
-                        estimate = owner_estimate(gas_key, cost_basis, work_count)
+                        estimate = owner_estimate(gas_key, cost_basis, work_count, units)
                         # An owner recovery pays no keeper; acceptance is the final pre-mutation check.
                         return owner_preflight([estimate], st.base_fee, fn)
                     if keeper_zero_loss:
-                        estimate_gas=receipt_gas(gas_curves,fn,work_count,cost_basis,estimate=True,legacy_floor=user_gas.get(fn,0))
-                        billed_gas=receipt_gas(gas_curves,fn,work_count,cost_basis,legacy_floor=user_gas.get(fn,0))
+                        estimate_gas=operation_gas(fn,work_count,gas_q,units,estimate=True)
+                        billed_gas=operation_gas(fn,work_count,gas_q,units)
                         ratio=billed_ratio(keeper_receipt_history,fn) if keeper_receipt_history_enabled else 1.
                         cost,need,accepted=profitability_gate(estimate_gas,st.gas_price,paid,
                             sc.get('keeper_fail_rate_bps',0),sc.get('keeper_min_return_bps',0),0,ratio=ratio)
@@ -983,23 +1031,24 @@ def run(sc, n_target, seed, days=365, values=None):
 
                 def pay(gas_q, units=0, ess=False, funding_cap=None, liability=False, work_count=1, physical_gas=None):
                     nonlocal self_serve_cost, holder_gas, holder_keeper_pay, holder_maintenance_gas, keeper_gas_proxy_cost
-                    nonlocal routine_paid, essential_paid, request_paid, unpaid_routine_calls, unknown_user_gas, zero_quote_sync_calls
+                    nonlocal routine_paid, essential_paid, request_paid, unpaid_routine_calls, unknown_user_gas, zero_quote_sync_calls, meter_censored_calls
                     if fn == 'syncCheckpoint':
                         ess, funding_cap = True, v.processing_pool
                     cost_basis = physical_gas if gas_curves and physical_gas is not None else gas_q
-                    offer = policy.payment(st, gas_q, units, ess)
                     recovery = self_serve and exit_all and exit_requested and liability and fn in ('sync','syncCheckpoint','unlist','liquidate','checkpoint')
-                    paid = 0 if recovery else v.pay_keeper(offer, essential=ess, cap=funding_cap, source='processing' if fn == 'syncCheckpoint' else 'renewal' if fn == 'renew' else None)
-                    if manager and not recovery:
-                        keeper_gas_proxy_cost += receipt_gas(gas_curves,fn,work_count,cost_basis,legacy_floor=user_gas.get(fn,0)) * st.gas_price
+                    offer = 0 if recovery or fn=='harvest' else policy.payment(st,gas_q,units,ess,measured_gas=0 if gas_q==0 and units==0 else work_meter(fn,work_count,gas_q,units))
+                    paid = 0 if recovery or fn=='harvest' else v.pay_keeper(offer, essential=ess, cap=funding_cap, source='processing' if fn == 'syncCheckpoint' else None)
+                    if manager and not recovery and fn!='harvest':
+                        meter_censored_calls += int(work_meter(fn,work_count,gas_q,units)>gas_q)
+                        keeper_gas_proxy_cost += operation_gas(fn,work_count,gas_q,units) * st.gas_price
                         if fn not in user_gas or fn in sc.get('unmeasured_gas_operations',[]):
                             keeper_unmeasured.add(fn)
                         if paid < offer or paid == 0:
                             raise RuntimeError(('ordinary keeper payment fell below its reviewed envelope', fn, paid, offer))
                         if keeper_receipt_history_enabled:
                             keeper_receipt_history.state['counted'].append(dict(label=fn,
-                                est=receipt_gas(gas_curves,fn,work_count,cost_basis,estimate=True),
-                                gas_used=receipt_gas(gas_curves,fn,work_count,cost_basis)))
+                                est=operation_gas(fn,work_count,gas_q,units,estimate=True),
+                                gas_used=operation_gas(fn,work_count,gas_q,units)))
                     op_paid[fn] += paid
                     op_calls[fn] += 1
                     if fn in ("checkpoint", "syncCheckpoint") and funding_cap is not None:
@@ -1010,19 +1059,16 @@ def run(sc, n_target, seed, days=365, values=None):
                         routine_paid += paid
                         unpaid_routine_calls += int(paid < offer and fn != "harvest" and not recovery)
                     if self_serve and liability:
-                        # Proxy from the operation quote, not a measured gas claim. Kept outside
-                        # vault NAV because the withdrawing holder pays this gas personally.
-                        self_serve_cost += max(0, gas_q * st.gas_price - paid)
-                        if exit_all and (recovery or paid < offer):
-                            # Variable-size unpaid maintenance retains the explicitly labeled
-                            # operation-quote gas proxy until matching receipt curves exist.
+                        if not manager:
+                            self_serve_cost += max(0, gas_q * st.gas_price - paid)
+                        if exit_all and (recovery or fn=='harvest' or paid < offer):
+                            # Owner recovery uses its own receipts, with no keeper meter or pay.
                             gas_key = 'recover_checkpoint' if recovery and fn=='checkpoint' else 'recover_sync' if recovery and fn in ('sync','syncCheckpoint') else fn
                             measured=user_gas.get(gas_key,0)
-                            # Variable work uses the larger calibrated sample or verified-work
-                            # allowance; a small receipt cannot underprice a larger exit batch.
-                            cost=owner_billed(gas_key,cost_basis,work_count)*st.gas_price if manager else owner_gas(max(gas_q,measured))*st.gas_price
+                            cost=owner_billed(gas_key,cost_basis,work_count,units)*st.gas_price if manager else owner_gas(max(gas_q,measured))*st.gas_price
                             if manager:
                                 owner_charge(cost)
+                                self_serve_cost += cost
                             else:
                                 holder_gas += cost
                             holder_maintenance_gas += cost
@@ -1242,7 +1288,7 @@ def run(sc, n_target, seed, days=365, values=None):
                             if self_serve and exit_all and exit_requested and v.locked_shares:
                                 v.recover_checkpoint(credit)
                             else:
-                                v.checkpoint(credit, keeper_payment=min(policy.payment(st, gas_q, 1, True), pool) if flows else 0)
+                                v.checkpoint(credit, keeper_payment=min(policy.payment(st,gas_q,1,True,measured_gas=work_meter(fn,1)), pool) if flows else 0)
                         except RuntimeError:
                             v.__dict__.update(snap)
                             missed_alloc += 1
@@ -1279,39 +1325,6 @@ def run(sc, n_target, seed, days=365, values=None):
                         v.build(list(range(next_id, next_id + count)), units, mint_fee, proposals)
                         next_id += count
                         pay(gas_q, 2 * count,work_count=count)
-                    elif fn == "renew":
-                        returned_count = sum(i != 0 for i in action[1])
-                        proposals = action[2]
-                        count = len(proposals)
-                        n = policy.shape_count(build_units)
-                        gas_q = Q['build'] + count * (Q['build_pack'] + n * Q['build_shape'] + Q['listed'])
-                        if returned_count:
-                            gas_q += Q['liquidate'] + returned_count * (Q['liq_pack'] + n * Q['redeem_shape'])
-                        returned_value = sum(v.renewal_eligible[:returned_count])
-                        burned = sum(v.renewal_shapes()[:returned_count])
-                        if returned_count:
-                            gas_q += (burned - returned_count*n) * Q['redeem_shape']
-                        need = count * (face_value + n * mint_fee) + sum(proposals)
-                        gas_q, take_credit, fee_ids = v.renewal_fee_plan(action[3], credit, gas_q,
-                            2*count + returned_count, need, lambda g,u: policy.quote(st,g,u), st.share_bps,
-                            Q['sync_funding'], Q['harvested'], Q['sync_credit'], cash_delta=returned_value)
-                        fee_receipts = take_credit + sum(v.positions[i].pending_fees for i in fee_ids)
-                        if not affordable(gas_q, 2*count + returned_count, cash_delta=returned_value+fee_receipts-need,work_count=count):
-                            continue
-                        snap = copy.deepcopy(v.__dict__)
-                        for listing_id in fee_ids:
-                            v.harvest_listing(listing_id)
-                        v.receive_fees(fee_receipts)
-                        credit -= take_credit
-                        try:
-                            v.renew(list(range(next_id, next_id+count)), build_units, mint_fee, proposals, returned_count)
-                        except RuntimeError:
-                            v.__dict__.update(snap)
-                            credit += take_credit
-                            continue
-                        action_meta = dict(renewal_credit=take_credit, renewal_fee_ids=fee_ids, renewal_fee_receipts=fee_receipts)
-                        next_id += count
-                        pay(gas_q, 2 * count + returned_count,work_count=count)
                     elif fn == "list":
                         if not timed:
                             if d < listing_ready_day:
@@ -1471,8 +1484,9 @@ def run(sc, n_target, seed, days=365, values=None):
             owner_exit_spend_limit_wei=owner_exit_limit,owner_exit_reserved_wei=owner_exit_reserved,
             owner_exit_spent_wei=owner_exit_spent,owner_exit_spend_limit_waits=manager_waits.get('EXIT_SPEND_LIMIT',0),
             owner_exit_estimate_fallback_operations=sorted(owner_estimate_fallback),
-            count_aware_gas_curves_enabled=bool(gas_curves),physical_sync_cost_basis_enabled=bool(gas_curves),
+            count_aware_gas_curves_enabled=bool(gas_curves),physical_sync_cost_basis_enabled=bool(sc.get("sync_contexts")),sync_contexts_enabled=bool(sc.get("sync_contexts")),
             owner_zero_quote_sync_calls=zero_quote_sync_calls,
+            compensation_mode='bounded-measured-v1',meter_censored_calls=meter_censored_calls,
             keeper_estimate_acceptance_enabled=bool(gas_curves and keeper_zero_loss),
             keeper_receipt_history_enabled=keeper_receipt_history_enabled,
             keeper_receipt_history_counts={name:sum(e['label']==name for e in keeper_receipt_history.state['counted']) for name in op_names},

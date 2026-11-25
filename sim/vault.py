@@ -50,7 +50,6 @@ class Position:
     state: int = ACTIVE  # cached book membership, independent of live FWA status
     allocated_at: int = 0
     unresolved_uplift: int = 0
-    acquired: bool = False
     shapes: int = 0
 
 
@@ -73,8 +72,6 @@ class Vault:
     allocated_bound_bps: int = None
     construction_cost: int = 0
     reference_capital: int = 24 * 10**16
-    renewal_float: int = 0
-    renewal_mode: int = 0
     accepted_mint_fee: int = 10**15
     live_mint_fee: int = 10**15
     pack_units_mask: int = 8
@@ -95,8 +92,6 @@ class Vault:
     charge_refund_reserve: int = 0
     issuances: dict = field(default_factory=dict)  # epoch -> [gross, issued, remaining gross, remaining shares]
     unresolved_keep_uplift: int = 0
-    renewal_eligible: list = field(default_factory=list)  # returned pack face values, one credit per completed acquisition
-    kept_replacements: int = 0
     epoch_dist: dict = field(default_factory=dict)
     redemptions: dict = field(default_factory=dict)
     locked_shares: int = 0
@@ -113,7 +108,6 @@ class Vault:
 
     positions: dict = field(default_factory=dict)  # listing id -> Position
     idle_packs: list = field(default_factory=list)  # exact wei backing of each idle pack
-    idle_acquired: list = field(default_factory=list)
     idle_shapes: list = field(default_factory=list)
     idle_quotes: list = field(default_factory=list)  # funding quote paired with the idle stack
     idle_funding: int = 0
@@ -164,15 +158,12 @@ class Vault:
         return mul_div_up(self.locked_shares, self.last_nav, self.total_shares)
 
     def idle(self):
-        keep = self.reserve + self.renewal_float + self.owed_estimate()
+        keep = self.reserve + self.owed_estimate()
         f = self.free()
         return f - keep if f > keep else 0
 
     def keeper_cash_after(self, proceeds=0):
-        return max(0, self.free() + proceeds - self.renewal_float)
-
-    def renewal_cash_after(self, proceeds=0):
-        return max(0, self.free() + proceeds - self.reserve - self.owed_estimate())
+        return max(0, self.free() + proceeds)
 
     def sync_budget(self, now):
         elapsed = now - self.budget_at
@@ -196,8 +187,8 @@ class Vault:
             return amount
         budget = self.essential_budget if essential else self.routine_budget
         cash = self.free() if essential else self.keeper_cash_after()
-        if source == 'renewal':
-            cash = self.renewal_cash_after()
+        if source is not None:
+            raise ValueError('unsupported keeper cash source')
         amount = min(amount, cash, budget if cap is None else cap)
         if cap is None:
             if essential:
@@ -232,52 +223,10 @@ class Vault:
             self.tracked_value += units * UNIT
             self.idle_value += units * UNIT
             self.idle_packs.append(units * UNIT)
-            self.idle_acquired.append(False)
             self.idle_shapes.append(n)
             self.idle_quotes.append(0)
             # Admission lists the pack at once (each widens the identifier interval, as on chain).
             self.list(listing_id, backing, fee_debt=fee_debt)
-
-    def renewal_shapes(self):
-        return [n for n,eligible in zip(reversed(self.idle_shapes),reversed(self.idle_acquired)) if eligible]
-
-    def renew(self, ids, units, mint_fee, proposals, returned_count=0):
-        snapshot = copy.deepcopy(self.__dict__)
-        try:
-            return self._renew(ids, units, mint_fee, proposals, returned_count)
-        except Exception:
-            self.__dict__.update(snapshot)
-            raise
-
-    def _renew(self, ids, units, mint_fee, proposals, returned_count=0):
-        """Consume verified acquisition credits once, redeem returned principal, then mint."""
-        count = len(ids)
-        if (not 0 < count <= 4 or len(proposals) != count or self.renewal_mode != 0
-                or not (self.pack_units_mask >> units) & 1 or mint_fee > self.accepted_mint_fee
-                or returned_count > len(self.renewal_eligible) or count - returned_count > self.kept_replacements):
-            raise RuntimeError('RenewalUnavailable')
-        faces = self.renewal_eligible[:returned_count]
-        price = units * UNIT + shape_count(units) * mint_fee
-        available = self.renewal_cash_after(sum(faces))
-        if available < count * price + sum(proposals):
-            raise RuntimeError('RenewalCashShort')
-        for face in faces:
-            at = next(i for i in range(len(self.idle_packs)-1,-1,-1) if self.idle_packs[i] == face and self.idle_acquired[i])
-            self.idle_packs.pop(at)
-            self.idle_acquired.pop(at)
-            self.idle_shapes.pop(at)
-            self.idle_funding -= self.idle_quotes.pop(at)
-            self.balance += face
-            self.idle_value -= face
-            self.tracked_value -= face
-        del self.renewal_eligible[:returned_count]
-        self.kept_replacements -= count - returned_count
-        float_before = self.renewal_float
-        self.renewal_float = 0
-        try:
-            self.build(ids, units, mint_fee, proposals)
-        finally:
-            self.renewal_float = float_before
 
     def _debt_count(self, debt, change):
         self.count_by_debt[debt] = self.count_by_debt.get(debt, 0) + change
@@ -290,7 +239,6 @@ class Vault:
             self.recovery_packs.append(value)
         else:
             self.idle_packs.append(value)
-            self.idle_acquired.append(False)
             self.idle_shapes.append(shape_count(value//UNIT) if shapes is None else shapes)
             self.idle_quotes.append(0)
 
@@ -303,13 +251,10 @@ class Vault:
     def list(self, listing_id, backing, status=ACTIVE, fee_debt=None):
         if status != ACTIVE:
             raise RuntimeError("InvalidListing")
-        if self.idle_acquired[-1] and self.renewal_mode == 0:
-            raise RuntimeError('FreshRenewalRequired')
+        if not self.idle_packs or self.balance<backing:
+            raise RuntimeError('InsufficientBacking')
         value = self.idle_packs.pop()
-        acquired = self.idle_acquired.pop()
         shapes = self.idle_shapes.pop()
-        if acquired:
-            self.renewal_eligible.remove(value)
         self.idle_funding -= self.idle_quotes.pop()
         self.advance_unexposed()
         units = value // UNIT
@@ -339,7 +284,6 @@ class Vault:
             p.status = ALLOCATED
         self.allocated_value += p.value
         p.unresolved_uplift = max(0, p.backing - p.value)
-        p.acquired = True
         self.unresolved_keep_uplift += p.unresolved_uplift
         self.allocation_queue.append(listing_id)
 
@@ -412,32 +356,6 @@ class Vault:
         self.fee_debt_sum += debt - p.fee_debt
         p.fee_debt = debt
         p.pending_fees = 0
-
-    def renewal_fee_plan(self, ids, credit, gas_q, units, need, quote, share_bps,
-                         fund_gas, harvested_gas, credit_gas, cash_delta=0):
-        cash = self.renewal_cash_after(cash_delta)
-        cost = quote(gas_q, units)
-        if cash >= need + cost:
-            return gas_q, 0, []
-        claims, fees = [], credit
-        previous = None
-        for index in range(len(ids) + 1):
-            funded_gas = gas_q + fund_gas + len(claims) * harvested_gas + (credit_gas if credit else 0)
-            funded_cost = quote(funded_gas, units)
-            if (fees and self.renewal_cash_after(cash_delta + fees) >= need + funded_cost and self.routine_budget >= funded_cost
-                    and (funded_cost - cost) * BPS <= fees * share_bps):
-                return funded_gas, credit, claims
-            if index == len(ids):
-                break
-            listing_id = ids[index]
-            if previous is not None and listing_id <= previous:
-                raise RuntimeError('Amount')
-            previous = listing_id
-            p = self.positions.get(listing_id)
-            if p and p.state == ACTIVE and p.status == ACTIVE and p.pending_fees:
-                claims.append(listing_id)
-                fees += p.pending_fees
-        return gas_q, 0, []
 
     def sync_fee_plan(self, ids, credit, gas_q, units, quote, share_bps,
                       credit_gas=40_000, funding_gas=40_000, claim_gas=80_000,
@@ -551,10 +469,7 @@ class Vault:
         del self.positions[listing_id]
         self.receipts.pop(listing_id, None)
         self.idle_value += p.value
-        if p.acquired:
-            self.renewal_eligible.insert(0,p.value)
         self.idle_packs.append(p.value)
-        self.idle_acquired.append(p.acquired)
         self.idle_shapes.append(p.shapes or shape_count(p.units))
         self.idle_quotes.append(p.backing)
         self.idle_funding += p.backing
@@ -589,7 +504,6 @@ class Vault:
         del self.positions[listing_id]
         self.allocated_value -= p.value
         self.unresolved_keep_uplift -= p.unresolved_uplift
-        self.kept_replacements += int(p.acquired)
         self.tracked_value -= p.value
         self.backing_lost += p.value  # the pack left: its value is the loss
 
@@ -599,7 +513,6 @@ class Vault:
         self.idle_value += p.value
         self.balance += p.backing
         self.idle_packs.append(p.value)
-        self.idle_acquired.append(False)
         self.idle_shapes.append(p.shapes or shape_count(p.units))
         self.idle_quotes.append(p.backing)
         self.idle_funding += p.backing
@@ -609,8 +522,6 @@ class Vault:
             return
         value = self.idle_packs.pop()
         self.idle_shapes.pop()
-        if self.idle_acquired.pop():
-            self.renewal_eligible.remove(value)
         self.idle_funding -= self.idle_quotes.pop()
         self.balance += value
         self.tracked_value -= value

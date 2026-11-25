@@ -1,199 +1,153 @@
 # Candidate settings inventory
 
-This inventory records the unsigned evaluation candidate in [`deploy/mainnet.json`](../../deploy/mainnet.json) and [`deploy/manager.json`](../../deploy/manager.json). **These are provisional evaluation settings, not approved or recommended production economics.** The selected launch recipe is fixed by the owner's requirement: 0.03 ETH packs containing three directly minted 0.01 ETH Shapes. Backing, uplift, funding, calibration and depositor-return acceptance remain subject to the final economic scorecard. No signature, public transaction, mint-fee change, application cutover or merge is authorized by this document.
+This inventory describes the unsigned values in [manager.json](../../deploy/manager.json) and, separately, [mainnet.json](../../deploy/mainnet.json). **The manager is reuse-only with bounded measured compensation. These numerical defaults remain provisional and do not approve production economics.** The new shared vault is undeployed and its application remains closed. This work sends no public transaction, changes no public mint fee, and grants no signature, merge or live cutover authority.
 
-Source configuration SHA-256:
+Owner requirements in [OWNER-REQUIREMENTS.md](../../OWNER-REQUIREMENTS.md) supersede the historical quoted-payment/Fresh renewal design. The shared implementation remains in [PackAccount](../../src/PackAccount.sol), [StrategyLib](../../src/StrategyLib.sol), [VaultLib](../../src/VaultLib.sol) and [ScanLib](../../src/ScanLib.sol). The manager-only deployment and migration path is in [MANAGER-RUNBOOK.md](MANAGER-RUNBOOK.md). Current verification status belongs to [REPORT.md](../REPORT.md); old fixed-quote and Fresh economic studies retain their original settings and are historical.
 
-- Main: `e9a5ca7b80c8e67cb2d0bfef5be4d2539129fcf078da488e52253cd9a2aaefd0`.
-- Manager: `f216770efacfe587770fe3d3821d0f2489d40c4e4f7758a051be77195ac0c026`.
+Values SHA-256: manager `66423b7ed03e758fafe3b0a0b79a861f7894e97bf1885a8f13cfe887f38385cc`; main `99f8cc6f82530a0df9059b99b944ad6c67550a34ba8e7a7bf38948a666cb5f10`. The main values are listed for schema comparison, not as a refreshed or accepted pooled release.
 
-The authoritative behavior is shared by [`PackAccount`](../../src/PackAccount.sol), [`VaultLib`](../../src/VaultLib.sol), [`StrategyLib`](../../src/StrategyLib.sol) and [`ScanLib`](../../src/ScanLib.sol). See [the completion requirements](../MAIN-POOL-COMPLETION.md), [owner requirements A5](../../OWNER-REQUIREMENTS.md), [the unsigned runbook](RUNBOOK.md) and [acceptance status](ACCEPTANCE.md). The final [economic scorecard](../receipts/completion-economics.md) and [receipt-backed verification](../receipts/completion-verification.md) accompany this inventory; historical scorecards do not accept this candidate.
+## Dependencies and live fee
 
-For the completed personal-manager scope, use [the manager runbook](MANAGER-RUNBOOK.md) and [final focused verification](../receipts/manager-final-verification.md) and [bounded manager scorecard](../receipts/manager-closeout-economics.md). The new shared vault remains undeployed and its app launch stays disabled.
+The constructor dependencies are FWA `0x958C41181182e76F221331b2755b77D9e1426A98`, Shapes `0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0`, and ShapePacks `0xf21514B090Da7dF4390803497d6ae673801E5cA7`. They are separate from mutable account economics. The factory is ownerless and cannot retune an existing manager.
 
-## Deployment inputs and fee observation
+The manager read-only refresh at Ethereum block **26,493,799** records **0.0005 ETH per primary Shape**, accepted maximum **0.001 ETH**. See [the fee observation](../../deploy/manager-mint-fee-observation.json) and [preserved legacy readback](../../deploy/manager-existing-main-readback.json). The task did not change the public fee. Current manager `expectedMintFeeWei` is 500,000,000,000,000; the main fixture retains 1,000,000,000,000,000. This deployment expectation is metadata outside Params and does not silently raise the accepted maximum.
 
-| Input | Main evaluation candidate |
-| --- | --- |
-| FWA | `0x958C41181182e76F221331b2755b77D9e1426A98` |
-| Shapes | `0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0` |
-| ShapePacks | `0xf21514B090Da7dF4390803497d6ae673801E5cA7` |
-| Initial vault owner | `0xCB43078C32423F5348Cab5885911C3B5faE217F9` |
-| Vault seed | 0.01 ETH |
-| `expectedMintFeeWei` | 1,000,000,000,000,000 wei, or 0.001 ETH per Shape |
+The legacy deployment readback retains its 0.01 ETH balance and old factory manager count zero. Unsupported selectors and read errors remain recorded; old code is not relabelled as the new ABI. The new manager-only package deploys no pooled vault or seed and does not modify that legacy deployment.
 
-These addresses are constructor dependencies, not mutable account economic settings. A manager's individual owner is supplied on creation; the factory retains no authority over previously created managers. Its parameter file supplies economics, not a shared manager owner or a mandatory creation funding amount. Creating an idle account is distinct from funding a productive first position.
+## Complete Params inventory: 21 scalars
 
-The historical combined-candidate read is **0.001 ETH per Shape at Ethereum block 26,484,850**, block hash `0xb74960f39c4f4971c0e3732837afb49ecdfd20153c3d9d0631796f1d6e086f7c`. See the [pinned fee observation](../../deploy/mint-fee-observation.json) and [existing-main readback](../../deploy/existing-main-readback.json). The read used `https://mainnet.gateway.tenderly.co`; it changed no public state. The existing deployment's readback describes its historical implementation, not the new candidate ABI.
+Settings belong to each account owner and change immediately within code bounds. Bps use 10,000 as denominator. Rates below are ETH per day. There is no renewal mode, renewal float, replacement eligibility or paid retirement-and-remint path.
 
-At that observed fee, one launch pack requires exactly 0.03 ETH redeemable principal plus **3 × 0.001 = 0.003 ETH actual primary mint fees**. Creator revenue is counted only from successful paid mint events, including eligible fresh replacements. That observation remains historical evidence. The manager closeout read now observes **0.0005 ETH at block 26,489,769**, so a current pack pays **0.0015 ETH** actual primary fees. See [the new observation](../../deploy/manager-mint-fee-observation.json), [fresh legacy readback](../../deploy/manager-existing-main-readback.json) and [manager-only bounded evaluation](../receipts/manager-closeout-economics.md). The public fee changed externally; this task sent no fee transaction. The accepted maximum remains 0.001 ETH and the old combined deployment expected-fee fixture is not refreshed or approved by this manager-only task.
+| Parameter | ABI type | Main candidate | Manager candidate | Meaning |
+|---|---|---:|---:|---|
+| `minEdgeBps` | `uint16` | 100 | 100 | Minimum gross edge in bps |
+| `bufferBps` | `uint16` | 0 | 0 | Oracle-cap discount in bps |
+| `distributionBps` | `uint16` | 0 | 0 | Pooled gain distribution share; no manager share flow |
+| `payMarkupBps` | `uint16` | 0 | 0 | Routine premium on reimbursed gas plus overhead |
+| `keeperShareBps` | `uint16` | 2,500 | 2,500 | Maximum optional funding cost share of realized fees |
+| `upliftBoundBps` | `uint16` | 25 | 25 | Pooled pricing exposure bound; no manager checkpoint gate |
+| `packUnitsMask` | `uint64` | 8 | 8 | Bit 3 selects the 0.03 ETH / three-mint recipe |
+| `gasCeilingWei` | `uint64` | 0.5 gwei | 0.5 gwei | Routine reimbursement-price ceiling |
+| `essentialCeilingWei` | `uint64` | 2 gwei | 0.5 gwei | Essential reimbursement-price ceiling |
+| `maxTipWei` | `uint64` | 0.05 gwei | 0.05 gwei | Maximum reimbursement above block base fee |
+| `workFeeWei` | `uint64` | 0.00002 ETH | 0.00002 ETH | Per actual verified service unit |
+| `routineCapWei` | `uint64` | 0.1 ETH | 0.03 ETH | Routine permission capacity |
+| `routineRatePerDayWei` | `uint64` | 0.02 ETH | 0.01 ETH | Routine permission refill per day |
+| `essentialCapWei` | `uint64` | 0 ETH | 0.01 ETH | Essential permission capacity |
+| `essentialRatePerDayWei` | `uint64` | 0 ETH | 0.005 ETH | Essential permission refill per day |
+| `reserveWei` | `uint128` | 0.005 ETH | 0.005 ETH | Cash withheld from new exposure |
+| `tvlCapWei` | `uint128` | uint128 maximum | 0 ETH | Pooled admission cap; manager has no deposit shares |
+| `backingRatioBps` | `uint32` | 70,000 | 70,000 | Separate backing target as bps of pack principal |
+| `acceptedMintFeeWei` | `uint64` | 0.001 ETH | 0.001 ETH | Explicit maximum per newly minted Shape |
+| `minDepositWei` | `uint64` | 0.01 ETH | 0.01 ETH | Pooled deposit threshold; shared schema in managers |
+| `minDistributionWei` | `uint64` | 0.01 ETH | 0.01 ETH | Pooled distribution threshold; shared schema in managers |
 
-## Account economics
+The main TVL value is the exact uint128 maximum, 340282366920938463463374607431768211455 wei. Its storage-width bound is not a practical capital limit.
 
-All values below are account-owned and adjustable immediately within the code bounds. Bps use 10,000 as the denominator. The two files agree except where shown.
+`setParams(next, expected)` accrues budgets at the old rates before applying new values and clamping capacities. Raising a cap does not refill spent permission. Budgets grant permission, not ETH. Settings updates retain the existing accepted fee; only `acceptMintFee(maximum, expected)` changes it. A lower external fee is paid at its actual amount. A fee above the accepted maximum blocks new mints while necessary unpaid recovery and owner withdrawal remain available.
 
-| Parameter | Main candidate | Manager candidate | Meaning |
-| --- | ---: | ---: | --- |
-| `packUnitsMask` | 8 | 8 | Bit 3 enables units 3: three paid 0.01 ETH mints per pack |
-| `minEdgeBps` | 100 | 100 | Minimum gross acquisition multiplier edge, 1% |
-| `bufferBps` | 0 | 0 | Discount from the live oracle cap |
-| `distributionBps` | 0 | 0 | Distribution share of eligible gain; disabled here |
-| `payMarkupBps` | 0 | 0 | Markup on routine quoted gas compensation |
-| `keeperShareBps` | 2,500 | 2,500 | Optional funding compensation may use at most 25% of verified realized value |
-| `backingRatioBps` | 70,000 | 70,000 | Provisional 7× pack-face backing target |
-| `upliftBoundBps` | 25 | 25 | Provisional shared-vault unresolved positive keep uplift limit, 0.25% of NAV; no manager share-pricing gate |
-| `renewalMode` | 0 | 0 | `FreshAfterAcquisition`; mode 1 is `ReuseReturned` |
-| `renewalFloatCount` | 1 | 1 | One separately funded fresh-renewal float |
-| `acceptedMintFeeWei` | 0.001 ETH | 0.001 ETH | Explicitly accepted maximum per paid fresh Shape |
-| `gasCeilingWei` | 0.5 gwei | 0.5 gwei | Routine gas price ceiling |
-| `essentialCeilingWei` | 2 gwei | 0.5 gwei | Essential gas price ceiling |
-| `maxTipWei` | 0.05 gwei | 0.05 gwei | Allowance above block base fee |
-| `workFeeWei` | 0.00002 ETH | 0.00002 ETH | Fee per actual verified service unit |
-| `reserveWei` | 0.005 ETH | 0.005 ETH | Maintenance reserve, separate from renewal float |
-| `tvlCapWei` | 340282366920938463463374607431768211455 wei | 0 | Vault uses the uint128 maximum, not a practical TVL cap; manager has no depositor admission flow |
-| `routineCapWei` | 0.1 ETH | 0.03 ETH | Maximum routine spending allowance |
-| `routineRatePerDayWei` | 0.02 ETH/day | 0.01 ETH/day | Routine allowance accrual |
-| `essentialCapWei` | 0 | 0.01 ETH | Essential spending allowance capacity |
-| `essentialRatePerDayWei` | 0 | 0.005 ETH/day | Essential allowance accrual |
-| `minDepositWei` | 0.01 ETH | 0.01 ETH | Minimum gross escrow after the shared checkpoint contribution; shared schema on managers |
-| `minDistributionWei` | 0.01 ETH | 0.01 ETH | Smallest eligible aggregate distribution |
+At the selected recipe, principal is 0.03 ETH from three paid 0.01 ETH Shapes. Nominal separate FWA backing is **0.21 ETH** at 70,000 bps, before caps, unique backing tags and admission checks. The unresolved face-coverage floor is `ceil(P / 0.95)`: 31,578,947,368,421,053 wei for P = 0.03 ETH. This is an accounting bound, not a rule forcing a purchaser choice. The 0.18 ETH positive unresolved uplift at nominal backing implies 72 ETH NAV at a 25 bps pooled threshold; personal managers have no share-pricing checkpoint.
 
-`setParams(next, expected)` changes settings under the account owner's authority. It accrues budgets at the old rates first, then clamps to the new capacities. Raising a capacity does not refill already spent allowance. A zero essential budget makes ordinary exit maintenance unpaid; callers can still carry out necessary recovery with their own transaction gas. Explicit checkpoint contributions have their own protected funding source and payer refunds, separate from routine/essential allowance.
+## GasSchedule: all 29 uint32 fields
 
-`setParams` must retain the existing accepted mint-fee maximum. Only the separate `acceptMintFee(maximum, expected)` explicitly changes that maximum. A live fee above the accepted maximum blocks paid fresh minting; unrelated owner updates do not silently accept it. A lower live fee is charged at the actual lower amount. Acceptance is account authority, not authority to change the Shapes contract's public mint fee.
+The first 28 coefficients are **verified-operation gas caps** or planner inputs. `overhead` is separate gas units per paid transaction. They are not ETH amounts, full measured receipts, or community coefficients. Main and manager values differ where shown.
 
-The 7× target gives a nominal **0.21 ETH backing** for a 0.03 ETH pack before oracle caps, quantization and unique backing tags. Backing remains owner-adjustable and is independently validated against current FWA admission and profitability. A backing floor of `ceil(P / 0.95)` preserves the face-value mark of an unresolved allocation even at FWA's immutable 5% maximum settlement fee. For P = 0.03 ETH that floor is **31,578,947,368,421,053 wei**. This is a NAV accounting floor, not a compulsory purchaser keep preference or FWA's minimum listing backing.
+| Field | Main gas units | Manager gas units |
+|---|---:|---:|
+| `checkpoint` | 500,000 | 500,000 |
+| `allocationEntry` | 6,000 | 6,000 |
+| `allocationRead` | 30,000 | 30,000 |
+| `build` | 360,000 | 360,000 |
+| `buildPack` | 300,000 | 300,000 |
+| `buildShape` | 130,000 | 130,000 |
+| `list` | 280,000 | 380,000 |
+| `listed` | 825,000 | 825,000 |
+| `sync` | 125,000 | 125,000 |
+| `requiredTail` | 120,000 | 120,000 |
+| `distributionProof` | 80,000 | 80,000 |
+| `journal` | 22,000 | 22,000 |
+| `scan` | 30,000 | 30,000 |
+| `selected` | 180,000 | 225,000 |
+| `synced` | 120,000 | 285,000 |
+| `pruned` | 45,000 | 45,000 |
+| `unlist` | 340,000 | 340,000 |
+| `unlisted` | 285,000 | 285,000 |
+| `liquidate` | 75,000 | 75,000 |
+| `liquidatePack` | 80,000 | 80,000 |
+| `redeemShape` | 35,000 | 35,000 |
+| `recoveryBase` | 100,000 | 100,000 |
+| `recoveryShape` | 35,000 | 35,000 |
+| `recoveryUnseal` | 70,000 | 70,000 |
+| `harvest` | 125,000 | 125,000 |
+| `harvested` | 80,000 | 80,000 |
+| `credit` | 40,000 | 40,000 |
+| `fund` | 40,000 | 40,000 |
+| `overhead` | 100,000 | 50,000 |
 
-Unresolved uplift accumulates `max(backing − actual pack face, 0)` incrementally when allocated and clears on actual resolution, including owed recovery. No full position-book scan is needed. At nominal launch backing this is 0.18 ETH per unresolved position; 25 bps requires 72 ETH NAV for one such position at the threshold. That arithmetic is not a claim that an entrant or incumbent's completed return is accepted.
+For verified eligible work:
 
-## GasSchedule: all 28 named fields
+```text
+gasPrice = min(tx.gasprice, block.basefee + maxTip, applicableCeiling)
+reimbursedGas = min(measuredGas, verifiedOperationAllowance) + overhead
+gasPay = reimbursedGas × gasPrice × (10000 + routineMarkupBps) / 10000
+paymentBeforeLimits = gasPay + actualWorkUnits × workFee
+```
 
-The named account-owned schedule is identical in both candidate files. Values are quoted gas units, not wei and not measured reimbursement. This inventory does not claim every operation's final calibration is accepted. The `harvest` field is account-owned planner calibration for unpaid standalone fee collection. The keeper compares its allowance with unlisting when choosing a partial-redemption liquidity path; the forward simulation mirrors that choice. Standalone harvest has no onchain compensation or charge calculation, and positive `minPay` reverts. Attached paid funding separately uses `fund`, `harvested` and `credit`. Actual caller wallet gas is evaluated from the receipt-based cost proxy, not as keeper compensation.
+Essential work has zero routine markup. The final payment also obeys its cash source, routine/essential permission or explicit funded pool, and caller `minPay`. The gas frame starts before the account guard and prechecks. `KeeperWorkMeasured` exposes the actual span/cap/price/work units/class; `KeeperPaid` records actual payment after clipping. Measured gas is **before refunds**, with the event/payment/guard tail and intrinsic transaction cost covered by the named overhead. Keeper wallet cost is separately `receipt.gasUsed × effectiveGasPrice`.
 
-| Field | Quoted gas units |
-| --- | ---: |
-| `checkpoint` | 500,000 |
-| `allocationEntry` | 6,000 |
-| `allocationRead` | 30,000 |
-| `build` | 360,000 |
-| `buildPack` | 300,000 |
-| `buildShape` | 130,000 |
-| `list` | 280,000 |
-| `listed` | 825,000 |
-| `sync` | 125,000 |
-| `requiredTail` | 120,000 |
-| `distributionProof` | 80,000 |
-| `journal` | 22,000 |
-| `scan` | 30,000 |
-| `selected` | 180,000 |
-| `synced` | 120,000 |
-| `pruned` | 45,000 |
-| `unlist` | 340,000 |
-| `unlisted` | 285,000 |
-| `liquidate` | 75,000 |
-| `liquidatePack` | 80,000 |
-| `redeemShape` | 35,000 |
-| `recoveryBase` | 100,000 |
-| `recoveryShape` | 35,000 |
-| `recoveryUnseal` | 70,000 |
-| `harvest` | 125,000 |
-| `harvested` | 80,000 |
-| `credit` | 40,000 |
-| `fund` | 40,000 |
+Quotes and reserve/charge views remain conservative envelopes using the full work cap plus overhead. Lifecycle envelopes count overhead once for each distinct paid call; combining sync and list does not remove one call's overhead. Two build service units are paid per actual built/listed pack; a resolved sync and a relist each earn one applicable unit. Reusing a returned pack has no three-mint fee or replacement fee.
 
-The common payment calculation sums the applicable bases and verified completed-work counts, prices the gas allowance at `min(basefee + maxTip, applicable ceiling)`, applies routine gas markup consistently, and adds `workFee × actual service units`. Envelope checks, actual compensation and relevant charge quotes use this basis. Cash availability, protected liabilities, source caps, spending permission and `minPay` then limit execution/payment. Repeated calls without new verified work earn no second reward. Actual transaction receipts calibrate coefficients; measured transaction gas does not replace the fixed-count payment model.
+Zero eligible work earns neither compensation nor overhead. Standalone harvest, owner import and caller-funded recovery are unpaid. Paid inputs must all perform verified terminal work, necessary claimed fee funding, listing or unlisting; padding, duplicates and ignored hints cannot enlarge paid work. Unpaid recovery can tolerate stale hints.
 
-Fresh construction cost includes the actual selected initial recipe's paid mint fees and full build/list quote. Reuse-mode relisting excludes another fresh mint expense; its initial construction still counts once. Fresh-mode continuing admission prices the currently enabled replacement recipe and the actual old inventory's retirement work. `relistEdgeFor(packId)` and `renewalQuote(...)` expose bounded inventory-specific quotes. Changing the numerical calibration requires only the owner's settings update. Changing the algorithm requires new implementation code and deployment; the external keeper-policy address, quote call and factory policy initializer are removed.
+The manager's **50,000 gas overhead is a provisional evaluation candidate**. Earlier 100,000-overhead receipts keep that original configuration and are not relabelled as 50,000 results. Splitting profitability depends on actual billed costs, markup and batch shape; a passing cap check alone does not settle it. [Current receipts and financial limits](../receipts/manager-measured-economics.md) name the tested overhead, gas prices and source hashes. The model refuses unmeasured sync patterns.
 
-## Derived operating cash
+## Productive opening: no renewal float
 
-For fresh renewal, the separate float is the maximum across enabled recipes of backing plus paid mint fees at the accepted maximum plus the full retirement/build/list quoted payment at the routine ceiling, multiplied by `renewalFloatCount`. Returned principal is redeemed before construction, so it cancels rather than being reserved a second time. Ordinary routine payment preserves this float. An eligible fresh renewal can consume it while preserving maintenance reserve and all liabilities; routine growth also preserves it. Renewal eligibility is single-use and comes only from verified acquisition outcomes, not ordinary unlisting or gifted inventory. Mode 1 relists returned inventory without fresh minting and derives zero fresh-renewal float.
+At the observed 0.0005 ETH fee, principal plus separate backing is 0.24 ETH and three primary mint fees add 0.0015 ETH. For one three-Shape build/list call, the work cap is 1,875,000 gas; with the manager's 50,000 overhead the envelope uses 1,925,000 gas and two work fees.
 
-For the current single enabled recipe and schedule:
+| Stated total price | Build/list payment envelope | Opening with observed fee and 0.005 reserve | Opening using accepted maximum fee |
+|---|---:|---:|---:|
+| 0.2 gwei (0.15 base + 0.05 tip) | 0.000425 ETH | **0.246925 ETH** | 0.248425 ETH |
+| 0.5 gwei (0.45 base + 0.05 tip) | 0.0010025 ETH | **0.2475025 ETH** | 0.2490025 ETH |
 
-- Retirement/build/list allowance is 2,135,000 quoted gas units; three verified service units add 0.00006 ETH work fee.
-- At the 0.5 gwei routine ceiling and zero markup: renewal quote is 0.0011275 ETH; float is **0.2141275 ETH**; maintenance plus float is **0.2191275 ETH**.
-- At a stated base fee of 0.15 gwei and priority allowance 0.05 gwei: initial build/list allowance is 1,875,000 gas, quoted compensation is 0.000415 ETH. Conditional one-position opening funding is **0.4625425 ETH** including principal, backing, actual mint fees, maintenance and float. At the 0.5 gwei ceiling it is 0.463105 ETH.
+These are conditional funding envelopes, excluding wallet creation gas, not actual billed costs or profit forecasts. Actual payment uses the bounded meter and may be lower. There is **no separate 0.2141275 ETH float**. Returned packs are relisted intact without new mint fees; a purchaser keeping the pack consumes inventory and any replacement is a normal new build subject to real cash, permission and admission.
 
-These are derived funding estimates, not measured transaction costs, productive-admission guarantees, depositor-profit results or recommended production capital. Extra bounded fee-claim funding, unique backing tags and actual inventory retirement composition can change a specific renewal's need. Funding status must distinguish missing cash from missing budget permission; fees at FWA are not automatically spendable cash.
+The factory can create an idle manager with less funding; the unsigned template's 0.5 ETH is an evaluation amount, not a contract minimum or return recommendation. Current UI preview requirements are interface behavior, not a mandatory factory funding value. FWA fee credit and pending fees become spendable only through real collection.
 
-## Retained bounds and bounded work
+The manager reserve stays 0.005 ETH. The keeper's conservative one-maximum-listing-batch plus journal/prune need is **0.0055305 ETH** at 0.5 gwei, zero markup and 50,000 overhead on each paid call. The 0.0005305 ETH difference remains visible; actual smaller calls and actual billings do not convert that maximum bound into universally funded capacity.
 
-These numerical limits preserve the current quoted-payment and accounting envelope. They do not establish profitable or sustainable economics. Within them, owners retain immediate numerical control.
+## Retained bounds and structural work
 
-| Bound | Limit and reason |
-| --- | --- |
-| Minimum edge / cap buffer | 0–1,000 bps / 0–2,000 bps; bounded admission margin and oracle discount |
-| Distribution / routine markup | 0–5,000 bps / 0–1,000 bps; bounded gain allocation and routine gas premium |
-| Keeper funding share / uplift | 0–5,000 bps / 0–1,000 bps; bounded optional fee-funded compensation and unresolved positive-uplift exposure |
-| Backing ratio | 10,000–1,000,000 bps, or 1×–100×; the separate NAV floor and live admission can reject a particular target |
-| Gas ceilings / priority allowance | Each ceiling ≤50 gwei; `maxTip ≤ gasCeiling`; these bound quoted prices, not transaction gas consumption |
-| Work fee | ≤0.00005 ETH per verified service unit; bounds exposed per-unit compensation |
-| Routine allowance | Capacity ≤0.3 ETH; accrual ≤0.02 ETH/day; bounds the spending burst and continuing refill |
-| Essential allowance | Capacity ≤0.1 ETH; accrual ≤0.005 ETH/day; separately bounds exit-work spending permission |
-| Deposit/distribution minima | Each ≤1 ETH; limits how high an owner can set the small-flow threshold; zero is allowed by the configuration bounds |
-| Reserve / TVL | uint128 amounts; storage-width limit only, with no additional policy maximum; vault candidate TVL uses uint128 maximum |
-| Accepted mint-fee maximum | uint64 wei storage-width limit; the operative spending limit is the owner's explicit accepted maximum |
-| Renewal float count | 0–16; cash reserve scale is adjustable independently of operation size |
-| Every GasSchedule field | 0–16,777,216 gas units; lowering a price never increases structural work limits |
-| Pack mask | Zero disables fresh construction; otherwise enabled unit bits 3–30; owner may adjust future recipes |
+| Bound | Limit |
+|---|---|
+| Minimum edge / cap buffer | 0–1,000 / 0–2,000 bps |
+| Distribution / routine markup | 0–5,000 / 0–1,000 bps |
+| Optional keeper funding share / unresolved uplift | 0–5,000 / 0–1,000 bps |
+| Backing target | 10,000–1,000,000 bps; live admission and face-coverage checks still apply |
+| Routine and essential price ceilings | Each ≤50 gwei; maxTip ≤ routine ceiling |
+| Work fee | ≤0.00005 ETH per actual service unit |
+| Routine permission | Capacity ≤0.3 ETH; refill ≤0.02 ETH/day |
+| Essential permission | Capacity ≤0.1 ETH; refill ≤0.005 ETH/day |
+| Deposit / distribution minima | Each ≤1 ETH, including zero |
+| Reserve / TVL | uint128 storage width; no additional policy maximum |
+| Explicit accepted fee | uint64 storage width; unchanged except by the separate owner acceptance call |
+| Every named gas field, including overhead | 0–16,777,216 gas units |
+| Construction mask | Zero disables builds; otherwise enabled bits 3–30 |
 
-Structural work bounds are separate from economic coefficients: build **at most 4 packs**, list at most 8, renewal at most 4, sync/unlist/terminal/prune work in bounded batches of 16, journal at most 128, rebase scan at most 96 positions, allocation proof at most 32 queue entries (plus its separate bounded active check), and renewal funding harvest at most 16 supplied fee IDs. Liquidation processes at most 16 ordinary packs, at most **60 units of principal**, with an additional actual-burn check of at most 60 Shapes per ordinary call. Oversized recovery is isolated to a chunk of at most 30 Shapes; each returned pack retired for renewal also checks at most 30 Shapes. Manager pack withdrawal is at most 16 per call. Total positions remain unlimited; a small account may scan its own bounded book, while larger books advance incrementally through the journal. There is no holder enumeration or required full-book scan.
+Work bounds are independent of price: at most four packs per build; eight per list; 16 supplied sync/unlist/terminal/prune IDs; 128 journal entries; 96 own positions per rebase scan; 32 allocation queue entries plus the separately bounded active pricing check. Ordinary liquidation handles at most 16 packs, 60 principal units and 60 actual burned Shapes per call. Oversized recovery is isolated to a chunk of at most 30 Shapes. Total positions remain unlimited and progress incrementally; no full-book or holder enumeration is required.
 
-Claims, cancellation, refund claims and necessary unpaid recovery remain available when the mint fee or ordinary economic configuration changes. Their availability does not bypass protected-liability accounting or make a formerly invalid admission profitable.
+## Import and owner migration
 
-## Expected configuration and owner authority
+Only the owner can call `importPacks(ids, expected)`, up to 16 IDs per call. The manager pulls an approved pack from that owner or adopts a sealed canonical pack already held by the account. It rejects tracked/third-party/unsealed packs and verifies canonical Shape custody, pack membership, exact backing and at most 30 actual Shapes before recording inventory. Contents reads are bounded to 150,000 gas and 1,024 bytes of returndata. Import neither mints, redeems nor pays a keeper.
 
-The reviewed hash is `keccak256(abi.encode(Params, live Shapes mintFee, listingPaused, windingDown))`. `Params` includes the full named gas schedule and explicitly accepted fee maximum. Creation hashes use the supplied parameters and the reviewed live fee with both flags false. The vault constructor and factory creation verify the expected hash; tooling carries `expectedMintFeeWei` separately from the accepted maximum. Spending/commitment calls and owner settings changes validate the caller's expected hash before proceeding.
+Ordinary imported value is at most 0.30 ETH; larger pack values enter recovery inventory. Composition counts remain exact for inherited and imported recipes. More than 30 Shapes cannot be imported through this bounded path; untracked NFTs retain the owner's rescue path.
 
-The hash intentionally excludes continuously changing balances, block time and base fee. It also does not pin every external FWA setting; current FWA admission, fees, oracle bounds and profitability are revalidated at execution. A hash match is not a promise that a reviewed operation remains profitable or executable. Owner pause/exit controls take effect immediately. Claims, cancellations and necessary unpaid recovery do not require a fresh hash. Two-step ownership handover preserves individual ownership; the factory cannot retune existing managers.
+`unlistForWithdrawal(ids)` is owner-only and caller-funded, leaves pause/exit flags unchanged and performs no liquidation. Live FWA and crown/settlement windows still apply. `withdrawPacks(to, count)` transfers at most 16 intact packs. `withdrawRecoveryPack(to, index, expectedPackId)` selects one sealed recovery pack with checked index and identity, so an unrelated unsealed gift cannot block it. An unsealed recovery item is a claim, not a transferable pack NFT, and uses bounded recovery instead.
 
-## Things that don't make sense / awaiting evidence
+The old account's owner must first withdraw actual assets through that account's supported APIs and then approve/import into the new manager. This is not an upgrade of old storage or authority. No creator, factory or administrator gains rights over the manager's assets.
 
-- The provisional 0.21 ETH backing, 25 bps uplift bound, renewal float and budget rates need their final completed holder/creator cash-flow comparison at current and isolated half fee. This inventory supplies no acceptance result.
-- The final receipt-calibrated gas coverage and economic scorecard must identify any changed owner outcome limits explicitly. Updating a coefficient is not approval to relax a net depositor-return requirement.
-- The 0.01 ETH deployment seed creates an idle vault; it does not fund the derived first productive position. Production funding and launch economics remain unapproved.
+## Configuration hash and remaining limits
 
-## Manager operating evaluation, 2026-11-25
+The reviewed expectation is `keccak256(abi.encode(Params, liveMintFee, listingPaused, windingDown))`; creation uses both flags false. The hash includes all 21 scalars and 29 gas fields, but excludes moving balances, time and base fee. Execution revalidates current FWA admission and economics; a matching hash promises neither inclusion nor profit. Owner numerical changes and pause/exit controls are immediate. Claims, refunds and necessary unpaid recovery do not require a fresh ordinary-operation expectation. Ownership uses the preserved two-step handover.
 
-The manager-only public readback now observes **0.0005 ETH per primary Shape at block 26,492,785**
-(`deploy/manager-mint-fee-observation.json`). The accepted maximum remains 0.001 ETH. No
-production setting was changed. The 0.03 ETH/three-Shape recipe and mask 8 remain selected.
-
-| Setting | Evaluation value | Production status |
-| --- | --- | --- |
-| Pack principal / mint count | 0.03 ETH / 3 | Selected launch recipe; future owner adjustment preserved |
-| Separate FWA backing | 0.21 ETH / 70,000 bps | Provisional evaluated candidate |
-| Renewal mode | FreshAfterAcquisition | Evaluated alongside explicit ReuseReturned |
-| Renewal float | One; 0.2141275 ETH at configured ceiling | Provisional; conservative accepted fee, separate from actual mint spending |
-| Operating reserve | 0.005 ETH | Provisional; below 0.0054805 ETH current maximum-batch need |
-| Routine / essential ceiling | 0.5 / 0.5 gwei | Existing unsigned candidate, not newly approved |
-| Priority allowance / work fee / markup | 0.05 gwei / 0.00002 ETH / 0 bps | Existing unsigned candidate |
-| Routine capacity / daily rate | 0.03 / 0.01 ETH | Permission only, creates no funding |
-| Essential capacity / daily rate | 0.01 / 0.005 ETH | Permission only; owner exits remain separately wallet funded |
-| Evaluation caller exit cap | 0.01 ETH cumulative signed maxima | Local evaluation choice, not a required production cap |
-| Unresolved uplift threshold | 25 bps | Shared-vault pricing input; no manager shares/checkpoint gate |
-| Gas schedule | All 28 fields in `deploy/manager.json` | Owner adjustable; current values independently verified by postflight |
-
-The full setting inventory is the values file, including zero-value fields; the unsigned creation
-calldata includes every scalar and gas coefficient. No factory policy argument or authority over
-previously created managers is added. Numerical calibration stays immediate under each owner.
-Algorithm changes require new code. The recorded-period evaluation keeps initial funding at
-0.5 ETH without topups and compares both renewal modes, 0.21 and hypothetical 0.03 ETH backing,
-three explicitly labeled fee cases, and 0.2/0.5 gwei gas scenarios. Current manager coverage/admission
-rejects 0.03 ETH backing; the protocol-admitted comparison is isolated and cannot be selected for
-production through the current manager. Its returns do not establish a deployable configuration.
-
-At the observed fee, independent arithmetic gives 0.24 ETH principal plus separate backing before
-fees/reserves. One productive Fresh position needs 0.461605 ETH at 0.5 gwei or 0.4610425 ETH at
-0.2 gwei, including actual opening mint fees, quoted initial work, the conservative float and
-reserve, excluding wallet creation gas. Reuse requires no fresh-renewal float; actual productive
-position counts, funding waits, receipts and owner/keeper/creator outcomes are reported in the
-operating assessment rather than inferred from this opening arithmetic.
-
-The measured manager quote repair changes only `gasSchedule.selected=225000`,
-`gasSchedule.synced=285000` and `gasSchedule.list=380000`. All twelve one-work ordinary cases
-cover actual keeper costs at matched 0.2/0.5 gwei, including exact minPay re-estimation. The
-current keeper reserve-need view is 0.0054805 ETH at the 0.5 gwei ceiling; the candidate reserve
-remains 0.005 ETH and the informational warning remains visible. These measured corrections
-are evaluated local defaults, not owner production acceptance or a profit promise.
+Things that don't make sense: a larger permission budget supplies no ETH; a maximum-work reserve shortfall remains despite successful smaller calls; gross measured gas is not billed gas after refunds; and positive conditional means or a gas calibration alone cannot approve production economics.

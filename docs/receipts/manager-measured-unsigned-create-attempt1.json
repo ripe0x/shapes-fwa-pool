@@ -1,0 +1,17 @@
+{
+ "status": "FAIL",
+ "command": [
+  "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+  "script/release.py",
+  "manager-create",
+  "0x308f258b47c406a820790fa8a8894e92b02cc3ab",
+  "0xCB43078C32423F5348Cab5885911C3B5faE217F9",
+  "500000000000000000"
+ ],
+ "exitStatus": 1,
+ "phase": "read live mintFee()",
+ "pinnedBlock": 26493556,
+ "error": "Tenderly public RPC TCP connection timeout (os error60)",
+ "existingUnsignedTemplatePreserved": true,
+ "publicTransactions": 0
+}
