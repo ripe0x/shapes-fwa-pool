@@ -1,11 +1,19 @@
+# Individual manager operating validation, 2026-11-25
+
+**Remaining work resumed with no validation-time cap at the owner's explicit request (A7).** The implementation is not yet being called fully deployment-ready: authenticated billed operating costs, a complete recorded-period assessment, current keeper readiness and final unsigned preparation are in progress. The new shared vault is **undeployed**, its app launch remains disabled, and no public transaction, production fee change, live cutover, signature or merge is authorized. The old fixed 8,192-path campaigns stay preserved and incomplete; they are not resumed or promoted into acceptance requirements.
+
+The prior engineering closeout below remains valid for its named runtime and receipt inputs. New work must retain exact provenance, ordinary keeper acceptance, caller wallet limits and separate owner/keeper/creator accounting.
+
+---
+
 # Individual manager completion, 2026-11-24
 
-**The owner resumed individual-manager closeout on 2026-11-24.** Owner-paid exit, manager-only unsigned tooling and app integration retain their verified runtime source below. Final closeout uses the [bounded economic scorecard](receipts/manager-closeout-economics.md), actual receipt accounting and [focused final checks](receipts/manager-final-verification.md). The shared vault stays closed. The 8,192-path / 49,152-scenario study size was chosen by the agent, not approved by the owner; its interrupted campaigns remain preserved and incomplete and are not a completion requirement. No campaign was restarted.
+**The owner resumed individual-manager closeout on 2026-11-24.** Owner-paid exit, manager-only unsigned tooling and app integration retain their verified runtime source below. Final closeout uses the [bounded economic scorecard](receipts/manager-closeout-economics.md), actual receipt accounting and [focused final checks](receipts/manager-final-verification.md). The new shared vault remains undeployed and its app launch stays disabled. The 8,192-path / 49,152-scenario study size was chosen by the agent, not approved by the owner; its interrupted campaigns remain preserved and incomplete and are not a completion requirement. No campaign was restarted.
 
 **Manager engineering is prepared; production economics remain unaccepted.**
 Runtime source and study inputs are frozen at `1bbe54c94eed34818d5e2c7ccd95d5f83a892b90`;
 app ABI follow-up is `1330b18ee3bb38b85e9439b3c7213ac37fc9f1d8`.
-The shared vault and both public app switches remain closed. No public transaction, mint-fee
+The new shared vault remains undeployed and both public app launch switches remain disabled. No public transaction, mint-fee
 change, live cutover, merge or acceptance signature was performed.
 
 The old −28.5% / two-draw result is withdrawn. A simulator cash-hold error could commit unpaid

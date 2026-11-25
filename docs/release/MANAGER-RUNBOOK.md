@@ -3,7 +3,7 @@
 The individual manager is one owner's account, with no shares, depositor checkpoint or
 contribution era. It uses the same PackAccount and linked strategy libraries as the pooled vault.
 The factory cannot withdraw, change settings or replace the owner of an existing manager.
-The shared vault stays closed. This package authorizes no public transaction, mint-fee change,
+The new shared vault remains undeployed and its app launch stays disabled. This package authorizes no public transaction, mint-fee change,
 application cutover, merge or signature. The owner's no-canary decision remains intact.
 
 ## One deployment path, explicit target

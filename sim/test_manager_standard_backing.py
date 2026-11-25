@@ -65,6 +65,16 @@ class StandardBackingTests(unittest.TestCase):
     def test_frozen_paths_and_lineage_are_preserved_without_parent_mutation(self):
         before=self.parent_path.read_bytes()
         options=argparse.Namespace(paths=8192,seed_start=100000,window_end=None,workers=8)
+        stale = [name for name, expected in self.parent['source_sha256'].items()
+                 if S.MC.digest(S.ROOT/name) != expected]
+        if stale:
+            with self.assertRaisesRegex(ValueError, 'parent input changed'):
+                S.campaign_manifest(self.parent_path, options)
+            self.assertEqual(self.parent_path.read_bytes(), before)
+            options.paths = 4096
+            with self.assertRaisesRegex(ValueError, 'retains every frozen parent path'):
+                S.campaign_manifest(self.parent_path, options)
+            return
         manifest=S.campaign_manifest(self.parent_path,options)
         self.assertEqual(manifest['windows'],self.parent['windows'])
         self.assertEqual(manifest['paths_per_cell'],8192)

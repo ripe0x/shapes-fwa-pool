@@ -286,3 +286,10 @@ The pooled-vault return result and pooled checkpoint uplift gate are not manager
 the fixed launch recipe, individually owned managers, common strategy implementation and existing
 community application. Production settings remain provisional; public deployment, production fee
 changes, live cutover, acceptance signing and merges retain their existing separate authority limits.
+
+
+## A7. Remaining manager operating validation (owner, 2026-11-25)
+
+The owner asked to complete the remaining billed operating measurements, realistic operating-period economics, keeper readiness, and unsigned deployment preparation: “do all those. i'm going to bed. have them all done when i wake up.” After an explicit request for more validation time, the owner answered: “no budget cap”. This removes the cumulative validation-time cap for this remaining task. It does not authorize public transactions, production fee changes, live application/service cutover, signatures, a shared-vault deployment or merges.
+
+The owner clarified that the new shared vault is undeployed; “closed” must not imply an existing deployed candidate. Its app launch remains disabled. Any local evaluation setting and simulation cohort is an agent-selected method, not an owner-approved production default or a newly required sample size. Complete available engineering and evidence, and report genuine economic failure or remaining release decisions honestly.

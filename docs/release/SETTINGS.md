@@ -9,7 +9,7 @@ Source configuration SHA-256:
 
 The authoritative behavior is shared by [`PackAccount`](../../src/PackAccount.sol), [`VaultLib`](../../src/VaultLib.sol), [`StrategyLib`](../../src/StrategyLib.sol) and [`ScanLib`](../../src/ScanLib.sol). See [the completion requirements](../MAIN-POOL-COMPLETION.md), [owner requirements A5](../../OWNER-REQUIREMENTS.md), [the unsigned runbook](RUNBOOK.md) and [acceptance status](ACCEPTANCE.md). The final [economic scorecard](../receipts/completion-economics.md) and [receipt-backed verification](../receipts/completion-verification.md) accompany this inventory; historical scorecards do not accept this candidate.
 
-For the completed personal-manager scope, use [the manager runbook](MANAGER-RUNBOOK.md) and [final focused verification](../receipts/manager-final-verification.md) and [bounded manager scorecard](../receipts/manager-closeout-economics.md). The shared vault remains closed.
+For the completed personal-manager scope, use [the manager runbook](MANAGER-RUNBOOK.md) and [final focused verification](../receipts/manager-final-verification.md) and [bounded manager scorecard](../receipts/manager-closeout-economics.md). The new shared vault remains undeployed and its app launch stays disabled.
 
 ## Deployment inputs and fee observation
 

@@ -465,6 +465,8 @@ def run(sc, n_target, seed, days=365, values=None):
     exit_all = sc.get("exit_all", False)
     exit_days = sc.get("exit_days", 30) if exit_all else 0
     user_gas = sc.get("user_gas_proxy", {})
+    user_estimates = sc.get("user_gas_estimate_proxy", {})
+    owner_estimate_fallback = set()
     entry_method = 'create' if manager else 'deposit'
     holder_gas = (int(g0 * GWEI) + tip) * user_gas.get(entry_method, 0)
     unknown_user_gas = int(exit_all and entry_method not in user_gas)
@@ -473,7 +475,14 @@ def run(sc, n_target, seed, days=365, values=None):
     manager_waits = {}
     manager_wait_examples = {}
     owner_processing_calls = owner_processing_cost = owner_processing_pending = 0
-    owner_harvest_calls = owner_withdraw_calls = 0
+    owner_harvest_calls = owner_withdraw_calls = owner_set_exiting_calls = 0
+    owner_exit_limit = sc.get('owner_exit_spend_limit_wei') if manager else None
+    if owner_exit_limit is not None and (not isinstance(owner_exit_limit, int) or owner_exit_limit < 0):
+        raise ValueError('owner exit signed spending limit must be a nonnegative integer')
+    owner_exit_reserved = owner_exit_spent = 0
+    owner_processing_blocked = False
+    keeper_zero_loss = manager and bool(sc.get('manager_keeper_zero_loss', False))
+    from keeper import profitability_gate, wallet_debit_bound
     holder_claimed = holder_cancelled = holder_keeper_pay = holder_maintenance_gas = 0
     exit_requested = False
     operation_end_backlog = 0
@@ -523,24 +532,53 @@ def run(sc, n_target, seed, days=365, values=None):
                               returned_value=sum(p.value for p in v.positions.values() if p.status == SETTLED and p.pack_owned),
                               journal=len(journal), claimed=holder_claimed))
 
+    def owner_gas(estimate):
+        return max(21_000, estimate) if owner_exit_limit is not None else estimate
+
+    def owner_estimate(operation, work_gas):
+        if operation not in user_estimates:
+            owner_estimate_fallback.add(operation)
+        return max(21_000, work_gas, user_estimates.get(operation, user_gas.get(operation, 0)))
+
+    def owner_preflight(estimates, base_fee, operation):
+        nonlocal owner_exit_reserved
+        bound = sum(wallet_debit_bound(max(21_000, estimate), base_fee, tip) for estimate in estimates)
+        if owner_exit_limit is not None and owner_exit_reserved + bound > owner_exit_limit:
+            manager_waits['EXIT_SPEND_LIMIT'] = manager_waits.get('EXIT_SPEND_LIMIT', 0) + 1
+            manager_wait_examples.setdefault('EXIT_SPEND_LIMIT', dict(time=now,operation=operation,
+                reserved_wei=owner_exit_reserved,next_signed_bound_wei=bound,limit_wei=owner_exit_limit))
+            return False
+        owner_exit_reserved += bound
+        return True
+
+    def owner_charge(cost):
+        nonlocal owner_exit_spent, holder_gas
+        owner_exit_spent += cost
+        holder_gas += cost
+
     def claim_available(gas_price, day):
         nonlocal holder_claimed, holder_gas, unknown_user_gas
         nonlocal credit,owner_harvest_calls,owner_withdraw_calls
         if manager:
-            if not exit_requested:
+            if not exit_requested or owner_processing_blocked:
                 return
             if credit and not (v.positions or v.idle_packs or v.recovery_packs or v.receipts):
                 # Collect once after retirement; no needless intermediate exit sweeps.
+                gas = owner_gas(max(st0.gas_schedule['harvest'], user_gas.get('harvest', 0)))
+                if not owner_preflight([owner_estimate('harvest', gas)], max(0, gas_price-tip), 'harvest'):
+                    return
                 v.receive_fees(credit)
                 credit = 0
-                gas = max(st0.gas_schedule['harvest'], user_gas.get('harvest', 0))
-                holder_gas += gas * gas_price
+                owner_charge(gas * gas_price)
                 unknown_user_gas += int('harvest' not in user_gas or 'harvest' in sc.get('unmeasured_gas_operations',[]))
                 owner_harvest_calls+=1
                 trace_state('owner-harvest-credit', day)
             if not (v.positions or v.idle_packs or v.recovery_packs or v.receipts) and v.balance:
+                withdraw_gas = owner_gas(user_gas.get('withdraw', 0))
+                if not owner_preflight([owner_estimate('withdraw', withdraw_gas)], max(0, gas_price-tip), 'withdraw'):
+                    return
                 holder_claimed += v.withdraw(v.balance)
-                holder_gas += user_gas.get('withdraw', 0) * gas_price
+                owner_charge(withdraw_gas * gas_price)
                 unknown_user_gas += int('withdraw' not in user_gas)
                 owner_withdraw_calls+=1
                 trace_state('owner-withdraw', day)
@@ -747,6 +785,10 @@ def run(sc, n_target, seed, days=365, values=None):
         checkpoint_done = timed and last_checkpoint_interval == absolute_now // OperatingClock.INTERVAL
         holder_finished = False
         phases = ([absolute_now % clock.INTERVAL >= clock.BLACKOUT_START] if event_kind == "keeper" else []) if timed else (False, True)
+        if manager and owner_processing_blocked and market_pending == 0:
+            owner_processing_blocked = False  # Actual archived callbacks removed the global queue lock.
+        if manager and owner_processing_blocked:
+            phases = []
         for blackout in phases:
             while not congested and not holder_finished and calls < (1 if timed else max_calls):
                 hydrated = list(v.positions)
@@ -870,6 +912,20 @@ def run(sc, n_target, seed, days=365, values=None):
                     paid = min(offer, funds) if fn == 'syncCheckpoint' else min(offer, funds, cash)
                     holder_fallback = self_serve and liability and (not exit_all or fn != "sync"
                         or (rescue_sync and exit_requested and (v.locked_shares or manager)))
+                    recovery = self_serve and exit_all and exit_requested and liability and fn in ('sync','syncCheckpoint','unlist','liquidate','checkpoint')
+                    if manager and recovery:
+                        gas_key = 'recover_checkpoint' if fn=='checkpoint' else 'recover_sync' if fn in ('sync','syncCheckpoint') else fn
+                        estimate = owner_estimate(gas_key, max(gas_q, user_gas.get(gas_key, 0)))
+                        # An owner recovery pays no keeper; acceptance is the final pre-mutation check.
+                        return owner_preflight([estimate], st.base_fee, fn)
+                    if keeper_zero_loss:
+                        cost, need, accepted = profitability_gate(max(gas_q, user_gas.get(fn, 0)), st.gas_price,
+                            paid, sc.get('keeper_fail_rate_bps', 0), sc.get('keeper_min_return_bps', 0), 0, ratio=1.0)
+                        if not accepted:
+                            if final_candidate:
+                                manager_waits['KEEPER_LOSS'] = manager_waits.get('KEEPER_LOSS', 0) + 1
+                                manager_wait_examples.setdefault('KEEPER_LOSS', dict(time=now,operation=fn,cost_wei=cost,need_wei=need,pay_wei=paid))
+                            return False
                     if paid < offer and not holder_fallback:
                         if not final_candidate:
                             return False  # A shorter preflight prefix is not an operating stall.
@@ -918,8 +974,11 @@ def run(sc, n_target, seed, days=365, values=None):
                             measured=user_gas.get(gas_key,0)
                             # Variable work uses the larger calibrated sample or verified-work
                             # allowance; a small receipt cannot underprice a larger exit batch.
-                            cost=max(gas_q,measured)*st.gas_price
-                            holder_gas += cost
+                            cost=owner_gas(max(gas_q,measured))*st.gas_price
+                            if manager:
+                                owner_charge(cost)
+                            else:
+                                holder_gas += cost
                             holder_maintenance_gas += cost
                             holder_keeper_pay += paid
                             holder_calls[fn] += 1
@@ -1257,20 +1316,28 @@ def run(sc, n_target, seed, days=365, values=None):
             operation_end_routine_paid, operation_end_routine_budget = routine_paid, v.routine_budget
             operation_end_idle, operation_end_funding, operation_end_loose = v.idle_value, v.idle_funding, 0
         if manager and ((event_kind == 'cutoff') if timed else d == days - 1):
-            exit_requested = True
-            v.set_exiting(True)
-            holder_gas += user_gas.get('setExiting', 0) * (gas + tip)
-            unknown_user_gas += int('setExiting' not in user_gas)
-            trace_state('set-exiting', d)
-            if market_pending:
-                from manager import owner_processing_reserve
-                owner_processing_pending=market_pending
-                owner_processing_calls,owner_processing_cost=owner_processing_reserve(market_pending,user_gas.get('processAcquisitions',0),gas+tip)
-                holder_gas+=owner_processing_cost
-                unknown_user_gas+=int('processAcquisitions' not in user_gas)
-                # Ready times still follow archived actual callbacks; reserve is owner-paid
-                # self-service for the remaining queue, not an assumed free rescue actor.
-                trace_state('owner-processing-reserve',d)
+            set_exit_gas = owner_gas(user_gas.get('setExiting', 0))
+            if owner_preflight([owner_estimate('setExiting', set_exit_gas)], gas, 'setExiting'):
+                exit_requested = True
+                v.set_exiting(True)
+                owner_set_exiting_calls += 1
+                owner_charge(set_exit_gas * (gas + tip))
+                unknown_user_gas += int('setExiting' not in user_gas)
+                trace_state('set-exiting', d)
+                if market_pending and (v.positions or v.receipts):
+                    from manager import owner_processing_reserve
+                    owner_processing_pending=market_pending
+                    single_gas=owner_gas(user_gas.get('processAcquisitions',0))
+                    single_estimate=owner_estimate('processAcquisitions', single_gas)
+                    estimates=[min(16,market_pending-start)*single_estimate for start in range(0,market_pending,16)]
+                    if owner_preflight(estimates, gas, 'processAcquisitions'):
+                        owner_processing_calls,owner_processing_cost=owner_processing_reserve(market_pending,single_gas,gas+tip)
+                        owner_charge(owner_processing_cost)
+                        unknown_user_gas+=int('processAcquisitions' not in user_gas)
+                        # Archived ready times remain; the owner pays the pending prefix reserve.
+                        trace_state('owner-processing-reserve',d)
+                    else:
+                        owner_processing_blocked=True
         if timed:
             redemptions = [(d, 1.0)] if event_kind == "cutoff" and exit_all else ([(d, payload)] if event_kind == "redemption" else [])
         elif exit_all:
@@ -1349,6 +1416,10 @@ def run(sc, n_target, seed, days=365, values=None):
             waiting_observations=manager_waits, first_wait_observation=manager_wait_examples,
             owner_processing_calls=owner_processing_calls,owner_processing_proxy_cost_wei=owner_processing_cost,
             owner_processing_pending_at_exit=owner_processing_pending,
+            owner_exit_spend_limit_wei=owner_exit_limit,owner_exit_reserved_wei=owner_exit_reserved,
+            owner_exit_spent_wei=owner_exit_spent,owner_exit_spend_limit_waits=manager_waits.get('EXIT_SPEND_LIMIT',0),
+            owner_exit_estimate_fallback_operations=sorted(owner_estimate_fallback),
+            keeper_zero_loss_enabled=keeper_zero_loss,keeper_loss_waits=manager_waits.get('KEEPER_LOSS',0),
             ordinary_completion_actor='Recorded external VRF/processor; historical requesters fund it',
             exit_processing_assumption='Owner reserve for pending prefix, <=16 records per call, full measured single-request call gas charged per pending record; archived ready times retained')
         for name in op_names:
@@ -1357,7 +1428,7 @@ def run(sc, n_target, seed, days=365, values=None):
             result['owner_calls_'+name]=holder_calls[name]
         result['owner_calls_harvest']+=owner_harvest_calls
         result['owner_calls_withdraw']=owner_withdraw_calls
-        result['owner_calls_setExiting']=int(exit_requested)
+        result['owner_calls_setExiting']=owner_set_exiting_calls
         if keyed_randomness:result.update(randomness_mode='request-keyed-v1',request_events_sha256=clock.request_events_sha256,requests_seen=request_ordinal)
         return result
 

@@ -108,6 +108,121 @@ class ManagerAccountingTest(unittest.TestCase):
         self.assertGreater(result['owner_calls_unlist'],0)
         self.assertGreater(result['owner_wallet_gas_proxy_wei'],gas['create']*200_000_000)
 
+    def quiet_with_costs(self, **overrides):
+        import forward as F
+        root=Path(__file__).resolve().parent.parent
+        values=json.loads((root/'deploy/manager.json').read_text())
+        costs=json.loads((root/'docs/receipts/manager-r2-cost-calibration.json').read_text())
+        receipts=json.loads((root/costs['receipts']).read_text())
+        signed_limits={t['transaction']['hash']:int(t['transaction']['gas'],0) for t in receipts['transactions']}
+        estimates={op:max(signed_limits[row['hash']] for row in samples) for op,samples in costs['measurements'].items()}
+        for op,alias in {'recover_sync':'recover','unlist':'recoverUnlist','liquidate':'recoverLiquidate'}.items():
+            estimates[op]=estimates[alias]
+        sc=F.Scenario(manager=True,volume=F.const(0),timed=True,start_timestamp=1795521275,
+            poll_seconds=60,receipt_seconds=36,replay_events=[],replay_period_seconds=3*F.DAY,
+            foreign_pool_weight=1.,exempt=True,gwei=.15,deposit_wei=5*10**17,mint_fee_wei=10**15,
+            exit_all=True,exit_days=1,user_gas_proxy=costs['gas_proxy'],holder_rescue_sync=True,
+            self_serve_exits=True,user_gas_estimate_proxy=estimates)
+        sc.update(overrides)
+        return F.run(sc,1,1,days=1,values=values)
+
+    def test_runtime_signed_exit_cap_completes_quiet_round_trip(self):
+        result=self.quiet_with_costs(owner_exit_spend_limit_wei=10**16,manager_keeper_zero_loss=True)
+        self.assertTrue(result['exit_complete'])
+        self.assertEqual(result['owner_calls_setExiting'],1)
+        self.assertEqual(result['owner_exit_spent_wei'],195432400000000)
+        self.assertEqual(result['owner_exit_reserved_wei'],1217071100000000)
+        self.assertLessEqual(result['owner_exit_spent_wei'],result['owner_exit_reserved_wei'])
+        self.assertLessEqual(result['owner_exit_reserved_wei'],10**16)
+        self.assertEqual(result['owner_exit_spend_limit_waits'],0)
+        self.assertEqual(result['creator_primary_fees_accrued_wei'],3000000000000000)
+        # Clone creation is outside the exit cap and still charged once to the owner.
+        self.assertEqual(result['owner_wallet_gas_proxy_wei'],195432400000000+606194*200000000)
+
+    def test_unsent_exit_intent_does_not_pause_strategy_after_gas_drops(self):
+        result=self.quiet_with_costs(gwei=lambda day:.6 if day<1 else .15,
+            owner_exit_spend_limit_wei=0,manager_keeper_zero_loss=True)
+        self.assertEqual(result['operation_end_cash_wei'],5*10**17)
+        self.assertEqual(result['owner_calls_setExiting'],0)
+        self.assertGreater(result['keeper_calls_build'],0)
+        self.assertLess(result['end_cash_wei'],result['operation_end_cash_wei'])
+        self.assertEqual(result['owner_exit_spent_wei'],0)
+        self.assertFalse(result['exit_complete'])
+
+    def test_zero_exit_cap_preserves_unsent_exit_and_inventory(self):
+        result=self.quiet_with_costs(owner_exit_spend_limit_wei=0)
+        self.assertFalse(result['exit_complete'])
+        self.assertEqual(result['owner_calls_setExiting'],0)
+        self.assertEqual(result['owner_exit_spent_wei'],0)
+        self.assertEqual(result['owner_exit_reserved_wei'],0)
+        self.assertEqual(result['owner_withdrawn_wei'],0)
+        self.assertEqual(result['end_open_positions'],1)
+        self.assertEqual(result['end_cash_wei'],result['operation_end_cash_wei'])
+        self.assertGreater(result['waiting_observations']['EXIT_SPEND_LIMIT'],0)
+        self.assertEqual(result['owner_wallet_gas_proxy_wei'],606194*200000000)
+
+    def test_keeper_loss_gate_refuses_work_before_mutating_account(self):
+        root=Path(__file__).resolve().parent.parent
+        costs=json.loads((root/'docs/receipts/manager-r2-cost-calibration.json').read_text())
+        gas=dict(costs['gas_proxy'])
+        # This is the actual three-pack bill, a conservative floor rather than a one-pack curve.
+        gas['build']=max(row['gasUsed'] for row in costs['measurements']['build'])
+        result=self.quiet_with_costs(user_gas_proxy=gas,manager_keeper_zero_loss=True,
+                                    owner_exit_spend_limit_wei=10**16)
+        self.assertEqual(result['keeper_calls_build'],0)
+        self.assertEqual(result['creator_primary_fees_accrued_wei'],0)
+        self.assertEqual(result['keeper_compensation_wei'],0)
+        self.assertEqual(result['keeper_gas_proxy_cost_wei'],0)
+        self.assertEqual(result['owner_withdrawn_wei'],5*10**17)
+        self.assertGreater(result['keeper_loss_waits'],0)
+        self.assertTrue(result['exit_complete'])
+
+    def test_empty_manager_does_not_pay_pending_foreign_requests(self):
+        import forward as F
+        from formal import window, PIN
+        root=Path(__file__).resolve().parent.parent
+        recorded=window(root/'sim/data/fwa.sqlite',PIN['timestamp'])
+        request,completion,payload=next(p for p in recorded['pairs'] if p[0]>0 and p[1]>p[0]+1)
+        costs=json.loads((root/'docs/receipts/manager-r2-cost-calibration.json').read_text())
+        gas=dict(costs['gas_proxy'])
+        gas['build']=max(row['gasUsed'] for row in costs['measurements']['build'])
+        # The actual recorded request straddles cutoff; no fulfilled service answer is fabricated.
+        result=self.quiet_with_costs(user_gas_proxy=gas,manager_keeper_zero_loss=True,
+            owner_exit_spend_limit_wei=10**16,start_timestamp=recorded['start']+request+1-F.DAY,
+            replay_events=[(F.DAY-1,'request',None),(F.DAY-1+completion-request,'acquisition',payload)])
+        self.assertEqual(result['keeper_calls_build'],0)
+        self.assertTrue(result['exit_complete'])
+        self.assertEqual(result['owner_withdrawn_wei'],5*10**17)
+        self.assertEqual(result['owner_processing_calls'],0)
+        self.assertEqual(result['owner_processing_proxy_cost_wei'],0)
+        self.assertEqual(result['owner_exit_spent_wei'],(53236+38926)*200000000)
+        self.assertEqual(result['owner_exit_reserved_wei'],(93325+69075)*350000000)
+
+    def test_recorded_callback_unblocks_exit_after_processing_reserve_is_denied(self):
+        import forward as F
+        from formal import window, PIN
+        root=Path(__file__).resolve().parent.parent
+        recorded=window(root/'sim/data/fwa.sqlite',PIN['timestamp'])
+        request,completion,payload=next(p for p in recorded['pairs'] if p[0]>0 and 1<p[1]-p[0]<F.DAY)
+        result=self.quiet_with_costs(manager_keeper_zero_loss=True,owner_exit_spend_limit_wei=10**15,
+            exit_days=2,gwei=lambda day:.15 if day<1 else 2 if day<2 else 0,
+            start_timestamp=recorded['start']+request+1-F.DAY,
+            replay_events=[(F.DAY-1,'request',None),(F.DAY-1+completion-request,'acquisition',payload)])
+        self.assertEqual(result['keeper_calls_build'],1)
+        self.assertEqual(result['owner_calls_setExiting'],1)
+        self.assertEqual(result['owner_processing_pending_at_exit'],1)
+        self.assertGreater(result['waiting_observations']['EXIT_SPEND_LIMIT'],0)
+        self.assertEqual(result['first_wait_observation']['EXIT_SPEND_LIMIT']['operation'],'processAcquisitions')
+        # Only the recorded external callback drains the queue; no owner prefix is paid twice.
+        self.assertEqual(result['owner_processing_calls'],0)
+        self.assertEqual(result['owner_processing_proxy_cost_wei'],0)
+        self.assertGreater(result['owner_calls_unlist']+result['owner_calls_liquidate'],0)
+        self.assertTrue(result['exit_complete'])
+        self.assertLessEqual(result['owner_exit_reserved_wei'],10**15)
+        self.assertLessEqual(result['owner_exit_spent_wei'],result['owner_exit_reserved_wei'])
+        self.assertEqual((result['physical_assets_wei'],result['external_fee_credit_wei'],result['end_cash_wei']),(0,0,0))
+        self.assertEqual(result['ledger_gap_wei'],0)
+
     def test_foreign_journal_does_not_lock_an_empty_managers_owner_cash(self):
         import forward as F
         values=json.loads((Path(__file__).resolve().parent.parent/'deploy/manager.json').read_text())

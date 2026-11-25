@@ -1,0 +1,15 @@
+{
+ "readOnly": true,
+ "rpc": "https://mainnet.gateway.tenderly.co",
+ "fromBlock": 26484808,
+ "toBlock": 26492130,
+ "blockHash": "0x239460663af7174d45b183baebc7bb6b9e2a49733fb42b160b593cfe074c9a99",
+ "configKey": 22,
+ "archiveLastChange": {
+  "block": 25944617,
+  "valueWei": 25000000000000000
+ },
+ "subsequentLogs": [],
+ "minBackingWei": 25000000000000000,
+ "retainedToProtocol": true
+}

@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""Pure arithmetic/control checks plus actual archive cohort qualification, no services."""
+import json
+import unittest
+
+import manager_operating_assessment as O
+from formal import window, PIN
+
+
+def partition():
+    # Independent wei example:500+20 earned=470 returned+5keeper+6creator+39backing.
+    return dict(initial_funding_wei=O.CAPITAL,owner_funded_wei=O.CAPITAL,owner_withdrawn_wei=O.CAPITAL-30,
+        owner_wallet_gas_proxy_wei=7,owner_net_wei=-37,exit_complete=True,ledger_gap_wei=0,
+        unpaid_routine_calls=0,keeper_compensation_wei=5,routine_keeper_paid_wei=3,essential_keeper_paid_wei=2,
+        keeper_gas_proxy_cost_wei=2,keeper_net_proxy_wei=3,routine_period_permission_upper_wei=10,
+        creator_primary_fees_accrued_wei=6,physical_assets_wei=0,external_fee_credit_wei=0,
+        unharvested_listing_fees_wei=0,fees_received_wei=20,backing_lost_wei=39,settlement_fees_wei=0,
+        waiting_observations={},randomness_mode='request-keyed-v1',request_events_sha256='pure-accounting-example',
+        unknown_owner_gas_calls=0,keeper_unmeasured_operations=[],owner_total_value_before_gas_wei=O.CAPITAL-30,
+        owner_exit_reserved_wei=10,owner_exit_spent_wei=7,owner_exit_spend_limit_wei=100,keeper_zero_loss_enabled=True)
+
+
+class OperatingAssessmentTests(unittest.TestCase):
+    def test_fixed_design_covers_requested_cross_product_and_stress_cases(self):
+        self.assertEqual(len(O.CELLS),24)
+        self.assertEqual({c['mint_fee_wei'] for c in O.CELLS},{250000000000000,500000000000000,1000000000000000})
+        self.assertEqual({c['backing_bps'] for c in O.CELLS},{10000,70000})
+        self.assertEqual({c['renewal_mode'] for c in O.CELLS},{0,1})
+        frozen=dict(buyer_regimes=['observed-choices','forced-responsive-bid-stress'],
+            windows=[dict(id='first',seeds=[10,11]),dict(id='second',seeds=[12,13])])
+        tasks=O.tasks(frozen)
+        self.assertEqual(len(tasks),16)
+        self.assertEqual(sum(t[2]=='recorded-month' for t in tasks),8)
+        self.assertEqual(sum(t[2]=='quiet' for t in tasks),4)
+        self.assertEqual(sum(t[2]=='early-burst-then-zero' for t in tasks),4)
+        self.assertEqual(len(set(tasks)),len(tasks))
+
+    def test_absolute_owner_keeper_creator_backing_cash_partition(self):
+        r=O.qualify_result(partition(),1,100,True)
+        self.assertEqual(r['owner_net_wei'],-37)
+        self.assertEqual(r['keeper_net_proxy_wei'],3)
+        self.assertEqual(r['creator_primary_fees_accrued_wei'],6)
+        self.assertEqual(r['backing_lost_wei'],39)
+        self.assertEqual(r['settled_keep_face_not_yet_consumed_wei'],0)
+        self.assertEqual(r['external_total_earned_wei'],20)
+        self.assertTrue(r['qualified_exit'])
+        for key in ('owner_funded_wei','owner_net_wei','fees_received_wei','keeper_compensation_wei','owner_total_value_before_gas_wei'):
+            bad=partition();bad[key]+=1
+            with self.subTest(key=key),self.assertRaises(ValueError):O.qualify_result(bad,1,100,True)
+
+    def test_no_unpaid_subsidy_or_unmeasured_final_calls(self):
+        for values in ({'unpaid_routine_calls':1},{'unknown_owner_gas_calls':1},{'keeper_unmeasured_operations':['renew']}):
+            with self.subTest(values=values),self.assertRaises(ValueError):
+                O.qualify_result(partition()|values,1,100,True)
+
+    def test_incomplete_and_over_cap_exits_remain_explicit(self):
+        with self.assertRaises(ValueError):O.qualify_result(partition(),1,6,True)
+        # Ten wei retained in physical assets, two still claimable externally.
+        incomplete=partition()|dict(exit_complete=False,owner_net_wei=None,physical_assets_wei=10,
+            owner_withdrawn_wei=O.CAPITAL-40,external_fee_credit_wei=2,owner_total_value_before_gas_wei=O.CAPITAL-28)
+        r=O.qualify_result(incomplete,1,100,True)
+        self.assertEqual(r['remaining_assets_wei'],12)
+        self.assertEqual(r['external_total_earned_wei'],22)
+        self.assertIsNone(r['owner_net_wei'])
+        self.assertFalse(r['qualified_exit'])
+
+    def test_only_isolated_admission_changes_then_restores_even_on_error(self):
+        import keeper
+        before=(O.F.policy.edge_backing,keeper.proposal_limits,O.F.policy.build_net,O.S.MIN_BACKING)
+        with self.assertRaisesRegex(RuntimeError,'intentional'):
+            with O.admission(True,25*10**15):
+                self.assertIs(O.F.policy.edge_backing,O.S.relaxed_edge)
+                self.assertIs(keeper.proposal_limits,O.S.relaxed_limits)
+                self.assertEqual(O.S.MIN_BACKING,25*10**15)
+                raise RuntimeError('intentional')
+        self.assertEqual((O.F.policy.edge_backing,keeper.proposal_limits,O.F.policy.build_net,O.S.MIN_BACKING),before)
+
+    def test_real_archive_response_choices_and_burst_phase_are_preserved(self):
+        w=window(O.ROOT/'sim/data/fwa.sqlite',PIN['timestamp'])
+        responses=list(w['responses'])
+        events,meta=O.feasible_burst(w)
+        self.assertEqual(w['responses'],responses)
+        self.assertTrue(any(delay is not None and delay>3600 for delay,_ in responses))
+        self.assertTrue(any(keep is True for _,keep in responses))
+        self.assertEqual(meta['requests'],sum(kind=='request' for _,kind,_ in events))
+        self.assertTrue(all(at<2*O.F.DAY for at,kind,_ in events if kind=='request'))
+        self.assertTrue(all((w['start']+at)%O.F.OperatingClock.INTERVAL<O.F.OperatingClock.BLACKOUT_START
+                            for at,kind,_ in events if kind=='request'))
+
+    def test_old_cost_packet_cannot_be_promoted_to_final_operating_evidence(self):
+        costs=json.loads((O.ROOT/'docs/receipts/manager-r2-cost-calibration.json').read_text())
+        with self.assertRaises(ValueError):O.qualify_costs(costs,True)
+
+    def test_measurement_gas_is_bound_to_real_successful_receipts(self):
+        costs=json.loads((O.ROOT/'docs/receipts/manager-r2-cost-calibration.json').read_text())
+        actual=json.loads((O.ROOT/costs['receipts']).read_text())
+        O.verify_measurement_receipts(costs,[actual])
+        costs['gas_estimate_proxy']={'setExiting':74659}
+        with self.assertRaisesRegex(ValueError,'understates receipt estimate'):
+            O.verify_measurement_receipts(costs,[actual])
+        costs.pop('gas_estimate_proxy')
+        costs['measurements']['create'][0]['gasUsed']+=1
+        with self.assertRaisesRegex(ValueError,'matching successful billed receipt'):
+            O.verify_measurement_receipts(costs,[actual])
+
+    def test_incomplete_or_over_cap_paths_suppress_group_return(self):
+        cell=O.CELLS[0]
+        frozen=dict(cells=[cell],paths_per_window=1,expected_rows=6,buyer_regimes=['observed-choices'])
+        good=O.qualify_result(partition(),1,100,True)|dict(cell=cell['id'],regime='recorded-month',buyer_regime='observed-choices',window='first',seed=1)
+        incomplete=partition()|dict(exit_complete=False,owner_net_wei=None,physical_assets_wei=10,
+            owner_withdrawn_wei=O.CAPITAL-40,owner_total_value_before_gas_wei=O.CAPITAL-30)
+        over=O.qualify_result(incomplete,1,100,True)|dict(cell=cell['id'],regime='recorded-month',buyer_regime='observed-choices',window='second',seed=2)
+        summary=O.summarize([good,over],frozen)['cells'][0]
+        self.assertEqual(summary['paths'],2)
+        self.assertEqual(summary['qualified_exits'],1)
+        self.assertIsNone(summary['owner_net_mean_wei'])
+        self.assertEqual(summary['exit_limit_violations'],0)
+        self.assertEqual(summary['mean_wei']['creator_primary_fees_accrued_wei'],6)
+
+
+if __name__=='__main__':unittest.main()
