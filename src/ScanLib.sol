@@ -348,7 +348,7 @@ library ScanLib {
 
 
 
-    function backingTerms(VaultLib.Params storage p, IFWAV2 f, address packs, uint256 units, uint256 mintFee, uint256)
+    function backingTerms(VaultLib.Params storage p, IFWAV2 f, address packs, uint256 units, uint256, uint256)
         external view returns (VaultLib.BackingTerms memory t)
     {
         (t.k, t.cap, t.settlementFee) = economics(f, packs);
@@ -358,12 +358,6 @@ library ScanLib {
         t.floor = t.value + t.value / 19 + (t.value % 19 == 0 ? 0 : 1);
         t.desired = t.value * p.backingRatioBps / VaultLib.BPS / VaultLib.BPS * VaultLib.BPS;
         if (t.cap != type(uint256).max) t.desired = M.min(t.desired, t.cap * (VaultLib.BPS - p.bufferBps) / VaultLib.BPS);
-        uint256 gasQ = uint256(p.gasSchedule.sync) + p.gasSchedule.journal + p.gasSchedule.selected
-            + p.gasSchedule.synced + p.gasSchedule.pruned + p.gasSchedule.fund + p.gasSchedule.harvested
-            + p.gasSchedule.credit;
-        t.initialCost = VaultLib.quote(p, gasQ, 1, false) + _buildCost(p, units, mintFee);
-        t.cycleCost = VaultLib.quote(p, gasQ, 1, false)
-            + VaultLib.quote(p, uint256(p.gasSchedule.list) + p.gasSchedule.listed, 1, false);
         t.ok = t.cap != 0 && t.k >= 1e18 + uint256(p.minEdgeBps) * 1e14 && t.desired >= t.floor
             && VaultLib._profitable(t, t.desired, false);
         if (!t.ok) t.desired = 0;

@@ -22,7 +22,7 @@
  "essentialRatePerDayWei": 0,
  "upliftBoundBps": 25,
  "backingRatioBps": 70000,
- "acceptedMintFeeWei": 1000000000000000,
+ "acceptedMintFeeWei": 500000000000000,
  "minDepositWei": 10000000000000000,
  "minDistributionWei": 10000000000000000,
  "gasSchedule": {
@@ -57,5 +57,5 @@
   "overhead": 100000
  },
  "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
- "expectedMintFeeWei": 1000000000000000
+ "expectedMintFeeWei": 500000000000000
 }

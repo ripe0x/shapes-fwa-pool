@@ -173,8 +173,6 @@ library VaultLib {
         uint256 settlementFee;
         uint256 value;
         uint256 floor;
-        uint256 cycleCost;
-        uint256 initialCost;
         bool ok;
     }
 
@@ -448,12 +446,13 @@ library VaultLib {
         return ScanLib.backingTerms(p, f, packs, units, mintFee, retiredShapes);
     }
 
-    /// @dev Initial reuse pays construction once plus maintenance, without charging a second
-    ///      relisting. A continuing reuse cycle pays no fresh mint.
+    /// @dev A keep must return at least the pack's face. Gas and the one-time build are not
+    ///      charged to a selection: the pack is reused across cycles, and gas is outside the
+    ///      strategy's control. The bid edge is FWA's k (>= 1 + minEdge, checked in backingTerms).
+    ///      `newlyBuilt` stays in the signature: dropping it pushes buildAndList past the stack limit.
     function _profitable(BackingTerms memory t, uint256 backing, bool newlyBuilt) internal pure returns (bool) {
-        uint256 cost = newlyBuilt ? t.initialCost : t.cycleCost;
-        return backing * (t.k - 1e18) / 1e18 > cost
-            && backing * (t.k - t.settlementFee * 1e14) / 1e18 >= t.value + cost;
+        newlyBuilt;
+        return backing * (t.k - t.settlementFee * 1e14) / 1e18 >= t.value;
     }
 
 

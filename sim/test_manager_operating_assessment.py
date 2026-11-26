@@ -23,10 +23,10 @@ def partition():
 
 class OperatingAssessmentTests(unittest.TestCase):
     def test_fixed_design_covers_requested_cross_product_and_stress_cases(self):
-        self.assertEqual(len(O.CELLS),8)
-        self.assertEqual({c['mint_fee_wei'] for c in O.CELLS},{500000000000000,1000000000000000})
-        self.assertEqual({c['backing_bps'] for c in O.CELLS},{70000})
-        self.assertEqual({c['reserve_wei'] for c in O.CELLS},{5000000000000000,6000000000000000})
+        self.assertEqual(len(O.CELLS),4)
+        self.assertEqual({c['mint_fee_wei'] for c in O.CELLS},{500000000000000})
+        self.assertEqual({c['backing_bps'] for c in O.CELLS},{16667,70000})
+        self.assertEqual({c['reserve_wei'] for c in O.CELLS},{6000000000000000})
         self.assertTrue(all('renewal_mode' not in cell for cell in O.CELLS))
         frozen=dict(buyer_regimes=['observed-choices','forced-responsive-bid-stress'],
             windows=[dict(id='first',seeds=[10,11]),dict(id='second',seeds=[12,13])])

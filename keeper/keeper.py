@@ -245,24 +245,12 @@ def read_tokens(vault, candidate_ids, block):
 
 def proposal_limits(s, value, settlement_fee, discount, cap, build=False, units=policy.REF_UNITS, retirement_shapes=None):
     """VaultLib._profitable floors for a listing near the edge's desired backing; production preflight
-    authenticates each one. A listing clears the bid outcome B(k-1) > cycle and the keep outcome
-    B(k-s) >= value + cycle (+ the build when newly built); a build repays from the keep outcome, not
-    the bid, so its floor uses the k-s denominator (audit: the k-1 denominator planned no builds)."""
+    authenticates each one. A keep must return at least the face, B(k-s) >= value, and the NAV face
+    coverage holds at FWA's maximum settlement fee. Gas and the build are not charged to a selection."""
     if s.k <= 10**18 or not 0 < discount <= 10_000 or not 0 <= settlement_fee < 10_000:
         return 1, 0
     up = lambda a, b: -(-a // b)
-    pricing = replace(s, build_units=units)
-    if build:
-        q = s.gas_schedule
-        common = sum(q[k] for k in ('sync','journal','selected','synced','pruned','sync_funding','harvested','sync_credit'))
-        cycle = policy.quote(pricing, common, 1)
-    else:
-        q = s.gas_schedule
-        cycle = policy.quote(pricing, policy.cycle_gas(pricing)-q['list']-q['listed'], 1) + policy.quote(pricing,q['list']+q['listed'],1)
-    extra = policy.build_cost(s, units if build else (s.build_units or policy.REF_UNITS)) if build else 0
-    minimum = max(up(value * 10_000, 9500),  # NAV face coverage at the maximum settlement fee
-                  (cycle + extra) * 10**18 // (s.k - 10**18) + 1,              # bid outcome: B(k-1) > cycle
-                  up((value + cycle + extra) * 10**18, s.k - settlement_fee * 10**14))  # keep outcome
+    minimum = max(up(value * 10_000, 9500), up(value * 10**18, s.k - settlement_fee * 10**14))
     return minimum, cap
 
 

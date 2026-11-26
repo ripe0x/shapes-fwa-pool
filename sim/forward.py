@@ -47,7 +47,7 @@ P = 3 * 10**16  # three paid 0.01 ETH primary mints
 BUILD_UNITS = 3
 SUR, CUT, S_FEE, BID_RATE = 0.05, 0.01, 0.01, 0.90
 ASK, PREMIUM = 0.033, 0.10
-MINT_FEE = 10**15
+MINT_FEE = 5*10**14
 # Backing follows the account ratio. Purchaser choices are separate explicit scenarios.
 KEEP_DEFAULT = 0.0  # no favorable purchaser behavior assumed
 POOL = None

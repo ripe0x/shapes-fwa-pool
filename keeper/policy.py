@@ -136,7 +136,7 @@ class State:
     backing_ratio_bps: int = 70_000
     keeper_cash: int = None
     operating_reserve: int = 0
-    accepted_mint_fee: int = 10**15
+    accepted_mint_fee: int = 5*10**14
     configuration_hash: str = ""
     caller_funded_exit: bool = False
     request_funding_needed: int = 0
@@ -186,31 +186,17 @@ def position_value(s, units=None):
 
 
 def edge_backing(k, cap, s_bps, units, gas_ceiling, markup_bps, work_fee, buffer_bps=0, min_edge_bps=100,
-                 discount_bps=9_150, price=None, mint_fee=10**15, backing_ratio_bps=70_000,
+                 discount_bps=9_150, price=None, mint_fee=5*10**14, backing_ratio_bps=16_667,
                  gas_schedule=None, newly_built=True, reference_units=None, retirement_shapes=None):
-    """Adjustable ratio backing, with actual FWA admission and no buyer-choice preference."""
-    q = Q if gas_schedule is None else gas_schedule
+    """Adjustable ratio backing, with actual FWA admission and no buyer-choice preference.
+    Gas and build arguments are accepted for callers but no longer priced (VaultLib._profitable)."""
     value = units * UNIT
     floor = -(-value * BPS // 9500)  # Conservative NAV coverage at the protocol maximum 5% keep settlement fee.
     desired = value * backing_ratio_bps // BPS // BPS * BPS
     if cap is not None:
         desired = min(desired, cap * (BPS - buffer_bps) // BPS // BPS * BPS)
-    pr = gas_ceiling if price is None else price
-    gas = sum(q[x] for x in ('sync', 'journal', 'selected', 'synced', 'pruned', 'sync_funding', 'harvested', 'sync_credit'))
-    recipe = units if newly_built or reference_units is None else reference_units
-    construction = (q['build'] + q['build_pack'] + shape_count(recipe)*q['build_shape'] + q['listed']) * pr*(BPS+markup_bps)//BPS + 2*work_fee + shape_count(recipe)*mint_fee
-    service_units = 1 if newly_built else 2
-    if not newly_built:
-        gas += q['list'] + q['listed']
-        construction = 0
-    # A construction and a synchronization are distinct transactions; a returned
-    # pack instead requires synchronization and relisting.
-    overhead_calls = 1 if newly_built else 2
-    construction += (q['overhead'] * pr * (BPS + markup_bps) // BPS) if newly_built else 0
-    cycle = (gas + overhead_calls*q['overhead'])*pr*(BPS+markup_bps)//BPS + service_units*work_fee
     ok = (cap != 0 and k >= 10**18 + min_edge_bps * 10**14 and desired >= floor
-          and desired * (k - 10**18) // 10**18 > cycle + construction
-          and desired * (k - s_bps * 10**14) // 10**18 >= value + cycle + construction)
+          and desired * (k - s_bps * 10**14) // 10**18 >= value)  # VaultLib._profitable: no gas or build cost
     return desired if ok else 0
 
 
@@ -267,13 +253,9 @@ def build_net(s):
     """Worst purchaser outcome after the complete initial cost, including all paid primary mints."""
     if s.k <= 10**18 or not s.backing:
         return 0
-    q = s.gas_schedule
-    common = sum(q[k] for k in ('sync','journal','selected','synced','pruned','sync_funding','harvested','sync_credit'))
-    maintenance = quote(s, common, 1)
-    cost=maintenance+build_cost(s)
     bid=s.backing*(s.k-10**18)//10**18
     keep=s.backing*(s.k-s.settlement_fee_bps*10**14)//10**18-s.build_units*UNIT
-    return max(0,min(bid,keep)-cost)
+    return max(0,min(bid,keep)) if keep >= 0 else 0
 
 
 def build_cost(s, units=None):

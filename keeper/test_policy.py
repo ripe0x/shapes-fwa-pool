@@ -15,7 +15,7 @@ def state(**kw):
     backing = kw.get("backing", 21 * 10**16)
     base = dict(now=10**6, gas_price=200_000_000, base_fee=150_000_000, gas_ceiling=500_000_000,
                 max_tip=50_000_000, markup_bps=1_000, share_bps=2_500, k=1_038_500_000_000_000_000,
-                backing=backing, min_edge_bps=100, settlement_fee_bps=100, mint_fee=10**15, settlement_window=3600,
+                backing=backing, min_edge_bps=100, settlement_fee_bps=100, mint_fee=5*10**14, settlement_window=3600,
                 blackout=True, queue_drained=True, checkpoint_done_this_interval=False, reserve=10**16,
                 backing_proposals=P.propose_backings(backing, 0, 16, lambda _: False),
                 build_proposals=[-(-backing // 10_000) * 10_000] * 8)

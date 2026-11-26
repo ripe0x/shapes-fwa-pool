@@ -28,8 +28,8 @@ OWNER_SAMPLE_ALIASES={'recover_sync':'recover','unlist':'recoverUnlist','liquida
 KNOWN_UNSUPPORTED=('larger sync batches',)
 CELLS = tuple(dict(id=f'b{backing}-r{reserve}-f{fee}-g{gas}',backing_bps=backing,
                   reserve_wei=reserve,mint_fee_wei=fee,total_gas_gwei=gas)
-              for backing in (70000,) for reserve in (5*10**15,6*10**15)
-              for fee in (5*10**14,10**15) for gas in (.2,.5))
+              for backing in (16667,70000) for reserve in (6*10**15,)
+              for fee in (5*10**14,) for gas in (.2,.5))
 WORKER = None
 
 
@@ -308,7 +308,7 @@ def manifest(args):
         verify_measurement_receipts(costs, packets)
     if observation.get('readOnly') is not True or observation.get('oracleExempt') is not True or observation.get('rpc') != 'https://mainnet.gateway.tenderly.co':
         raise ValueError('verified Tenderly oracle/fee observation required')
-    if observation['mintFeeWei'] != 5*10**14 or values['acceptedMintFeeWei'] != 10**15:
+    if observation['mintFeeWei'] != 5*10**14 or values['acceptedMintFeeWei'] != 5*10**14:
         raise ValueError('observed/accepted fees changed; rescope the declared fee comparison')
     protocol = observation['protocol']
     constants = dict(surchargeBps=round(F.SUR*10000), ownerAcquisitionFeeBps=round(F.CUT*10000),
@@ -365,7 +365,7 @@ def manifest(args):
         estimate_curve_sources={op:estimate_samples(operation_samples(costs,op))[0]['estimateKind'] for op in costs.get('gas_curves',{})},
         unmeasured_operations=costs.get('unmeasured_operations', []), manager_values=values,
         mint_fee_observation=observation, protocol_minimum_backing=minimum,
-        fee_cases={str(5*10**14):'Observed current mint fee',str(10**15):'Historical/accepted maximum comparison'},
+        fee_cases={str(5*10**14):'Observed current mint fee'},
         expected_rows=2*(2*args.paths_per_window+4)*len(CELLS),
         buyer_regimes=['observed-choices','forced-responsive-bid-stress'],
         physical_sync_cost_basis='Exact verified allowance/units context under recorded full GasSchedule; paid event spans and separately billed paired unpaid recovery receipts. Unknown contexts refuse; quote coefficients are not actual gas expense',
