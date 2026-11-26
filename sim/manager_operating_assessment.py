@@ -478,7 +478,7 @@ def run_path(task):
             user_gas_estimate_proxy=frozen['gas_estimate_proxy'],gas_curves=frozen['gas_curves'],gas_meter_proxy=frozen['gas_meter_proxy'],gas_meter_max_work=frozen['gas_meter_max_work'],
             owner_gas_curves=frozen['owner_gas_curves'],owner_gas_max_work=frozen['owner_gas_max_work'],
             full_gas_schedule=frozen['full_gas_schedule'],sync_contexts=frozen['sync_contexts'],owner_sync_contexts=frozen['owner_sync_contexts'],
-            manager_keeper_zero_loss=True,manager_keeper_receipt_history=True, owner_exit_spend_limit_wei=frozen['owner_exit_spend_limit_wei'])
+            manager_keeper_zero_loss=True,manager_keeper_receipt_history=True,manager_keeper_executed_gas=True, owner_exit_spend_limit_wei=frozen['owner_exit_spend_limit_wei'])
         started = time.monotonic()
         with admission(cell['backing_bps']==10000, frozen['protocol_minimum_backing']['value_wei']):
             raw = F.run(sc,1,seed,days=30,values=values)

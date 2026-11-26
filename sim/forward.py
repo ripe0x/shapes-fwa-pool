@@ -557,6 +557,7 @@ def run(sc, n_target, seed, days=365, values=None):
     keeper_zero_loss = manager and bool(sc.get('manager_keeper_zero_loss', False))
     from keeper import profitability_gate, wallet_debit_bound, billed_ratio
     keeper_receipt_history_enabled = manager and bool(sc.get('manager_keeper_receipt_history',False))
+    keeper_executed_gas = manager and bool(sc.get('manager_keeper_executed_gas', False))
     if keeper_receipt_history_enabled and (not keeper_zero_loss or not gas_curves):
         raise ValueError('keeper receipt history requires calibrated curves and zero-loss admission')
     keeper_receipt_history=SimpleNamespace(state={'counted':[]})
@@ -1009,7 +1010,10 @@ def run(sc, n_target, seed, days=365, values=None):
                             sc.get('keeper_fail_rate_bps',0),sc.get('keeper_min_return_bps',0),0,ratio=ratio)
                         billed_cost,billed_need,billed_accepted=profitability_gate(billed_gas,st.gas_price,paid,
                             sc.get('keeper_fail_rate_bps',0),sc.get('keeper_min_return_bps',0),0,ratio=1.)
-                        cost,need,accepted=max(cost,billed_cost),max(need,billed_need),accepted and billed_accepted
+                        if keeper_executed_gas:  # keeper bills the simulated signed call: estimate only sets the limit
+                            cost,need,accepted=billed_cost,billed_need,billed_accepted
+                        else:
+                            cost,need,accepted=max(cost,billed_cost),max(need,billed_need),accepted and billed_accepted
                         if not accepted:
                             if final_candidate:
                                 manager_waits['KEEPER_LOSS'] = manager_waits.get('KEEPER_LOSS', 0) + 1

@@ -222,6 +222,25 @@ class TxManager:
                     return None, name, True
             return None, msg.splitlines()[-1][:200] if msg else "estimate failed", False
 
+    def executed_gas(self, to, args, gas_limit, fees):
+        """Gas the exact call bills when signed with `gas_limit` at `fees` (eth_simulateV1 at
+        pending), or None when the node cannot simulate it. Manager work reads gasleft(), so the
+        simulation must run at the signed limit; eth_estimateGas reports the smallest limit that
+        succeeds, which for gasleft-bounded work is several times what the call then bills."""
+        try:
+            value = int(args[args.index("--value") + 1]) if "--value" in args else 0
+            call_args = args[:args.index("--value")] if "--value" in args else args
+            data = subprocess.check_output(["cast", "calldata", *map(str, call_args)], text=True,
+                                           stderr=subprocess.STDOUT).strip() if call_args[0] != "0x" else "0x"
+            flag = lambda name: int(fees[fees.index(name) + 1])
+            call = {"from": self.sender, "to": to, "data": data, "gas": hex(gas_limit), "value": hex(value),
+                    "maxFeePerGas": hex(flag("--gas-price")), "maxPriorityFeePerGas": hex(flag("--priority-gas-price"))}
+            out = self.rpc_call("eth_simulateV1", {"blockStateCalls": [{"calls": [call]}]}, "pending")
+            result = out[0]["calls"][0]
+            return int(result["gasUsed"], 16) if int(result["status"], 16) == 1 else None
+        except (subprocess.CalledProcessError, ValueError, LookupError, TypeError, json.JSONDecodeError):
+            return None
+
     def _broadcast(self, p):
         self._reserve_signed(p)
         out = self.cast("send", p["to"], *p["args"], *self.auth, "--nonce", p["nonce"], "--gas-limit", p["gas"],

@@ -505,6 +505,13 @@ def billed_ratio(tm, label):
     return BILLED_PER_ESTIMATE.get(label, 1.0)
 
 
+def billed_basis(tm, target, args, est, fees, label):
+    """(gas, ratio) the cost check bills: the exact call's executed gas at its signed limit when
+    the node simulates it, else the estimate calibrated by receipts."""
+    executed = tm.executed_gas(target, args, (est * 5 + 3) // 4, fees) if tm else None
+    return (executed, 1.0) if executed else (est, billed_ratio(tm, label))
+
+
 def execution_cost(est, bid, fail_rate_bps, ratio=1.0):
     """What the keeper expects to spend: billed gas (the estimate calibrated by receipts) at its
     bid, grossed up for competing transactions it expects to lose."""
@@ -715,8 +722,8 @@ def run_account(a, tm, account, pooled):
         bid = state.base_fee + state.max_tip
         fees = fee_args(state.base_fee, state.max_tip)
         pay = compensation(target, args, tm.sender, fees)
-        cost_, need, accepted = profitability_gate(est, bid, pay, a.fail_rate_bps, a.min_return_bps,
-                                                  max_loss, billed_ratio(tm, step[0]))
+        gas, ratio = billed_basis(tm, target, args, est, fees, step[0])
+        cost_, need, accepted = profitability_gate(gas, bid, pay, a.fail_rate_bps, a.min_return_bps, max_loss, ratio)
         if a.caller_funded_exit and step[0] not in ('build', 'list', 'burnTokens'):
             contribution = int(step[1]) if step[0] == 'fundCheckpoint' else int(step[2]) if step[0] == 'requestRedeem' else 0
             accepted=tm.can_reserve(tm.nonce('pending'),(est*5+3)//4,2*state.base_fee+state.max_tip,contribution)
@@ -748,8 +755,9 @@ def run_account(a, tm, account, pooled):
             tm.state["stats"]["skipped_expected"] += 1
             print(f"skip {step[0]}: the signed call would revert ({why2})")
             continue
-        if est2 > est and step[0] != "burnTokens" and not a.caller_funded_exit:
-            signed_cost = execution_cost(est2, bid, a.fail_rate_bps, billed_ratio(tm, step[0]))
+        if step[0] != "burnTokens" and not a.caller_funded_exit:
+            gas2, ratio2 = billed_basis(tm, target, args, est2, fees, step[0])
+            signed_cost = execution_cost(gas2, bid, a.fail_rate_bps, ratio2)
             if pay + max_loss < signed_cost * (10_000 + a.min_return_bps) // 10_000:
                 skip.add(plan_key(step))
                 tm.state["stats"]["skipped_loss"] += 1
