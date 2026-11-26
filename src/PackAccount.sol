@@ -34,9 +34,16 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
 
     VaultLib.Strategy internal s;
     uint256 public deploymentBlock;
+    /// @notice Owner's pack mix: byte u (bits 8u to 8u+7, u in [MIN_PACK_UNITS, MAX_PACK_UNITS]) is
+    ///         the most packs of u x 0.01 ETH this account builds up to, counting every pack of that
+    ///         size it holds. 0 sets no counts: `packUnitsMask` alone decides. Imports and returned
+    ///         packs are never refused; a lowered count only stops further builds.
+    uint256 public design;
 
     event ParamsSet();
     event MintFeeAccepted(uint256 maximum);
+    event DesignSet(uint256 design);
+    error InvalidDesign();
     error ConfigurationChanged();
     error ExplicitFeeAcceptanceRequired();
 
@@ -126,6 +133,8 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
 
     function _build(uint256 units, uint256[] calldata backingProposals, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256) {
         _checkConfiguration(expected);
+        if (design != 0 && (units > VaultLib.MAX_PACK_UNITS
+            || s.book.recipeCounts[units] + backingProposals.length > (design >> (units * 8)) & 0xFF)) revert VaultLib.BadBatch();
         return StrategyLib.build(s, fwa, packs, shapes, units, backingProposals, minPay, gasStart);
     }
 
@@ -209,6 +218,16 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
         emit ParamsSet();
     }
 
+    function setDesign(uint256 design_) external onlyOwner {
+        _setDesign(design_);
+    }
+
+    function _setDesign(uint256 design_) internal {
+        if (design_ & 0xFFFFFF != 0 || design_ >> 248 != 0) revert InvalidDesign();
+        design = design_;
+        emit DesignSet(design_);
+    }
+
     function acceptMintFee(uint64 maximum, bytes32 expected) external onlyOwner {
         _checkConfiguration(expected);
         s.params.acceptedMintFee = maximum;
@@ -244,6 +263,8 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
     function operatingReserve() public view returns (uint256) { return VaultLib.operatingReserve(s.params); }
 
     function unresolvedUplift() public view returns (uint256) { return s.book.unresolvedKeepUplift; }
+    /// @notice Packs of `units` x 0.01 ETH this account holds: idle, listed or awaiting settlement.
+    function recipeCount(uint256 units) external view returns (uint256) { return s.book.recipeCounts[units]; }
     function inventoryShapeCount(uint256 packId) external view returns (uint256) { return s.book.packShapeCount[packId]; }
 
 

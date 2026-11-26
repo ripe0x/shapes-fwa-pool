@@ -147,13 +147,13 @@ contract ForkManagerTest is ForkBase {
         VaultLib.Params memory p = managerParams();
         vm.prank(address(factory));
         vm.expectRevert(Ownable.AlreadyInitialized.selector);
-        impl.initialize(bob, p);
+        impl.initialize(bob, p, 0);
         vm.prank(address(factory));
         vm.expectRevert(Ownable.AlreadyInitialized.selector);
-        m.initialize(bob, p);
+        m.initialize(bob, p, 0);
         vm.prank(bob);
         vm.expectRevert(Ownable.Unauthorized.selector);
-        m.initialize(bob, p);
+        m.initialize(bob, p, 0);
         assertEq(m.owner(), alice);
     }
 
@@ -169,6 +169,52 @@ contract ForkManagerTest is ForkBase {
         vm.expectRevert(Ownable.NewOwnerIsZeroAddress.selector);
         factory.create(address(0), managerParams(), _expected23);
         assertEq(factory.managerCount(), 0);
+    }
+
+    /// The owner's pack mix caps each size's held packs; builds below it run on the real pool,
+    /// builds past it revert, and only the owner can change it.
+    function test_designCapsEachPackSize() public {
+        VaultLib.Params memory p = managerParams();
+        p.packUnitsMask = uint64(1 << 3 | 1 << 5);
+        uint256 design = 2 << 24 | 1 << 40; // two 0.03 ETH packs, one 0.05 ETH pack
+        bytes32 expected = TestVaultOps.factoryHash(factory, p);
+        vm.prank(alice);
+        PackManager m = factory.create{value: 1 ether}(alice, p, design, expected);
+        assertEq(m.design(), design);
+
+        vm.startPrank(keeper);
+        TestVaultOps.restock(m, 2, 3, 0);
+        TestVaultOps.restock(m, 1, 5, 0);
+        assertEq(m.recipeCount(3), 2);
+        assertEq(m.recipeCount(5), 1);
+        assertEq(m.openListingCount(), 3, "every designed pack lists");
+        uint256[] memory one = TestVaultOps.proposals(m, 1, 3);
+        bytes32 h = TestVaultOps.configurationHash(m);
+        vm.expectRevert(VaultLib.BadBatch.selector);
+        m.build(3, one, 0, h);
+        one = TestVaultOps.proposals(m, 1, 5);
+        vm.expectRevert(VaultLib.BadBatch.selector);
+        m.build(5, one, 0, h);
+        vm.stopPrank();
+
+        vm.prank(bob);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        m.setDesign(3 << 24);
+        vm.startPrank(alice);
+        vm.expectRevert(PackAccount.InvalidDesign.selector);
+        m.setDesign(1 << 16); // 0.02 ETH packs do not exist
+        vm.expectRevert(PackAccount.InvalidDesign.selector);
+        m.setDesign(1 << 248);
+        m.setDesign(3 << 24 | 1 << 40);
+        vm.stopPrank();
+        vm.prank(keeper);
+        TestVaultOps.restock(m, 1, 3, 0);
+        assertEq(m.recipeCount(3), 3, "a raised count builds again");
+
+        bytes32 e2 = TestVaultOps.factoryHash(factory, p);
+        vm.prank(alice);
+        vm.expectRevert(PackAccount.InvalidDesign.selector);
+        factory.create{value: 1 ether}(alice, p, uint256(1) << 8, e2);
     }
 
     // ------------------------------------------------------------------ owner controls

@@ -223,13 +223,20 @@ def stable_read_state(vault, slowdown, burn=False, pooled=True):
                 raise
 
 
-def build_units_for(mask):
-    """The pack size this keeper builds: REF_UNITS when the account admits it, else the smallest
-    admitted size. A valid mask always has an enabled size in [MIN_PACK_UNITS, MAX_PACK_UNITS]."""
-    if (mask >> policy.REF_UNITS) & 1:
-        return policy.REF_UNITS
-    return next((u for u in range(policy.MIN_PACK_UNITS, policy.MAX_PACK_UNITS + 1) if (mask >> u) & 1),
-                0)
+def build_units_for(mask, design=0, held=None):
+    """The pack size this keeper builds and how many more of it the account's design allows.
+
+    design 0: REF_UNITS when the mask admits it, else the smallest admitted size, without a count.
+    Otherwise the admitted size furthest below its design count (`held[u]` packs held), the
+    smaller size on a tie; (0, 0) once every size is at its count."""
+    if not design:
+        if (mask >> policy.REF_UNITS) & 1:
+            return policy.REF_UNITS, None
+        return next((u for u in range(policy.MIN_PACK_UNITS, policy.MAX_PACK_UNITS + 1) if (mask >> u) & 1), 0), None
+    room = {u: (design >> 8 * u & 0xFF) - held.get(u, 0) for u in range(policy.MIN_PACK_UNITS, policy.MAX_PACK_UNITS + 1)
+            if (mask >> u) & 1 and design >> 8 * u & 0xFF}
+    best = max(room, key=lambda u: (room[u], -u), default=0)
+    return (best, room[best]) if best and room[best] > 0 else (0, 0)
 
 
 def read_tokens(vault, candidate_ids, block):
@@ -274,7 +281,10 @@ def read_state(vault, slowdown, burn=False, pooled=True):
     premium, share, mask = (p[k] for k in ('payMarkupBps', 'keeperShareBps', 'packUnitsMask'))
     ceiling, ess_ceiling, tip, wfee, res = (p[k] for k in ('gasCeilingWei', 'essentialCeilingWei', 'maxTipWei', 'workFeeWei', 'reserveWei'))
     _ec = p['essentialCapWei']
-    build_units = build_units_for(mask)
+    design = num(at(vault, 'design()(uint256)'))
+    held = {u: num(at(vault, 'recipeCount(uint256)(uint256)', u)) for u in range(policy.MIN_PACK_UNITS, policy.MAX_PACK_UNITS + 1)
+            if design >> 8 * u & 0xFF}
+    build_units, build_room = build_units_for(mask, design, held)
     idle_count = num(at(vault, 'idlePackCount()(uint256)'))
     idle_ids = [num(at(vault, 'idlePackAt(uint256)(uint256)', idle_count-1-i)) for i in range(min(idle_count, policy.MAX_BATCH['list']))]
     idle_candidates = [(i, num(at(vault, 'idleValueOf(uint256)(uint256)', i))) for i in idle_ids]
@@ -329,7 +339,7 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         recovery_packs=num(at(vault, "recoveryPackCount()(uint256)")),
         free=max(0, balance - reserves), idle_eth=num(at(vault, "idleEth()(uint256)")), owed_estimate=owed,
         pending_deposits=pending, locked_shares=locked, total_shares=supply, pack_units_mask=mask,
-        build_units=build_units, pooled=pooled, settlement_fee_bps=num(at(FWA, "ownerSettlementFeeBps()(uint256)")),
+        build_units=build_units, build_room=build_room, pooled=pooled, settlement_fee_bps=num(at(FWA, "ownerSettlementFeeBps()(uint256)")),
         essential_ceiling=ess_ceiling, essential_cap=_ec, processing_pool=processing_pool,
         gas_schedule=gas_schedule(p), backing_ratio_bps=p["backingRatioBps"],
         accepted_mint_fee=p["acceptedMintFeeWei"],

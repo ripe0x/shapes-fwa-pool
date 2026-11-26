@@ -1359,3 +1359,16 @@ stated wallet cap. Already burned pack NFTs cannot migrate intact. Unsupported p
 
 Earlier studies/receipts remain historical. New code needs fresh validation and unsigned artifacts;
 this decision grants no public transaction, signature, live cutover, shared vault deployment or merge.
+
+## Owner pack mix (2026-11-26)
+
+The owner asked for a pack designer like the community pool's: exact counts per pack size, presets,
+and a total-count control that scales the mix. `PackAccount.design` holds the mix in one word (byte u
+= most packs of u x 0.01 ETH held, u in 3..30); 0 means no counts and `packUnitsMask` alone decides,
+which keeps every existing caller and the pooled vault unchanged. `build` reverts once a size's held
+count (idle, listed or awaiting settlement) plus the batch would pass its count; imports and returned
+packs are never refused, and a lowered count only stops further builds. The factory gains a
+`create(owner, p, design, expected)` overload; the owner changes the mix with `setDesign`. The keeper
+builds the admitted size furthest below its count, the smaller size on a tie, never past it.
+Presets (small 0.03; balanced 2:1:1 of 0.03/0.05/0.10; large 0.10) are UI defaults, not owner rules.
+Backing stays one ratio for every size. Grants no deployment, signature or merge.

@@ -120,6 +120,7 @@ class State:
     distribution_due: bool = False  # a no-flow checkpoint would distribute now (simulated)
     pack_units_mask: int = 1 << REF_UNITS  # account packUnitsMask: the pack sizes it admits
     build_units: int = REF_UNITS  # pack size the keeper builds; must be enabled in pack_units_mask
+    build_room: int = None  # packs of build_units the account design still allows; None = no count
     essential_ceiling: int = None  # redemption and wind-down work; None = same as gas_ceiling
     book_pack_count: int = 0
     book_shape_count: int = 0
@@ -489,7 +490,8 @@ def plan(s):
         proposals = s.build_proposals[:MAX_BATCH["build"]]
         build = build_cost(s, units)
         n = 0  # largest batch the vault's capital check accepts: per-pack mint cost plus backing
-        for c in range(min(len(proposals), MAX_BATCH["build"]), 0, -1):
+        limit = MAX_BATCH["build"] if s.build_room is None else min(MAX_BATCH["build"], s.build_room)
+        for c in range(min(len(proposals), limit), 0, -1):
             if c * price + sum(proposals[:c]) + quote(s,q['build']+c*(q['build_pack']+shape_count(units)*q['build_shape']+q['listed']),2*c) <= idle:
                 n = c
                 break

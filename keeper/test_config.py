@@ -25,7 +25,15 @@ def main():
         assert h != configuration_hash(changed, 10**15), field
     assert wallet_debit_bound(100, 2, 1, 7) == 632
     assert wallet_debit_bound(101, 2, 1, 7) > 632  # signed minPay calldata changes its estimate
-    assert build_units_for(0) == 0 and build_units_for(8) == 3
+    assert build_units_for(0) == (0, None) and build_units_for(8) == (3, None)
+    mix = 1 << 3 | 1 << 5 | 1 << 10
+    design = 4 << 24 | 2 << 40 | 1 << 80  # four 0.03, two 0.05, one 0.10 ETH packs
+    assert build_units_for(mix, design, {}) == (3, 4)
+    assert build_units_for(mix, design, {3: 3}) == (5, 2), "furthest below its count first"
+    assert build_units_for(mix, design, {3: 3, 5: 1}) == (3, 1), "a tie builds the smaller size"
+    assert build_units_for(mix, design, {3: 4, 5: 2}) == (10, 1)
+    assert build_units_for(mix, design, {3: 5, 5: 2, 10: 1}) == (0, 0), "an over-count size never builds"
+    assert build_units_for(1 << 3, design, {}) == (3, 4), "a size the mask refuses is skipped"
     assert to_cast(('build', 3, [21 * 10**16]), expected=h)[-1] == h
     assert to_cast(('checkpoint',7),caller_funded=True)==['recoverCheckpoint(uint256)',7]
     assert to_cast(('sync', [1], 1), expected=h, caller_funded=True) == ['recover(uint256[],uint256)', '[1]', 1]

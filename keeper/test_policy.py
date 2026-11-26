@@ -187,6 +187,9 @@ def main():
     build = dict(listings=act, idle_eth=E, free=E)
     assert "build" in fns(plan(state(**build)))
     assert "build" not in fns(plan(state(pack_units_mask=1 << 4, **build)))  # REF_UNITS bit unset
+    batch = lambda **kw: max((len(st[2]) for st in plan(state(**build, **kw)) if st[0] == "build"), default=0)
+    assert batch() > 1 and batch(build_room=1) == 1, "the design count bounds a build batch"
+    assert batch(build_room=0) == 0, "a size at its design count never builds"
     # Building does not reserve a tag. Listing is replanned from the next fresh inventory state.
     assert "list" not in fns(plan(state(**build)))
     assert not {"list", "build"} & set(fns(plan(state(queue_drained=False, **build))))

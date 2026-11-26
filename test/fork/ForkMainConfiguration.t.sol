@@ -317,7 +317,7 @@ contract ForkMainConfigurationTest is ForkBase {
     }
 
 
-    function test_reuseRejectsLosingInitialBuildButRelistsRealExistingInventory() public {
+    function test_reuseRelistsRealExistingInventoryAndBuildIsNotChargedItsOneTimeCost() public {
         PackManager m = manager();
         this.buildInRealFeeContext(m, proposal(), m.configurationHash());
         uint256 listingId = m.openListingAt(0);
@@ -337,28 +337,20 @@ contract ForkMainConfigurationTest is ForkBase {
         p.backingRatioBps = 20_000;
         p.payMarkupBps = 0;
         set(m, p);
-        (uint256 k, uint256 freshBacking, bool freshOk) = m.edge(3);
-        assertFalse(freshOk, "initial primary mint expense cannot be omitted in reuse mode");
-        assertEq(freshBacking, 0);
+        // The build gate charges a selection neither gas nor the one-time build (owner, 2026-11-26).
+        (, uint256 freshBacking, bool freshOk) = m.edge(3);
+        assertTrue(freshOk, "a fresh build is not charged its one-time construction");
+        assertEq(freshBacking, 0.06 ether);
         (, uint256 relistBacking, bool relistOk) = m.relistEdge(3);
         assertTrue(relistOk, "existing inventory has no new primary mint expense");
         assertEq(relistBacking, 0.06 ether);
-        uint256 maintenance = m.quote(652_000, 1, false);
-        uint256 construction = m.buildCost(3);
-        assertEq(maintenance + construction, 0.0036054 ether, "each initial construction and maintenance base counted once");
-        assertGt(maintenance + construction, 0.06 ether * (k - 1e18) / 1e18, "initial bid cycle would lose ETH");
         uint256 supply = SHAPES.totalSupply();
         uint256 fees = IShapesFeeAdmin(address(SHAPES)).pendingFees();
         uint256[] memory values = new uint256[](1);
         values[0] = relistBacking;
-        bytes32 expected = m.configurationHash();
-        vm.expectRevert(VaultLib.InvalidBacking.selector);
-        m.build(3, values, 0, expected);
-        assertEq(SHAPES.totalSupply(), supply, "rejected build commits no new mint");
-        assertEq(IShapesFeeAdmin(address(SHAPES)).pendingFees(), fees);
         m.list(values, 0, m.configurationHash());
         assertEq(m.position(m.openListingAt(0)).packId, packId);
-        assertEq(SHAPES.totalSupply(), supply);
+        assertEq(SHAPES.totalSupply(), supply, "relisting a returned pack mints nothing");
         assertEq(IShapesFeeAdmin(address(SHAPES)).pendingFees(), fees);
     }
 

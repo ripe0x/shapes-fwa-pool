@@ -27,9 +27,18 @@ contract PackManagerFactory {
 
     /// @notice Create a manager owned by `owner` with parameters `p`, funded with `msg.value`.
     function create(address owner, VaultLib.Params calldata p, bytes32 expected) external payable returns (PackManager manager) {
+        return _create(owner, p, 0, expected);
+    }
+
+    /// @notice As `create`, with the owner's pack mix (`PackAccount.design`).
+    function create(address owner, VaultLib.Params calldata p, uint256 design, bytes32 expected) external payable returns (PackManager manager) {
+        return _create(owner, p, design, expected);
+    }
+
+    function _create(address owner, VaultLib.Params calldata p, uint256 design, bytes32 expected) private returns (PackManager manager) {
         if (expected != configHashFor(p)) revert ConfigurationChanged();
         manager = PackManager(payable(LibClone.clone(address(implementation))));
-        manager.initialize{value: msg.value}(owner, p);
+        manager.initialize{value: msg.value}(owner, p, design);
         isManager[address(manager)] = true;
         emit ManagerCreated(address(manager), owner, _managers.length, msg.value);
         _managers.push(address(manager));
