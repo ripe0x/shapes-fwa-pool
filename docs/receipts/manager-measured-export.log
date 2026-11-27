@@ -1,7 +1,7 @@
 No files changed, compilation skipped
 
 Ran 1 test for test/fork/ManagerOperationsCheckpoint.t.sol:ManagerOperationsCheckpointTest
-[PASS] test_exportAuthenticatedAllocatedCheckpoint() (gas: 148193885)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.55s (1.09s CPU time)
+[PASS] test_exportAuthenticatedAllocatedCheckpoint() (gas: 148401185)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.62s (1.15s CPU time)
 
-Ran 1 test suite in 1.86s (1.55s CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)
+Ran 1 test suite in 1.90s (1.62s CPU time): 1 tests passed, 0 failed, 0 skipped (1 total tests)

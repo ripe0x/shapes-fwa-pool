@@ -56,6 +56,24 @@ No Solidity runtime, ABI or app source changed in A10. The earlier real-counterp
 
 **Things that don't make sense.** A positive model mean accompanies zero ordinary sync/relist cycles. Repeated local transaction hashes are possible across separate isolated forks, so a receipt hash alone is not a unique evidence key. More selection seeds on two archived months do not create new demand histories.
 
+## Current-source rebind (A9.8 replaceable factory implementation)
+
+Rebinds [`manager-measured-cost-calibration.json`](manager-measured-cost-calibration.json) to `src/**/*.sol`
+after D87 (`PackManagerFactory.setImplementation`, two-step admin; `PackManager` takes its factory as a
+constructor argument). The same three-packet procedure as the D86 rebind below, freshly executed on a
+retained 8545 Anvil with a freshly exported checkpoint (the prior checkpoint files are in Git history):
+[main](manager-measured-50k-receipts-v3.json) PASS 64 tx, [sync-contexts](manager-measured-sync-contexts-v3.json)
+PASS 18 tx, [owner-exit](manager-measured-owner-exit-v3.json) PASS 13 tx; zero public transactions.
+
+| Paid op | receipts | keeper-loss receipts | min keeper net (wei) | single-work gasUsed (v2) |
+|---|---|---|---|---|
+| build | 6 | 0 | 77,459,400,000,000 | 1,815,697 (1,815,758) |
+| list | 9 | 0 | 32,502,600,000,000 | 1,152,578 (1,152,578) |
+| sync | 4 | 0 | 7,729,400,000,000 | 352,806 (352,806) |
+
+Exit unlist and liquidate stay unpaid (D86) with gasUsed identical to v2. The manager runtime and its
+libraries are unchanged by D87, so keeper work gas matches v2 within 61 gas; only factory creation changed.
+
 ## Current-source rebind (D86 unpaid exit)
 
 Rebinds [`manager-measured-cost-calibration.json`](manager-measured-cost-calibration.json) to the current
