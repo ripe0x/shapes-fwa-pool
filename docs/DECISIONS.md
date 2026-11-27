@@ -1415,3 +1415,18 @@ a creation reviewed against the previous implementation reverts `ConfigurationCh
 manager's own `configurationHash()` is unchanged. Trust added: the admin chooses the code future
 managers run. Tests: `ForkManager.t.sol` `test_adminChangesImplementationForNewManagersOnly`,
 `test_adminTransferIsTwoStep`.
+
+## D88. Launch-audit repairs: exact mix, same-frame gas, preview hash (2026-11-27)
+
+Launch audit of 8e9034d (A informed, B uninformed). Owner approved all four repairs.
+E1: `design == 0` meant no pack-count limit, so any caller could build with all idle ETH (0.01498
+ETH measured cost on 1 ETH with no demand). A9.5 requires exact owner counts: the three-argument
+`create` is removed and `_setDesign` rejects 0. PackVault never sets a design and is unaffected.
+E2: `measuredPayment` read `gasleft()` two delegatecall frames below the account's `gasStart`, so
+EIP-150's withheld 1/64 grew `measured` (and pay, up to the allowance) with the caller's gas limit.
+Accounts now pass gas spent across each library call and each external library entry re-anchors;
+the few thousand gas per call boundary are unmeasured and covered by `overhead`.
+I2: `preview` returned a hash without the implementation; it now returns `configHashFor`.
+I1 (app): the manager entry shows whenever a manager factory is configured, without a vault.
+Tests: `ForkManager.t.sol` `test_zeroDesignRefused`, `test_previewHashCreates`,
+`test_gasLimitDoesNotChangeMeasuredPay`.

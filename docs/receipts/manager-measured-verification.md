@@ -56,6 +56,25 @@ No Solidity runtime, ABI or app source changed in A10. The earlier real-counterp
 
 **Things that don't make sense.** A positive model mean accompanies zero ordinary sync/relist cycles. Repeated local transaction hashes are possible across separate isolated forks, so a receipt hash alone is not a unique evidence key. More selection seeds on two archived months do not create new demand histories.
 
+## Current-source rebind (D88 launch-audit repairs)
+
+Rebinds the profile after D88: `_setDesign` rejects 0 and the factory has only the design-carrying
+`create`; keeper gas is re-anchored in each library frame (`spent` across calls) so the caller's gas
+limit no longer inflates `measured`; `preview` returns `configHashFor`. Same three-packet procedure on
+a fresh 8545 checkpoint; the writers now create with an exact mix (`full_design`: 255 of each admitted
+size). [main](manager-measured-50k-receipts-v4.json) PASS 64 tx, [sync-contexts](manager-measured-sync-contexts-v4.json)
+PASS 18, [owner-exit](manager-measured-owner-exit-v4.json) PASS 13; zero public transactions.
+
+| Paid op | receipts | keeper-loss receipts | min keeper net (wei), v4 (v3) | single-work gasUsed, v4 (v3) |
+|---|---|---|---|---|
+| build | 6 | 0 | 67,506,800,000,000 (77,459,400,000,000) | 1,816,369 (1,815,697) |
+| list | 9 | 0 | 26,156,000,000,000 (32,502,600,000,000) | 1,152,811 (1,152,578) |
+| sync | 4 | 0 | 5,448,000,000,000 (7,729,400,000,000) | 353,066 (352,806) |
+
+Keeper net falls because pay no longer includes the withheld forwarding gas; work gas rises by the
+design check and re-anchoring (233 to 672 gas). `test_gasLimitDoesNotChangeMeasuredPay` measured
+1,880,167 vs 2,246,424 gas at 3M vs 15M gas limits on the old code and identical values after the fix.
+
 ## Current-source rebind (A9.8 replaceable factory implementation)
 
 Rebinds [`manager-measured-cost-calibration.json`](manager-measured-cost-calibration.json) to `src/**/*.sol`
