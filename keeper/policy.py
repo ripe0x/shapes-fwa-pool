@@ -187,7 +187,7 @@ def position_value(s, units=None):
 
 
 def edge_backing(k, cap, s_bps, units, gas_ceiling, markup_bps, work_fee, buffer_bps=0, min_edge_bps=100,
-                 discount_bps=9_150, price=None, mint_fee=5*10**14, backing_ratio_bps=10_607,
+                 discount_bps=9_150, price=None, mint_fee=5*10**14, backing_ratio_bps=11_053,
                  gas_schedule=None, newly_built=True, reference_units=None, retirement_shapes=None):
     """Adjustable ratio backing, with actual FWA admission and no buyer-choice preference.
     Gas and build arguments are accepted for callers but no longer priced (VaultLib._profitable)."""

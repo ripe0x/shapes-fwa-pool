@@ -1372,3 +1372,12 @@ packs are never refused, and a lowered count only stops further builds. The fact
 builds the admitted size furthest below its count, the smaller size on a tie, never past it.
 Presets (small 0.03; balanced 2:1:1 of 0.03/0.05/0.10; large 0.10) are UI defaults, not owner rules.
 Backing stays one ratio for every size. Grants no deployment, signature or merge.
+
+## Manager backing 11053 bps (2026-11-26)
+
+New managers post backing of 11053 bps of pack value (0.033159 ETH on a 0.03 ETH pack). A kept pack
+then repays its Shapes and one 0.0005 ETH mint fee per 0.01 ETH unit (the worst Shapes makeup) even
+at FWA's immutable 5% settlement-fee cap; at today's 1% fee a kept 0.03 pack nets +0.0013 ETH. This
+supersedes 10607 bps, which broke even only at the 1% fee and lost 0.00127 ETH per kept 0.03 pack at
+5%. Cost: about 2% more capital per 0.03 pack and about 4% fewer picks per pack, with unchanged
+expected income per unit time. Owners keep the pack mix as their only design choice.
