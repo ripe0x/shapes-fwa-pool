@@ -10,7 +10,7 @@ One manager owns its assets and uses the shared PackAccount/StrategyLib/VaultLib
 
 The current recipe is 0.03 ETH principal from three primary Shapes, with mask bit 3 and nominal separate backing of 0.21 ETH. Returned packs are relisted intact. A kept pack leaves inventory, and any replacement is a normal build using actual cash and permission. There is no Fresh mode, renewal float, replacement-eligibility balance or paid retirement/remint path.
 
-The accepted fee is 0.001 ETH per Shape. The [pinned block 26,494,800 readback](../receipts/manager-a10-public-readback.json) and updated creation template at block 26,494,820 show an actual fee of 0.0005 ETH, signer nonce **4181**, old factory manager count zero and unchanged 0.01 ETH legacy vault balance. The earlier nonce-4180 package is preserved in [manager-unsigned-history](../../deploy/manager-unsigned-history/) and in its original commit. These reads change no fee. The 0.5 ETH creation template is an evaluation funding amount, not a contract minimum or return recommendation. The owner's pinned wallet balance was **0.177336592479995704 ETH**, so that 0.5 ETH template cannot currently execute from this wallet: it lacks **0.322663407520004296 ETH plus wallet gas**.
+The accepted and live Shapes mint fee is 0.0005 ETH per Shape (`acceptedMintFeeWei` 500,000,000,000,000 in [manager.json](../../deploy/manager.json)). At block 26,503,589 the signer nonce was **4259** and the owner/signer wallet held **0.007998370385103725 ETH**. Earlier nonce-4180 and nonce-4181 packages remain in Git history and [manager-unsigned-history](../../deploy/manager-unsigned-history/). The 0.5 ETH creation template is an evaluation funding amount, not a contract minimum or return recommendation; this wallet cannot fund it now (it lacks about 0.492 ETH plus wallet gas).
 
 At zero markup, the maximum one-pack build/list funding envelope plus reserve is 0.246925 ETH at 0.2 gwei or 0.2475025 ETH at 0.5 gwei using the observed fee. Using the accepted maximum gives 0.248425 / 0.2490025 ETH. Wallet creation gas is separate. Actual compensation uses bounded measured work and can be lower; these envelopes are not billed costs or profit predictions.
 
@@ -37,26 +37,26 @@ RPC_URL=https://mainnet.gateway.tenderly.co /Users/dd/.pyenv/versions/3.11.8/bin
   0xCB43078C32423F5348Cab5885911C3B5faE217F9 500000000000000000
 ```
 
-The wrapper was run **without broadcast**, with exit status 0. Its reported release-gate failure was the shell's default Python missing `eth_utils`; the Forge simulation and local postflight still passed. The commands above pin the working Python environment, and the final release check is run separately after commit. The same compiled dry-run was independently revalidated by the package generator at block 26,494,819; nonce **4181** matched. No acceptance or signature was generated or reused.
+The wrapper was run **without broadcast**, with exit status 0, at block 26,503,589 after the manifest was regenerated; the Forge simulation and local postflight passed. The release check then reported only the uncommitted manifest, which is committed with this package. No acceptance or signature was generated or reused.
 
 The validated public Forge dry-run was preserved as [manager-measured-dry-run.json](../../deploy/manager-measured-dry-run.json), SHA-256 `b2cd8ae949910519e996ce5fa0afff14d9b240f3a60b38a40f61cac01e0694db`. The [A10 preparation log](../receipts/manager-measured-unsigned-dry-run-a10.log) preserves the Python gate error as well as the successful Forge simulation/postflight. Forge's sensitive cache is not an input to this package and was not copied.
 
-[manager-unsigned-cutover.json](../../deploy/manager-unsigned-cutover.json) records Ethereum chain 1, refreshed nonce readback **4181** at block **26,494,819**, contiguous unsigned nonces 4181–4184, validated compiled links and dependency values:
+[manager-unsigned-cutover.json](../../deploy/manager-unsigned-cutover.json) records Ethereum chain 1 at block **26,503,589**, signer nonce **4259** read live, contiguous unsigned nonces 4259–4262, validated compiled links and dependency values. It includes the owner pack mix (`PackAccount.design`) and backing of 10607 bps:
 
 | Contract | Predicted address | Transaction gas limit |
 |---|---|---:|
-| ScanLib | `0x8148d8b4621ce009275d88e5dfdf1302a700cbc0` | 6,827,830 |
-| VaultLib | `0x1e7a9cd8acf72f5dffda172497d41f5471d15317` | 7,181,954 |
-| StrategyLib | `0xc3ab28505d386ea4f77b4b121e0e8c4b8b828a30` | 4,399,705 |
-| PackManagerFactory | `0x0cEc235560B81Bf0568A1cFc07D9491fE3d9EC4B` | 7,348,688 |
+| ScanLib | `0xeccad35c59e192e86443cdbcf70a7eac308fc63f` | 6,316,516 |
+| VaultLib | `0x27d06bbaa13f860702d97aeebf3a8bc982b71239` | 6,720,441 |
+| StrategyLib | `0xcd9241562dcda713e6429e18b0b8f14cfb862f04` | 4,399,705 |
+| PackManagerFactory | `0xBFfF9760EC41a3a9167f641E17AF8d93503C79a4` | 7,442,016 |
 
-The implementation predicted by the factory is `0xaEd9c253c62cbf390Ebbe72dddbBA85bD589A4BE`. Every transaction is below EIP-7825's 16,777,216 limit. The script's aggregate estimate is 25,758,177 gas across transactions, not one transaction. Its estimated required total of 0.005377090335253104 ETH at a 0.208752752 gwei estimate is simulation output, not gas spent or a fixed future price.
+The implementation predicted by the factory is `0xEB1B5F61e1b4D4cd379DF9aA0421fb25cB34b52F`. Every transaction is below EIP-7825's 16,777,216 limit. The script's aggregate estimate is 24,878,678 gas; its estimated total of 0.006844906976131202 ETH at a 0.275 gwei estimate is simulation output, not gas spent. The signer held **0.007998 ETH** at that block, a margin of about 0.0012 ETH at that gas price.
 
-Compiled runtime sizes in this package are PackManager 20,707 bytes, factory 4,876, StrategyLib 14,456, VaultLib 22,422 and ScanLib 21,310. The package binds their exact runtime/initcode hashes. Historical unsigned inputs and the earlier public dry-run are retained in [manager-unsigned-history](../../deploy/manager-unsigned-history/); their predicted addresses and nonces are not current.
+Compiled runtime sizes in this package are PackManager 21,090 bytes, factory 4,826, StrategyLib 14,456, VaultLib 22,212 and ScanLib 20,869. The package binds their exact runtime/initcode hashes. The dry-run [manager-measured-dry-run.json](../../deploy/manager-measured-dry-run.json) has SHA-256 `1317bf58d8e24c96b689288418b874a450f8b6ac5191386282d5a46cf0c07c1d`. The release ABI guard requires exactly two factory creates, `(owner, p, expected)` and `(owner, p, design, expected)`, and `initialize(owner_, p, design_)`.
 
 ## Creation template and final refresh
 
-[manager-create-unsigned.json](../../deploy/manager-create-unsigned.json) is unsigned calldata to the current predicted factory. At block **26,494,820**, the factory is not deployed, the reviewed owner is `0xCB43078C32423F5348Cab5885911C3B5faE217F9`, funding is 500,000,000,000,000,000 wei, and the configuration expectation is `0x2c8bed5338b295b8aa543711ce5b97f774557239742a91ec1e96702b7f66b0c6`. Manager values SHA-256 is `66423b7ed03e758fafe3b0a0b79a861f7894e97bf1885a8f13cfe887f38385cc`; template SHA-256 is `aa2b9c9313356407fa787e65afcdb6dba4aad75b51eafd7fcce1678baff41187`. The prior template remains available in the previous Git revision and [manager-unsigned-history](../../deploy/manager-unsigned-history/).
+[manager-create-unsigned.json](../../deploy/manager-create-unsigned.json) is unsigned calldata to the current predicted factory, using `create(owner, p, design, expected)`. At block **26,503,590**, the factory is not deployed, the reviewed owner is `0xCB43078C32423F5348Cab5885911C3B5faE217F9`, the sample design is 2 x 0.03, 1 x 0.05 and 1 x 0.10 ETH packs (`0x100000000010002000000`, packUnitsMask 1064), funding is 500,000,000,000,000,000 wei, the live mint fee is 0.0005 ETH and the configuration expectation is `0x7ac929d179fa5a29bd6606f18acb7b133f350b921c97dc71faa73bbd2c58b7fa`. Manager values SHA-256 is `2650ab75d46c2f7b242016d39a2fb502af280510ed96722e173b16afbf484584`; template SHA-256 is `22c832c35f30271023c824f4f5a8d3c87dd4ef3921467d266626d66834a12e7b`. The design and funding are evaluation samples; the owner sets both at creation. The prior template remains available in the previous Git revision and [manager-unsigned-history](../../deploy/manager-unsigned-history/).
 
 A prior template attempt timed out during the pinned live mint-fee read before replacing its output. [The failure record](../receipts/manager-measured-unsigned-create-attempt1.json) is retained. Only template generation was retried; the successful deployment simulation was not repeated. The final template uses the current package's factory, rather than a historical predicted address.
 
