@@ -557,6 +557,10 @@ def postflight_manager(factory, values, manager=None, owner=None, funding=None, 
         check(cast("call", manager, "factory()(address)").lower() == factory.lower(), "manager factory")
         check(cast("call", manager, "owner()(address)").lower() == owner.lower(), "manager owner")
         v = _launch_json(ROOT / "deploy/manager.json")
+        # A manager created with a pack mix admits exactly the mix's sizes (as manager_create sets them).
+        design = int(first(cast("call", manager, "design()(uint256)")))
+        if design:
+            v = v | {"packUnitsMask": sum(1 << u for u in range(3, 31) if (design >> (8 * u)) & 0xFF)}
         got = decode_params(cast("call", manager, f"getParams()({PARAMS_T})"))
         expected = {key: v[key] for key, _ in PARAM_FIELDS} | {"gasSchedule": v["gasSchedule"]}
         check(got == expected, "manager complete Params/GasSchedule")
