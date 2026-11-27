@@ -43,8 +43,9 @@ contract PackManager is PackAccount {
 
     uint256 private constant PACK_CONTENTS_GAS = 150_000;
 
-    constructor(IFWAV2 fwa_, IShapes shapes_, IShapePacks packs_) PackAccount(fwa_, shapes_, packs_) {
-        factory = msg.sender;
+    /// @dev `factory_` lets a later implementation be deployed by anyone and bound to an existing factory.
+    constructor(IFWAV2 fwa_, IShapes shapes_, IShapePacks packs_, address factory_) PackAccount(fwa_, shapes_, packs_) {
+        factory = factory_;
         _initialized = true; // the implementation itself can never be initialized
     }
 

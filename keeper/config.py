@@ -66,6 +66,14 @@ def configuration_hash(values, live_mint_fee, listing_paused=False, winding_down
     return '0x' + keccak(encode([PARAMS_T, 'uint256', 'bool', 'bool'], [params_values(values), live_mint_fee, listing_paused, winding_down])).hex()
 
 
+def factory_configuration_hash(values, live_mint_fee, implementation):
+    """PackManagerFactory.configHashFor: the creation's settings bound to the implementation it clones."""
+    from eth_abi import encode
+    from eth_utils import keccak
+    return '0x' + keccak(encode([PARAMS_T, 'uint256', 'bool', 'bool', 'address'],
+                                [params_values(values), live_mint_fee, False, False, implementation])).hex()
+
+
 def guarded_call(sig, args, read):
     """Bind legacy rehearsal call sites to the current ABI at the execution boundary."""
     name = sig.split('(')[0]

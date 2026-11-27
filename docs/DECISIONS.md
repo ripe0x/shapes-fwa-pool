@@ -1402,3 +1402,16 @@ the routine one; `budget()` now returns just the routine amount.
 (`requestCharge`, `syncFunded`/`payFunded(..., essential=true)`) to price checkpoint work at its own
 ceiling from the requester's processing pool, independent of the routine budget. All vault holder
 features (distribution, redemption, claims, checkpoint) and `distributionBps` are unchanged.
+
+## D87. Factory implementation is replaceable for new managers only (A9.8, 2026-11-27)
+
+`PackManagerFactory.implementation` is a storage address the admin may change with
+`setImplementation`, following `BalancerFactory`. The deployer is the first admin; transfer is two
+steps (`transferAdmin`, `acceptAdmin`). `PackManager` takes its factory as a constructor argument, so
+anyone can deploy a replacement bound to this factory; `setImplementation` rejects one bound
+elsewhere, and its clones can only be initialized through this factory. Each clone is a fixed EIP-1167 proxy, so existing
+managers never change code, owner or settings. `configHashFor` now also binds the implementation:
+a creation reviewed against the previous implementation reverts `ConfigurationChanged`. A
+manager's own `configurationHash()` is unchanged. Trust added: the admin chooses the code future
+managers run. Tests: `ForkManager.t.sol` `test_adminChangesImplementationForNewManagersOnly`,
+`test_adminTransferIsTwoStep`.

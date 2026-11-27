@@ -121,7 +121,7 @@ contract ForkManagerTest is ForkBase {
         assertFalse(m.listingPaused());
         assertFalse(m.windingDown());
         // The implementation never gets an owner.
-        assertEq(factory.implementation().owner(), address(0));
+        assertEq(PackManager(payable(factory.implementation())).owner(), address(0));
     }
 
     /// @dev Deployment gas of the shared contracts (libraries are deployed by the test harness and
@@ -140,7 +140,7 @@ contract ForkManagerTest is ForkBase {
 
     function test_initializeOnlyOnceOnlyByFactory() public {
         PackManager m = _create(alice, 0.1 ether);
-        PackManager impl = factory.implementation();
+        PackManager impl = PackManager(payable(factory.implementation()));
 
         VaultLib.Params memory p = managerParams();
         vm.prank(address(factory));
@@ -153,6 +153,63 @@ contract ForkManagerTest is ForkBase {
         vm.expectRevert(Ownable.Unauthorized.selector);
         m.initialize(bob, p, 0);
         assertEq(m.owner(), alice);
+    }
+
+    /// @dev The admin may point new creations at another implementation; managers already created
+    ///      keep their code, a hash reviewed against the old implementation is refused, and only an
+    ///      implementation bound to this factory is accepted.
+    function test_adminChangesImplementationForNewManagersOnly() public {
+        assertEq(factory.admin(), address(this));
+        PackManager oldM = _create(alice, 0.1 ether);
+        address oldImpl = factory.implementation();
+        bytes32 staleHash = TestVaultOps.factoryHash(factory, managerParams());
+
+        PackManager foreign = new PackManager(FWA, SHAPES, PACKS, address(this)); // bound to another factory
+        vm.expectRevert(PackManagerFactory.InvalidImplementation.selector);
+        factory.setImplementation(address(foreign));
+        vm.expectRevert(PackManagerFactory.InvalidImplementation.selector);
+        factory.setImplementation(carol);
+
+        vm.prank(alice); // anyone may deploy a replacement; only the admin may select it
+        PackManager next = new PackManager(FWA, SHAPES, PACKS, address(factory));
+        vm.prank(alice);
+        vm.expectRevert(PackManagerFactory.Unauthorized.selector);
+        factory.setImplementation(address(next));
+        factory.setImplementation(address(next));
+        assertEq(factory.implementation(), address(next));
+
+        vm.prank(bob);
+        vm.expectRevert(PackManagerFactory.ConfigurationChanged.selector);
+        factory.create{value: 0.1 ether}(bob, managerParams(), staleHash);
+
+        PackManager newM = _create(bob, 0.1 ether);
+        assertEq(keccak256(address(oldM).code), keccak256(_clone(oldImpl)), "old manager keeps its code");
+        assertEq(keccak256(address(newM).code), keccak256(_clone(address(next))), "new manager clones next");
+        assertEq(oldM.owner(), alice);
+        assertEq(newM.owner(), bob);
+        assertTrue(factory.isManager(address(oldM)) && factory.isManager(address(newM)));
+    }
+
+    function test_adminTransferIsTwoStep() public {
+        vm.prank(alice);
+        vm.expectRevert(PackManagerFactory.Unauthorized.selector);
+        factory.transferAdmin(alice);
+        factory.transferAdmin(alice);
+        assertEq(factory.admin(), address(this), "pending until accepted");
+        vm.prank(bob);
+        vm.expectRevert(PackManagerFactory.Unauthorized.selector);
+        factory.acceptAdmin();
+        vm.prank(alice);
+        factory.acceptAdmin();
+        assertEq(factory.admin(), alice);
+        assertEq(factory.pendingAdmin(), address(0));
+        address impl = factory.implementation();
+        vm.expectRevert(PackManagerFactory.Unauthorized.selector);
+        factory.setImplementation(impl);
+    }
+
+    function _clone(address impl) internal pure returns (bytes memory) {
+        return abi.encodePacked(hex"3d3d3d3d363d3d37363d73", impl, hex"5af43d3d93803e602a57fd5bf3");
     }
 
     function test_createRejectsBadInputs() public {

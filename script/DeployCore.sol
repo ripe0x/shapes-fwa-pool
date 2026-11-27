@@ -26,12 +26,13 @@ library DeployCore {
     function postflightFactory(PackManagerFactory factory, IFWAV2 fwa, IShapes shapes, IShapePacks packs)
         internal view
     {
-        PackManager impl = factory.implementation();
+        PackManager impl = PackManager(payable(factory.implementation()));
         require(impl.factory() == address(factory), "postflight: implementation factory");
         require(address(impl.fwa()) == address(fwa) && address(impl.shapes()) == address(shapes)
             && address(impl.packs()) == address(packs), "postflight: implementation externals");
         require(impl.owner() == address(0), "postflight: implementation has an owner");
         require(factory.managerCount() == 0, "postflight: no managers yet");
+        require(factory.pendingAdmin() == address(0), "postflight: pending admin");
     }
 
     function postflight(PackVault vault, IFWAV2 fwa, address owner, VaultLib.Params memory p, uint256 seed)

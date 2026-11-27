@@ -27,7 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "keeper"))
-from config import PARAMS_T, PARAM_FIELDS, GAS_FIELDS, decode_params, configuration_hash, params_values, tuple_arg
+from config import PARAMS_T, PARAM_FIELDS, GAS_FIELDS, decode_params, configuration_hash, factory_configuration_hash, params_values, tuple_arg
 MANIFEST = ROOT / "deploy/release-manifest.json"
 ACCEPTANCE = ROOT / "docs/release/acceptance.json"
 SIGNATURE = ROOT / "deploy/release-acceptance.sig"
@@ -313,8 +313,8 @@ def _validate_factory_abi(factory_abi):
 
 def validate_compiled_manager_abi(manager_abi, factory_abi):
     if _abi_fields(_abi_entry(manager_abi, "constructor").get("inputs", [])) != [
-            ("fwa_", "address"), ("shapes_", "address"), ("packs_", "address")]:
-        raise ValueError("compiled manager constructor must have only the three main dependencies")
+            ("fwa_", "address"), ("shapes_", "address"), ("packs_", "address"), ("factory_", "address")]:
+        raise ValueError("compiled manager constructor must have only the three main dependencies and its factory")
     getter = _abi_entry(manager_abi, "function", "getParams")
     if getter.get("inputs") != [] or len(getter.get("outputs", [])) != 1:
         raise ValueError("compiled manager getParams must return one Params tuple")
@@ -539,13 +539,15 @@ def postflight_manager(factory, values, manager=None, owner=None, funding=None, 
     fail = []
     check = lambda ok, what: ok or fail.append(what)
     implementation = cast("call", factory, "implementation()(address)")
+    admin = cast("call", factory, "admin()(address)")
     libs = {name: m["build"][name]["create2_address"] for name in LIBRARIES}
     deployed = [("PackManagerFactory", factory), ("PackManager", implementation)] + list(libs.items())
     _postflight_code(m, deployed, fail, "manager")
+    check(int(cast("call", factory, "pendingAdmin()(address)"), 16) == 0, "factory pending admin")
     check(cast("call", implementation, "factory()(address)").lower() == factory.lower(), "implementation factory")
     check(int(cast("call", implementation, "owner()(address)"), 16) == 0, "implementation has an owner")
     accounts = [("implementation", implementation)]
-    result = dict(context, deploymentTarget="manager", factory=factory, implementation=implementation,
+    result = dict(context, deploymentTarget="manager", factory=factory, implementation=implementation, admin=admin,
                   libraries=libs, managerCount=int(first(cast("call", factory, "managerCount()(uint256)"))),
                   factoryBalanceWei=int(cast("balance", factory)), implementationBalanceWei=int(cast("balance", implementation)))
     if manager:
@@ -842,7 +844,9 @@ def manager_create(factory, owner, funding, design=0):
     fee = int(first(cast("call", MAIN_DEPENDENCIES["shapes"], "mintFee()(uint256)")))
     if fee > p["acceptedMintFeeWei"]:
         raise ValueError("live mint fee exceeds the owner's accepted maximum")
-    expected = configuration_hash(p, fee)
+    implementation = (cast("call", factory, "implementation()(address)") if deployed
+                      else create_address(factory, 1))
+    expected = factory_configuration_hash(p, fee, implementation)
     if deployed and cast("call", factory, f"configHashFor({PARAMS_T})(bytes32)", tuple_arg(p)).lower() != expected.lower():
         raise ValueError("factory configuration hash disagrees with the reviewed encoding")
     from eth_abi import encode
@@ -866,7 +870,7 @@ def manager_create(factory, owner, funding, design=0):
                   conditions=["Refresh preview and estimate exact calldata before signing.",
                     "After factory deployment, independently verify its runtime, dependencies and links.",
                     "Creating an idle manager does not establish productive funding or positive returns.",
-                    "No factory or administrator can change this manager's owner/settings after creation."])
+                    "The factory admin changes only the implementation future managers clone; it cannot change this manager's owner, settings or code after creation."])
     print(json.dumps(result, indent=2))
     return result
 
