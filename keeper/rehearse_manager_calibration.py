@@ -188,8 +188,7 @@ def main():
         if operation=='syncCombined':return (sync+journal+selected+synced+pruned)*price+work
         if operation=='list':return (q['list']+q['listed'])*price+work
         if operation=='build':return build*price+2*work
-        if operation=='renew':return (build+q['liquidate']+q['liquidatePack']+3*q['redeemShape'])*price+3*work
-        raise ValueError(operation)
+        raise ValueError(operation)  # 'renew' is retired (reuse-only strategy)
     def explicit(step,label):
         parent=prime();client.RPC=url
         state_path=work/f'{branch}-{label}-tx.json';assert not state_path.exists()

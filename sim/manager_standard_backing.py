@@ -71,7 +71,7 @@ def diagnostic(parent):
         s.k=k;s.backing=backing;s.mint_fee=fee;s.settlement_fee_bps=100
         q=s.gas_schedule
         common={name:q[name] for name in ('sync','journal','selected','synced','pruned','sync_funding','harvested','sync_credit')}
-        retirement=dict(liquidate=q['liquidate'],pack=q['liq_pack'],three_shapes=3*q['redeem_shape'])
+        retirement={}  # retired: reuse-only strategy has no pack retirement, and exits are unpaid
         construction=dict(build=q['build'],pack=q['build_pack'],three_shapes=3*q['build_shape'],listed=q['listed'])
         cycle_quote=F.policy.quote(s,sum(common.values())+sum(retirement.values()),2)
         keep_maintenance_quote=F.policy.quote(s,sum(common.values()),1)

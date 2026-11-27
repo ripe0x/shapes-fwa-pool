@@ -28,13 +28,6 @@ library StrategyLib {
     uint256 internal constant CROWN_EXIT_WINDOW = 12 hours; // FWA early crown exit costs 1%
     uint256 internal constant MAX_LIQUIDATE_UNITS = VaultLib.MAX_LIQUIDATE_UNITS; // ordinary packs: at most 60 Shapes burned
 
-    /// Operation identifiers retained for shared payment entry points.
-    uint256 internal constant OP_BUILD = 1;
-    uint256 internal constant OP_LIST = 2;
-    uint256 internal constant OP_SYNC = 3;
-    uint256 internal constant OP_UNLIST = 5;
-    uint256 internal constant OP_LIQUIDATE = 6;
-
     event Built(uint256 packs, uint256 units);
     event Listed(uint256 indexed listingId, uint256 packId, uint256 backing);
     event Unlisted(uint256 indexed listingId);
@@ -48,7 +41,7 @@ library StrategyLib {
     error Payment();
     error UnlistNotAllowed();
 
-    struct LiquidationWork { uint256 n; uint256 units; uint256 recovery; uint256 recoveryGas; }
+    struct LiquidationWork { uint256 n; uint256 units; uint256 recovery; }
 
     // ------------------------------------------------------------------ economics
 
@@ -94,7 +87,7 @@ library StrategyLib {
         uint256 count = proposals.length;
         emit Built(count, units);
         (, uint256 n) = VaultLib.makeup(units);
-        return _pay(s, OP_BUILD, s.params.gasSchedule.build + count * (VaultLib.buildGas(s.params, n) + s.params.gasSchedule.listed), 2 * count,
+        return _pay(s, s.params.gasSchedule.build + count * (VaultLib.buildGas(s.params, n) + s.params.gasSchedule.listed), 2 * count,
             false, minPay, type(uint256).max, gasStart);
     }
 
@@ -125,7 +118,7 @@ library StrategyLib {
         }
         if (listed == 0) revert Nothing();
         if (listed != proposals.length) revert VaultLib.UnusedPaidInput();
-        return _pay(s, OP_LIST, s.params.gasSchedule.list + listed * s.params.gasSchedule.listed, listed, false, minPay, type(uint256).max, gasStart);
+        return _pay(s, s.params.gasSchedule.list + listed * s.params.gasSchedule.listed, listed, false, minPay, type(uint256).max, gasStart);
     }
 
 
@@ -161,7 +154,7 @@ library StrategyLib {
     {
         (uint256 gasQ, uint256 units) =
             VaultLib.syncChanges(s.params, s.budget, s.book, f, packs, listingIds, checkpointMode, witnessId);
-        return _pay(s, OP_SYNC, gasQ, units, false, minPay, type(uint256).max, gasStart);
+        return _pay(s, gasQ, units, false, minPay, type(uint256).max, gasStart);
     }
 
     /// @notice Withdraw active listings: in wind-down (exit), when `shortfall` ETH is owed beyond
@@ -196,7 +189,7 @@ library StrategyLib {
         }
         if (realized == 0) revert Nothing();
         if (!s.callerFunded && moved != listingIds.length) revert VaultLib.UnusedPaidInput();
-        return _pay(s, OP_UNLIST, s.params.gasSchedule.unlist + moved * s.params.gasSchedule.unlisted, moved, essential, minPay,
+        return _pay(s, s.params.gasSchedule.unlist + moved * s.params.gasSchedule.unlisted, moved, essential, minPay,
             type(uint256).max, gasStart);
     }
 
@@ -225,7 +218,7 @@ library StrategyLib {
             } else if (b.recoveryPacks.length != 0) {
                 if (w.n != 0) break;
                 // Recovery is one isolated chunk of at most 30 underlying Shapes.
-                w.recoveryGas = VaultLib.recoverInventory(s.params, b, packs, shapes);
+                VaultLib.recoverInventory(s.params, b, packs, shapes);
                 ++w.recovery;
                 break;
             } else {
@@ -237,8 +230,9 @@ library StrategyLib {
         uint256 burned = w.n == 0 ? 0 : supplyBefore - shapes.totalSupply();
         if (w.n != 0 && (burned == 0 || burned > MAX_LIQUIDATE_UNITS)) revert Amount();
         emit Liquidated(w.n + w.recovery, burned, address(this).balance - before);
-        return _pay(s, OP_LIQUIDATE, s.params.gasSchedule.liquidate + w.n * s.params.gasSchedule.liquidatePack + burned * s.params.gasSchedule.redeemShape
-            + w.recoveryGas, w.n + w.recovery, true, minPay, type(uint256).max, gasStart);
+        // Liquidation and recovery are exit work: always unpaid, so no gas is quoted. `_pay` only
+        // enforces callerFunded / nonzero-minPay here (essential path).
+        return _pay(s, 0, 0, true, minPay, type(uint256).max, gasStart);
     }
 
     // ------------------------------------------------------------------ fees, tokens, receipts
@@ -302,10 +296,10 @@ library StrategyLib {
     // ------------------------------------------------------------------ keeper pay
 
     /// @notice Pay the caller for verified work (VaultLib.pay): the least of the quote, `cap`, the account's free ETH and its budget.
-    function pay(VaultLib.Strategy storage s, uint256 op, uint256 gasQ, uint256 units, bool essential,
+    function pay(VaultLib.Strategy storage s, uint256 gasQ, uint256 units, bool essential,
         uint256 minPay, uint256 cap, uint256 gasStart) external returns (uint256)
     {
-        return _pay(s, op, gasQ, units, essential, minPay, cap, gasStart);
+        return _pay(s, gasQ, units, essential, minPay, cap, gasStart);
     }
 
     /// @notice Revert before the work when `minPay` already exceeds what could be paid.
@@ -313,7 +307,7 @@ library StrategyLib {
         _precheckPermission(s, minPay, essential);
     }
 
-    function _pay(VaultLib.Strategy storage s, uint256, uint256 gasQ, uint256 units, bool essential,
+    function _pay(VaultLib.Strategy storage s, uint256 gasQ, uint256 units, bool essential,
         uint256 minPay, uint256 cap, uint256 gasStart) private returns (uint256)
     {
         if (s.callerFunded) return 0;
@@ -327,7 +321,7 @@ library StrategyLib {
             IAccount(address(this)).keeperCash(), gasStart);
     }
 
-    function payFunded(VaultLib.Strategy storage s, uint256, uint256 gasQ, uint256 units, bool essential,
+    function payFunded(VaultLib.Strategy storage s, uint256 gasQ, uint256 units, bool essential,
         uint256 minPay, uint256 fundingCap, uint256 gasStart) external returns (uint256)
     {
         return VaultLib.payFunded(s.params, gasQ, units, essential, minPay, fundingCap, gasStart);

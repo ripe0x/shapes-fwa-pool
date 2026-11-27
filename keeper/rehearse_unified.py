@@ -89,7 +89,7 @@ def pricing(to, sig, *a):
 
 
 def call(to, sig, *a):
-    if sig.split("(")[0] in ("edge", "requestCharge", "deployCharge", "unwindCharge"):
+    if sig.split("(")[0] in ("edge", "requestCharge", "deployCharge"):
         return pricing(to, sig, *a)
     return cast("call", to, sig, *a).split(" ")[0]
 
@@ -118,10 +118,8 @@ def ids(account=None, inventory="open"):
 
 
 def redeem_charge(shares):
-    """PackVault's redemption charge for `shares` now: checkpoint + unwind per position value."""
-    value = shares * num(call(VAULT, "lastNav()(uint256)")) // num(call(VAULT, "totalShares()(uint256)"))
-    return num(call(VAULT, "requestCharge()(uint256)")) + \
-        value * num(call(VAULT, "unwindCharge()(uint256)")) // (663 * 10**14)
+    """PackVault's redemption charge for `shares`: just the checkpoint charge (exits are unpaid)."""
+    return num(call(VAULT, "requestCharge()(uint256)"))
 
 
 def expire_queue():

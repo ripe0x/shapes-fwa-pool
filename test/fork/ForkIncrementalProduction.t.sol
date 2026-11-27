@@ -298,7 +298,6 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(vault.idlePackCount(), 0);
         (uint256 tracked, uint256 idle,,,,) = vault.totals();
         assertEq(tracked, 0.34 ether); assertEq(idle, tracked);
-        assertEq(vault.unwindCharge(), 0, "exits are unpaid, so there is no unwind charge");
         _drain();
         TestVaultOps.restock(vault, 1, UNITS, 0); // build lists it at once
         assertEq(vault.openListingCount(), 1, "oversized gift does not occupy normal stack");
@@ -671,7 +670,7 @@ contract ForkProductionInventoryTest is ForkBase {
         vm.prank(alice); vault.deposit{value: amount}(_expected31);
         toBlackout(); checkpoint();
         uint256 shares = vault.shareBalance(alice);
-        uint256 charge = vault.requestCharge() + shares * vault.lastNav() / vault.totalShares() * vault.unwindCharge() / 0.1248 ether;
+        uint256 charge = vault.requestCharge(); // exits are unpaid; no unwind term
         bytes32 _expected32 = TestVaultOps.configurationHash(vault);
         vm.prank(alice); vault.requestRedeem{value: charge}(shares, _expected32);
         toOpen(); toBlackout(); checkpoint();

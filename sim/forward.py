@@ -657,7 +657,7 @@ def run(sc, n_target, seed, days=365, values=None):
                 return
             if credit and not (v.positions or v.idle_packs or v.recovery_packs or v.receipts):
                 # Collect once after retirement; no needless intermediate exit sweeps.
-                gas = owner_billed('harvest',st0.gas_schedule['harvest'])
+                gas = owner_billed('harvest',policy.HARVEST_GAS)
                 if not owner_preflight([owner_estimate('harvest', gas)], max(0, gas_price-tip), 'harvest'):
                     return
                 v.receive_fees(credit)
@@ -1267,12 +1267,13 @@ def run(sc, n_target, seed, days=365, values=None):
                             cash += value
                         if not packs:
                             continue
-                        gas_q = Q["liquidate"] + Q["liq_pack"] * packs + Q["redeem_shape"] * burned
-                        if not affordable(gas_q, packs, True, cash_delta=cash, liability=True,work_count=packs):
+                        # Liquidation is exit work: always unpaid, so no gas or units are quoted
+                        # (mirrors StrategyLib.liquidate -> _pay(..., 0, 0, true)).
+                        if not affordable(0, 0, True, cash_delta=cash, liability=True,work_count=packs):
                             continue
                         for _ in range(packs):
                             v.liquidate_one()
-                        pay(gas_q, packs, True, liability=True,work_count=packs)
+                        pay(0, 0, True, liability=True,work_count=packs)
                     elif fn == "checkpoint":
                         pool = v.processing_pool
                         flows = v.pending_total != 0 or v.locked_shares != 0
@@ -1434,10 +1435,9 @@ def run(sc, n_target, seed, days=365, values=None):
                 st1.gas_ceiling, st1.essential_ceiling, st1.max_tip = ceiling, essential_ceiling, tip
                 st1.work_fee = work_fee
                 ck = policy.request_charge(st1)
-                unwind = (sh * v.last_nav // v.total_shares) * policy.unwind_charge(st1) // policy.position_value(st1)
-                v.request_redeem("h", sh, ck, unwind)
+                v.request_redeem("h", sh, ck)
                 trace_state("request-redeem", d)
-                paid_in += ck + unwind
+                paid_in += ck
                 holder_gas += user_gas.get("request_redeem", 0) * (gas + tip)
                 unknown_user_gas += int(exit_all and "request_redeem" not in user_gas)
         if exit_all and exit_requested:

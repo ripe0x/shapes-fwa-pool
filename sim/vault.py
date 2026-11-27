@@ -608,12 +608,13 @@ class Vault:
         self.balance -= amount
         return amount
 
-    def request_redeem(self, h, amount, ck=0, unwind=0):
+    def request_redeem(self, h, amount, ck=0):
         self._settle_holder(h)
         if amount <= 0 or amount > self.shares.get(h, 0):
             raise RuntimeError('Amount')
         self.contribute(h, ck)
-        self.balance += ck + unwind
+        # Exit work is unpaid: the only redemption charge is the checkpoint (ck).
+        self.balance += ck
         self._settle_dist(h)
         self.shares[h] -= amount
         self.dist_debt[h] = self.shares[h] * self.dist_per_share // E

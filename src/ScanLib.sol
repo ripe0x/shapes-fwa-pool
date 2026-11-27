@@ -93,7 +93,7 @@ library ScanLib {
                 || p.packUnitsMask >> (VaultLib.MAX_PACK_UNITS + 1) != 0 || p.packUnitsMask & ((1 << VaultLib.MIN_PACK_UNITS) - 1) != 0
         ) revert VaultLib.OutOfBounds();
         VaultLib.GasSchedule memory g = p.gasSchedule;
-        uint32[29] memory entries;
+        uint32[22] memory entries;
         assembly ("memory-safe") { entries := g }
         for (uint256 i; i < entries.length; ++i) if (entries[i] > VaultLib.MAX_GAS_QUOTE) revert VaultLib.OutOfBounds();
     }
@@ -145,12 +145,6 @@ library ScanLib {
         }
     }
 
-    /// @notice Exit work (unlist, liquidate, recovery) is unpaid (owner decision: keepers are not
-    ///         paid for exits), so redeemers are never charged an unwind cost.
-    function unwindCharge(VaultLib.Params storage, VaultLib.Book storage) external pure returns (uint256) {
-        return 0;
-    }
-
     function economics(IFWAV2 f, address packs) internal view returns (uint256 k1e18, uint256 cap, uint256 s) {
         s = f.ownerSettlementFeeBps();
         uint256 w = f.totalWeight();
@@ -192,13 +186,11 @@ library ScanLib {
         cap = ask * (VaultLib.BPS + f.oracleCeilingPremiumBps()) / VaultLib.BPS;
     }
 
-    function recoverInventory(VaultLib.Params storage p, VaultLib.Book storage b, IShapePacks packs, IShapes shapes) external returns (uint256 gasQ) {
+    function recoverInventory(VaultLib.Params storage, VaultLib.Book storage b, IShapePacks packs, IShapes shapes) external {
         uint256 id = b.recoveryPacks[b.recoveryPacks.length - 1];
-        gasQ = p.gasSchedule.recoveryBase;
         if (!b.recoveryUnsealed[id]) {
             packs.unseal(id, address(this));
             b.recoveryUnsealed[id] = true;
-            gasQ += p.gasSchedule.recoveryUnseal;
         }
         uint256 before = address(this).balance;
         uint256 supply = shapes.totalSupply();
@@ -208,7 +200,6 @@ library ScanLib {
         // No other supply mutation can interleave while this guarded vault receives that ETH.
         uint256 burned = supply - shapes.totalSupply();
         if (out == 0 || burned == 0 || burned > VaultLib.MAX_REDEEM_SHAPES) revert VaultLib.MissingInventory();
-        gasQ += burned * p.gasSchedule.recoveryShape;
         b.trackedValue -= out;
         b.idleValue -= out;
         b.idleValueOf[id] -= out;

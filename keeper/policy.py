@@ -31,6 +31,9 @@ EXPOSURE_SHARE_HIGH_BPS = 1_000  # 10%
 
 # Default calibration only. Every observed account carries its own schedule.
 Q = {GAS_KEYS[k]: v for k, v in GAS_DEFAULTS.items()}
+# Keeper-side gas estimate for the (unpaid) harvest op. The account's Params no longer carries a
+# harvest field, so this one named constant is the single source for harvest gas modelling.
+HARVEST_GAS = 125_000
 REF_UNITS = 3
 MIN_PACK_UNITS, MAX_PACK_UNITS = 3, 30
 MAX_SCAN = 96  # hard work bound, independent of mutable quote coefficients
@@ -283,12 +286,6 @@ def deploy_charge(s):
                 for u in range(MIN_PACK_UNITS, MAX_PACK_UNITS + 1) if (s.pack_units_mask >> u) & 1), default=0)
 
 
-def unwind_charge(s):
-    """Exit work (unlist, liquidate, recovery) is unpaid (owner decision), so redeemers are never
-    charged an unwind cost. Mirrors ScanLib.unwindCharge."""
-    return 0
-
-
 def sync_funding_candidates(s, terminal_ids, active, checkpoint_due):
     """Optional bounded candidates; exact eligibility belongs to ordinary contract preflight.
 
@@ -390,7 +387,7 @@ def plan(s):
                 break
             earning.append(listing)
             amount += listing.pending_fees
-        hgas = q["harvest"] + q["harvested"] * len(earning)
+        hgas = HARVEST_GAS + q["harvested"] * len(earning)
         # A due checkpoint already sweeps fee credit without a separate transaction.
         if amount >= shortfall and hgas < q["unlist"] + q["unlisted"] and not (not earning and credit_checkpoint):
             out.append(("harvest", sorted(l.id for l in earning)))

@@ -555,10 +555,9 @@ contract ForkKeeperPayTest is ForkBase {
         _priced(alice, 1 ether);
         _restock(3); // build mints and lists 3
         setCaps(vault.getParams().routineCap);
-        assertEq(vault.unwindCharge(), 0, "no unwind charge");
         uint256 shares = vault.shareBalance(alice);
         uint256 rc = Charges.redeemCharge(vault, shares);
-        assertEq(rc, vault.requestCharge(), "only the shared checkpoint charge");
+        assertEq(rc, vault.requestCharge(), "only the shared checkpoint charge; exits are unpaid");
         bytes32 _expected29 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
         vault.requestRedeem{value: rc}(shares, _expected29);

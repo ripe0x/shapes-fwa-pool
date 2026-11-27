@@ -59,8 +59,8 @@ class LaunchValidationTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "missing"):
                         release.validate_launch_values(wrong, manager=manager)
 
-    def test_all_29_gas_fields_are_required_and_no_unknown_key_is_ignored(self):
-        self.assertEqual(len(release.GAS_FIELDS), 29)
+    def test_all_22_gas_fields_are_required_and_no_unknown_key_is_ignored(self):
+        self.assertEqual(len(release.GAS_FIELDS), 22)
         for key in release.GAS_FIELDS:
             with self.subTest(missing=key):
                 wrong = copy.deepcopy(self.main)

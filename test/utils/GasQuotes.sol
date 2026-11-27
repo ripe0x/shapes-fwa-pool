@@ -24,12 +24,11 @@ library GasQuotes {
     uint256 internal constant Q_POSITION_SYNC = Q_JOURNAL + Q_SELECTED + Q_SYNCED + Q_PRUNED;
     uint256 internal constant Q_UNLIST = 340_000;
     uint256 internal constant Q_UNLISTED = 285_000;
+    // Liquidation is exit work (unpaid); these remain only as the billed-gas reference used by
+    // ForkMaxBatchGas margin logs, not as a keeper payment quote.
     uint256 internal constant Q_LIQUIDATE = 75_000;
     uint256 internal constant Q_LIQ_PACK = 80_000;
     uint256 internal constant Q_REDEEM_SHAPE = 35_000;
-    uint256 internal constant Q_RECOVERY_BASE = 100_000;
-    uint256 internal constant Q_RECOVERY_SHAPE = 35_000;
-    uint256 internal constant Q_RECOVERY_UNSEAL = 70_000;
     uint256 internal constant Q_HARVESTED = 80_000;
     uint256 internal constant Q_CREDIT = 40_000;
     uint256 internal constant Q_FUND = 40_000;

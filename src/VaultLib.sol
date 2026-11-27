@@ -61,13 +61,6 @@ library VaultLib {
         uint32 pruned;
         uint32 unlist;
         uint32 unlisted;
-        uint32 liquidate;
-        uint32 liquidatePack;
-        uint32 redeemShape;
-        uint32 recoveryBase;
-        uint32 recoveryShape;
-        uint32 recoveryUnseal;
-        uint32 harvest;
         uint32 harvested;
         uint32 credit;
         uint32 fund;
@@ -337,7 +330,7 @@ library VaultLib {
     function defaultGasSchedule() internal pure returns (GasSchedule memory g) {
         g = GasSchedule(500_000, 6_000, 30_000, 360_000, 300_000, 130_000, 280_000, 825_000,
             125_000, 120_000, 80_000, 22_000, 30_000, 180_000, 120_000, 45_000, 340_000, 285_000,
-            75_000, 80_000, 35_000, 100_000, 35_000, 70_000, 125_000, 80_000, 40_000, 40_000, 100_000);
+            80_000, 40_000, 40_000, 100_000);
     }
 
     function preview(Params memory p, uint256 mintFee) external view returns (uint256 units, uint256 principal,
@@ -403,10 +396,6 @@ library VaultLib {
 
     function deployCharge(Params storage p, uint256 mintFee) external view returns (uint256 cost) {
         return ScanLib.deployCharge(p, mintFee);
-    }
-
-    function unwindCharge(Params storage p, Book storage b) external view returns (uint256) {
-        return ScanLib.unwindCharge(p, b);
     }
 
     /// @notice Owner-selected backing ratio, bounded by actual FWA admission and profitable
@@ -1096,7 +1085,7 @@ library VaultLib {
     }
 
     /// @dev An extended gift may contain arbitrarily many Shapes. Never enumerate its contents.
-    function recoverInventory(Params storage p, Book storage b, IShapePacks packs, IShapes shapes) external returns (uint256 gasQ) {
-        return ScanLib.recoverInventory(p, b, packs, shapes);
+    function recoverInventory(Params storage p, Book storage b, IShapePacks packs, IShapes shapes) external {
+        ScanLib.recoverInventory(p, b, packs, shapes);
     }
 }

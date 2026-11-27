@@ -44,10 +44,8 @@ def exercise_value_reorg(R):
         if not shares:
             raise RuntimeError('value reorg regression requires the real holder position')
         charge = R.num(R.call(vault, 'requestCharge()(uint256)'))
-        nav = R.num(R.call(vault, 'lastNav()(uint256)'))
-        supply = R.num(R.call(vault, 'totalShares()(uint256)'))
-        unwind = shares*nav//supply * R.num(R.call(vault,'unwindCharge()(uint256)')) // R.num(R.call(vault,'positionValue()(uint256)'))
-        R.send(R.HOLDER, vault, 'requestRedeem(uint256)', shares, value=2*(charge+unwind))
+        # Exit work is unpaid, so the redemption charge is just the checkpoint charge.
+        R.send(R.HOLDER, vault, 'requestRedeem(uint256)', shares, value=2*charge)
         R.warp_to(42360)
         R.expire_queue()
         witness=R.num(R.call(vault,'openListingAt(uint256)(uint256)',0)) if R.num(R.call(vault,'openListingCount()(uint256)')) else 0

@@ -655,8 +655,8 @@ def run_account(a, tm, account, pooled):
                 if not (shares or holder_locked or holder_claimable or num(own_pending[0])):
                     steps=[]
                 if shares and ('requestRedeem',) not in skip:
-                    last_nav = num(call(account, 'lastNav()(uint256)'))
-                    charge = num(call(account, 'requestCharge()(uint256)')) + shares * last_nav // state.total_shares * num(call(account, 'unwindCharge()(uint256)')) // num(call(account, 'positionValue()(uint256)'))
+                    # Exit work is unpaid, so the redemption charge is just the checkpoint charge.
+                    charge = num(call(account, 'requestCharge()(uint256)'))
                     steps.insert(0, ('requestRedeem', shares, charge))
                 if state.pending_deposits and ('cancelDeposit',) not in skip:
                     pending = call(account, 'pendingDeposits(address)(uint128,uint128)', tm.sender).splitlines()

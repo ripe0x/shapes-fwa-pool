@@ -279,8 +279,8 @@ def _validate_params_abi(component, label):
     if component.get("type") != "tuple" or _abi_fields(fields) != expected:
         raise ValueError(f"{label} Params names/types/order differ from keeper.config.PARAM_FIELDS aliases")
     gas = fields[-1].get("components", [])
-    if len(GAS_FIELDS) != 29 or _abi_fields(gas) != [(key, "uint32") for key in GAS_FIELDS]:
-        raise ValueError(f"{label} GasSchedule names/types/order differ from the complete 29 keeper.config.GAS_FIELDS")
+    if len(GAS_FIELDS) != 22 or _abi_fields(gas) != [(key, "uint32") for key in GAS_FIELDS]:
+        raise ValueError(f"{label} GasSchedule names/types/order differ from the complete 22 keeper.config.GAS_FIELDS")
 
 
 def validate_compiled_launch_abi(vault_abi, factory_abi):

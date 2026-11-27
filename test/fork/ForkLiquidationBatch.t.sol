@@ -6,9 +6,9 @@ import {DeployCore} from "../../script/DeployCore.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
-/// @notice Exit work is unpaid, so the unwind charge is always 0; the LIFO liquidation batching
-///         bound is unchanged and a full exit still completes.
-contract ForkUnwindChargeTest is ForkBase {
+/// @notice Exit work is unpaid, and a wind-down still completes: the LIFO liquidation batching
+///         respects the sixty-unit work bound (legacy and mixed recipes) and every call pays nothing.
+contract ForkLiquidationBatchTest is ForkBase {
     receive() external payable {}
 
     function _exercise(bool mixed) internal {
@@ -28,7 +28,6 @@ contract ForkUnwindChargeTest is ForkBase {
         bytes32 expected = vault.configurationHash();
         vm.prank(owner);
         vault.setParams(p, expected);
-        assertEq(vault.unwindCharge(), 0, "exits are unpaid, so redeemers pay no unwind charge");
         vm.warp(vm.getBlockTimestamp() + 13 hours);
         vm.prank(owner);
         vault.startWindDown();
@@ -43,6 +42,6 @@ contract ForkUnwindChargeTest is ForkBase {
         assertEq(vault.openListingCount() + vault.idlePackCount(), 0);
     }
 
-    function test_largeLegacyRecipeChargesEveryRequiredLiquidationBase() public { _exercise(false); }
+    function test_largeLegacyRecipeUsesEveryRequiredLiquidationCall() public { _exercise(false); }
     function test_mixedLifoRecipesCannotUseGroupedBatchUnderestimate() public { _exercise(true); }
 }

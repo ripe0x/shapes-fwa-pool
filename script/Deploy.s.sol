@@ -73,13 +73,6 @@ contract Deploy is Script {
         p.gasSchedule.pruned = uint32(fit(v, ".gasSchedule.pruned", type(uint32).max));
         p.gasSchedule.unlist = uint32(fit(v, ".gasSchedule.unlist", type(uint32).max));
         p.gasSchedule.unlisted = uint32(fit(v, ".gasSchedule.unlisted", type(uint32).max));
-        p.gasSchedule.liquidate = uint32(fit(v, ".gasSchedule.liquidate", type(uint32).max));
-        p.gasSchedule.liquidatePack = uint32(fit(v, ".gasSchedule.liquidatePack", type(uint32).max));
-        p.gasSchedule.redeemShape = uint32(fit(v, ".gasSchedule.redeemShape", type(uint32).max));
-        p.gasSchedule.recoveryBase = uint32(fit(v, ".gasSchedule.recoveryBase", type(uint32).max));
-        p.gasSchedule.recoveryShape = uint32(fit(v, ".gasSchedule.recoveryShape", type(uint32).max));
-        p.gasSchedule.recoveryUnseal = uint32(fit(v, ".gasSchedule.recoveryUnseal", type(uint32).max));
-        p.gasSchedule.harvest = uint32(fit(v, ".gasSchedule.harvest", type(uint32).max));
         p.gasSchedule.harvested = uint32(fit(v, ".gasSchedule.harvested", type(uint32).max));
         p.gasSchedule.credit = uint32(fit(v, ".gasSchedule.credit", type(uint32).max));
         p.gasSchedule.fund = uint32(fit(v, ".gasSchedule.fund", type(uint32).max));

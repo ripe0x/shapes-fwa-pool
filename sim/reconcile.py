@@ -148,7 +148,7 @@ def reconcile_cycle():
     checkpoint_from_trace(v, by["checkpoint1"])
     compare("checkpoint1")
     rc = by["redeemCharge"]
-    v.request_redeem("alice", v.share_balance("alice"), rc["ck"], rc["total"] - rc["ck"])
+    v.request_redeem("alice", v.share_balance("alice"), rc["ck"])
     compare("redeem")
     checkpoint_from_trace(v, by["checkpoint2"])
     compare("checkpoint2")
@@ -200,7 +200,7 @@ def reconcile_partial():
         v.build(chunk, bi["units"], setup["mintFee"], bi["backings"][start:start + len(chunk)], fee_debt=debt)
     compare("build")
     rc = by["redeemCharge"]
-    v.request_redeem("alice", v.share_balance("alice"), rc["ck"], rc["total"] - rc["ck"])
+    v.request_redeem("alice", v.share_balance("alice"), rc["ck"])
     compare("redeem")
     checkpoint_from_trace(v, by["partial"])
     if not 0 < v.locked_shares < v.redemptions["alice"].shares:
@@ -435,7 +435,7 @@ def reconcile_funding():
     units=next(u for u in range(3,31) if values['packUnitsMask']>>u&1)
     minted=shape_count(units);retired=v.idle_shapes[-1]
     q=state.gas_schedule
-    gas=q['build']+q['build_pack']+minted*q['build_shape']+q['listed']+q['liquidate']+q['liq_pack']+retired*q['redeem_shape']
+    gas=q['build']+q['build_pack']+minted*q['build_shape']+q['listed']  # retired: no liquidate/redeem retirement term
     bare=quote(state,gas,3)
     position=after['positions'][0]
     need=units*10**16+minted*inputs['mintFee']+position['backing']

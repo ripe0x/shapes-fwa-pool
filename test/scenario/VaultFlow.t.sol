@@ -155,13 +155,6 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         p.gasSchedule.pruned = uint32(vm.parseJsonUint(v, ".gasSchedule.pruned"));
         p.gasSchedule.unlist = uint32(vm.parseJsonUint(v, ".gasSchedule.unlist"));
         p.gasSchedule.unlisted = uint32(vm.parseJsonUint(v, ".gasSchedule.unlisted"));
-        p.gasSchedule.liquidate = uint32(vm.parseJsonUint(v, ".gasSchedule.liquidate"));
-        p.gasSchedule.liquidatePack = uint32(vm.parseJsonUint(v, ".gasSchedule.liquidatePack"));
-        p.gasSchedule.redeemShape = uint32(vm.parseJsonUint(v, ".gasSchedule.redeemShape"));
-        p.gasSchedule.recoveryBase = uint32(vm.parseJsonUint(v, ".gasSchedule.recoveryBase"));
-        p.gasSchedule.recoveryShape = uint32(vm.parseJsonUint(v, ".gasSchedule.recoveryShape"));
-        p.gasSchedule.recoveryUnseal = uint32(vm.parseJsonUint(v, ".gasSchedule.recoveryUnseal"));
-        p.gasSchedule.harvest = uint32(vm.parseJsonUint(v, ".gasSchedule.harvest"));
         p.gasSchedule.harvested = uint32(vm.parseJsonUint(v, ".gasSchedule.harvested"));
         p.gasSchedule.credit = uint32(vm.parseJsonUint(v, ".gasSchedule.credit"));
         p.gasSchedule.fund = uint32(vm.parseJsonUint(v, ".gasSchedule.fund"));
