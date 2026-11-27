@@ -299,10 +299,14 @@ def validate_compiled_launch_abi(vault_abi, factory_abi):
 
 
 def _validate_factory_abi(factory_abi):
-    create = _abi_entry(factory_abi, "function", "create")
-    if _abi_fields(create.get("inputs", [])) != [("owner", "address"), ("p", "tuple"), ("expected", "bytes32")]:
-        raise ValueError("compiled factory create must be only (owner, p, expected), without a policy")
-    _validate_params_abi(create["inputs"][1], "factory create")
+    # Two creates: without and with the owner's pack counts (PackAccount.design); nothing else, no policy.
+    creates = [e for e in factory_abi if e.get("type") == "function" and e.get("name") == "create"]
+    shapes = sorted(_abi_fields(e.get("inputs", [])) for e in creates)
+    if shapes != sorted([[("owner", "address"), ("p", "tuple"), ("expected", "bytes32")],
+                         [("owner", "address"), ("p", "tuple"), ("design", "uint256"), ("expected", "bytes32")]]):
+        raise ValueError("compiled factory create must be only (owner, p, expected) and (owner, p, design, expected)")
+    for create in creates:
+        _validate_params_abi(create["inputs"][1], "factory create")
     if _abi_fields(_abi_entry(factory_abi, "constructor").get("inputs", [])) != [
             ("fwa", "address"), ("shapes", "address"), ("packs", "address")]:
         raise ValueError("compiled factory constructor must have only the three main dependencies")
@@ -318,8 +322,8 @@ def validate_compiled_manager_abi(manager_abi, factory_abi):
     _validate_params_abi(getter["outputs"][0], "manager getParams")
     _validate_factory_abi(factory_abi)
     initial = _abi_entry(manager_abi, "function", "initialize")
-    if _abi_fields(initial.get("inputs", [])) != [("owner_", "address"), ("p", "tuple")]:
-        raise ValueError("compiled manager initialize must be only (owner_, p)")
+    if _abi_fields(initial.get("inputs", [])) != [("owner_", "address"), ("p", "tuple"), ("design_", "uint256")]:
+        raise ValueError("compiled manager initialize must be only (owner_, p, design_)")
     _validate_params_abi(initial["inputs"][1], "manager initialize")
     for name, fields in (("importPacks", [("ids", "uint256[]"), ("expected", "bytes32")]),
                          ("unlistForWithdrawal", [("listingIds", "uint256[]")]),
