@@ -236,10 +236,10 @@ def charge_state(gas, open_positions, pool=0):
 
 def configured_state(base_fee, values=None):
     values = values or json.loads((ROOT.parent / 'deploy/mainnet.json').read_text())
-    s = charge_state(base_fee, 0)
-    s.gas_schedule = gas_schedule(values)
     if 'renewalMode' in values or 'renewalFloatCount' in values:
         raise ValueError('historical Fresh settings require their pinned revision; active strategy is reuse-only')
+    s = charge_state(base_fee, 0)
+    s.gas_schedule = gas_schedule(values)
     s.backing_ratio_bps = values['backingRatioBps']
     s.gas_ceiling, s.essential_ceiling = values['gasCeilingWei'], values['essentialCeilingWei']
     s.max_tip, s.work_fee = values['maxTipWei'], values['workFeeWei']
