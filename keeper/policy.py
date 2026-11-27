@@ -251,7 +251,8 @@ def cycle_net(s):
 
 
 def build_net(s):
-    """Worst purchaser outcome after the complete initial cost, including all paid primary mints."""
+    """Worst one-cycle purchaser outcome per pack: bid margin, or keep payout less Shapes principal.
+    Gas and mint fees are excluded by owner decision; the build gate charges neither."""
     if s.k <= 10**18 or not s.backing:
         return 0
     bid=s.backing*(s.k-10**18)//10**18
@@ -492,7 +493,7 @@ def plan(s):
         n = 0  # largest batch the vault's capital check accepts: per-pack mint cost plus backing
         limit = MAX_BATCH["build"] if s.build_room is None else min(MAX_BATCH["build"], s.build_room)
         for c in range(min(len(proposals), limit), 0, -1):
-            if c * price + sum(proposals[:c]) + quote(s,q['build']+c*(q['build_pack']+shape_count(units)*q['build_shape']+q['listed']),2*c) <= idle:
+            if c * price + sum(proposals[:c]) + quote(s,q['build']+c*(q['build_pack']+shape_count(units)*q['build_shape']+q['listed']),2*c) <= max(0, idle - s.idle_funding):
                 n = c
                 break
         # The build repays from the keep outcome (build_net), not the bid-only cycle_net.

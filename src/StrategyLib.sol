@@ -87,7 +87,10 @@ library StrategyLib {
     {
         _requireListing(s, f);
         _precheck(s, minPay, false);
-        VaultLib.buildAndList(s.params, s.book, f, packs, shapes, units, proposals, IAccount(address(this)).idleEth());
+        // Returned packs relist first: a build may not spend the backing booked for idle inventory.
+        uint256 idle = IAccount(address(this)).idleEth();
+        uint256 booked = s.book.idleFunding;
+        VaultLib.buildAndList(s.params, s.book, f, packs, shapes, units, proposals, idle > booked ? idle - booked : 0);
         uint256 count = proposals.length;
         emit Built(count, units);
         (, uint256 n) = VaultLib.makeup(units);

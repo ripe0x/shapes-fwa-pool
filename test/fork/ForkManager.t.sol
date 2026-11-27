@@ -217,6 +217,45 @@ contract ForkManagerTest is ForkBase {
         factory.create{value: 1 ether}(alice, p, uint256(1) << 8, e2);
     }
 
+    /// @dev Audit B E1: a build may not spend the backing booked for a returned pack (reuse first).
+    function test_buildCannotSpendReturnedPackBacking() public {
+        VaultLib.Params memory p = managerParams();
+        p.packUnitsMask = uint64(1 << 3 | 1 << 5);
+        bytes32 expected = TestVaultOps.factoryHash(factory, p);
+        vm.prank(alice);
+        PackManager m = factory.create{value: 1 ether}(alice, p, uint256(1) << 24 | uint256(1) << 40, expected);
+        vm.prank(keeper);
+        TestVaultOps.restock(m, 1, 3, 0);
+        uint256[] memory ids = TestVaultOps.open(m);
+        vm.prank(alice);
+        m.unlistForWithdrawal(ids);
+        uint256 booked = m.idleFunding();
+        assertGt(booked, 0, "returned pack books its backing");
+        assertEq(m.idlePackCount(), 1);
+
+        // Cash for exactly one 0.05 ETH build above the reserve, so not also the returned pack's backing.
+        uint256[] memory five = TestVaultOps.proposals(m, 1, 5);
+        uint256 need5 = 0.05 ether + m.buildCost(5) + five[0] + 0.001 ether;
+        uint256 target = m.operatingReserve() + need5;
+        assertLt(0.001 ether, booked);
+        vm.prank(alice);
+        m.withdraw(alice, address(m).balance - target);
+        assertEq(address(m).balance, target);
+
+        uint256 supply0 = SHAPES.totalSupply();
+        bytes32 h = TestVaultOps.configurationHash(m);
+        vm.prank(keeper);
+        vm.expectRevert(VaultLib.InsufficientBacking.selector);
+        m.build(5, five, 0, h);
+        assertEq(SHAPES.totalSupply(), supply0, "no fresh mint while the returned pack waits");
+
+        vm.prank(keeper);
+        TestVaultOps.list(m, 1, 0);
+        assertEq(m.idlePackCount(), 0, "the returned pack relists intact");
+        assertEq(m.idleFunding(), 0);
+        assertEq(SHAPES.totalSupply(), supply0, "relisting mints nothing");
+    }
+
     // ------------------------------------------------------------------ owner controls
 
     function test_onlyOwnerControls_andHandover() public {

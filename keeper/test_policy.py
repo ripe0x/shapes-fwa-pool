@@ -197,8 +197,8 @@ def main():
     # An unlistable larger gift must not bury valid inventory forever.
     gift = state(idle_packs=1, idle_value=4 * P.UNIT, backing_proposals=[], **build)
     assert "build" in fns(plan(gift))
-    gift.idle_funding = E
-    assert "build" in fns(plan(gift)), "old idle quotes do not reserve an extra float"
+    gift.idle_funding = gift.idle_eth
+    assert "build" not in fns(plan(gift)), "backing booked for returned packs is not build cash"
     gift.idle_funding = 0
     gift.backing_proposals = [2 * E]
     assert "build" not in fns(plan(gift)), "viable inventory retains cash priority"
