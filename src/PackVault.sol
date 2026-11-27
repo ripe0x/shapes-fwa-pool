@@ -325,7 +325,7 @@ contract PackVault is PackAccount {
     function _syncCheckpoint(uint256[] calldata ids, uint256 witnessId, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256 paid) {
         _checkConfiguration(expected);
         if (pendingDepositTotal == 0 && lockedShares == 0) revert Nothing();
-        paid = StrategyLib.syncFunded(s, fwa, packs, ids, witnessId, 1, minPay, processingPool, gasStart);
+        paid = StrategyLib.syncFunded(s, fwa, packs, ids, witnessId, 1, minPay, processingPool, gasStart - gasleft());
         processingPool -= paid;
     }
 
@@ -503,13 +503,13 @@ contract PackVault is PackAccount {
         if (work) {
             // Source classification survives the final redemption. Contributions never become
             // general free cash; unused wei move directly to their payers' protected reserve.
-            uint256 paidKeeper = StrategyLib.payFunded(s, gasQ, 1, true, minPay, processingPool, gasStart);
+            uint256 paidKeeper = StrategyLib.payFunded(s, gasQ, 1, true, minPay, processingPool, gasStart - gasleft());
             processingPool -= paidKeeper;
             _closeChargeEra();
             return paidKeeper;
         }
         if (distributed != 0) {
-            return StrategyLib.pay(s, gasQ, 1, false, minPay, type(uint256).max, gasStart);
+            return StrategyLib.pay(s, gasQ, 1, false, minPay, type(uint256).max, gasStart - gasleft());
         }
         // No flows and nothing distributed: revert, so the interval's one slot stays free (audit E3).
         revert Nothing();

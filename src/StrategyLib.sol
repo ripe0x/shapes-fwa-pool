@@ -76,8 +76,9 @@ library StrategyLib {
     ///         backing proposal per pack. Only while listing is open and a keep cycle repays the
     ///         build at today's quoted price (VaultLib.buildAndList).
     function build(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, IShapes shapes, uint256 units,
-        uint256[] calldata proposals, uint256 minPay, uint256 gasStart) external returns (uint256)
+        uint256[] calldata proposals, uint256 minPay, uint256 spent) external returns (uint256)
     {
+        uint256 gasStart = gasleft() + spent;
         _requireListing(s, f);
         _precheck(s, minPay, false);
         // Returned packs relist first: a build may not spend the backing booked for idle inventory.
@@ -94,8 +95,9 @@ library StrategyLib {
     /// @notice Relist idle packs (returned by bids, withdrawals or expiry) at bounded proposals,
     ///         checked against live economics. No mint: a returned pack is reused as is.
     function list(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, IShapes shapes,
-        uint256[] calldata proposals, uint256 minPay, uint256 gasStart) external returns (uint256)
+        uint256[] calldata proposals, uint256 minPay, uint256 spent) external returns (uint256)
     {
+        uint256 gasStart = gasleft() + spent;
         _requireListing(s, f);
         _precheck(s, minPay, false);
         if (proposals.length > VaultLib.MAX_LIST_BATCH) revert Amount();
@@ -131,11 +133,12 @@ library StrategyLib {
     }
 
     function syncFunded(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, uint256[] calldata ids,
-        uint256 witness, uint256 checkpointMode, uint256 minPay, uint256 fundingCap, uint256 gasStart) external returns (uint256)
+        uint256 witness, uint256 checkpointMode, uint256 minPay, uint256 fundingCap, uint256 spent) external returns (uint256)
     {
+        uint256 gasStart = gasleft() + spent;
         if (checkpointMode != 1) revert Nothing();
         (uint256 gasQ, uint256 units) = VaultLib.syncUnfunded(s.params, s.book, f, packs, ids, checkpointMode, witness, true);
-        return VaultLib.payFunded(s.params, gasQ, units, true, minPay, fundingCap, gasStart);
+        return VaultLib.payFunded(s.params, gasQ, units, true, minPay, fundingCap, gasStart - gasleft());
     }
 
     function _requireListing(VaultLib.Strategy storage s, IFWAV2 f) private view {
@@ -150,8 +153,9 @@ library StrategyLib {
     /// @notice Bounded journal or scan job, terminal resolutions and allocation cleanup.
     ///         `checkpointMode` is 0 for an account without checkpoints.
     function sync(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, uint256[] calldata listingIds,
-        uint256 witnessId, uint256 checkpointMode, uint256 minPay, uint256 gasStart) external returns (uint256)
+        uint256 witnessId, uint256 checkpointMode, uint256 minPay, uint256 spent) external returns (uint256)
     {
+        uint256 gasStart = gasleft() + spent;
         (uint256 gasQ, uint256 units) =
             VaultLib.syncChanges(s.params, s.budget, s.book, f, packs, listingIds, checkpointMode, witnessId);
         return _pay(s, gasQ, units, false, minPay, type(uint256).max, gasStart);
@@ -162,8 +166,9 @@ library StrategyLib {
     ///         (routine). A stale quote or a gas spike stops new listings but never unwinds earning
     ///         ones. Exits never read FWA's economics, so a hostile oracle or fee cannot block them.
     function unlist(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, uint256[] calldata listingIds,
-        uint256 minPay, uint256 shortfall, uint256 gasStart) external returns (uint256)
+        uint256 minPay, uint256 shortfall, uint256 spent) external returns (uint256)
     {
+        uint256 gasStart = gasleft() + spent;
         if (listingIds.length > VaultLib.MAX_BATCH) revert Amount();
         bool essential = s.windingDown || shortfall != 0;
         if (!essential) {
@@ -201,8 +206,9 @@ library StrategyLib {
     /// @notice Redeem up to `maxCount` idle packs to ETH at their exact backing, or one bounded
     ///         recovery chunk, while `need` ETH is still owed beyond free ETH, or freely in wind-down.
     function liquidate(VaultLib.Strategy storage s, IShapePacks packs, IShapes shapes, uint256 maxCount,
-        uint256 minPay, uint256 need, uint256 gasStart) external returns (uint256)
+        uint256 minPay, uint256 need, uint256 spent) external returns (uint256)
     {
+        uint256 gasStart = gasleft() + spent;
         if (!s.windingDown && need == 0) revert Nothing();
         _precheckPermission(s, minPay, true);
         VaultLib.Book storage b = s.book;
@@ -302,8 +308,9 @@ library StrategyLib {
 
     /// @notice Pay the caller for verified work (VaultLib.pay): the least of the quote, `cap`, the account's free ETH and its budget.
     function pay(VaultLib.Strategy storage s, uint256 gasQ, uint256 units, bool essential,
-        uint256 minPay, uint256 cap, uint256 gasStart) external returns (uint256)
+        uint256 minPay, uint256 cap, uint256 spent) external returns (uint256)
     {
+        uint256 gasStart = gasleft() + spent;
         return _pay(s, gasQ, units, essential, minPay, cap, gasStart);
     }
 
@@ -323,13 +330,14 @@ library StrategyLib {
             return 0;
         }
         return VaultLib.pay(s.params, s.budget, gasQ, units, minPay, cap,
-            IAccount(address(this)).keeperCash(), gasStart);
+            IAccount(address(this)).keeperCash(), gasStart - gasleft());
     }
 
     function payFunded(VaultLib.Strategy storage s, uint256 gasQ, uint256 units, bool essential,
-        uint256 minPay, uint256 fundingCap, uint256 gasStart) external returns (uint256)
+        uint256 minPay, uint256 fundingCap, uint256 spent) external returns (uint256)
     {
-        return VaultLib.payFunded(s.params, gasQ, units, essential, minPay, fundingCap, gasStart);
+        uint256 gasStart = gasleft() + spent;
+        return VaultLib.payFunded(s.params, gasQ, units, essential, minPay, fundingCap, gasStart - gasleft());
     }
 
     function _precheck(VaultLib.Strategy storage s, uint256 minPay, bool essential) private view {

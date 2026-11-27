@@ -8,6 +8,10 @@ import {PackManagerFactory} from "../../src/PackManagerFactory.sol";
 import {IFloorOracle} from "../../src/interfaces/External.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 
+/// @dev Manager design with the maximum 255 packs of every size 3 to 30 units: test builds stay
+///      unconstrained while every manager still has an exact mix (A9.5).
+uint256 constant ANY_DESIGN = 0x00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF000000;
+
 /// @dev Test references may enumerate bounded getters; production keepers use indexed events.
 library TestVaultOps {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));

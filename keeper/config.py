@@ -66,6 +66,11 @@ def configuration_hash(values, live_mint_fee, listing_paused=False, winding_down
     return '0x' + keccak(encode([PARAMS_T, 'uint256', 'bool', 'bool'], [params_values(values), live_mint_fee, listing_paused, winding_down])).hex()
 
 
+def full_design(values):
+    """PackAccount.design with the maximum 255 packs of every size packUnitsMask admits."""
+    return sum(0xFF << (8 * u) for u in range(3, 31) if (int(values['packUnitsMask']) >> u) & 1)
+
+
 def factory_configuration_hash(values, live_mint_fee, implementation):
     """PackManagerFactory.configHashFor: the creation's settings bound to the implementation it clones."""
     from eth_abi import encode

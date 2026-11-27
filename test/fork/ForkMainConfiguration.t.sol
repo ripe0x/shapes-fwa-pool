@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {ANY_DESIGN} from "../utils/TestVaultOps.sol";
 import {ForkBase, IOwnable, IFwaAdmin} from "./ForkBase.sol";
 import {PackAccount} from "../../src/PackAccount.sol";
 import {PackManager} from "../../src/PackManager.sol";
@@ -48,7 +49,7 @@ contract ForkMainConfigurationTest is ForkBase {
     function manager() internal returns (PackManager m) {
         PackManagerFactory factory = new PackManagerFactory(FWA, SHAPES, PACKS);
         VaultLib.Params memory p = launchParams();
-        m = factory.create{value: 2 ether}(owner, p, factory.configHashFor(p));
+        m = factory.create{value: 2 ether}(owner, p, ANY_DESIGN, factory.configHashFor(p));
         assertEq(m.owner(), owner, "factory preserves individual ownership");
         assertEq(m.referenceUnits(), 3);
         assertEq(m.referencePositionValue(), 0.24 ether);
@@ -271,12 +272,15 @@ contract ForkMainConfigurationTest is ForkBase {
         PackManagerFactory factory = new PackManagerFactory(FWA, SHAPES, PACKS);
         VaultLib.Params memory p = launchParams();
         p.routineCap = 0.3 ether;
-        PackManager m = factory.create{value: 100 ether}(owner, p, factory.configHashFor(p));
+        p.packUnitsMask |= uint64(1) << 6; // an exact mix holds at most 255 packs of one size
+        PackManager m = factory.create{value: 100 ether}(owner, p, ANY_DESIGN, factory.configHashFor(p));
         for (uint256 start; start < 301;) {
             uint256 count = 301 - start > 4 ? 4 : 301 - start;
+            uint256 units = start < 252 ? 3 : 6; // 252 three-unit packs, then 49 six-unit packs
+            if (start < 252 && start + count > 252) count = 252 - start;
             uint256[] memory values = new uint256[](count);
-            for (uint256 i; i < count; ++i) values[i] = 0.21 ether + (start + i) * 10_000;
-            m.build(3, values, 0, m.configurationHash());
+            for (uint256 i; i < count; ++i) values[i] = units * 0.07 ether + (start + i) * 10_000;
+            m.build(units, values, 0, m.configurationHash());
             start += count;
         }
         assertEq(m.openListingCount(), 301, "no total position cap");

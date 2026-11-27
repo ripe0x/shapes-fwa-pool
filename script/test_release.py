@@ -157,7 +157,7 @@ class LaunchValidationTests(unittest.TestCase):
         wrong = copy.deepcopy(self.factory_abi)
         create = next(entry for entry in wrong if entry.get("name") == "create")
         create["inputs"].insert(2, {"name": "policy", "type": "address"})
-        with self.assertRaisesRegex(ValueError, "only.*owner, p, expected"):
+        with self.assertRaisesRegex(ValueError, "only.*owner, p, design, expected"):
             release.validate_compiled_launch_abi(self.vault_abi, wrong)
 
     def test_factory_and_constructor_nested_params_are_also_checked(self):
@@ -223,7 +223,7 @@ class ManagerDeploymentTests(unittest.TestCase):
                 release.validate_compiled_manager_abi(bad, self.factory_abi)
         bad = copy.deepcopy(self.factory_abi)
         next(e for e in bad if e.get("name") == "create")["inputs"].insert(2, {"name": "policy", "type": "address"})
-        with self.assertRaisesRegex(ValueError, "only.*owner, p, expected"):
+        with self.assertRaisesRegex(ValueError, "only.*owner, p, design, expected"):
             release.validate_compiled_manager_abi(self.manager_abi, bad)
         bad = copy.deepcopy(self.manager_abi)
         next(e for e in bad if e.get("type") == "constructor")["inputs"].append({"name": "policy", "type": "address"})

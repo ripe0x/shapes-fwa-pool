@@ -18,7 +18,7 @@ import time
 import urllib.request
 from eth_abi import decode, encode
 from eth_utils import keccak, to_checksum_address
-from config import PARAMS_T, params_values
+from config import PARAMS_T, full_design, params_values
 from rehearse_manager_r2 import ROOT, PUBLIC, FWA, SHAPES, PACKS, sources
 
 OUT = ROOT / 'docs/receipts/manager-measured-receipts.json'
@@ -371,7 +371,7 @@ def main():
         send(owner,manager,'unlistForWithdrawal(uint256[])',['uint256[]'],[ids])
         count=number(factory,'managerCount()')
         expected=read(factory,f'configHashFor({PARAMS_T})',[PARAMS_T],[params_values(settings)],('bytes32',))[0]
-        send(owner,factory,f'create(address,{PARAMS_T},bytes32)',['address',PARAMS_T,'bytes32'],[owner,params_values(settings),expected],operation='create')
+        send(owner,factory,f'create(address,{PARAMS_T},uint256,bytes32)',['address',PARAMS_T,'uint256','bytes32'],[owner,params_values(settings),full_design(settings),expected],operation='create')
         destination=read(factory,'managerAt(uint256)',['uint256'],[count],('address',))[0]
         report['destination']=destination
         send(owner,destination,'setListingPaused(bool)',['bool'],[True])
@@ -408,7 +408,7 @@ def main():
             branch=f'paid-batches-{price}';report['phase']=branch;save()
             index=number(factory,'managerCount()')
             expected=read(factory,f'configHashFor({PARAMS_T})',[PARAMS_T],[params_values(settings)],('bytes32',))[0]
-            send(owner,factory,f'create(address,{PARAMS_T},bytes32)',['address',PARAMS_T,'bytes32'],[owner,params_values(settings),expected],operation='create',value=3*10**18)
+            send(owner,factory,f'create(address,{PARAMS_T},uint256,bytes32)',['address',PARAMS_T,'uint256','bytes32'],[owner,params_values(settings),full_design(settings),expected],operation='create',value=3*10**18)
             target=read(factory,'managerAt(uint256)',['uint256'],[index],('address',))[0]
             opening=rpc('evm_snapshot')
             before_supply=number(SHAPES,'totalSupply()');before_fees=number(SHAPES,'pendingFees()')
@@ -465,8 +465,8 @@ def write_profile(report):
     # owner recoverUnlist/recoverLiquidate. The superseded multi-packet set is kept on disk as
     # history but dropped here (see docs/receipts/manager-measured-verification.md for what that costs).
     paths=[OUT]
-    for name in ('manager-measured-sync-contexts-v3.json',
-                 'manager-measured-owner-exit-v3.json'):
+    for name in ('manager-measured-sync-contexts-v4.json',
+                 'manager-measured-owner-exit-v4.json'):
         path=ROOT/'docs/receipts'/name
         if path.exists():paths.append(path)
     if len(paths)<3:

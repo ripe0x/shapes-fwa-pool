@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {ANY_DESIGN} from "../utils/TestVaultOps.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
@@ -73,7 +74,7 @@ contract ForkManagerImportTest is Test {
         VaultLib.Params memory p = _params();
         bytes32 expected = factory.configHashFor(p);
         vm.prank(alice);
-        m = factory.create{value: funding}(alice, p, expected);
+        m = factory.create{value: funding}(alice, p, ANY_DESIGN, expected);
     }
 
     function _one(uint256 id) internal pure returns (uint256[] memory ids) {

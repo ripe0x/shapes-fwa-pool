@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {ANY_DESIGN} from "../utils/TestVaultOps.sol";
 import {ForkBase} from "./ForkBase.sol";
 import {MainRenewalBase, IFwaSettle} from "./ForkMainRenewal.t.sol";
 import {PackVault} from "../../src/PackVault.sol";
@@ -32,7 +33,7 @@ contract ForkMeasuredKeeperTest is ForkBase {
 
     function manager(VaultLib.Params memory p) private returns (PackManager m) {
         PackManagerFactory factory = new PackManagerFactory(FWA, SHAPES, PACKS);
-        m = factory.create{value: 1 ether}(owner, p, factory.configHashFor(p));
+        m = factory.create{value: 1 ether}(owner, p, ANY_DESIGN, factory.configHashFor(p));
     }
 
     function proposals() private pure returns (uint256[] memory ids) {

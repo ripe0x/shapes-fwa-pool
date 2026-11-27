@@ -274,8 +274,12 @@ library VaultLib {
         return gasUnits * price + units * workFee;
     }
 
-    /// @dev The account supplies gasStart from before its guard and checks. No caller-selected
-    ///      gas limit or unused allowance is reimbursed. Only verified eligible work earns pay.
+    /// @dev `gasStart` is anchored in this frame: every external library entry re-anchors as
+    ///      `gasleft() + spent`, where `spent` is the gas its caller used since the account read
+    ///      gas before its guard and checks. Comparing gasleft() across frames would count the
+    ///      1/64 of gas each call withholds (EIP-150), which grows with the caller's gas limit.
+    ///      The few thousand gas each call boundary costs are not measured; overhead covers them.
+    ///      No caller-selected gas limit or unused allowance is reimbursed.
     function measuredPayment(Params storage p, uint256 gasStart, uint256 gasAllowance, uint256 units,
         bool essential) private returns (uint256)
     {
@@ -302,8 +306,9 @@ library VaultLib {
         uint256 minPay,
         uint256 cap,
         uint256 free,
-        uint256 gasStart
+        uint256 spent
     ) external returns (uint256 amount) {
+        uint256 gasStart = gasleft() + spent;
         uint256 r = budgetNow(p, b);
         amount = M.min(M.min(measuredPayment(p, gasStart, gasQ, units, false), cap), M.min(free, r));
         if (amount < minPay) revert Payment();
@@ -315,8 +320,9 @@ library VaultLib {
     }
 
     function payFunded(Params storage p, uint256 gasQ, uint256 units, bool essential, uint256 minPay,
-        uint256 fundingCap, uint256 gasStart) external returns (uint256 amount)
+        uint256 fundingCap, uint256 spent) external returns (uint256 amount)
     {
+        uint256 gasStart = gasleft() + spent;
         amount = M.min(measuredPayment(p, gasStart, gasQ, units, essential), fundingCap);
         if (amount < minPay) revert Payment();
         if (amount != 0) {

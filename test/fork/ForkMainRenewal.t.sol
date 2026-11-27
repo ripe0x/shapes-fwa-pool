@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {ANY_DESIGN} from "../utils/TestVaultOps.sol";
 import {ForkBase, IOwnable, IFwaAdmin} from "./ForkBase.sol";
 import {IFwaSettle} from "./ForkSelection.t.sol";
 import {IShapesFeeAdmin} from "./ForkMainConfiguration.t.sol";
@@ -78,7 +79,7 @@ abstract contract MainRenewalBase is ForkBase {
         } else {
             PackManagerFactory factory = new PackManagerFactory(FWA, SHAPES, PACKS);
             VaultLib.Params memory p = parameters();
-            account = factory.create{value: _initialFunding()}(accountOwner, p, factory.configHashFor(p));
+            account = factory.create{value: _initialFunding()}(accountOwner, p, ANY_DESIGN, factory.configHashFor(p));
         }
         _beforeInitialBuild();
         ReceiptFixtureFiller filler = new ReceiptFixtureFiller{value: _fillerFunding()}(

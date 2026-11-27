@@ -64,17 +64,9 @@ contract PackManagerFactory {
         pendingAdmin = address(0);
     }
 
-    /// @notice Create a manager owned by `owner` with parameters `p`, funded with `msg.value`.
-    function create(address owner, VaultLib.Params calldata p, bytes32 expected) external payable returns (PackManager manager) {
-        return _create(owner, p, 0, expected);
-    }
-
-    /// @notice As `create`, with the owner's pack mix (`PackAccount.design`).
+    /// @notice Create a manager owned by `owner` with parameters `p` and the owner's exact pack
+    ///         mix (`PackAccount.design`, nonzero), funded with `msg.value`.
     function create(address owner, VaultLib.Params calldata p, uint256 design, bytes32 expected) external payable returns (PackManager manager) {
-        return _create(owner, p, design, expected);
-    }
-
-    function _create(address owner, VaultLib.Params calldata p, uint256 design, bytes32 expected) private returns (PackManager manager) {
         if (expected != configHashFor(p)) revert ConfigurationChanged();
         manager = PackManager(payable(LibClone.clone(implementation)));
         manager.initialize{value: msg.value}(owner, p, design);
@@ -90,7 +82,8 @@ contract PackManagerFactory {
     function preview(VaultLib.Params calldata p) external view returns (uint256 units, uint256 principal,
         uint256 backing, uint256 mintCost, uint256 openingCash, bytes32 expectedConfigHash)
     {
-        return VaultLib.preview(p, PackManager(payable(implementation)).shapes().mintFee());
+        (units, principal, backing, mintCost, openingCash,) = VaultLib.preview(p, PackManager(payable(implementation)).shapes().mintFee());
+        expectedConfigHash = configHashFor(p);
     }
 
     function managerCount() external view returns (uint256) {

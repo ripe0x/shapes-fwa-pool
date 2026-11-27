@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 import {ForkBase, IFwaAdmin, IOwnable, IOracleAdmin} from "./ForkBase.sol";
-import {TestVaultOps} from "../utils/TestVaultOps.sol";
+import {TestVaultOps, ANY_DESIGN} from "../utils/TestVaultOps.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {PackManager} from "../../src/PackManager.sol";
 import {PackManagerFactory} from "../../src/PackManagerFactory.sol";
@@ -68,7 +68,7 @@ contract ForkManagerTest is ForkBase {
     function _create(address who, uint256 funding) internal returns (PackManager m) {
         bytes32 _expected19 = TestVaultOps.factoryHash(factory, managerParams());
         vm.prank(who);
-        m = factory.create{value: funding}(who, managerParams(), _expected19);
+        m = factory.create{value: funding}(who, managerParams(), ANY_DESIGN, _expected19);
     }
 
     function _build(PackAccount a, uint256 n) internal returns (uint256 pay) {
@@ -88,11 +88,11 @@ contract ForkManagerTest is ForkBase {
         bytes32 _expected20 = TestVaultOps.factoryHash(factory, managerParams());
         vm.prank(alice);
         vm.expectRevert(Ownable.Unauthorized.selector);
-        factory.create{value: 1 ether}(address(factory), managerParams(), _expected20);
+        factory.create{value: 1 ether}(address(factory), managerParams(), ANY_DESIGN, _expected20);
         bytes32 _expected21 = TestVaultOps.factoryHash(factory, managerParams());
         vm.prank(alice);
         vm.expectRevert(Ownable.Unauthorized.selector);
-        factory.create{value: 1 ether}(predicted, managerParams(), _expected21);
+        factory.create{value: 1 ether}(predicted, managerParams(), ANY_DESIGN, _expected21);
     }
 
     function test_createInitializesAtomically() public {
@@ -180,7 +180,7 @@ contract ForkManagerTest is ForkBase {
 
         vm.prank(bob);
         vm.expectRevert(PackManagerFactory.ConfigurationChanged.selector);
-        factory.create{value: 0.1 ether}(bob, managerParams(), staleHash);
+        factory.create{value: 0.1 ether}(bob, managerParams(), ANY_DESIGN, staleHash);
 
         PackManager newM = _create(bob, 0.1 ether);
         assertEq(keccak256(address(oldM).code), keccak256(_clone(oldImpl)), "old manager keeps its code");
@@ -218,12 +218,73 @@ contract ForkManagerTest is ForkBase {
         bytes32 _expected22 = TestVaultOps.factoryHash(factory, p);
         vm.prank(alice);
         vm.expectRevert(VaultLib.OutOfBounds.selector);
-        factory.create(alice, p, _expected22);
+        factory.create(alice, p, ANY_DESIGN, _expected22);
         bytes32 _expected23 = TestVaultOps.factoryHash(factory, managerParams());
         vm.prank(alice);
         vm.expectRevert(Ownable.NewOwnerIsZeroAddress.selector);
-        factory.create(address(0), managerParams(), _expected23);
+        factory.create(address(0), managerParams(), ANY_DESIGN, _expected23);
         assertEq(factory.managerCount(), 0);
+    }
+
+    /// @dev A9.5: every manager has an exact owner mix. Zero (no count limit) is refused at
+    ///      creation and by `setDesign`, so no caller can build past what the owner chose.
+    function test_zeroDesignRefused() public {
+        bytes32 expected = TestVaultOps.factoryHash(factory, managerParams());
+        vm.prank(alice);
+        vm.expectRevert(PackAccount.InvalidDesign.selector);
+        factory.create{value: 1 ether}(alice, managerParams(), 0, expected);
+        PackManager m = _create(alice, 1 ether);
+        vm.prank(alice);
+        vm.expectRevert(PackAccount.InvalidDesign.selector);
+        m.setDesign(0);
+        assertEq(m.design(), ANY_DESIGN);
+    }
+
+    /// @dev `preview`'s configuration hash is the one `create` checks.
+    function test_previewHashCreates() public {
+        (,,,,, bytes32 h) = factory.preview(managerParams());
+        assertEq(h, factory.configHashFor(managerParams()));
+        vm.prank(alice);
+        PackManager m = factory.create{value: 0.1 ether}(alice, managerParams(), ANY_DESIGN, h);
+        assertEq(m.owner(), alice);
+    }
+
+    /// @dev Identical work pays the same whatever gas limit the keeper sets: measurement is
+    ///      re-anchored in each library frame, so EIP-150's withheld 1/64 is never counted.
+    function test_gasLimitDoesNotChangeMeasuredPay() public {
+        vm.fee(0.15 gwei);
+        vm.txGasPrice(0.2 gwei);
+        assertEq(block.basefee, 0.15 gwei);
+        assertEq(tx.gasprice, 0.2 gwei);
+        VaultLib.Params memory p = managerParams();
+        p.gasSchedule.build += 1_000_000; // headroom so the measured value is never clipped
+        bytes32 h = TestVaultOps.factoryHash(factory, p);
+        vm.prank(alice);
+        PackManager m = factory.create{value: 2 ether}(alice, p, ANY_DESIGN, h);
+        uint256[] memory quotes = TestVaultOps.proposals(m, 1, UNITS);
+        bytes32 expected = TestVaultOps.configurationHash(m);
+        uint256 snap = vm.snapshotState();
+        (uint256 payLow, uint256 measuredLow, uint256 allowance) = _buildAt(m, quotes, expected, 3_000_000);
+        vm.revertToState(snap);
+        (uint256 payHigh, uint256 measuredHigh,) = _buildAt(m, quotes, expected, 15_000_000);
+        assertGt(payLow, 0);
+        assertLt(measuredLow, allowance, "unclipped, so a forwarding error would show");
+        assertEq(measuredHigh, measuredLow, "measured gas independent of the gas limit");
+        assertEq(payHigh, payLow, "pay independent of the gas limit");
+    }
+
+    function _buildAt(PackManager m, uint256[] memory quotes, bytes32 expected, uint256 gasLimit)
+        internal returns (uint256 pay, uint256 measured, uint256 allowance)
+    {
+        vm.recordLogs();
+        vm.prank(keeper);
+        pay = m.build{gas: gasLimit}(UNITS, quotes, 0, expected);
+        bytes32 topic = keccak256("KeeperWorkMeasured(uint256,uint256,uint256,uint256,bool)");
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics[0] == topic) (measured, allowance) = abi.decode(logs[i].data, (uint256, uint256));
+        }
+        assertGt(measured, 0, "work measured");
     }
 
     /// The owner's pack mix caps each size's held packs; builds below it run on the real pool,
@@ -693,7 +754,7 @@ contract ForkManagerSelectionTest is Test {
         replayParams.maxTip = 0;
         bytes32 _expected24 = TestVaultOps.factoryHash(factory, replayParams);
         vm.prank(owner);
-        m = factory.create{value: 2 ether}(owner, replayParams, _expected24);
+        m = factory.create{value: 2 ether}(owner, replayParams, ANY_DESIGN, _expected24);
         (, uint256 target, bool ok) = m.edge(6);
         assertTrue(ok);
         assertEq(target, BACKING, "exact backing the replayed word was found for");

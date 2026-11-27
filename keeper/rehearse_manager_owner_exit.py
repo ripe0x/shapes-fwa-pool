@@ -17,7 +17,7 @@ from pathlib import Path
 from eth_abi import decode
 from eth_utils import keccak, to_checksum_address
 
-from config import GAS_FIELDS, PARAMS_T, params_values
+from config import GAS_FIELDS, PARAMS_T, full_design, params_values
 from rehearse_manager_measured import data, rpc_at
 from rehearse_manager_r2 import ROOT, FWA, SHAPES, PACKS, sources
 
@@ -145,8 +145,8 @@ def main():
         # Fresh funded manager, eight listed packs (two build(4) calls, owner-driven at minPay 0).
         index = number(factory, 'managerCount()')
         expected = read(factory, f'configHashFor({PARAMS_T})', [PARAMS_T], [values], ('bytes32',))[0]
-        packet['transactions'].append(send(owner, factory, f'create(address,{PARAMS_T},bytes32)',
-            ['address', PARAMS_T, 'bytes32'], [owner, values, expected], 'setupCreate', base, price, value=3 * 10**18))
+        packet['transactions'].append(send(owner, factory, f'create(address,{PARAMS_T},uint256,bytes32)',
+            ['address', PARAMS_T, 'uint256', 'bytes32'], [owner, values, full_design(settings), expected], 'setupCreate', base, price, value=3 * 10**18))
         target = read(factory, 'managerAt(uint256)', ['uint256'], [index], ('address',))[0]
         target = to_checksum_address(target)
         # Canonical backing for the current config: the account owns the ratio, so proposals must equal
