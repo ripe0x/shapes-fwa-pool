@@ -13,6 +13,9 @@ import {ReconcileTrace} from "../utils/ReconcileTrace.sol";
 contract ForkCompletionAccountingTest is ForkBase {
     address carol = makeAddr("pack-vault-test-completion-carol");
     string constant TRACE = "sim/out/reconcile-contributions-trace.jsonl";
+    // Keeper cash delta for the next _trace, passed via storage (not a stack arg) so the wide trace
+    // string.concat in the deep reconcile test stays under the via_ir stack limit. Reset each trace.
+    uint256 private _ckPay;
 
     receive() external payable {}
 
@@ -332,7 +335,8 @@ contract ForkCompletionAccountingTest is ForkBase {
 
     function _trace(string memory action) internal {
         vm.writeLine(TRACE, string.concat('{', action, ',"expected":',
-            ReconcileTrace.render(vault, alice, bob, 0, "contribution"), '}'));
+            ReconcileTrace.render(vault, alice, bob, _ckPay, "contribution"), '}'));
+        _ckPay = 0;
     }
 
     function test_reconcileContributionErasEveryWei() public {
@@ -385,6 +389,10 @@ contract ForkCompletionAccountingTest is ForkBase {
         expected = vault.configurationHash();
         vm.prank(keeper);
         uint256 paid = vault.checkpoint(0, 0, expected);
+        // A funded (essential) checkpoint pays the keeper; hand that cash delta to render's
+        // measuredWork window (require(paidTotal == pay)) through _ckPay rather than a second _trace
+        // argument, which would add a call-argument slot and overflow this deep function (via_ir).
+        _ckPay = paid;
         _trace(string.concat('"action":"closeCheckpoint","pay":', vm.toString(paid),
             ',"constructionCost":', vm.toString(construction), ',"referenceCapital":', vm.toString(capital)));
         uint256 refundAlice = vault.checkpointRefund(2);

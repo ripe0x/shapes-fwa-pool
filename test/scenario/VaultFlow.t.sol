@@ -26,6 +26,11 @@ import {
     LISTING_WITHDRAWN
 } from "../../src/interfaces/External.sol";
 
+interface IShapesMintFeeAdmin {
+    function admin() external view returns (address);
+    function setMintFee(uint256 fee) external;
+}
+
 /// @notice Asset-flow breakdown for PackVault (docs/SYSTEM-MAP.md). Every regime runs on a real
 ///         mainnet fork with the real FWA pool, its rewards module, oracle, Shapes, ShapePacks and
 ///         FWA token. Nothing is mocked. Selections come only from replaying real VRF requests and
@@ -100,6 +105,12 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         // above the ~0.036 ETH oracle cap) can list. The real FWA owner makes the call.
         vm.prank(IOwnable(address(FWA)).owner());
         IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
+        // Live mainnet state reduced the Shapes mint fee to 0.0005 ETH after the pinned block; the
+        // shipping config (deploy/mainnet.json) accepts exactly that. Make the same real admin call
+        // so regimes run the current fee, not the block's historical 0.001 (inlined to avoid adding a
+        // contract method, which tips the flow framework over the via_ir stack limit).
+        vm.prank(IShapesMintFeeAdmin(address(SHAPES)).admin());
+        IShapesMintFeeAdmin(address(SHAPES)).setMintFee(0.0005 ether);
         vm.deal(alice, 50 ether);
         vm.deal(bob, 50 ether);
     }
@@ -137,28 +148,34 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         p.acceptedMintFee = uint64(vm.parseJsonUint(v, ".acceptedMintFeeWei"));
         p.minDeposit = uint64(vm.parseJsonUint(v, ".minDepositWei"));
         p.minDistribution = uint64(vm.parseJsonUint(v, ".minDistributionWei"));
-        p.gasSchedule.checkpoint = uint32(vm.parseJsonUint(v, ".gasSchedule.checkpoint"));
-        p.gasSchedule.allocationEntry = uint32(vm.parseJsonUint(v, ".gasSchedule.allocationEntry"));
-        p.gasSchedule.allocationRead = uint32(vm.parseJsonUint(v, ".gasSchedule.allocationRead"));
-        p.gasSchedule.build = uint32(vm.parseJsonUint(v, ".gasSchedule.build"));
-        p.gasSchedule.buildPack = uint32(vm.parseJsonUint(v, ".gasSchedule.buildPack"));
-        p.gasSchedule.buildShape = uint32(vm.parseJsonUint(v, ".gasSchedule.buildShape"));
-        p.gasSchedule.list = uint32(vm.parseJsonUint(v, ".gasSchedule.list"));
-        p.gasSchedule.listed = uint32(vm.parseJsonUint(v, ".gasSchedule.listed"));
-        p.gasSchedule.sync = uint32(vm.parseJsonUint(v, ".gasSchedule.sync"));
-        p.gasSchedule.requiredTail = uint32(vm.parseJsonUint(v, ".gasSchedule.requiredTail"));
-        p.gasSchedule.distributionProof = uint32(vm.parseJsonUint(v, ".gasSchedule.distributionProof"));
-        p.gasSchedule.journal = uint32(vm.parseJsonUint(v, ".gasSchedule.journal"));
-        p.gasSchedule.scan = uint32(vm.parseJsonUint(v, ".gasSchedule.scan"));
-        p.gasSchedule.selected = uint32(vm.parseJsonUint(v, ".gasSchedule.selected"));
-        p.gasSchedule.synced = uint32(vm.parseJsonUint(v, ".gasSchedule.synced"));
-        p.gasSchedule.pruned = uint32(vm.parseJsonUint(v, ".gasSchedule.pruned"));
-        p.gasSchedule.unlist = uint32(vm.parseJsonUint(v, ".gasSchedule.unlist"));
-        p.gasSchedule.unlisted = uint32(vm.parseJsonUint(v, ".gasSchedule.unlisted"));
-        p.gasSchedule.harvested = uint32(vm.parseJsonUint(v, ".gasSchedule.harvested"));
-        p.gasSchedule.credit = uint32(vm.parseJsonUint(v, ".gasSchedule.credit"));
-        p.gasSchedule.fund = uint32(vm.parseJsonUint(v, ".gasSchedule.fund"));
-        p.gasSchedule.overhead = uint32(vm.parseJsonUint(v, ".gasSchedule.overhead"));
+        p.gasSchedule = _gasSchedule(v);
+    }
+
+    /// @dev Parsed in its own frame so `_values` stays under the via_ir stack limit (the full
+    ///      Params + nested 22-field GasSchedule otherwise overflows this deep function by one slot).
+    function _gasSchedule(string memory v) private view returns (VaultLib.GasSchedule memory g) {
+        g.checkpoint = uint32(vm.parseJsonUint(v, ".gasSchedule.checkpoint"));
+        g.allocationEntry = uint32(vm.parseJsonUint(v, ".gasSchedule.allocationEntry"));
+        g.allocationRead = uint32(vm.parseJsonUint(v, ".gasSchedule.allocationRead"));
+        g.build = uint32(vm.parseJsonUint(v, ".gasSchedule.build"));
+        g.buildPack = uint32(vm.parseJsonUint(v, ".gasSchedule.buildPack"));
+        g.buildShape = uint32(vm.parseJsonUint(v, ".gasSchedule.buildShape"));
+        g.list = uint32(vm.parseJsonUint(v, ".gasSchedule.list"));
+        g.listed = uint32(vm.parseJsonUint(v, ".gasSchedule.listed"));
+        g.sync = uint32(vm.parseJsonUint(v, ".gasSchedule.sync"));
+        g.requiredTail = uint32(vm.parseJsonUint(v, ".gasSchedule.requiredTail"));
+        g.distributionProof = uint32(vm.parseJsonUint(v, ".gasSchedule.distributionProof"));
+        g.journal = uint32(vm.parseJsonUint(v, ".gasSchedule.journal"));
+        g.scan = uint32(vm.parseJsonUint(v, ".gasSchedule.scan"));
+        g.selected = uint32(vm.parseJsonUint(v, ".gasSchedule.selected"));
+        g.synced = uint32(vm.parseJsonUint(v, ".gasSchedule.synced"));
+        g.pruned = uint32(vm.parseJsonUint(v, ".gasSchedule.pruned"));
+        g.unlist = uint32(vm.parseJsonUint(v, ".gasSchedule.unlist"));
+        g.unlisted = uint32(vm.parseJsonUint(v, ".gasSchedule.unlisted"));
+        g.harvested = uint32(vm.parseJsonUint(v, ".gasSchedule.harvested"));
+        g.credit = uint32(vm.parseJsonUint(v, ".gasSchedule.credit"));
+        g.fund = uint32(vm.parseJsonUint(v, ".gasSchedule.fund"));
+        g.overhead = uint32(vm.parseJsonUint(v, ".gasSchedule.overhead"));
     }
 
     function _deploy(uint256 seed, VaultLib.Params memory p) internal {
@@ -587,7 +604,9 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         uint256 buildPay = keeperPaidCum - paid0;
         VaultLib.Params memory pp = vault.getParams();
         // Priced at the ceiling (min(basefee+tip, ceiling) = gasCeiling), not the 2 gwei basefee.
-        assertEq(buildPay, (GasQuotes.Q_BUILD + GasQuotes.buildGas(3) + GasQuotes.Q_LISTED) * pp.gasCeiling
+        // A8: measured pay adds the account-owned overhead (100_000, the deploy schedule's `overhead`)
+        // to the gas allowance, priced at the ceiling.
+        assertEq(buildPay, (GasQuotes.Q_BUILD + GasQuotes.buildGas(3) + GasQuotes.Q_LISTED + 100_000) * pp.gasCeiling
             + 2 * pp.workFee, "build paid at the ceiling price, not the spike");
         _deposit(bob, 0.5 ether);
         _toBlackout();
@@ -595,9 +614,9 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         _kCheckpoint(keeper); // prices bob's deposit; keeper pay capped at the ceiling
         uint256 pay = keeper.balance - kb;
         assertGt(pay, 0, "checkpoint compensation is funded");
-        assertEq(pay, 0.00102 ether, "actual absolute holder processing expense at the two-gwei ceiling");
-        assertEq(pay, uint256(pp.gasSchedule.checkpoint) * pp.essentialCeiling + pp.workFee,
-            "funded holder pricing follows the current configured payment class");
+        assertEq(pay, 0.00122 ether, "actual absolute holder processing expense at the two-gwei ceiling");
+        assertEq(pay, (uint256(pp.gasSchedule.checkpoint) + 100_000) * pp.essentialCeiling + pp.workFee,
+            "funded holder pricing follows the current configured payment class (checkpoint + overhead)");
         Fact[] memory f = _facts("open_listings", TestVaultOps.open(vault).length);
         f[1] = Fact("gas_price_gwei_x100", 200);
         f[2] = Fact("checkpoint_pay_wei", pay);
@@ -627,7 +646,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         uint256 vb = address(vault).balance;
         IFwaAdmin(address(FWA)).kickListing(ids[0]);
         backingReturnedCum += address(vault).balance - vb; // full backing B returns on a kick
-        _kSync(keeper, ids);
+        _kSync(keeper, _one(ids[0])); // only the kicked listing resolved; the rest stay active (paid sync rejects unused hints)
         // Repoint the oracle so no cap can be read; edge fails, nothing new lists.
         vm.prank(IOwnable(address(FWA)).owner());
         IFwaAdmin(address(FWA)).setAddr(64, address(PACKS));
@@ -992,6 +1011,9 @@ contract VaultFlowSelectionTest is VaultFlowBase {
         // D62 live state: ShapePacks is oracle-exempt so the 6-unit backing can list.
         vm.prank(IOwnable(address(FWA)).owner());
         IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
+        // Current mainnet Shapes mint fee (0.0005 ETH), as in _forkPinned; the shipping config accepts it.
+        vm.prank(IShapesMintFeeAdmin(address(SHAPES)).admin());
+        IShapesMintFeeAdmin(address(SHAPES)).setMintFee(0.0005 ether);
         IFWAToken token = IFWAToken(FWA.token());
         IFWARewards rewards = IFWARewards(FWA.rewards());
 

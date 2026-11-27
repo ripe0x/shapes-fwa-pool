@@ -174,6 +174,7 @@ library StrategyLib {
         VaultLib.Book storage b = s.book;
         uint256 realized;
         uint256 moved;
+        bool covered; // shortfall satisfied: the loop stopped early, the untouched tail is not unused input
         for (uint256 i; i < listingIds.length; ++i) {
             uint256 id = listingIds[i];
             if (b.openIndex[id] == 0) continue;
@@ -185,10 +186,14 @@ library StrategyLib {
             emit Unlisted(id);
             realized += pos.backing + pos.value;
             ++moved;
-            if (!s.windingDown && shortfall != 0 && realized >= shortfall) break;
+            if (!s.windingDown && shortfall != 0 && realized >= shortfall) { covered = true; break; }
         }
         if (realized == 0) revert Nothing();
-        if (!s.callerFunded && moved != listingIds.length) revert VaultLib.UnusedPaidInput();
+        // The unused-input guard rejects stale/invalid hints the keeper should fix. But a shortfall
+        // unlist deliberately stops once it covers the shortfall (the break above), leaving the rest
+        // of the batch valid-but-unneeded; a caller legitimately passes the whole open set, so that
+        // early stop is not unused input. Skip the guard only for that case.
+        if (!s.callerFunded && !covered && moved != listingIds.length) revert VaultLib.UnusedPaidInput();
         return _pay(s, s.params.gasSchedule.unlist + moved * s.params.gasSchedule.unlisted, moved, essential, minPay,
             type(uint256).max, gasStart);
     }

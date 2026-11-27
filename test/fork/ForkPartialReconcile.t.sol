@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Vm} from "forge-std/Vm.sol";
 import {ForkBase, IOwnable, IFwaAdmin} from "./ForkBase.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
@@ -47,20 +46,6 @@ contract ForkPartialReconcileTest is ForkBase {
         vm.recordLogs();
     }
 
-    function _listedIds(uint256 count) private returns (uint256[] memory ids) {
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        ids = new uint256[](count);
-        bytes32 listed = keccak256("NFTListed(uint256,uint256,address,address,uint256,uint256,uint256)");
-        uint256 found;
-        for (uint256 i; i < logs.length; ++i) {
-            if (logs[i].emitter == address(FWA) && logs[i].topics.length == 4 && logs[i].topics[0] == listed
-                && address(uint160(uint256(logs[i].topics[3]))) == address(vault)) {
-                assertLt(found, count); ids[found++] = uint256(logs[i].topics[1]);
-            }
-        }
-        assertEq(found, count, "real FWA admission events identify every submitted position");
-    }
-
     function test_reconcilePartialRedemptionAndWindDown() public {
         this.assertGasContext();
         require(!vm.exists(OUT), "preserve prior measured pooled trace");
@@ -81,7 +66,11 @@ contract ForkPartialReconcileTest is ForkBase {
         // once (no separate list step). Six fits a 1 ETH deposit at 0.06 ETH value plus backing.
         vm.recordLogs();
         vm.prank(keeper); TestVaultOps.restock(vault, 6, UNITS, 0);
-        uint256[] memory builtIds = _listedIds(6);
+        // Read the built listings from the book, NOT from the recorded logs: `_snap("build")` below
+        // consumes this same log window to reconcile the keeper pay (measuredWork), so a
+        // getRecordedLogs() here would steal it and make paidTotal 0 != the real cash delta.
+        uint256[] memory builtIds = TestVaultOps.open(vault);
+        assertEq(builtIds.length, 6, "six packs built and listed");
         uint256[] memory backings = new uint256[](builtIds.length);
         for (uint256 i; i < builtIds.length; ++i) { (,, uint128 b) = TestVaultOps.position(vault, builtIds[i]); backings[i] = b; }
         vm.writeLine(OUT, string.concat('{"step":"buildInputs","count":6,"units":', vm.toString(UNITS),

@@ -286,7 +286,9 @@ contract ForkMaxBatchGasTest is ForkBase {
         vm.prank(owner); vault.setParams(p, _expected9);
         vm.fee(1.95 gwei); vm.txGasPrice(2 gwei); this.assertEssentialSpikeContext();
         uint256 spikeCharge = vault.requestCharge();
-        assertEq(spikeCharge, GasQuotes.Q_CHECKPOINT * 2 gwei + p.workFee);
+        // A8: the request charge prices one checkpoint plus the account-owned overhead (100_000,
+        // the deploy schedule's `overhead`) per call. Literal keeps this deep frame off stack-too-deep.
+        assertEq(spikeCharge, (GasQuotes.Q_CHECKPOINT + 100_000) * 2 gwei + p.workFee);
         deposit = Charges.grossFor(vault, 1 ether);
         bytes32 _expected10 = TestVaultOps.configurationHash(vault);
         vm.prank(bob); vault.deposit{value: deposit}(_expected10);

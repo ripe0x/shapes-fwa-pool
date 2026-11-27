@@ -60,17 +60,20 @@ contract AuditOwnerExtraction is ForkBase {
         uint256 beforePay = owner.balance;
         vm.prank(owner);
         uint256 paidUnlist = TestVaultOps.unlist(vault, ids, 0);
-        assertEq(paidUnlist, routine, "unlist pays entire remaining routine budget");
+        // A8 measured pay: a routine unlist pays only for measured work, and that pay can never
+        // exceed the routine budget. That budget is the sole value a compromised owner can extract.
+        assertGt(paidUnlist, 0, "routine unlist pays for the measured work done");
+        assertLe(paidUnlist, routine, "routine pay is bounded by the remaining routine budget");
         vm.prank(owner);
         vault.startWindDown();
         bytes32 _expected3 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
         uint256 paidLiquidate = vault.liquidate(40, 0, _expected3);
         assertEq(paidLiquidate, 0, "liquidate is exit work and pays nothing");
-        assertEq(owner.balance - beforePay, routine, "owner extracts only the routine budget; exits are unpaid");
+        assertEq(owner.balance - beforePay, paidUnlist, "owner extracts only the measured routine pay; exits are unpaid");
         emit log_named_uint("owner keeper pay extracted wei", owner.balance - beforePay);
-        assertEq(vault.budget(), 0);
+        assertEq(vault.budget(), routine - paidUnlist, "only the measured routine pay leaves the budget");
         vm.warp(block.timestamp + 1 days);
-        assertEq(vault.budget(), 0.01 ether);
+        assertEq(vault.budget(), routine - paidUnlist + 0.01 ether, "budget refills one routine rate per day");
     }
 }
