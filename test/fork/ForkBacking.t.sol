@@ -110,26 +110,30 @@ contract ForkBackingTest is ForkBase {
         assertEq(highCeil, lowCeil, "backing is independent of the keeper gas ceiling");
     }
 
-    /// Backing at 5/3 of face (0.05 ETH on a 0.03 pack) builds and lists on the real pool even at
-    /// a 5 gwei ceiling: the gate charges a selection neither gas nor the one-time build.
+    /// The manager backing, 1.0607x face (a keep at a 1% settlement fee repays the pack and a
+    /// 0.0005 ETH mint fee per unit, the worst case: 0.031821 ETH on a 0.03 pack), builds and lists on the real pool even at a 5 gwei
+    /// ceiling: the gate charges a selection neither gas nor the one-time build.
     function test_lowBackingBuildsRegardlessOfGas() public {
         _exempt(true);
         _setCeiling(5 gwei);
         VaultLib.Params memory p = vault.getParams();
-        p.backingRatioBps = 16_667;
+        p.backingRatioBps = 10_607;
         bytes32 expected = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
         vault.setParams(p, expected);
         _priced(1 ether);
         (, uint256 backing, bool ok) = vault.edge(UNITS);
-        assertTrue(ok, "gas does not block a 5/3-face backing");
+        assertTrue(ok, "gas does not block the break-even backing");
         assertEq(backing, _target(UNITS));
-        assertEq(backing, UNITS * 0.01 ether * 16_667 / 10_000 / 10_000 * 10_000, "absolute backing");
+        assertEq(backing, UNITS * 0.01 ether * 10_607 / 10_000 / 10_000 * 10_000, "absolute backing");
         vm.prank(keeper);
         TestVaultOps.restock(vault, 1, UNITS, 0);
         uint256[] memory ids = TestVaultOps.open(vault);
         assertEq(ids.length, 1, "the build lists");
         (,, uint128 posted) = TestVaultOps.position(vault, ids[0]);
         assertGe(posted, FLOOR);
+        // Mainnet now (block 26,503,090): 1% settlement fee, 0.0005 ETH mint fee. Worst case is one
+        // 0.01 ETH Shape per unit, one mint fee each.
+        assertGe(backing * 9_900 / 10_000, UNITS * 0.01 ether + UNITS * 0.0005 ether, "a keep repays the pack and its mints");
     }
 }
