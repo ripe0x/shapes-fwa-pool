@@ -146,7 +146,7 @@ class ManagerAccountingTest(unittest.TestCase):
         self.assertTrue(result['exit_complete'])
         self.assertEqual(result['compensation_mode'],'bounded-measured-v1')
         self.assertEqual(result['unpaid_routine_calls'],0)
-        self.assertEqual(result['creator_primary_fees_accrued_wei'],3000000000000000)
+        self.assertEqual(result['creator_primary_fees_accrued_wei'],10500000000000000)  # 7 packs x 3 Shapes x 0.0005 (11053 bps config)
         self.assertEqual(result['owner_funded_wei']-result['owner_withdrawn_wei'],
             result['creator_primary_fees_accrued_wei']+result['keeper_compensation_wei'])
         self.assertEqual(result['owner_net_wei'],result['owner_withdrawn_wei']-5*10**17-result['owner_wallet_gas_proxy_wei'])
@@ -156,6 +156,24 @@ class ManagerAccountingTest(unittest.TestCase):
         self.assertLessEqual(result['owner_exit_reserved_wei'],10**16)
         self.assertEqual(result['ledger_gap_wei'],0)
 
+    def test_exit_unlist_and_liquidate_are_unpaid_owner_expense(self):
+        # D86: keeper pay is for routine build/list/sync only. Exit unlist/liquidate are caller-funded
+        # and pay 0 (StrategyLib._pay essential path), priced through the owner curves, never a keeper
+        # work meter. This asserts the unpaid-exit rule rather than a metered exit payment.
+        self.assertNotIn('unlist',METERED_OPERATIONS)
+        self.assertNotIn('liquidate',METERED_OPERATIONS)
+        costs=current_profile()
+        self.assertNotIn('unlist',costs['gas_meter_proxy'])
+        self.assertNotIn('liquidate',costs['gas_meter_proxy'])
+        for op in ('unlist','liquidate'):
+            self.assertIn(op,costs['owner_gas_curves'])
+            rows=operation_samples(costs,op,owner=True)
+            self.assertTrue(rows)
+            self.assertTrue(all('measuredWork' not in r and 'measuredGas' not in r for r in rows))
+        result=self.run_quiet()
+        self.assertTrue(result['exit_complete'])
+        self.assertEqual(result['essential_keeper_paid_wei'],0)
+
     def test_zero_exit_cap_keeps_owner_intent_unsent(self):
         result=self.run_quiet(owner_exit_spend_limit_wei=0)
         self.assertFalse(result['exit_complete'])
@@ -163,7 +181,7 @@ class ManagerAccountingTest(unittest.TestCase):
         self.assertEqual(result['owner_exit_spent_wei'],0)
         self.assertEqual(result['owner_exit_reserved_wei'],0)
         self.assertEqual(result['owner_withdrawn_wei'],0)
-        self.assertEqual(result['end_open_positions'],2)
+        self.assertEqual(result['end_open_positions'],7)  # 11053 bps backing funds 7 packs from 0.5 ETH
         self.assertGreater(result['waiting_observations']['EXIT_SPEND_LIMIT'],0)
 
     def test_unsent_exit_does_not_pause_after_gas_drops(self):
@@ -237,14 +255,15 @@ class ManagerAccountingTest(unittest.TestCase):
         build_allowance=q['build']+q['build_pack']+3*q['build_shape']+q['listed']
         meter=F.metered_work_gas(costs['gas_curves'],costs['gas_meter_proxy'],'build')
         initial_pay=F.policy.payment(state,build_allowance,2,measured_gas=meter)
-        values['routineCapWei']=initial_pay;values['routineRatePerDayWei']=0
+        # The keeper's zero-loss gate prices its padded estimate, so one allowance-sized budget may
+        # not open a listing; the point is that an opened listing hits the guarded foreign tail.
+        values['routineCapWei']=5*initial_pay;values['routineRatePerDayWei']=0
         trace=[]
         with self.assertRaisesRegex(ValueError,'sync context calibration gas schedule differs'):
             self.run_quiet(values=values,operating_days=operating,deposit_wei=3*10**17,
                 start_timestamp=recorded['start']+day*F.DAY,replay_events=events,
                 replay_period_seconds=(operating+3)*F.DAY,owner_exit_spend_limit_wei=10**16,trace_sink=trace)
-        opening=next(row for row in trace if row['action']=='build')
-        self.assertEqual(opening['routine_budget'],0)
+        self.assertTrue(any(row['action']=='build' for row in trace))  # a listing opened before the guarded foreign sync
         # Zero payable work does not mean zero journal work or justify a terminal-only receipt.
         physical_allowance=q['sync']+127*q['journal']
         self.assertEqual(physical_allowance,2919000)

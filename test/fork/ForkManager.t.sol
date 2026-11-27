@@ -370,6 +370,59 @@ contract ForkManagerTest is ForkBase {
         assertEq(spare + (backing - exitPay) + 7 * P + 7 * FEE_PER_PACK + pay + exitPay, start, "every wei");
     }
 
+    /// @dev FWA's owner removes ShapePacks from the whitelist with packs listed. New exposure stops
+    ///      (no cap means no build and no relist); every exit path still returns every wei and pack.
+    function test_dewhitelistedPacksNeverBrickExit() public {
+        PackManager m = _create(alice, 1 ether);
+        _build(m, 3);
+        uint256 backing = _sumBacking(m);
+        address[] memory cols = new address[](1);
+        cols[0] = address(PACKS);
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaPurchaser(address(FWA)).setCollectionsWhitelisted(cols, false);
+        assertFalse(FWA.canDeposit(address(PACKS)), "real FWA removal");
+        (,, bool admitted) = m.edge(UNITS);
+        assertFalse(admitted, "no new exposure once the collection is removed");
+        uint256[] memory planned = new uint256[](1);
+        planned[0] = 0.07 ether;
+        bytes32 h = m.configurationHash();
+        vm.prank(keeper);
+        vm.expectRevert(VaultLib.InvalidBacking.selector);
+        m.build(UNITS, planned, 0, h);
+
+        // Owner pulls one pack: it returns, and relisting it is refused, not stuck.
+        uint256[] memory ids = TestVaultOps.open(m);
+        vm.prank(alice);
+        m.unlistForWithdrawal(_first(ids));
+        assertEq(m.idlePackCount(), 1);
+        h = m.configurationHash();
+        vm.prank(keeper);
+        vm.expectRevert();
+        m.list(planned, 0, h);
+
+        // Exit the rest unpaid, then every pack and every wei leaves.
+        vm.prank(alice);
+        m.setExiting(true);
+        ids = TestVaultOps.open(m);
+        vm.prank(bob);
+        assertEq(TestVaultOps.unlist(m, ids, 0), 0, "exit work is unpaid");
+        assertEq(m.openListingCount(), 0);
+        assertEq(m.idlePackCount(), 3);
+        vm.prank(alice);
+        m.withdrawPacks(alice, 3);
+        uint256 cash = address(m).balance;
+        assertGe(cash, backing, "every backing returned");
+        vm.prank(alice);
+        m.withdraw(alice, cash);
+        (uint256 tracked, uint256 idle,,,,) = m.totals();
+        assertEq(tracked + idle + address(m).balance, 0, "empty book, empty balance");
+    }
+
+    function _first(uint256[] memory ids) internal pure returns (uint256[] memory one) {
+        one = new uint256[](1);
+        one[0] = ids[0];
+    }
+
     function test_pauseStopsBuildsNotMaintenance() public {
         PackManager m = _create(alice, 1 ether);
         _build(m, 2);
@@ -712,6 +765,35 @@ contract ForkManagerSelectionTest is Test {
         assertEq(SHAPES.totalSupply(), supply, "reuse mints nothing");
         assertEq(m.openListingCount(), 1);
         assertEq(m.idlePackCount(), 0);
+    }
+
+    /// @dev Removal while a listing is allocated: the real settlement still completes and syncs,
+    ///      the returned pack cannot relist, and the owner still takes it out.
+    function test_dewhitelistedDuringSelectionStillSettles() public {
+        _select();
+        address[] memory cols = new address[](1);
+        cols[0] = address(PACKS);
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaPurchaser(address(FWA)).setCollectionsWhitelisted(cols, false);
+        assertFalse(FWA.canDeposit(address(PACKS)));
+        (,,, uint256 packId,,,,,,,) = FWA.listings(selected);
+        vm.prank(PURCHASER);
+        IFwaPurchaser(address(FWA)).acceptDepositorBid(selected);
+        bytes32 h = m.configurationHash();
+        vm.prank(keeper);
+        m.sync(_one(selected), 0, 0, h);
+        assertEq(m.openListingCount(), 0);
+        assertEq(m.idlePackCount(), 1, "pack back in inventory");
+        (,, bool admitted) = m.edge(6);
+        assertFalse(admitted, "no relist after removal");
+        vm.prank(owner);
+        m.withdrawPacks(owner, 1);
+        assertEq(PACKS.ownerOf(packId), owner, "owner recovers the pack");
+        uint256 cash = address(m).balance;
+        vm.prank(owner);
+        m.withdraw(owner, cash);
+        (uint256 tracked, uint256 idle,,,,) = m.totals();
+        assertEq(tracked + idle + address(m).balance, 0, "empty book, empty balance");
     }
 
     /// @dev A silent purchaser: after the settlement window the manager reclaims B (1 - s), which

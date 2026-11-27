@@ -193,9 +193,9 @@ class OperatingAssessmentTests(unittest.TestCase):
             self.assertTrue(O.operation_samples(costs,op,owner=True))
             self.assertTrue(all('measuredGas' not in row and 'measuredWork' not in row
                                 for row in O.operation_samples(costs,op,owner=True)))
-        self.assertEqual(O.supported_work(costs)['sync'],2)
+        self.assertEqual(O.supported_work(costs)['sync'],1)  # single-position sync only; multi-allocation sync packets dropped in the rebind
         with self.assertRaisesRegex(ValueError,'actual receipt support'):
-            O.F.metered_work_gas(costs['gas_curves'],costs['gas_meter_proxy'],'sync',3,O.supported_work(costs))
+            O.F.metered_work_gas(costs['gas_curves'],costs['gas_meter_proxy'],'sync',2,O.supported_work(costs))
         changed=copy.deepcopy(costs)
         sample=O.operation_samples(changed,'build')[0]
         meter=sample.get('measuredWork',sample)

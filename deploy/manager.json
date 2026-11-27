@@ -21,7 +21,7 @@
   "checkpoint": 500000,
   "allocationEntry": 6000,
   "allocationRead": 30000,
-  "build": 360000,
+  "build": 540000,
   "buildPack": 300000,
   "buildShape": 130000,
   "list": 380000,

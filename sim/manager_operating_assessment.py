@@ -22,7 +22,11 @@ ROOT = Path(__file__).resolve().parent.parent
 CAPITAL = 5 * 10**17
 REQUIRED_GAS = ('create', 'setExiting', 'withdraw', 'unlist', 'liquidate', 'recover_sync',
                 'processAcquisitions', 'build', 'list', 'sync', 'harvest')
-METERED_OPERATIONS=('build','list','sync','unlist','liquidate')
+# D86: keeper pay is for routine build/list/sync only. Exit unlist/liquidate are caller-funded and
+# pay 0 (StrategyLib._pay essential path), so they are owner-expense ops priced via owner_gas_curves,
+# not keeper work meters. Routine (non-exit, underwater) paid unlist stays paid in the contract but
+# is unreachable for a personal manager (no holder shortfall) and so is an explicit untested gap here.
+METERED_OPERATIONS=('build','list','sync')
 OWNER_OPERATIONS=('create','setExiting','withdraw','unlist','liquidate','recover_sync','processAcquisitions','harvest')
 OWNER_SAMPLE_ALIASES={'recover_sync':'recover','unlist':'recoverUnlist','liquidate':'recoverLiquidate'}
 KNOWN_UNSUPPORTED=('larger sync batches',)

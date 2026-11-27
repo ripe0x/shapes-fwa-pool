@@ -13,9 +13,11 @@ from config import GAS_FIELDS, PARAMS_T, params_values
 from rehearse_manager_measured import data, rpc_at
 from rehearse_manager_r2 import ROOT, FWA, PACKS, sources
 
-URL = 'http://127.0.0.1:18826'
-BASE = ROOT / 'docs/receipts/manager-measured-50k-receipts.json'
-OUT = ROOT / 'docs/receipts/manager-measured-sync-contexts.json'
+# Current defaults: the retained main-run node is on 8545 and the fresh main packet records its
+# post-setup snapshot. Overridable by args for a different run.
+URL = 'http://127.0.0.1:8545'
+BASE = ROOT / 'docs/receipts/manager-measured-50k-receipts-current.json'
+OUT = ROOT / 'docs/receipts/manager-measured-sync-contexts-current.json'
 METER = '0x' + keccak(text='KeeperWorkMeasured(uint256,uint256,uint256,uint256,bool)').hex()
 PAID = '0x' + keccak(text='KeeperPaid(address,uint256)').hex()
 
@@ -96,11 +98,18 @@ def send(sender,target,signature,kinds,values,branch,operation,base,price,paid=F
 
 
 def main():
+    global URL,BASE,OUT
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--starting-snapshot',default='0x2')
+    ap.add_argument('--starting-snapshot',default=None,help='Post-setup snapshot on the retained node; defaults to the base packet record')
+    ap.add_argument('--port',type=int,default=8545,help='Retained main-run node port (anvil only runs on 8545)')
+    ap.add_argument('--base',default=str(BASE),help='Fresh main measured packet the node was set up from')
+    ap.add_argument('--output',default=str(OUT),help='Fresh output packet; existing packets are never overwritten')
     args=ap.parse_args()
+    URL=f'http://127.0.0.1:{args.port}';BASE=Path(args.base).resolve();OUT=Path(args.output).resolve()
     assert not OUT.exists(),'preserve existing immutable receipt packet'
     base_packet=json.loads(BASE.read_text())
+    if args.starting_snapshot is None:
+        args.starting_snapshot=base_packet['postSetupSnapshot']
     assert base_packet['status']=='PASS' and base_packet['contractSourceSha256']==sources()
     assert rpc('eth_chainId')=='0x7a69' and rpc('anvil_nodeInfo')['hardFork']=='Osaka'
     manager=to_checksum_address(base_packet['manager'])
@@ -164,6 +173,9 @@ def main():
                     gasAllowance=m['gasAllowance'],workUnits=m['workUnits'],
                     paidGasUsed=paid['gasUsed'],ownerGasUsed=owner_row['gasUsed']))
                 OUT.write_text(json.dumps(packet,indent=1)+'\n')
+        # `initial` is a freshly re-taken post-setup snapshot that survives this run; the owner-exit
+        # packet reverts to it next (reverting the base packet's snapshot consumed it here).
+        packet['postSetupSnapshot']=initial
         packet['status']='PASS'
     except Exception as e:
         packet['status']='FAIL';packet['error']=str(e)
