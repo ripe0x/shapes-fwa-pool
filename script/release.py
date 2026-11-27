@@ -9,7 +9,8 @@
   script/release.py manifest|check <values> --target manager  separate manager-only identity/approval
   script/release.py postflight-manager <factory> <values> [manager owner fundingWei]
   script/release.py manager-package <Forge mainnet dry-run.json>  write unsigned manager deployment data
-  script/release.py manager-create <factory> <owner> <fundingWei>  print unsigned creation template
+  script/release.py manager-create <factory> <owner> <fundingWei> [design]  print unsigned creation template;
+      design is PackAccount.design (byte u = packs of u x 0.01 ETH) and sets packUnitsMask to its sizes
 
 The owner accepts a release by signing the sha256 of docs/release/acceptance.json (which names the
 manifest hash) with the key in deploy/allowed_signers, namespace packvault-release:
@@ -811,7 +812,7 @@ def manager_package(run_path):
     print("wrote unsigned manager-only deployment and keeper address data; no vault or seed")
 
 
-def manager_create(factory, owner, funding):
+def manager_create(factory, owner, funding, design=0):
     validate_launch_inputs(target="manager")
     _address(factory, "factory")
     _address(owner, "owner")
@@ -825,6 +826,12 @@ def manager_create(factory, owner, funding):
         context = {k: v for k, v in postflight_manager(factory, ROOT / "deploy/manager-factory.json", emit=False).items()
                    if k in ("chainId", "block", "blockHash", "rpc")}
     p = _launch_json(ROOT / "deploy/manager.json")
+    design = int(design, 0) if isinstance(design, str) else int(design)
+    # PackAccount._setDesign: sizes 3..30 units only, at most 255 packs each; the mask admits exactly those sizes.
+    if design & 0xFFFFFF or design >> 248:
+        raise ValueError("design may only count pack sizes of 3 to 30 units")
+    if design:
+        p = p | {"packUnitsMask": sum(1 << u for u in range(3, 31) if (design >> (8 * u)) & 0xFF)}
     fee = int(first(cast("call", MAIN_DEPENDENCIES["shapes"], "mintFee()(uint256)")))
     if fee > p["acceptedMintFeeWei"]:
         raise ValueError("live mint fee exceeds the owner's accepted maximum")
@@ -833,13 +840,18 @@ def manager_create(factory, owner, funding):
         raise ValueError("factory configuration hash disagrees with the reviewed encoding")
     from eth_abi import encode
     from eth_utils import keccak
-    signature = f"create(address,{PARAMS_T},bytes32)"
-    data = keccak(text=signature)[:4] + encode(["address", PARAMS_T, "bytes32"],
-                   [owner, params_values(p), bytes.fromhex(expected[2:])])
+    if design:
+        signature = f"create(address,{PARAMS_T},uint256,bytes32)"
+        data = keccak(text=signature)[:4] + encode(["address", PARAMS_T, "uint256", "bytes32"],
+                       [owner, params_values(p), design, bytes.fromhex(expected[2:])])
+    else:
+        signature = f"create(address,{PARAMS_T},bytes32)"
+        data = keccak(text=signature)[:4] + encode(["address", PARAMS_T, "bytes32"],
+                       [owner, params_values(p), bytes.fromhex(expected[2:])])
     result = dict(status="UNSIGNED_MANAGER_CREATION_TEMPLATE", **context, factoryAlreadyDeployed=deployed,
                   unsignedTransaction=dict(chainId=hex(context["chainId"]), **{"from": owner}, to=factory,
                                            value=hex(funding), input="0x" + data.hex()),
-                  reviewedOwner=owner, reviewedFundingWei=funding, reviewedLiveMintFeeWei=fee,
+                  reviewedOwner=owner, reviewedFundingWei=funding, reviewedDesign=hex(design), reviewedLiveMintFeeWei=fee,
                   fixtureExpectedMintFeeWei=p["expectedMintFeeWei"],
                   mintFeeChangedSinceFixture=fee != p["expectedMintFeeWei"],
                   acceptedMintFeeWei=p["acceptedMintFeeWei"], expectedConfigurationHash=expected,
@@ -919,7 +931,7 @@ def main():
         postflight_manager(*args)
     elif cmd == "manager-package" and len(args) == 1:
         manager_package(args[0])
-    elif cmd == "manager-create" and len(args) == 3:
+    elif cmd == "manager-create" and len(args) in (3, 4):
         manager_create(*args)
     elif cmd == "postflight" and len(args) in (2, 3, 4, 5):
         if target == "manager":
