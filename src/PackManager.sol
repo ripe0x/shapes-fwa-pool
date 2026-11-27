@@ -144,10 +144,6 @@ contract PackManager is PackAccount {
             if (actualValue != value) revert InvalidPack();
             if (holder == msg.sender) packs.transferFrom(msg.sender, address(this), packId);
             VaultLib.addInventory(b, packId, value);
-            // addInventory assumes one .01 Shape per unit for ordinary external returns.
-            if (value <= VaultLib.MAX_PACK_UNITS * VaultLib.UNIT) {
-                b.ordinaryShapeCount = b.ordinaryShapeCount - b.packShapeCount[packId] + contents.length;
-            }
             b.packShapeCount[packId] = contents.length;
             emit PackImported(packId, value, contents.length);
         }

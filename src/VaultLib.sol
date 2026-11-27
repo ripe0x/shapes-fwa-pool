@@ -178,7 +178,6 @@ library VaultLib {
         uint256 unresolvedKeepUplift;
         uint256[31] recipeCounts;
         mapping(uint256 => uint256) packShapeCount;
-        uint256 ordinaryShapeCount;
         mapping(uint256 => uint256) idleIndex;
         uint256[] allocationQueue;
         uint256 allocationHead;
@@ -459,7 +458,6 @@ library VaultLib {
         if (value <= MAX_PACK_UNITS * UNIT) {
             ++b.recipeCounts[value / UNIT];
             b.packShapeCount[packId] = value / UNIT;
-            b.ordinaryShapeCount += value / UNIT;
         }
         b.idleValue += value;
         _toIdle(b, packId, value, 0);
@@ -527,7 +525,6 @@ library VaultLib {
         b.unresolvedKeepUplift -= p.keepUplift;
         b.trackedValue -= p.value;
         --b.recipeCounts[p.value / UNIT];
-        b.ordinaryShapeCount -= b.packShapeCount[p.packId];
         delete b.packShapeCount[p.packId];
         _retire(b, id, p.packId);
     }
@@ -567,7 +564,6 @@ library VaultLib {
         b.idleValue -= value;
         b.trackedValue -= value;
         --b.recipeCounts[value / UNIT];
-        b.ordinaryShapeCount -= b.packShapeCount[packId];
         delete b.packShapeCount[packId];
         b.idleFunding -= b.idleQuote[packId];
         delete b.idleQuote[packId];
@@ -1078,7 +1074,6 @@ library VaultLib {
             if (packs.valueOf(packId) != units * UNIT) revert MissingInventory();
             emit PrimaryMinted(1, n, units * UNIT, n * fee);
             addInventory(b, packId, units * UNIT);
-            b.ordinaryShapeCount = b.ordinaryShapeCount - b.packShapeCount[packId] + n;
             b.packShapeCount[packId] = n;
             admit(b, f, packs, packId, backingProposals[i]);
         }
