@@ -105,14 +105,11 @@ class CompletionAccountingTest(unittest.TestCase):
         self.assertEqual(v.claim('bob'),2*10**16)
 
     def test_capacity_increase_does_not_refill_and_old_rate_accrues(self):
-        v = Vault(seed=E, balance=E, routine_cap=100, routine_budget=10, routine_rate=20,
-                  essential_cap=30, essential_budget=5, essential_rate=2)
-        v.set_budget(86400, 1000, 100, 3, 200)
+        v = Vault(seed=E, balance=E, routine_cap=100, routine_budget=10, routine_rate=20)
+        v.set_budget(86400, 1000, 100)
         self.assertEqual(v.routine_budget, 30)
-        self.assertEqual(v.essential_budget, 3)
         v.sync_budget(2 * 86400)
         self.assertEqual(v.routine_budget, 130)
-        self.assertEqual(v.essential_budget, 3)
 
     def test_unresolved_allocation_proof_bound_precedes_large_nav_uplift_check(self):
         from vault import Position, ALLOCATED

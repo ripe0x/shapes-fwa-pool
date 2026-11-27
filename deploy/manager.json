@@ -1,9 +1,7 @@
 {
  "comment": "Unsigned reuse-only evaluation candidate; not approved production economics. 0.03 ETH packs, three paid 0.01 ETH mints; 11053 bps (0.033159 ETH) backing, so a kept pack repays its Shapes and 0.0005 ETH mint fees even at FWA's 5% settlement-fee cap, 25 bps pooled uplift, 0.006 ETH reserve. Measured-work cap plus receipt-calibrated 50000 gas overhead; all numerical inputs remain owner adjustable.",
  "minEdgeBps": 100,
- "bufferBps": 0,
  "distributionBps": 0,
- "payMarkupBps": 0,
  "keeperShareBps": 2500,
  "packUnitsMask": 8,
  "gasCeilingWei": 500000000,
@@ -14,8 +12,6 @@
  "tvlCapWei": 0,
  "routineCapWei": 30000000000000000,
  "routineRatePerDayWei": 10000000000000000,
- "essentialCapWei": 10000000000000000,
- "essentialRatePerDayWei": 5000000000000000,
  "upliftBoundBps": 25,
  "backingRatioBps": 11053,
  "acceptedMintFeeWei": 500000000000000,

@@ -76,21 +76,17 @@ library VaultLib {
 
     struct Params {
         uint16 minEdgeBps; // require k >= 1 + minEdge
-        uint16 bufferBps; // list at cap x (1 - buffer), so a small ask cut does not trigger kicks
         uint16 distributionBps; // share of new gains above the high-water mark paid out
-        uint16 payMarkupBps; // markup on bounded measured routine gas compensation
         uint16 keeperShareBps; // optional calls are paid only if pay <= this share of value realized
         uint16 upliftBoundBps; // checkpoint skips when Allocated value exceeds this share of NAV
         uint64 packUnitsMask; // bit u set: packs of u x 0.01 ETH may be built and listed
         uint64 gasCeiling; // wei per gas, routine work
-        uint64 essentialCeiling; // wei per gas, redemption and wind-down work (essential budget)
+        uint64 essentialCeiling; // wei per gas, holder-funded redemption checkpoints
         uint64 maxTip; // reimbursed price is at most basefee + this
         uint64 workFee; // flat wei per unit of work done: position listed, resolved,
         //                 unlisted, item liquidated, or a checkpoint that priced flows
         uint64 routineCap; // keeper budget for strategy work: capacity (wei) and refill per day
         uint64 routineRate;
-        uint64 essentialCap; // keeper budget for redemption and wind-down work
-        uint64 essentialRate;
         uint128 reserve; // ETH kept idle
         uint128 tvlCap; // deposits refused above this NAV
         uint32 backingRatioBps; // backing as a ratio of pack face value
@@ -118,16 +114,12 @@ library VaultLib {
 
     uint256 internal constant MAX_WORK_FEE = 0.00005 ether; // per unit of work (D55, D56)
     uint256 internal constant MAX_MIN_EDGE_BPS = 1_000;
-    uint256 internal constant MAX_BUFFER_BPS = 2_000;
     uint256 internal constant MAX_GAS_CEILING = 50 gwei;
     uint256 internal constant MAX_DISTRIBUTION_BPS = 5_000;
-    uint256 internal constant MAX_PAY_MARKUP_BPS = 1_000; // routine work only (D56, D57)
     uint256 internal constant MAX_KEEPER_SHARE_BPS = 5_000;
     uint256 internal constant MAX_UPLIFT_BOUND_BPS = 1_000;
     uint256 internal constant MAX_ROUTINE_CAP = 0.3 ether;
     uint256 internal constant MAX_ROUTINE_RATE = 0.02 ether;
-    uint256 internal constant MAX_ESSENTIAL_CAP = 0.1 ether;
-    uint256 internal constant MAX_ESSENTIAL_RATE = 0.005 ether;
     uint256 internal constant MAX_PACK_UNITS = 30; // at most 30 x 0.01 ETH: bounded redemption work
     uint256 internal constant MIN_PACK_UNITS = 3; // ShapePacks' minimum pack value, 0.03 ETH
     uint256 internal constant REF_UNITS = 3; // charge fallback; launch recipe remains owner adjustable
@@ -256,10 +248,10 @@ library VaultLib {
 
     // ---------------------------------------------------------------- keeper pay (D56, D57)
 
-    /// Keeper budgets: levels as of `at`; each refills at its daily rate up to its cap.
+    /// Keeper budget: level as of `at`; refills at its daily rate up to its cap. Exit work is
+    ///         unpaid (owner decision), so only routine strategy work draws on a budget.
     struct Budget {
         uint128 routine;
-        uint128 essential;
         uint256 at;
     }
 
@@ -270,6 +262,7 @@ library VaultLib {
     error ExplicitFeeAcceptanceRequired();
 
     /// @notice Upper payment envelope: verified work cap plus the separately named overhead.
+    ///         `essential` selects the holder-funded checkpoint ceiling (`essentialCeiling`).
     function quote(Params storage p, uint256 gasAllowance, uint256 units, bool essential) internal view returns (uint256) {
         return quoteCalls(p, gasAllowance, units, essential, 1);
     }
@@ -280,14 +273,13 @@ library VaultLib {
     {
         if (gasAllowance == 0 && units == 0) return 0;
         return calculatePayment(gasAllowance + calls * p.gasSchedule.overhead, units,
-            M.min(block.basefee + p.maxTip, essential ? p.essentialCeiling : p.gasCeiling),
-            essential ? 0 : p.payMarkupBps, p.workFee);
+            M.min(block.basefee + p.maxTip, essential ? p.essentialCeiling : p.gasCeiling), p.workFee);
     }
 
-    function calculatePayment(uint256 gasUnits, uint256 units, uint256 price, uint256 markupBps,
-        uint256 workFee) internal pure returns (uint256)
+    function calculatePayment(uint256 gasUnits, uint256 units, uint256 price, uint256 workFee)
+        internal pure returns (uint256)
     {
-        return gasUnits * price * (BPS + markupBps) / BPS + units * workFee;
+        return gasUnits * price + units * workFee;
     }
 
     /// @dev The account supplies gasStart from before its guard and checks. No caller-selected
@@ -300,41 +292,30 @@ library VaultLib {
             M.min(block.basefee + p.maxTip, essential ? p.essentialCeiling : p.gasCeiling));
         uint256 measured = gasStart - gasleft();
         emit KeeperWorkMeasured(measured, gasAllowance, price, units, essential);
-        return calculatePayment(M.min(measured, gasAllowance) + p.gasSchedule.overhead,
-            units, price, essential ? 0 : p.payMarkupBps, p.workFee);
+        return calculatePayment(M.min(measured, gasAllowance) + p.gasSchedule.overhead, units, price, p.workFee);
     }
 
-    function budgetNow(Params storage p, Budget storage b) internal view returns (uint256 r, uint256 e) {
-        uint256 dt = block.timestamp - b.at;
-        r = M.min(p.routineCap, b.routine + dt * p.routineRate / 1 days);
-        e = M.min(p.essentialCap, b.essential + dt * p.essentialRate / 1 days);
+    function budgetNow(Params storage p, Budget storage b) internal view returns (uint256 r) {
+        r = M.min(p.routineCap, b.routine + (block.timestamp - b.at) * p.routineRate / 1 days);
     }
 
-    /// @notice Accrue both budgets to now; caps lowered since only clamp, never refill.
-    function syncBudget(Params storage p, Budget storage b) external {
-        (uint256 r, uint256 e) = budgetNow(p, b);
-        (b.routine, b.essential, b.at) = (uint128(r), uint128(e), block.timestamp);
-    }
-
-    /// @notice Pay the caller for verified work: the least of the account's
-    ///         envelope for that work, `cap` (a funding source), free ETH and the budget. Below
-    ///         `minPay` the whole call reverts; with 0 the work is done for whatever is paid.
+    /// @notice Pay the caller for verified routine work: the least of the account's envelope for
+    ///         that work, `cap` (a funding source), free ETH and the routine budget. Below `minPay`
+    ///         the whole call reverts; with 0 the work is done for whatever is paid.
     function pay(
         Params storage p,
         Budget storage b,
         uint256 gasQ,
         uint256 units,
-        bool essential,
         uint256 minPay,
         uint256 cap,
         uint256 free,
         uint256 gasStart
     ) external returns (uint256 amount) {
-        (uint256 r, uint256 e) = budgetNow(p, b);
-        amount = M.min(M.min(measuredPayment(p, gasStart, gasQ, units, essential), cap), M.min(free, essential ? e : r));
+        uint256 r = budgetNow(p, b);
+        amount = M.min(M.min(measuredPayment(p, gasStart, gasQ, units, false), cap), M.min(free, r));
         if (amount < minPay) revert Payment();
-        (b.routine, b.essential, b.at) =
-            (uint128(essential ? r : r - amount), uint128(essential ? e - amount : e), block.timestamp);
+        (b.routine, b.at) = (uint128(r - amount), block.timestamp);
         if (amount == 0) return 0;
         (bool ok,) = msg.sender.call{value: amount}("");
         if (!ok) revert Payment();
@@ -456,13 +437,12 @@ library VaultLib {
     }
 
 
-    /// @notice Revert before the work when `minPay` already exceeds what could be paid.
-    function precheck(Params storage p, Budget storage b, uint256 minPay, bool essential, uint256 free)
+    /// @notice Revert before routine work when `minPay` already exceeds what could be paid.
+    function precheck(Params storage p, Budget storage b, uint256 minPay, uint256 free)
         external
         view
     {
-        (uint256 r, uint256 e) = budgetNow(p, b);
-        if (minPay > M.min(free, essential ? e : r)) revert Payment();
+        if (minPay > M.min(free, budgetNow(p, b))) revert Payment();
     }
 
     function owns(IShapePacks packs, uint256 packId) internal view returns (bool) {
@@ -837,7 +817,7 @@ library VaultLib {
         uint256[] calldata ids, uint256 gasQ, uint256 units, bool distributionTail, uint256 witnessId)
         private returns (uint256, uint256)
     {
-        (uint256 routine,) = budgetNow(p, budget);
+        uint256 routine = budgetNow(p, budget);
         uint256 cost = quote(p, gasQ, units, false);
         if (routine < cost) return (gasQ, 0);
         uint256 credit = f.feeCredit(address(this));
@@ -1078,7 +1058,7 @@ library VaultLib {
             || b.idForBacking[backing] != 0) revert InvalidBacking();
         uint256 delta = backing > t.desired ? backing - t.desired : t.desired - backing;
         if (delta > (b.reservedCount + 1) * BPS) revert InvalidBacking();
-        if (backing < t.floor || (t.cap != type(uint256).max && backing > t.cap * (BPS - p.bufferBps) / BPS)
+        if (backing < t.floor || (t.cap != type(uint256).max && backing > t.cap)
             || !_profitable(t, backing, newlyBuilt)) revert InvalidBacking();
     }
 

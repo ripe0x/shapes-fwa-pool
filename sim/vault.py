@@ -127,11 +127,8 @@ class Vault:
     receipts: dict = field(default_factory=dict)  # payment-time identity, kind, amount and fee
     recovery_packs: list = field(default_factory=list)  # exact remaining backing in oversized gifts
     routine_budget: int = 10**30
-    essential_budget: int = 10**30
     routine_cap: int = 10**30
-    essential_cap: int = 10**30
     routine_rate: int = 0
-    essential_rate: int = 0
     budget_at: int = 0
 
     # Expense and income ledger (wei). NAV changes only through these and holder flows.
@@ -168,15 +165,12 @@ class Vault:
     def sync_budget(self, now):
         elapsed = now - self.budget_at
         self.routine_budget = min(self.routine_cap, self.routine_budget + elapsed * self.routine_rate // 86400)
-        self.essential_budget = min(self.essential_cap, self.essential_budget + elapsed * self.essential_rate // 86400)
         self.budget_at = now
 
-    def set_budget(self, now, routine_cap, routine_rate, essential_cap, essential_rate):
+    def set_budget(self, now, routine_cap, routine_rate):
         self.sync_budget(now)  # Accrue at the old rate before changing capacity.
         self.routine_budget = min(self.routine_budget, routine_cap)
-        self.essential_budget = min(self.essential_budget, essential_cap)
         self.routine_cap, self.routine_rate = routine_cap, routine_rate
-        self.essential_cap, self.essential_rate = essential_cap, essential_rate
 
     def pay_keeper(self, amount, essential=False, cap=None, source=None):
         if source == 'processing':
@@ -185,16 +179,14 @@ class Vault:
             self.balance -= amount
             self.keeper_paid += amount
             return amount
-        budget = self.essential_budget if essential else self.routine_budget
-        cash = self.free() if essential else self.keeper_cash_after()
         if source is not None:
             raise ValueError('unsupported keeper cash source')
-        amount = min(amount, cash, budget if cap is None else cap)
+        # Exit work is unpaid (owner decision); only routine work draws on the budget.
+        if essential:
+            return 0
+        amount = min(amount, self.keeper_cash_after(), self.routine_budget if cap is None else cap)
         if cap is None:
-            if essential:
-                self.essential_budget -= amount
-            else:
-                self.routine_budget -= amount
+            self.routine_budget -= amount
         self.balance -= amount
         self.keeper_paid += amount
         return amount

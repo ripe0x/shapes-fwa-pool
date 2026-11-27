@@ -127,7 +127,7 @@ class LaunchValidationTests(unittest.TestCase):
                 elif change == "reorder":
                     fields[0], fields[1] = fields[1], fields[0]
                 else:
-                    fields.pop(20)
+                    fields.pop(16)
                 with self.assertRaisesRegex(ValueError, "Params names/types/order"):
                     release.validate_compiled_launch_abi(wrong, self.factory_abi)
 

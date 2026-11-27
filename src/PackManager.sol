@@ -196,7 +196,7 @@ contract PackManager is PackAccount {
     }
 
     /// @notice Exit mode: pauses listing and lets anyone unlist every Active position and
-    ///         liquidate idle packs (essential work, paid only if the essential budget allows).
+    ///         liquidate idle packs. This exit work is unpaid; callers cover their own gas.
     ///         Reversible; leaving exit mode keeps listing paused until the owner resumes it.
     function setExiting(bool exiting) external onlyOwner {
         s.windingDown = exiting;

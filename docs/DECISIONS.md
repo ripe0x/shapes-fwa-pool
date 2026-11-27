@@ -1381,3 +1381,24 @@ at FWA's immutable 5% settlement-fee cap; at today's 1% fee a kept 0.03 pack net
 supersedes 10607 bps, which broke even only at the 1% fee and lost 0.00127 ETH per kept 0.03 pack at
 5%. Cost: about 2% more capital per 0.03 pack and about 4% fewer picks per pack, with unchanged
 expected income per unit time. Owners keep the pack mix as their only design choice.
+
+## D86. Unused keeper settings removed; exits unpaid; one keeper budget (2026-11-27)
+
+The owner decided to delete contract code that was only ever left inactive at deploy, rather than
+keep dormant knobs. Removed from the shared `VaultLib.Params`: `payMarkupBps` (a percentage markup
+on routine gas pay, redundant with the flat `workFee`), `bufferBps` (a discount below the oracle
+cap; listings now use the cap directly, behaviour at 0 unchanged), and the whole essential keeper
+budget (`essentialCap`, `essentialRate`, `Budget.essential`). Routine pay is now
+`gasUnits * price + units * workFee`.
+
+Exit work — wind-down / shortfall `unlist` and `liquidate`, and recovery — is now **unpaid**: the
+work still runs and anyone may run it, the caller is paid 0, and a nonzero `minPay` on such a call
+reverts (`Payment`). This is the owner's position that "we shouldn't pay keepers for exits", and it
+makes `unwindCharge()` always 0, so redeemers are never charged for exit work (D64 generalised: the
+essential budget was already 0 in the vault's deploy config). The single remaining keeper budget is
+the routine one; `budget()` now returns just the routine amount.
+
+`essentialCeiling` is **kept**: the holder-funded redemption checkpoint path still reads it
+(`requestCharge`, `syncFunded`/`payFunded(..., essential=true)`) to price checkpoint work at its own
+ceiling from the requester's processing pool, independent of the routine budget. All vault holder
+features (distribution, redemption, claims, checkpoint) and `distributionBps` are unchanged.

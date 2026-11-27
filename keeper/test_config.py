@@ -38,24 +38,24 @@ def main():
     assert to_cast(('checkpoint',7),caller_funded=True)==['recoverCheckpoint(uint256)',7]
     assert to_cast(('sync', [1], 1), expected=h, caller_funded=True) == ['recover(uint256[],uint256)', '[1]', 1]
     args = dict(now=0, gas_price=200_000_000, base_fee=150_000_000, gas_ceiling=500_000_000,
-                max_tip=50_000_000, markup_bps=1000, share_bps=2500, k=10**18, backing=0,
+                max_tip=50_000_000, share_bps=2500, k=10**18, backing=0,
                 min_edge_bps=100, mint_fee=10**15, settlement_window=3600, blackout=False,
                 queue_drained=True, checkpoint_done_this_interval=False)
     s = State(**args, gas_schedule=gas_schedule(values))
-    # One basis for quote and pay: markup applies to routine gas, never to flat service fees.
-    assert quote(s, 100_000, 2) == 44_000_000_000_000
+    # One basis for quote and pay: measured gas x price plus flat service fees (no markup, V1).
+    assert quote(s, 100_000, 2) == 40_000_000_000_000
     s.work_fee = 20_000_000_000_000
-    assert quote(s, 100_000, 2) == 84_000_000_000_000
+    assert quote(s, 100_000, 2) == 80_000_000_000_000
     assert quote(s, 100_000, 2, True) == 80_000_000_000_000
-    # 140k compensated gas at0.1gwei,10% markup plus two20e12workfees.
-    assert payment(s,100_000,2,measured_gas=40_000,tx_gas_price=100_000_000)==55_400_000_000_000
-    assert payment(s,100_000,2,measured_gas=200_000,tx_gas_price=10**9)==84_000_000_000_000
+    # 140k compensated gas at0.1gwei plus two20e12workfees.
+    assert payment(s,100_000,2,measured_gas=40_000,tx_gas_price=100_000_000)==54_000_000_000_000
+    assert payment(s,100_000,2,measured_gas=200_000,tx_gas_price=10**9)==80_000_000_000_000
     assert payment(s,0,measured_gas=10**9)==0 and quote(s,0)==0
     oldpay=payment(s,100_000,2,measured_gas=40_000)
     oldquote=quote(s,100_000,2)
     s.gas_schedule=s.gas_schedule|{'overhead':110_000}
-    assert payment(s,100_000,2,measured_gas=40_000)-oldpay==2_200_000_000_000
-    assert quote(s,100_000,2)-oldquote==2_200_000_000_000
+    assert payment(s,100_000,2,measured_gas=40_000)-oldpay==2_000_000_000_000
+    assert quote(s,100_000,2)-oldquote==2_000_000_000_000
     s.backing = 21 * 10**16
     s.k = 1_038_500_000_000_000_000
     s.free = s.idle_eth = 10**18
@@ -77,7 +77,7 @@ def main():
     s.caller_funded_exit=False
     old = build_cost(s)
     s.gas_schedule = s.gas_schedule | {'build': s.gas_schedule['build'] + 10_000}
-    assert build_cost(s) - old == 2_200_000_000_000
+    assert build_cost(s) - old == 2_000_000_000_000
     s.open_positions, s.completed_prefix = MAX_SCAN + 1, 10**9
     s.gas_schedule = Q | {'scan': 0, 'journal': 2**32 - 1}
     assert not scan_proof(s) and not scan_vault(s)

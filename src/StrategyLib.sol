@@ -317,8 +317,14 @@ library StrategyLib {
         uint256 minPay, uint256 cap, uint256 gasStart) private returns (uint256)
     {
         if (s.callerFunded) return 0;
-        return VaultLib.pay(s.params, s.budget, gasQ, units, essential, minPay, cap,
-            essential ? IAccount(address(this)).freeEth() : IAccount(address(this)).keeperCash(), gasStart);
+        // Exit work (wind-down / shortfall unlist and liquidate, recovery) is unpaid (owner
+        // decision). The work still runs; the caller gets 0 and a nonzero minPay reverts.
+        if (essential) {
+            if (minPay != 0) revert Payment();
+            return 0;
+        }
+        return VaultLib.pay(s.params, s.budget, gasQ, units, minPay, cap,
+            IAccount(address(this)).keeperCash(), gasStart);
     }
 
     function payFunded(VaultLib.Strategy storage s, uint256, uint256 gasQ, uint256 units, bool essential,
@@ -328,13 +334,16 @@ library StrategyLib {
     }
 
     function _precheck(VaultLib.Strategy storage s, uint256 minPay, bool essential) private view {
-        if (minPay != 0) VaultLib.precheck(s.params, s.budget, minPay, essential,
-            essential ? IAccount(address(this)).freeEth() : IAccount(address(this)).keeperCash());
+        if (minPay == 0) return;
+        if (essential) revert Payment(); // exit work is unpaid
+        VaultLib.precheck(s.params, s.budget, minPay, IAccount(address(this)).keeperCash());
     }
 
-    /// @dev Proceeds-realizing operations check the full actual cash source at final payment.
-    ///      Requiring cash before a withdrawal, redemption or fee sweep would reject funded work.
+    /// @dev Proceeds-realizing operations check only the budget before the work: requiring cash
+    ///      before a withdrawal, redemption or fee sweep would reject funded work.
     function _precheckPermission(VaultLib.Strategy storage s, uint256 minPay, bool essential) private view {
-        if (minPay != 0) VaultLib.precheck(s.params, s.budget, minPay, essential, type(uint256).max);
+        if (minPay == 0) return;
+        if (essential) revert Payment(); // exit work is unpaid
+        VaultLib.precheck(s.params, s.budget, minPay, type(uint256).max);
     }
 }

@@ -325,8 +325,8 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
     function freeEth() external view returns (uint256) { return _free(); }
     function idleEth() external view returns (uint256) { return _idle(); }
 
-    /// @notice Keeper budget available now: routine (strategy) and essential (exit work).
-    function budget() external view returns (uint256 routine, uint256 essential) {
+    /// @notice Keeper budget available now for routine strategy work. Exit work is unpaid.
+    function budget() external view returns (uint256 routine) {
         return VaultLib.budgetNow(s.params, s.budget);
     }
 }

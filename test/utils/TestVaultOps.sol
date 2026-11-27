@@ -57,7 +57,6 @@ library TestVaultOps {
         if (!exempt) {
             (, uint256 ask,,) = IFloorOracle(v.fwa().floorOracle()).getFloorRange(address(v.packs()));
             ceiling = ask * (10_000 + v.fwa().oracleCeilingPremiumBps()) / 10_000;
-            ceiling = ceiling * (10_000 - v.getParams().bufferBps) / 10_000;
         }
         for (uint256 i; i < n; ++i) {
             bool found;

@@ -400,7 +400,7 @@ def reconcile_funding():
     raw=decode([PARAMS_T],bytes.fromhex(inputs['params'][2:]))[0]
     values=dict(zip(PARAMS_ORDER,raw[:-1]))|{'gasSchedule':dict(zip(GAS_FIELDS,raw[-1]))}
     state=State(now=0,gas_price=inputs['gasPrice'],base_fee=inputs['baseFee'],gas_ceiling=values['gasCeilingWei'],
-        essential_ceiling=values['essentialCeilingWei'],max_tip=values['maxTipWei'],markup_bps=values['payMarkupBps'],
+        essential_ceiling=values['essentialCeilingWei'],max_tip=values['maxTipWei'],
         share_bps=values['keeperShareBps'],k=0,backing=0,min_edge_bps=values['minEdgeBps'],mint_fee=inputs['mintFee'],
         settlement_window=0,blackout=False,queue_drained=True,checkpoint_done_this_interval=False,
         work_fee=values['workFeeWei'],gas_schedule=gas_schedule(values))
@@ -413,7 +413,7 @@ def reconcile_funding():
     v.tracked_value=v.idle_value=sum(v.idle_packs);v.idle_funding=sum(v.idle_quotes)
     v.fee_credit=before['feeCredit'];v.kept_replacements=before['keptReplacements']
     v.acquisition_cursor=before['cursor'];v.completed_prefix=before['completedPrefix']
-    v.routine_budget=before['routineBudget'];v.essential_budget=before['essentialBudget']
+    v.routine_budget=before['routineBudget']
     failures=[]
     def compare(row):
         amounts={'balance':v.balance,'open':len(v.positions),'idle':len(v.idle_packs),'trackedValue':v.tracked_value,
@@ -422,7 +422,7 @@ def reconcile_funding():
             'cursor':v.acquisition_cursor,'pendingReceipts':len(v.receipts),'reservedCount':sum(p.state!=OWED for p in v.positions.values()),
             'feeCredit':v.fee_credit,'renewalEligible':len(v.renewal_eligible),'keptReplacements':v.kept_replacements,
             'renewalFloat':v.renewal_float,'reserve':v.reserve,'creatorFees':v.mint_fees,
-            'routineBudget':v.routine_budget,'essentialBudget':v.essential_budget}
+            'routineBudget':v.routine_budget}
         for field,amount in amounts.items():
             if amount!=row[field]: failures.append(f'{row["step"]}.{field}: model {amount}, actual {row[field]}')
         for actual in row['positions']:

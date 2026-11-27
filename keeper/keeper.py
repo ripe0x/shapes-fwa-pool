@@ -277,10 +277,9 @@ def read_state(vault, slowdown, burn=False, pooled=True):
     at = lambda to, sig, *args: call(to, sig, *args, block=head)
     account_owner = at(vault, 'owner()(address)') if not pooled else None
     p = decode_params(at(vault, f"getParams()({PARAMS_T})"))
-    min_edge, buf, dist_bps = (p[k] for k in ('minEdgeBps', 'bufferBps', 'distributionBps'))
-    premium, share, mask = (p[k] for k in ('payMarkupBps', 'keeperShareBps', 'packUnitsMask'))
+    min_edge, dist_bps = (p[k] for k in ('minEdgeBps', 'distributionBps'))
+    share, mask = (p[k] for k in ('keeperShareBps', 'packUnitsMask'))
     ceiling, ess_ceiling, tip, wfee, res = (p[k] for k in ('gasCeilingWei', 'essentialCeilingWei', 'maxTipWei', 'workFeeWei', 'reserveWei'))
-    _ec = p['essentialCapWei']
     design = num(at(vault, 'design()(uint256)'))
     held = {u: num(at(vault, 'recipeCount(uint256)(uint256)', u)) for u in range(policy.MIN_PACK_UNITS, policy.MAX_PACK_UNITS + 1)
             if design >> 8 * u & 0xFF}
@@ -289,7 +288,7 @@ def read_state(vault, slowdown, burn=False, pooled=True):
     idle_ids = [num(at(vault, 'idlePackAt(uint256)(uint256)', idle_count-1-i)) for i in range(min(idle_count, policy.MAX_BATCH['list']))]
     idle_candidates = [(i, num(at(vault, 'idleValueOf(uint256)(uint256)', i))) for i in idle_ids]
     quote_units = build_units or (idle_candidates[0][1] // policy.UNIT if idle_candidates else policy.REF_UNITS)
-    rbud, ebud = lines(at(vault, "budget()(uint256,uint256)"))
+    rbud = at(vault, "budget()(uint256)")
     k, backing = "0", "0"  # prospective economics are read after pinned financial hydration
     window = num(at(FWA, "settlementWindow()(uint256)"))
     top, top_since = num(at(FWA, "topListingId()(uint256)")), num(at(FWA, "topListingSince()(uint64)"))
@@ -329,7 +328,7 @@ def read_state(vault, slowdown, burn=False, pooled=True):
     tokens = read_tokens(vault, index.token_candidates(policy.MAX_BATCH["tokens"]) if burn else [], head)
     state = policy.State(
         now=now, gas_price=base_fee + tip, base_fee=base_fee, gas_ceiling=ceiling,
-        max_tip=tip, markup_bps=premium, share_bps=share, k=num(k), backing=num(backing), min_edge_bps=min_edge,
+        max_tip=tip, share_bps=share, k=num(k), backing=num(backing), min_edge_bps=min_edge,
         mint_fee=num(at(SHAPES, "mintFee()(uint256)")), settlement_window=window,
         blackout=at(FWA, "isPurchaseBlackout()(bool)") == "true",
         queue_drained=num(at(FWA, "unsettledAcquisitionCount()(uint256)")) == 0,
@@ -340,7 +339,7 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         free=max(0, balance - reserves), idle_eth=num(at(vault, "idleEth()(uint256)")), owed_estimate=owed,
         pending_deposits=pending, locked_shares=locked, total_shares=supply, pack_units_mask=mask,
         build_units=build_units, build_room=build_room, pooled=pooled, settlement_fee_bps=num(at(FWA, "ownerSettlementFeeBps()(uint256)")),
-        essential_ceiling=ess_ceiling, essential_cap=_ec, processing_pool=processing_pool,
+        essential_ceiling=ess_ceiling, processing_pool=processing_pool,
         gas_schedule=gas_schedule(p), backing_ratio_bps=p["backingRatioBps"],
         accepted_mint_fee=p["acceptedMintFeeWei"],
         fee_credit=num(at(FWA, "feeCredit(address)(uint256)", vault)),
@@ -352,7 +351,7 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         winding_down=at(vault, "windingDown()(bool)") == "true",
         listing_paused=at(vault, "listingPaused()(bool)") == "true", distribution_bps=dist_bps,
         recent_volume=index.recent_volume(now), slowdown_volume=slowdown, burn_tokens=burn,
-        reserve=res, work_fee=wfee, routine_budget=num(rbud), essential_budget=num(ebud), **tokens,
+        reserve=res, work_fee=wfee, routine_budget=num(rbud), **tokens,
     )
     state.keeper_cash = num(at(vault, "keeperCash()(uint256)"))
     state.operating_reserve = res
@@ -391,7 +390,6 @@ def read_state(vault, slowdown, burn=False, pooled=True):
             oracle = prospective(FWA, "floorOracle()(address)")
             _, ask, _, _ = lines(prospective(oracle, "getFloorRange(address)(uint256,uint256,uint48,uint48)", packs))
             cap = num(ask) * (10_000 + num(prospective(FWA, "oracleCeilingPremiumBps()(uint256)"))) // 10_000
-            cap = cap * (10_000 - buf) // 10_000
         reserved = num(prospective(vault, "reservedCount()(uint256)"))
         lo, hi = proposal_limits(state, build_units * policy.UNIT, fee, discount, cap, build=True, units=build_units)
         # build lists every pack at once: each proposal must be a distinct identifier inside the

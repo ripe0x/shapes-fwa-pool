@@ -99,7 +99,7 @@ contract ForkScanReconcileTest is SelectionBase {
 
         // Zero keeperShareBps: the scan pays from routine only, never sweeping the fee credit.
         VaultLib.Params memory p = vault.getParams();
-        p.payMarkupBps = 0;
+
         p.workFee = 0;
         p.maxTip = 0;
         p.keeperShareBps = 0;

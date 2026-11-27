@@ -38,7 +38,7 @@ contract ForkManagerReuseFundingTest is MainRenewalBase {
         _select(false);
         _bidAndRecover();
         VaultLib.Params memory p = account.getParams();
-        p.routineCap = 0; p.routineRate = 0; p.essentialCap = 0; p.essentialRate = 0;
+        p.routineCap = 0; p.routineRate = 0;
         bytes32 expected = account.configurationHash();
         vm.prank(accountOwner); account.setParams(p, expected);
         expected = account.configurationHash();

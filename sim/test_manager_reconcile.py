@@ -19,7 +19,7 @@ class ManagerMeasuredReconcileTest(unittest.TestCase):
         allowance=q['build']+count*(q['build_pack']+R.policy.shape_count(units)*q['build_shape']+q['listed'])
         frames=row['state']['measuredWork'];frame=frames[0] if isinstance(frames,list) else frames
         measured=min(frame['measuredGas'],allowance)
-        expected=(measured+params['gasSchedule']['overhead'])*frame['gasPrice']*(10000+params['payMarkupBps'])//10000+2*count*params['workFeeWei']
+        expected=(measured+params['gasSchedule']['overhead'])*frame['gasPrice']+2*count*params['workFeeWei']
         self.assertGreater(frame['measuredGas'],0)
         self.assertEqual(R.measured_offer(row,state,allowance,2*count),expected)
         self.assertEqual(frame['paid'],expected)

@@ -298,18 +298,11 @@ contract ForkProductionReceiptsTest is SelectionBase {
         assertEq(vault.idlePackCount(), 0);
         (uint256 tracked, uint256 idle,,,,) = vault.totals();
         assertEq(tracked, 0.34 ether); assertEq(idle, tracked);
-        uint256 referenceCapital = vault.positionValue();
-        uint256 recoveryOnlyQuote = vault.unwindCharge();
-        assertGe(recoveryOnlyQuote * tracked, 0.000279 ether * referenceCapital,
-            "recovery-only inventory quote includes real bounded recovery expense");
+        assertEq(vault.unwindCharge(), 0, "exits are unpaid, so there is no unwind charge");
         _drain();
         TestVaultOps.restock(vault, 1, UNITS, 0); // build lists it at once
         assertEq(vault.openListingCount(), 1, "oversized gift does not occupy normal stack");
-        uint256 fullQuote = vault.unwindCharge();
-        uint256 capital = 0.34 ether;
         uint256 ordinaryId = vault.openListingAt(0);
-        VaultLib.Position memory ordinary = vault.position(ordinaryId);
-        capital += ordinary.value + ordinary.backing;
         address vaultOwner = vault.owner();
         vm.prank(vaultOwner); vault.startWindDown();
         // The 30-Shape gift pack (one 0.05 and twenty-nine 0.01) unseals and burns in one bounded
@@ -327,7 +320,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
         emit log_named_uint("recovery thirty Shapes pay wei", paid);
         assertLt(used * 125 / 100, 16_777_216);
         assertEq(address(vault).balance + paid - before, 0.34 ether, "the whole gift pack recovers in one chunk");
-        assertEq(paid, MeasuredPay.gross(vault, 75_000 + 100_000 + 70_000 + 30 * 35_000, 1, true, 0.2 gwei));
+        assertEq(paid, 0, "recovery is exit work and pays the keeper nothing");
         assertEq(vault.recoveryPackCount(), 0);
         (tracked, idle,,,,) = vault.totals();
         assertEq(tracked, 0.06 ether, "only the new listed six-unit pack remains");
@@ -336,8 +329,7 @@ contract ForkProductionReceiptsTest is SelectionBase {
         paid += vault.unlist(_one(ordinaryId), 0, vault.configurationHash());
         paid += vault.liquidate(16, 0, vault.configurationHash());
         assertEq(vault.openListingCount() + vault.idlePackCount() + vault.recoveryPackCount(), 0);
-        assertGe(fullQuote * capital, paid * referenceCapital,
-            "mixed ordinary and oversized gift quote covers every actual exit payment");
+        assertEq(paid, 0, "every mixed ordinary and oversized-gift exit call is unpaid");
     }
 
     function test_feeChangeDoesNotReinterpretReceipt() public {
@@ -634,7 +626,7 @@ contract ForkProductionInventoryTest is ForkBase {
         vm.prank(alice); vault.deposit{value: gross}(_expected25);
         toBlackout(); checkpoint(); toOpen();
         VaultLib.Params memory p = vault.getParams();
-        p.gasCeiling = 0.5 gwei; p.maxTip = 0.05 gwei; p.payMarkupBps = 0; p.workFee = 0.00002 ether;
+        p.gasCeiling = 0.5 gwei; p.maxTip = 0.05 gwei; p.workFee = 0.00002 ether;
         p.backingRatioBps = 15_000; // fresh construction is viable in both tested gas regimes
         bytes32 _expected26 = TestVaultOps.configurationHash(vault);
         vm.prank(owner); vault.setParams(p, _expected26);
@@ -795,7 +787,7 @@ contract ForkProductionAdmissionTest is ForkBase {
         bytes32 _expected34 = TestVaultOps.configurationHash(vault);
         vm.prank(alice); vault.deposit{value: gross}(_expected34);
         toBlackout(); checkpoint(); toOpen();
-        VaultLib.Params memory p = vault.getParams(); p.gasCeiling = 1 gwei; p.payMarkupBps = 0;
+        VaultLib.Params memory p = vault.getParams(); p.gasCeiling = 1 gwei;
         bytes32 _expected35 = TestVaultOps.configurationHash(vault);
         vm.prank(owner); vault.setParams(p, _expected35);
         vm.prank(IOwnable(address(FWA)).owner());

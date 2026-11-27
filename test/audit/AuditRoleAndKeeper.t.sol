@@ -33,7 +33,6 @@ contract AuditRoleAndKeeperTest is ForkBase {
         toOpen();
 
         VaultLib.Params memory p = defaultParams();
-        p.payMarkupBps = 1_000; // MAX_PAY_MARKUP_BPS
         p.gasCeiling = 50 gwei;
         p.essentialCeiling = 50 gwei;
         p.maxTip = 50 gwei;

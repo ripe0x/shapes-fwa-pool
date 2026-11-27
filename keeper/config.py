@@ -2,11 +2,11 @@
 import re
 
 PARAM_FIELDS = [
-    ('minEdgeBps', 'uint16'), ('bufferBps', 'uint16'), ('distributionBps', 'uint16'),
-    ('payMarkupBps', 'uint16'), ('keeperShareBps', 'uint16'), ('upliftBoundBps', 'uint16'),
+    ('minEdgeBps', 'uint16'), ('distributionBps', 'uint16'),
+    ('keeperShareBps', 'uint16'), ('upliftBoundBps', 'uint16'),
     ('packUnitsMask', 'uint64'), ('gasCeilingWei', 'uint64'), ('essentialCeilingWei', 'uint64'),
     ('maxTipWei', 'uint64'), ('workFeeWei', 'uint64'), ('routineCapWei', 'uint64'),
-    ('routineRatePerDayWei', 'uint64'), ('essentialCapWei', 'uint64'), ('essentialRatePerDayWei', 'uint64'),
+    ('routineRatePerDayWei', 'uint64'),
     ('reserveWei', 'uint128'), ('tvlCapWei', 'uint128'), ('backingRatioBps', 'uint32'),
     ('acceptedMintFeeWei', 'uint64'),
     ('minDepositWei', 'uint64'), ('minDistributionWei', 'uint64'),

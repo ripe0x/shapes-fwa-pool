@@ -39,9 +39,7 @@ contract Deploy is Script {
         require(keccak256(bytes(target)) == keccak256("combined"), "unknown deployment target");
         VaultLib.Params memory p;
         p.minEdgeBps = uint16(fit(v, ".minEdgeBps", type(uint16).max));
-        p.bufferBps = uint16(fit(v, ".bufferBps", type(uint16).max));
         p.distributionBps = uint16(fit(v, ".distributionBps", type(uint16).max));
-        p.payMarkupBps = uint16(fit(v, ".payMarkupBps", type(uint16).max));
         p.keeperShareBps = uint16(fit(v, ".keeperShareBps", type(uint16).max));
         p.upliftBoundBps = uint16(fit(v, ".upliftBoundBps", type(uint16).max));
         p.packUnitsMask = uint64(fit(v, ".packUnitsMask", type(uint64).max));
@@ -51,8 +49,6 @@ contract Deploy is Script {
         p.workFee = uint64(fit(v, ".workFeeWei", type(uint64).max));
         p.routineCap = uint64(fit(v, ".routineCapWei", type(uint64).max));
         p.routineRate = uint64(fit(v, ".routineRatePerDayWei", type(uint64).max));
-        p.essentialCap = uint64(fit(v, ".essentialCapWei", type(uint64).max));
-        p.essentialRate = uint64(fit(v, ".essentialRatePerDayWei", type(uint64).max));
         p.reserve = uint128(fit(v, ".reserveWei", type(uint128).max));
         p.tvlCap = uint128(fit(v, ".tvlCapWei", type(uint128).max));
         p.backingRatioBps = uint32(fit(v, ".backingRatioBps", type(uint32).max));

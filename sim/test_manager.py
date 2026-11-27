@@ -72,10 +72,10 @@ class ManagerAccountingTest(unittest.TestCase):
         self.assertEqual(owner_processing_reserve(0,100000,200000000),(0,0))
 
     def test_budget_anchor_keeps_fractional_refill_and_old_capacity(self):
-        m=self.account(routine_budget=0,routine_cap=1000,routine_rate=7,essential_budget=0,essential_cap=1000,essential_rate=7)
+        m=self.account(routine_budget=0,routine_cap=1000,routine_rate=7)
         for now in (1,2,3,86399,86400):m.sync_budget(now)
         self.assertEqual(m.routine_budget,7)
-        m.pay_keeper(2);m.set_budget(86401,2000,14,2000,14)
+        m.pay_keeper(2);m.set_budget(86401,2000,14)
         self.assertEqual(m.routine_budget,5)
         m.sync_budget(2*86400+1)
         self.assertEqual(m.routine_budget,19)

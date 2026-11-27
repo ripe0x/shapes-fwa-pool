@@ -229,11 +229,11 @@ def main():
             actual_settings = read(target,'getParams()',returns=(PARAMS_T,))[0]
             from config import PARAM_FIELDS,GAS_FIELDS
             p=dict(zip((k for k,_ in PARAM_FIELDS),actual_settings[:-1]));g=dict(zip(GAS_FIELDS,actual_settings[-1]))
-            overhead=g['overhead'];markup=0 if meter['essential'] else p['payMarkupBps']
-            expected=(min(meter['measuredGas'],meter['gasAllowance'])+overhead)*price*(10000+markup)//10000+meter['workUnits']*p['workFeeWei']
+            overhead=g['overhead']
+            expected=(min(meter['measuredGas'],meter['gasAllowance'])+overhead)*price+meter['workUnits']*p['workFeeWei']
             assert compensation==expected, 'actual receipt compensation differs from recorded meter/configuration'
             assert compensation>=row['gasCostWei'], ('unsubsidized keeper loss',row['operation'],compensation,row['gasCostWei'])
-            row.update(measuredWork=meter,overhead=overhead,markupBps=markup,workFeeWei=p['workFeeWei'],
+            row.update(measuredWork=meter,overhead=overhead,workFeeWei=p['workFeeWei'],
                 simulatedCompensationWei=simulated,minimumPaymentWei=floor,keeperNetWei=compensation-row['gasCostWei'])
         else:
             assert compensation==0 and not meters, 'owner work must not earn keeper rewards'

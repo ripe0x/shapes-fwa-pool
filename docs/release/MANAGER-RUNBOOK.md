@@ -78,7 +78,7 @@ An owner-paid cash exit stops new exposure, performs necessary bounded settlemen
 
 ## Measured compensation and keeper operations
 
-The account captures gas before the guard/prechecks. Payment uses `min(measuredGas, verifiedOperationAllowance) + overhead`, multiplied by `min(tx.gasprice, basefee + maxTip, classCeiling)`, with routine markup and actual work fees. Cash/source/permission and caller minimum protection still apply. The meter is gross before refunds; actual wallet gas is the receipt's billed gas. Quotes use the upper envelope, with overhead once per actual paid call.
+The account captures gas before the guard/prechecks. Payment uses `min(measuredGas, verifiedOperationAllowance) + overhead`, multiplied by `min(tx.gasprice, basefee + maxTip, classCeiling)`, plus actual work fees (no markup). Cash/source/permission and caller minimum protection still apply. Exit work (wind-down / shortfall unlist and liquidate, recovery) is unpaid: the work runs, the caller is paid 0, and a nonzero `minPay` on it reverts. The meter is gross before refunds; actual wallet gas is the receipt's billed gas. Quotes use the upper envelope, with overhead once per actual paid call.
 
 `KeeperWorkMeasured(uint256 measuredGas,uint256 gasAllowance,uint256 gasPrice,uint256 workUnits,bool essential)` records the work frame; `KeeperPaid` records payment after clipping. Paid padding, duplicates and unused fee hints are rejected. Unpaid owner recovery can tolerate stale hints. Import and standalone harvest pay no keeper.
 

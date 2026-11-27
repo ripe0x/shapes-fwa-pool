@@ -117,9 +117,9 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
     function _values() internal view returns (VaultLib.Params memory p) {
         string memory v = vm.readFile("deploy/mainnet.json");
         p.minEdgeBps = uint16(vm.parseJsonUint(v, ".minEdgeBps"));
-        p.bufferBps = uint16(vm.parseJsonUint(v, ".bufferBps"));
+
         p.distributionBps = uint16(vm.parseJsonUint(v, ".distributionBps"));
-        p.payMarkupBps = uint16(vm.parseJsonUint(v, ".payMarkupBps"));
+
         p.keeperShareBps = uint16(vm.parseJsonUint(v, ".keeperShareBps"));
         p.upliftBoundBps = uint16(vm.parseJsonUint(v, ".upliftBoundBps"));
         p.packUnitsMask = uint64(vm.parseJsonUint(v, ".packUnitsMask"));
@@ -131,8 +131,8 @@ abstract contract VaultFlowBase is SelectionBase, FlowBreakdown {
         p.tvlCap = uint128(vm.parseJsonUint(v, ".tvlCapWei"));
         p.routineCap = uint64(vm.parseJsonUint(v, ".routineCapWei"));
         p.routineRate = uint64(vm.parseJsonUint(v, ".routineRatePerDayWei"));
-        p.essentialCap = uint64(vm.parseJsonUint(v, ".essentialCapWei"));
-        p.essentialRate = uint64(vm.parseJsonUint(v, ".essentialRatePerDayWei"));
+
+
         p.backingRatioBps = uint32(vm.parseJsonUint(v, ".backingRatioBps"));
         p.acceptedMintFee = uint64(vm.parseJsonUint(v, ".acceptedMintFeeWei"));
         p.minDeposit = uint64(vm.parseJsonUint(v, ".minDepositWei"));
@@ -518,7 +518,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         uint256 listed;
         uint256 built;
         uint256 pay0 = keeperPaidCum;
-        (uint256 routineBefore,) = vault.budget();
+        uint256 routineBefore = vault.budget();
         // Build mints and lists at once; the build batch is capped at MAX_BUILD_BATCH (4), so counts above
         // it are refused and the loop steps down. Each admitted pack is both built and listed.
         for (uint256 c = 10; c != 0;) {
@@ -528,7 +528,7 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         // Fixed quote price: min(0.2 gwei bid, basefee 0.15 + maxTip 0.05, ceiling 0.5), no markup (V1).
         // Both completed construction and listing earn their stated work units.
         assertLt(keeperPaidCum - pay0, routineBefore, "payment is not clipped by the starting budget");
-        (uint256 routineAfter,) = vault.budget();
+        uint256 routineAfter = vault.budget();
         assertEq(routineBefore - routineAfter, keeperPaidCum - pay0, "no intervening refill or budget clipping");
         uint256 feePaid = (built + listed) * vault.getParams().workFee;
         assertGt(listed, 0, "max-load reaches real pack admission");

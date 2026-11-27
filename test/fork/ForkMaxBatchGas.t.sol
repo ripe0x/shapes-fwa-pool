@@ -293,7 +293,7 @@ contract ForkMaxBatchGasTest is ForkBase {
         toBlackout(); this.assertEssentialSpikeContext();
         assertGt(vault.lockedShares(), 0, "pending redemption makes this checkpoint essential");
         assertEq(vault.processingPool(), spikeCharge);
-        (uint256 routineBefore, uint256 essentialBefore) = vault.budget();
+        uint256 routineBefore = vault.budget();
         uint256 keeperBefore = keeper.balance;
         witness = TestVaultOps.witness(vault);
         input = abi.encodeCall(PackVault.checkpoint, (witness, 0, vault.configurationHash()));
@@ -316,8 +316,8 @@ contract ForkMaxBatchGasTest is ForkBase {
         emit log_named_uint("essential spike checkpoint actual pay wei", abi.decode(result, (uint256)));
         assertLt((gross * 125 + 99) / 100, 16_777_216);
         assertEq(keeper.balance - keeperBefore, spikeCharge, "essential ceiling is funded by the actual request charge");
-        (uint256 routineAfter, uint256 essentialAfter) = vault.budget();
-        assertEq(routineAfter, routineBefore); assertEq(essentialAfter, essentialBefore);
+        uint256 routineAfter = vault.budget();
+        assertEq(routineAfter, routineBefore);
         assertEq(vault.processingPool(), 0); assertEq(vault.pendingDepositTotal(), 0);
         assertEq(vault.lockedShares(), 0); assertGt(vault.shareBalance(bob), 0);
         protected = vault.redemptionReserve() + vault.distributionReserve() + vault.claimableTotal();

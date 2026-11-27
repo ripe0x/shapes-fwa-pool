@@ -44,8 +44,8 @@ function managerParams() pure returns (VaultLib.Params memory p) {
     p.reserve = 0.005 ether;
     p.routineCap = 0.03 ether;
     p.routineRate = 0.01 ether;
-    p.essentialCap = 0.03 ether;
-    p.essentialRate = 0.005 ether;
+
+
 }
 
 /// @notice Personal managers on the real FWA, Shapes and ShapePacks at the pinned block, beside the
@@ -112,9 +112,7 @@ contract ForkManagerTest is ForkBase {
         assertTrue(factory.isManager(address(m)));
         assertEq(keccak256(abi.encode(m.getParams())), keccak256(abi.encode(managerParams())));
 
-        (uint256 r, uint256 e) = m.budget();
-        assertEq(r, managerParams().routineCap);
-        assertEq(e, managerParams().essentialCap);
+        assertEq(m.budget(), managerParams().routineCap);
         assertEq(m.deploymentBlock(), block.number);
         assertEq(m.acquisitionCursor(), FWA.nextSequenceToProcess());
         assertTrue(IApproval(address(PACKS)).isApprovedForAll(address(m), address(FWA)), "FWA may take listed packs");
@@ -345,8 +343,7 @@ contract ForkManagerTest is ForkBase {
         assertEq(alice.balance - a0, spare);
         assertEq(address(m).balance, 0);
 
-        // Exit: anyone unlists (essential work, paid from the manager's own essential budget, which
-        // needs free ETH: with none left, the keeper is paid nothing and the work still happens).
+        // Exit: anyone unlists, unpaid (owner decision: keepers are not paid for exits).
         vm.prank(alice);
         m.setExiting(true);
         assertTrue(m.listingPaused());
@@ -354,7 +351,7 @@ contract ForkManagerTest is ForkBase {
         uint256 b0 = bob.balance;
         vm.prank(bob);
         uint256 exitPay = TestVaultOps.unlist(m, ids, 0);
-        assertGt(exitPay, 0, "exit work is paid from the returned backing, after the work");
+        assertEq(exitPay, 0, "exit work is unpaid");
         assertEq(bob.balance - b0, exitPay);
         assertEq(m.openListingCount(), 0);
         assertEq(m.idlePackCount(), 7);
@@ -385,12 +382,11 @@ contract ForkManagerTest is ForkBase {
         m.build(UNITS, quotes, 0, _expected1);
         // Stopping paid automation: zero budgets. Strategy work then pays nothing.
         VaultLib.Params memory p = managerParams();
-        (p.routineCap, p.routineRate, p.essentialCap, p.essentialRate) = (0, 0, 0, 0);
+        (p.routineCap, p.routineRate) = (0, 0);
         bytes32 _expected2 = TestVaultOps.configurationHash(m);
         vm.prank(alice);
         m.setParams(p, _expected2);
-        (uint256 r, uint256 e) = m.budget();
-        assertEq(r + e, 0);
+        assertEq(m.budget(), 0);
         vm.prank(alice);
         m.setListingPaused(false);
         uint256 k0 = keeper.balance;

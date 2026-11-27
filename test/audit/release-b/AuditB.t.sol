@@ -32,8 +32,8 @@ function canary() pure returns (VaultLib.Params memory p) {
     p.tvlCap = 2 ether;
     p.routineCap = 0.03 ether;
     p.routineRate = 0.0008 ether;
-    p.essentialCap = 0.01 ether;
-    p.essentialRate = 0.0002 ether;
+
+
 }
 
 contract AuditBSelection is SelectionBase {
@@ -228,8 +228,8 @@ contract AuditBPinned is ForkBase {
         vm.prank(alice);
         vault.claim();
         console2.log("alice claim wei (deposited principal + charges)", alice.balance - a0, gross + rc);
-        (uint256 r, uint256 e) = vault.budget();
-        console2.log("budgets left routine, essential", r, e);
+        uint256 r = vault.budget();
+        console2.log("budget left routine", r);
         console2.log("vault balance, lastNav", address(vault).balance, vault.lastNav());
     }
 }
@@ -277,7 +277,7 @@ contract AuditBBudget is ForkBase {
         }
         vm.stopPrank();
         uint256[] memory open = TestVaultOps.open(vault);
-        (uint256 r, uint256 e) = vault.budget();
+        uint256 r = vault.budget();
         console2.log("built, listed", built, open.length);
         console2.log("routine paid for the build, routine budget left", routinePaid, r);
         console2.log("idle packs, idle ETH", TestVaultOps.idle(vault).length, vault.idleEth());
@@ -299,8 +299,8 @@ contract AuditBBudget is ForkBase {
             try vault.liquidate(16, 0, _expected15) returns (uint256 lp) { essentialPaid += lp; }
             catch { break; }
         }
-        (r, e) = vault.budget();
-        console2.log("essential budget after unlist + liquidate", e);
+        r = vault.budget();
+        console2.log("routine budget after unlist + liquidate", r);
         console2.log("idle packs left", TestVaultOps.idle(vault).length);
         // A keeper asking for any pay is now refused; the work is only done unpaid.
         bytes32 _expected16 = TestVaultOps.configurationHash(vault);
@@ -308,7 +308,7 @@ contract AuditBBudget is ForkBase {
         vault.liquidate(40, 1e12, _expected16);
         vm.stopPrank();
         console2.log("essential paid in total vs unwind charge alice paid", essentialPaid, rc);
-        assertEq(e, 0, "essential budget empty after one exit");
+        assertEq(essentialPaid, 0, "exit work is unpaid");
         assertEq(vault.openListingCount(), 0); assertEq(vault.idlePackCount(), 0);
         toBlackout(); checkpoint();
         assertEq(vault.lockedShares(), 0, "the exhausted-budget exit completes from requester-funded checkpoint work");
@@ -342,13 +342,13 @@ contract AuditBBudget is ForkBase {
         p.gasCeiling = 50 gwei;
         p.essentialCeiling = 50 gwei;
         p.maxTip = 50 gwei;
-        p.payMarkupBps = 1_000;
+
         p.workFee = 0.00005 ether;
         p.keeperShareBps = 5_000;
         p.routineCap = 0.3 ether;
         p.routineRate = 0.01 ether;
-        p.essentialCap = 0.1 ether;
-        p.essentialRate = 0.005 ether;
+
+
         bytes32 _expected19 = TestVaultOps.configurationHash(vault);
         vm.startPrank(owner);
         vault.setParams(p, _expected19);
@@ -366,8 +366,8 @@ contract AuditBBudget is ForkBase {
         bytes32 _expected20 = TestVaultOps.configurationHash(vault);
         pay = vault.liquidate(1, 0, _expected20);
         console2.log("t+24h: liquidate 1, essential pay", pay);
-        (uint256 r, uint256 e) = vault.budget();
-        console2.log("t+24h budgets routine (not reachable in wind-down?), essential", r, e);
+        uint256 r = vault.budget();
+        console2.log("t+24h routine budget", r);
         vm.stopPrank();
         console2.log("owner took in ~24 h", owner.balance - b0);
     }

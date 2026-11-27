@@ -133,7 +133,7 @@ def main():
     def apply_candidate(mode=0,zero=False):
         settings=copy.deepcopy(candidate);settings['renewalMode']=mode
         if zero:
-            for key in ('routineCapWei','routineRatePerDayWei','essentialCapWei','essentialRatePerDayWei'):settings[key]=0
+            for key in ('routineCapWei','routineRatePerDayWei'):settings[key]=0
         send(owner.address,manager,f'setParams({PARAMS_T},bytes32)',[PARAMS_T,'bytes32'],[params_values(settings),config()],'setParams')
         assert rpc('eth_call',dict(to=manager,data=calldata('getParams()')),'latest').lower()=='0x'+encode([PARAMS_T],[params_values(settings)]).hex()
         if number(SHAPES,'mintFee()')!=500000000000000:

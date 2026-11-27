@@ -34,7 +34,7 @@ def relaxed_edge(k,cap,s_bps,units,gas_ceiling,markup_bps,work_fee,buffer_bps=0,
                  discount_bps=9150,price=None,mint_fee=10**15,backing_ratio_bps=10000,
                  gas_schedule=None,renewal_mode=0,newly_built=True,reference_units=None,retirement_shapes=None):
     desired=units*F.policy.UNIT*backing_ratio_bps//10000//10000*10000
-    if cap is not None:desired=min(desired,cap*(10000-buffer_bps)//10000//10000*10000)
+    if cap is not None:desired=min(desired,cap//10000*10000)  # list at the oracle cap directly (no buffer)
     return desired if desired>=MIN_BACKING else 0
 
 
@@ -81,7 +81,7 @@ def diagnostic(parent):
         bid=backing*(k-10**18)//10**18
         keep=backing*(k-10**16)//10**18-3*10**16
         minimum,_=canonical_limits(s,3*10**16,100,9000,2**256-1,build=True,units=3)
-        edge=CANONICAL_EDGE(k,None,100,3,s.gas_ceiling,s.markup_bps,s.work_fee,
+        edge=CANONICAL_EDGE(k,None,100,3,s.gas_ceiling,0,s.work_fee,
             price=F.policy.price(s),mint_fee=fee,backing_ratio_bps=ratio,gas_schedule=q,renewal_mode=0)
         reasons=[]
         if backing<-(-(3*10**16)*10000//9500):reasons.append('IMMUTABLE_95PCT_FACE_COVERAGE')

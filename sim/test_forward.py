@@ -12,7 +12,7 @@ from vault import ACTIVE, ALLOCATED, OWED, SETTLED, WITHDRAWN, Position, Vault
 class CandidateProjectionTest(unittest.TestCase):
     def test_exact_preflight_reaches_two_claims_after_shorter_syncs_cannot_pay(self):
         state = policy.State(now=10_000, gas_price=1, base_fee=1, gas_ceiling=1,
-            max_tip=0, markup_bps=0, share_bps=2500, k=10**18, backing=0,
+            max_tip=0, share_bps=2500, k=10**18, backing=0,
             min_edge_bps=100, mint_fee=10**15, settlement_window=3600,
             blackout=False, queue_drained=True, checkpoint_done_this_interval=False,
             listings=[policy.Listing(i, ACTIVE, pending_fees=500_000) for i in (1, 2)],

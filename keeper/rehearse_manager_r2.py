@@ -259,8 +259,8 @@ def main():
                 if 'afterBuild' in case:
                     assert state(manager)==case['afterBuild'],'prepared inventory/cash changed before resume'
                     assert number(manager,'openListingCount()(uint256)')==packs
-                    assert call(manager,'budget()(uint256,uint256)').split()==['0','0']
-                    zeros=values|dict(routineCapWei=0,routineRatePerDayWei=0,essentialCapWei=0,essentialRatePerDayWei=0)
+                    assert call(manager,'budget()(uint256)').strip()=='0'
+                    zeros=values|dict(routineCapWei=0,routineRatePerDayWei=0)
                     expected=call(factory,f'configHashFor({PARAMS_T})(bytes32)',tuple_arg(zeros))
                     assert call(manager,'configurationHash()(bytes32)')==expected,'prepared owner settings or flags changed'
                     continue
@@ -287,7 +287,7 @@ def main():
                 rpc('evm_mine')
             assert state(manager)['openListingCount']==packs,'bounded keeper indexing/build did not complete after16passes'
             case['afterBuild']=state(manager)
-            send(owner,manager,f'setParams({PARAMS_T})',tuple_arg(values|dict(routineCapWei=0,routineRatePerDayWei=0,essentialCapWei=0,essentialRatePerDayWei=0)))
+            send(owner,manager,f'setParams({PARAMS_T})',tuple_arg(values|dict(routineCapWei=0,routineRatePerDayWei=0)))
         assert number(SHAPES,'pendingFees()(uint256)')-creator_before==12*live['mintFeeWei']
         quiet_time();acquire_gas_price=200_000_000
         assert int(rpc('eth_getBlockByNumber','pending',False)['baseFeePerGas'],16)<=acquire_gas_price

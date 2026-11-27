@@ -245,8 +245,8 @@ def main():
                   if log['address'].lower() == SHAPES.lower() and log['topics'] and log['topics'][0] == mint_topic]
         assert len(minted) == 3 and all(decode(['uint256', 'bytes32', 'uint256'], bytes.fromhex(log['data'][2:]))[0] == 10**16 for log in minted)
         report['paidPrimaryShapeMints'] = len(minted)
-        send(actors['owner'], manager, f'setParams({PARAMS_T})', tuple_arg(values | dict(routineCapWei=0, routineRatePerDayWei=0, essentialCapWei=0, essentialRatePerDayWei=0)))
-        assert call(manager, 'budget()(uint256,uint256)').split() == ['0', '0']
+        send(actors['owner'], manager, f'setParams({PARAMS_T})', tuple_arg(values | dict(routineCapWei=0, routineRatePerDayWei=0)))
+        assert call(manager, 'budget()(uint256)').strip() == '0'
         now = int(rpc('eth_getBlockByNumber', 'latest', False)['timestamp'], 16)
         rpc('evm_setNextBlockTimestamp', now + 13 * 3600); rpc('evm_mine')
         owner_state = work / 'owner-exit.json'

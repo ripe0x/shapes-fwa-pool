@@ -23,7 +23,7 @@ def arithmetic():
     # Backing depends on the routine gas ceiling, never on the block's basefee (D80): a head
     # basefee change between quote and inclusion cannot move the target outside the tag band.
     kwargs = dict(k=1_038_500_000_000_000_000, cap=None, s_bps=100, units=6,
-                  gas_ceiling=500_000_000, markup_bps=0, work_fee=20_000_000_000_000)
+                  gas_ceiling=500_000_000, work_fee=20_000_000_000_000)
     old = P.edge_backing(price=500_000_000, **kwargs)
     future = P.edge_backing(price=443_750_000, **kwargs)
     assert old == future == 64_896_174_863_380_000, (old, future)

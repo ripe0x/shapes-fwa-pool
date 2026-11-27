@@ -26,8 +26,8 @@ contract ForkCompletionAccountingTest is ForkBase {
         p.backingRatioBps = 70_000;
         p.reserve = 0.005 ether;
         p.upliftBoundBps = 25;
-        p.essentialCap = 0;
-        p.essentialRate = 0;
+
+
         _settings(p);
     }
 

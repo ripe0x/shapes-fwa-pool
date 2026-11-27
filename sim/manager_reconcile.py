@@ -32,7 +32,7 @@ def measured_offer(row,state,gas,units=0,essential=False):
         raise ValueError('paid atomic manager step requires one actual work-meter frame')
     frame=frames[0]
     expected=dict(gasAllowance=gas,workUnits=units,essential=essential,
-        overhead=state.gas_schedule['overhead'],markupBps=state.markup_bps,
+        overhead=state.gas_schedule['overhead'],
         baseFee=row['baseFee'],txGasPrice=row['gasPrice'])
     if any(frame.get(key)!=value for key,value in expected.items()):
         raise ValueError('actual work-meter context differs from independently derived operation')
@@ -49,8 +49,8 @@ def replay(path):
     setup=rows[0];p=parameters(setup['params']);data=setup['input']
     m=Manager(seed=0,balance=data['deployBalance'],owner=setup['owner'],owner_funded=data['fundingWei'],reserve=p['reserveWei'],
         pack_units_mask=p['packUnitsMask'],accepted_mint_fee=p['acceptedMintFeeWei'],live_mint_fee=setup['liveMintFee'])
-    m.routine_budget=m.routine_cap=p['routineCapWei'];m.essential_budget=m.essential_cap=p['essentialCapWei']
-    m.routine_rate=p['routineRatePerDayWei'];m.essential_rate=p['essentialRatePerDayWei']
+    m.routine_budget=m.routine_cap=p['routineCapWei']
+    m.routine_rate=p['routineRatePerDayWei']
     m.acquisition_cursor=m.completed_prefix=data['initialCursor'];start=setup['timestamp'];pack_ids={};idle_ids=[];allocation_times={};request=None
     failures=[]
     def check(step,field,model,actual):
@@ -61,7 +61,7 @@ def replay(path):
             'activeBacking':m.active_backing,'activeCount':m.active_count,'feeDebtSum':m.fee_debt_sum,'allocatedValue':m.allocated_value,
             'idleFunding':m.idle_funding,'completedPrefix':m.completed_prefix,'cursor':m.acquisition_cursor,'pendingReceipts':len(m.receipts),
             'reservedCount':sum(pos.state!=OWED for pos in m.positions.values()),'feeCredit':m.fee_credit,'reserve':m.reserve,
-            'routineBudget':m.routine_budget,'essentialBudget':m.essential_budget}
+            'routineBudget':m.routine_budget}
         for field,value in amounts.items():check(step,field,value,actual[field])
         check(step,'keeperPay',m.keeper_paid,row['keeperPayCumulativeWei']);check(step,'creatorFees',m.mint_fees,row['creatorFeesCumulativeWei'])
         check(step,'ownerReceived',m.owner_withdrawn,row['ownerReceivedWei']);check(step,'exiting',m.exiting,row['windingDown']);check(step,'paused',m.listing_paused,row['listingPaused'])
@@ -124,7 +124,7 @@ def replay(path):
             m.pay_keeper(offer(q['list']+q['listed'],1))
             pack_ids[data['ids'][0]]=data['packId']
         elif action=='setParams':
-            new=parameters(row['params']);m.set_budget(now,new['routineCapWei'],new['routineRatePerDayWei'],new['essentialCapWei'],new['essentialRatePerDayWei']);p=new;m.reserve=p['reserveWei']
+            new=parameters(row['params']);m.set_budget(now,new['routineCapWei'],new['routineRatePerDayWei']);p=new;m.reserve=p['reserveWei']
         elif action=='recover':
             found=[]
             backlog=m.completed_prefix-m.acquisition_cursor

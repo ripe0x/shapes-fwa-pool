@@ -84,15 +84,15 @@ contract CompleteForeignJournalTest is SelectionBase {
         p.acceptedMintFee = 0.001 ether;
         p.minDeposit = 0.01 ether;
         p.minDistribution = 0.01 ether;
-        p.minEdgeBps = 100; p.payMarkupBps = 1_000; p.maxTip = 0.05 gwei; p.keeperShareBps = 2_500;
+        p.minEdgeBps = 100; p.maxTip = 0.05 gwei; p.keeperShareBps = 2_500;
         p.upliftBoundBps = 200; p.packUnitsMask = uint64(1) << UNITS;
         p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei; // the 6-unit edge lists at this ceiling
         p.tvlCap = 100 ether; p.routineCap = 0.3 ether; p.routineRate = 0.01 ether;
-        p.essentialCap = 0.1 ether; p.essentialRate = 0.005 ether;
+
         vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         TestVaultOps.restock(vault, 1, UNITS, 0); // build lists it at once
         selected = vault.openListingAt(0);
-        p.payMarkupBps = 0;
+
         bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(owner); vault.setParams(p, _expected0);
         begin = vault.acquisitionCursor();
@@ -365,7 +365,6 @@ contract CompleteForeignJournalTest is SelectionBase {
         vm.serializeUint(name, "end", FWA.nextSequenceToProcess());
         vm.serializeUint(name, "escrow", vault.pendingDepositTotal());
         vm.serializeUint(name, "workFeeWei", 0);
-        vm.serializeUint(name, "payMarkupBps", 0);
         vm.serializeUint(name, "maxTipWei", 0.05 gwei);
         vm.serializeUint(name, "gasCeilingWei", 0.5 gwei);
         vm.serializeUint(name, "essentialCeilingWei", 2 gwei);

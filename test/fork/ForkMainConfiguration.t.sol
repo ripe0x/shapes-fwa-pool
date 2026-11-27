@@ -42,7 +42,7 @@ contract ForkMainConfigurationTest is ForkBase {
         p.reserve = 0.005 ether;
         p.gasCeiling = 0.5 gwei;
         p.essentialCeiling = 2 gwei;
-        p.payMarkupBps = 1_000;
+
     }
 
     function manager() internal returns (PackManager m) {
@@ -83,9 +83,9 @@ contract ForkMainConfigurationTest is ForkBase {
         uint256 balance = address(m).balance;
         uint256 quoteGas = uint256(p.gasSchedule.build) + p.gasSchedule.buildPack
             + 3 * p.gasSchedule.buildShape + p.gasSchedule.listed;
-        uint256 expectedPay = (quoteGas + p.gasSchedule.overhead) * 0.2 gwei * 11_000 / 10_000 + 2 * p.workFee;
+        uint256 expectedPay = (quoteGas + p.gasSchedule.overhead) * 0.2 gwei + 2 * p.workFee;
         uint256 paid = this.buildInRealFeeContext(m, proposal(), m.configurationHash());
-        assertLe(paid, expectedPay, "measured routine pay stays inside the marked-up work cap");
+        assertLe(paid, expectedPay, "measured routine pay stays inside the work cap");
         assertGt(paid, 2 * p.workFee, "real paid work reimburses positive measured gas");
         assertEq(SHAPES.totalSupply() - supply, 3, "three fresh primary mints");
         assertEq(IShapesFeeAdmin(address(SHAPES)).pendingFees() - creatorFees, 0.003 ether,
@@ -114,7 +114,7 @@ contract ForkMainConfigurationTest is ForkBase {
         assertEq(SHAPES.totalSupply(), supply, "oversized mint batch fails before primary mints");
     }
 
-    function test_paidExitMinimumCanBeFundedByActualBackingAndPrincipalProceeds() public {
+    function test_exitWorkIsUnpaidAndNonzeroMinPayReverts() public {
         PackManager m = manager();
         this.buildInRealFeeContext(m, proposal(), m.configurationHash());
         uint256[] memory ids = new uint256[](1);
@@ -122,19 +122,15 @@ contract ForkMainConfigurationTest is ForkBase {
         vm.warp(vm.getBlockTimestamp() + 13 hours);
         vm.prank(owner);
         m.setExiting(true);
-        vm.prank(owner);
-        m.withdraw(owner, address(m).balance);
-        assertEq(address(m).balance, 0, "real owner withdrawal leaves all value in the protocol");
-        uint256 paid = m.unlist(ids, m.getParams().workFee, m.configurationHash());
-        assertGe(paid, m.getParams().workFee, "verified backing return funds a positive keeper minimum");
-        assertEq(address(m).balance, 0.21 ether - paid);
-        vm.prank(owner);
-        m.withdraw(owner, address(m).balance);
-        assertEq(address(m).balance, 0, "actual pack principal is the remaining payment source");
-        paid = m.liquidate(16, m.getParams().workFee, m.configurationHash());
-        assertGe(paid, m.getParams().workFee);
-        assertEq(address(m).balance, 0.03 ether - paid);
-        assertEq(m.openListingCount() + m.idlePackCount(), 0);
+        // Exit work is unpaid: a nonzero minPay reverts before the work.
+        uint256 fee = m.getParams().workFee;
+        bytes32 h = m.configurationHash();
+        vm.expectRevert(VaultLib.Payment.selector);
+        m.unlist(ids, fee, h);
+        // The same unlist runs unpaid at minPay 0, then the freed pack liquidates unpaid too.
+        assertEq(m.unlist(ids, 0, m.configurationHash()), 0, "exit unlist pays nothing");
+        assertEq(m.liquidate(16, 0, m.configurationHash()), 0, "exit liquidation pays nothing");
+        assertEq(m.openListingCount() + m.idlePackCount(), 0, "the exit still completes");
     }
 
     function test_staleConfigurationFailsBeforeAnyMintOrCapitalCommitment() public {
@@ -202,19 +198,19 @@ contract ForkMainConfigurationTest is ForkBase {
         p.gasSchedule.buildShape += 3_000;
         p.gasSchedule.listed += 4_000;
         set(m, p);
-        uint256 extra = (1_000 + 2_000 + 3 * 3_000 + 4_000) * 0.2 gwei * 11_000 / 10_000;
+        uint256 extra = (1_000 + 2_000 + 3 * 3_000 + 4_000) * 0.2 gwei;
         assertEq(m.buildCost(3) - before, extra);
         uint256 paid = this.buildInRealFeeContext(m, proposal(), m.configurationHash());
         uint256 gasQ = uint256(p.gasSchedule.build) + p.gasSchedule.buildPack
             + 3 * p.gasSchedule.buildShape + p.gasSchedule.listed;
-        assertLe(paid, (gasQ + p.gasSchedule.overhead) * 0.2 gwei * 11_000 / 10_000 + 2 * p.workFee);
+        assertLe(paid, (gasQ + p.gasSchedule.overhead) * 0.2 gwei + 2 * p.workFee);
         assertGt(paid, 2 * p.workFee);
     }
 
     function test_oldRateAccrualAndCapacityIncreaseNeverRefillSpentBudget() public {
         PackManager m = manager();
         this.buildInRealFeeContext(m, proposal(), m.configurationHash());
-        (uint256 oldBalance,) = m.budget();
+        uint256 oldBalance = m.budget();
         VaultLib.Params memory p = m.getParams();
         uint256 oldRate = p.routineRate;
         vm.warp(vm.getBlockTimestamp() + 1 hours);
@@ -223,11 +219,11 @@ contract ForkMainConfigurationTest is ForkBase {
         p.routineCap = 0.3 ether;
         p.routineRate = 0.02 ether;
         set(m, p);
-        (uint256 afterUpdate,) = m.budget();
+        uint256 afterUpdate = m.budget();
         assertEq(afterUpdate, accrued, "old rate first, capacity increase gives no refill");
         p.routineCap = 1;
         set(m, p);
-        (afterUpdate,) = m.budget();
+        afterUpdate = m.budget();
         assertEq(afterUpdate, 1, "lower capacity clamps");
     }
 
@@ -335,7 +331,7 @@ contract ForkMainConfigurationTest is ForkBase {
         m.setListingPaused(false);
         VaultLib.Params memory p = m.getParams();
         p.backingRatioBps = 20_000;
-        p.payMarkupBps = 0;
+
         set(m, p);
         // The build gate charges a selection neither gas nor the one-time build (owner, 2026-11-26).
         (, uint256 freshBacking, bool freshOk) = m.edge(3);
@@ -372,7 +368,7 @@ contract ForkMainConfigurationTest is ForkBase {
         m.setListingPaused(false);
         VaultLib.Params memory p = m.getParams();
         p.backingRatioBps = 10_527;
-        p.payMarkupBps = 0;
+
         set(m, p);
         (, uint256 target, bool ok) = m.relistEdgeFor(pack);
         assertTrue(ok, "both account settlement outcomes cover their actual costs");
@@ -432,7 +428,7 @@ contract ForkMainConfigurationTest is ForkBase {
         p = m.getParams();
         p.packUnitsMask = 8;
         p.backingRatioBps = 11_000;
-        p.payMarkupBps = 0;
+
         set(m, p);
         vm.fee(0.45 gwei);
         vm.txGasPrice(0.5 gwei);

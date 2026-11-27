@@ -84,16 +84,14 @@ contract ForkKeeperPayTest is ForkBase {
 
     /// Compare actual extra compensation with extra gross caller gas. Keep this economic
     /// hypothesis explicit: per-call overhead can create a splitting incentive.
-    function test_splittingDoesNotPay() public { _split(false, 50_000, false); }
+    function test_splittingDoesNotPay() public { _split(50_000, false); }
 
-    function test_splittingDoesNotPayAtMaximumMarkup() public { _split(true, 50_000, false); }
+    function test_largerOverheadCanRewardSplitting() public { _split(100_000, true); }
 
-    function test_largerOverheadCanRewardSplittingAtMaximumMarkup() public { _split(true, 100_000, true); }
-
-    function _split(bool maximumMarkup, uint32 overhead, bool expectIncrementalProfit) internal {
+    function _split(uint32 overhead, bool expectIncrementalProfit) internal {
         _priced(alice, 1 ether);
         VaultLib.Params memory p = vault.getParams();
-        p.payMarkupBps = maximumMarkup ? 1_000 : 0;
+
         p.gasSchedule.overhead = overhead;
         bytes32 expected = vault.configurationHash();
         vm.prank(owner); vault.setParams(p, expected);
@@ -231,7 +229,7 @@ contract ForkKeeperPayTest is ForkBase {
         vm.prank(keeper);
         TestVaultOps.restock(vault, 13, 6, 0); // build mints and lists 13
         VaultLib.Params memory p = defaultParams();
-        p.payMarkupBps = 1_000;
+
         p.workFee = uint64(vault.MAX_WORK_FEE());
         // 8 gwei is the effective ceiling maximum at which the 6-unit recipe still lists: above it
         // the purchaser-redeem margin (160,000 x gasCeiling) pushes the backing below P / 0.95. A
@@ -267,7 +265,7 @@ contract ForkKeeperPayTest is ForkBase {
         TestVaultOps.restock(vault, 15, 6, 0);
         gasCost += (g - gasleft() + 4 * 21_000) * 0.2 gwei;
         assertGe(TestVaultOps.open(vault).length, 25, "the attacker's ETH was deployed");
-        // Redeem everything; unwind at a 5 gwei spike (essential work pays at the ceiling-capped price).
+        // Redeem everything; unwind at a 5 gwei spike (exit work is unpaid: the attacker pays its own gas).
         uint256 shares = vault.shareBalance(a);
         uint256 rc = Charges.redeemCharge(vault, shares);
         bytes32 _expected8 = TestVaultOps.configurationHash(vault);
@@ -329,9 +327,9 @@ contract ForkKeeperPayTest is ForkBase {
     function test_unpaidWorkWhenBudgetsAreEmpty() public {
         _priced(alice, 1 ether);
         _restock(2);
-        setCaps(0, 0);
-        (uint256 r, uint256 e) = vault.budget();
-        assertEq(r + e, 0);
+        setCaps(0);
+        uint256 r = vault.budget();
+        assertEq(r, 0);
         uint256[] memory planned3 = TestVaultOps.proposals(vault, 2, 6);
         bytes32 _expected13 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper);
@@ -370,8 +368,8 @@ contract ForkKeeperPayTest is ForkBase {
     function test_budgetsBoundSpendingOverTime() public {
         _priced(alice, 3 ether);
         VaultLib.Params memory q = vault.getParams();
-        setCaps(0.002 ether, q.essentialCap);
-        (uint256 r,) = vault.budget();
+        setCaps(0.002 ether);
+        uint256 r = vault.budget();
         assertEq(r, 0.002 ether, "lowering clamps the level to the cap");
         // Build until the routine budget runs out: total pay never exceeds it.
         uint256 paid;
@@ -380,14 +378,14 @@ contract ForkKeeperPayTest is ForkBase {
             paid += TestVaultOps.restock(vault, 1, 6, 0);
         }
         assertLe(paid, 0.002 ether);
-        (r,) = vault.budget();
+        r = vault.budget();
         assertEq(r, 0.002 ether - paid);
         // One day refills at most the daily rate; a month never exceeds the cap.
         vm.warp(block.timestamp + 1 days);
-        (r,) = vault.budget();
+        r = vault.budget();
         assertLe(r, 0.002 ether - paid + q.routineRate);
         vm.warp(block.timestamp + 30 days);
-        (r,) = vault.budget();
+        r = vault.budget();
         assertEq(r, 0.002 ether);
         // Raise the cap: the level stays where it was (0.002), not 0.3.
         VaultLib.Params memory up = vault.getParams();
@@ -395,7 +393,7 @@ contract ForkKeeperPayTest is ForkBase {
         bytes32 _expected17 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
         vault.setParams(up, _expected17);
-        (r,) = vault.budget();
+        r = vault.budget();
         assertEq(r, 0.002 ether, "applying a raise refills nothing");
         // Above the bytecode maxima: refused.
         up.routineCap = 0.3 ether + 1;
@@ -411,8 +409,8 @@ contract ForkKeeperPayTest is ForkBase {
         vault.setParams(up, _expected19);
         // A owner lowering clamps the level at once.
         q = vault.getParams();
-        setCaps(0.001 ether, q.essentialCap);
-        (r,) = vault.budget();
+        setCaps(0.001 ether);
+        r = vault.budget();
         assertEq(r, 0.001 ether, "lowered cap clamps the level");
     }
 
@@ -425,17 +423,16 @@ contract ForkKeeperPayTest is ForkBase {
         uint256 cash = address(vault).balance;
         bytes32 _expected21 = TestVaultOps.configurationHash(vault);
         vm.prank(owner); vault.setParams(p, _expected21);
-        (uint256 routine, uint256 essential) = vault.budget();
+        uint256 routine = vault.budget();
         assertEq(routine, 0, "raising the ceiling grants no immediate spending permission");
         assertEq(vault.getParams().routineRate, 0.02 ether);
         vm.warp(vm.getBlockTimestamp() + 1 days);
-        (routine,) = vault.budget();
+        routine = vault.budget();
         assertEq(routine, 0.02 ether);
         assertEq(address(vault).balance, cash, "refill creates permission, never ETH");
         vm.warp(vm.getBlockTimestamp() + 10 days);
-        (routine, essential) = vault.budget();
+        routine = vault.budget();
         assertEq(routine, p.routineCap, "capacity remains independently bounded");
-        assertEq(essential, p.essentialCap, "routine rate does not change essential capacity");
         assertEq(address(vault).balance, cash);
         p.routineRate = 0.02 ether + 1;
         bytes32 _expected22 = TestVaultOps.configurationHash(vault);
@@ -444,26 +441,25 @@ contract ForkKeeperPayTest is ForkBase {
         assertEq(vault.getParams().routineRate, 0.02 ether, "over-limit change is atomic");
     }
 
-    /// 8 (essential): routine work cannot use the essential budget: with routine empty, unwinding
-    /// for a redemption is still paid from the essential budget.
-    function test_routineCannotDrainEssential() public {
+    /// 8 (exits unpaid): exit work for a redemption pays the keeper nothing; a nonzero minPay
+    /// reverts. Owner decision: keepers are not paid for exits.
+    function test_exitWorkIsUnpaid() public {
         _priced(alice, 1 ether);
         _restock(3); // build mints and lists 3
-        VaultLib.Params memory q = vault.getParams();
-        setCaps(0, q.essentialCap);
-        _restock(1); // routine: unpaid now
         uint256 shares = vault.shareBalance(alice);
         uint256 rc = Charges.redeemCharge(vault, shares);
         bytes32 _expected23 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
         vault.requestRedeem{value: rc}(shares, _expected23);
         uint256[] memory ids = TestVaultOps.open(vault);
+        // A nonzero minPay on exit work reverts before the work.
+        bytes32 _expected23b = TestVaultOps.configurationHash(vault);
         vm.prank(keeper);
-        uint256 pay = TestVaultOps.unlist(vault, ids, 0);
-        assertGt(pay, 0, "essential work is paid from its own budget");
-        (uint256 r, uint256 e) = vault.budget();
-        assertEq(r, 0);
-        assertEq(e, q.essentialCap - pay);
+        vm.expectRevert(VaultLib.Payment.selector);
+        vault.unlist(ids, 1, _expected23b);
+        // The same work runs unpaid when minPay is 0.
+        vm.prank(keeper);
+        assertEq(TestVaultOps.unlist(vault, ids, 0), 0, "exit work is unpaid");
     }
 
     /// 10: keeper pay never touches ETH owed to holders: after every paid call the balance still
@@ -553,37 +549,12 @@ contract ForkKeeperPayTest is ForkBase {
         assertEq(vault.chargeRefundReserve(), ckA, "Alice retains the protected payer refund");
     }
 
-    /// Redemption and wind-down work is paid up to the essential ceiling; routine work stops at
-    /// the routine ceiling. Canary: 0.5 and 2 gwei.
-    function test_essentialCeilingPaysExitsInSpikes() public {
-        VaultLib.Params memory p = vault.getParams();
-        (p.gasCeiling, p.essentialCeiling, p.payMarkupBps) = (0.5 gwei, 2 gwei, 0);
-        p.backingRatioBps = 15_000; // paid fresh construction remains viable at the routine ceiling
-        bytes32 _expected28 = TestVaultOps.configurationHash(vault);
-        vm.prank(owner);
-        vault.setParams(p, _expected28);
-        _priced(alice, 1 ether);
-        vm.fee(1 gwei);
-        vm.txGasPrice(1.05 gwei);
-        vm.prank(keeper);
-        uint256 buildPay = TestVaultOps.restock(vault, 2, 6, 0); // routine build of two listings
-        assertEq(buildPay, MeasuredPay.gross(vault, _buildQuote(2), 4, false, 0.5 gwei));
-        vm.prank(owner);
-        vault.startWindDown();
-        uint256[] memory ids = TestVaultOps.open(vault);
-        vm.prank(keeper);
-        uint256 unlistPay = TestVaultOps.unlist(vault, ids, 0);
-        assertEq(unlistPay, MeasuredPay.gross(vault, GasQuotes.Q_UNLIST + 2 * GasQuotes.Q_UNLISTED, 2, true, 1.05 gwei));
-        vm.fee(0.15 gwei);
-        vm.txGasPrice(0.2 gwei);
-    }
-
     /// D64: without an essential budget exit work is unpaid and redeemers pay no unwind charge; the
     /// withdrawer unlists and liquidates herself and the redemption completes.
     function test_selfServeExitWithoutEssentialBudget() public {
         _priced(alice, 1 ether);
         _restock(3); // build mints and lists 3
-        setCaps(vault.getParams().routineCap, 0);
+        setCaps(vault.getParams().routineCap);
         assertEq(vault.unwindCharge(), 0, "no unwind charge");
         uint256 shares = vault.shareBalance(alice);
         uint256 rc = Charges.redeemCharge(vault, shares);

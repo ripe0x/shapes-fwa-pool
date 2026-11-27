@@ -40,8 +40,7 @@ library DeployCore {
         require(address(vault.fwa()) == address(fwa), "postflight: fwa");
         require(vault.owner() == owner, "postflight: owner");
         require(keccak256(abi.encode(vault.getParams())) == keccak256(abi.encode(p)), "postflight: params");
-        (uint256 r, uint256 e) = vault.budget();
-        require(r == p.routineCap && e == p.essentialCap, "postflight: budgets");
+        require(vault.budget() == p.routineCap, "postflight: budget");
         require(vault.totalShares() == vault.DEAD_SHARES(), "postflight: seed shares");
         require(address(vault).balance >= seed, "postflight: seed");
         require(!vault.windingDown() && !vault.depositsPaused() && !vault.listingPaused(), "postflight: flags");

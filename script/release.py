@@ -205,8 +205,7 @@ MAIN_DEPENDENCIES = {
 PARAM_ABI_ALIASES = {
     "gasCeilingWei": "gasCeiling", "essentialCeilingWei": "essentialCeiling",
     "maxTipWei": "maxTip", "workFeeWei": "workFee", "routineCapWei": "routineCap",
-    "routineRatePerDayWei": "routineRate", "essentialCapWei": "essentialCap",
-    "essentialRatePerDayWei": "essentialRate", "reserveWei": "reserve", "tvlCapWei": "tvlCap",
+    "routineRatePerDayWei": "routineRate", "reserveWei": "reserve", "tvlCapWei": "tvlCap",
     "acceptedMintFeeWei": "acceptedMintFee", "minDepositWei": "minDeposit",
     "minDistributionWei": "minDistribution",
 }
@@ -566,8 +565,8 @@ def postflight_manager(factory, values, manager=None, owner=None, funding=None, 
         check(cast("call", manager, "configurationHash()(bytes32)").lower() == configuration_hash(v, mint_fee).lower(), "manager configuration hash")
         flags = {name: cast("call", manager, name + "()(bool)") for name in ("windingDown", "listingPaused")}
         check(all(value == "false" for value in flags.values()), "new manager pause/exit flags")
-        budget = [int(first(x)) for x in cast("call", manager, "budget()(uint256,uint256)").splitlines()]
-        check(budget == [v["routineCapWei"], v["essentialCapWei"]], "new manager budgets")
+        budget = int(first(cast("call", manager, "budget()(uint256)")))
+        check(budget == v["routineCapWei"], "new manager budget")
         cash = int(cast("balance", manager))
         if funding is not None:
             _unsigned(int(funding), 256, "manager funding")
@@ -623,8 +622,8 @@ def postflight(vault, values, owner=None, factory=None):
         check(cast('call', vault, key + '()(address)').lower() == expected_address.lower(), f'vault {key} immutable')
         if factory:
             check(cast('call', implementation, key + '()(address)').lower() == expected_address.lower(), f'implementation {key} immutable')
-    budget = [int(first(x)) for x in cast("call", vault, "budget()(uint256,uint256)").splitlines()]
-    check(budget[0] <= v["routineCapWei"] and budget[1] <= v["essentialCapWei"], "budgets above caps")
+    budget = int(first(cast("call", vault, "budget()(uint256)")))
+    check(budget <= v["routineCapWei"], "budget above cap")
     dead = first(cast("call", vault, "DEAD_SHARES()(uint256)"))
     check(first(cast("call", vault, "sharesOf(address)(uint256)", "0x000000000000000000000000000000000000dEaD")) == dead,
           "seed shares")

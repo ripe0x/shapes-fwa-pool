@@ -32,8 +32,8 @@ contract ForkMainCheckpointFairnessTest is MainRenewalBase {
     function parameters() internal pure override returns (VaultLib.Params memory p) {
         p = super.parameters();
         p.tvlCap = 200 ether;
-        p.essentialCap = 0;
-        p.essentialRate = 0;
+
+
     }
 
     function _initialFunding() internal pure override returns (uint256) { return 0.01 ether; }
