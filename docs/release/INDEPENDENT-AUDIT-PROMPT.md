@@ -1,4 +1,4 @@
-# Independent re-audit prompt (frozen candidate 0839459)
+# Independent re-audit prompt (frozen candidate 0839459) — superseded by LAUNCH-AUDIT-PROMPT.md
 
 Paste everything below the line into a fresh session with no prior context. The session must not
 read earlier chats, memory, audit reports or builder notes during discovery.
