@@ -465,8 +465,8 @@ def write_profile(report):
     # owner recoverUnlist/recoverLiquidate. The superseded multi-packet set is kept on disk as
     # history but dropped here (see docs/receipts/manager-measured-verification.md for what that costs).
     paths=[OUT]
-    for name in ('manager-measured-sync-contexts-current.json',
-                 'manager-measured-owner-exit-current.json'):
+    for name in ('manager-measured-sync-contexts-v2.json',
+                 'manager-measured-owner-exit-v2.json'):
         path=ROOT/'docs/receipts'/name
         if path.exists():paths.append(path)
     if len(paths)<3:
