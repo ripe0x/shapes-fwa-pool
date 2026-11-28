@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {Ownable} from "solady/auth/Ownable.sol";
 import {ForkBase, IFwaAdmin, IOwnable, IOracleAdmin} from "./ForkBase.sol";
-import {TestVaultOps} from "../utils/TestVaultOps.sol";
+import {TestVaultOps, ANY_DESIGN} from "../utils/TestVaultOps.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {PackManager} from "../../src/PackManager.sol";
 import {PackManagerFactory} from "../../src/PackManagerFactory.sol";
@@ -44,8 +44,8 @@ function managerParams() pure returns (VaultLib.Params memory p) {
     p.reserve = 0.005 ether;
     p.routineCap = 0.03 ether;
     p.routineRate = 0.01 ether;
-    p.essentialCap = 0.03 ether;
-    p.essentialRate = 0.005 ether;
+
+
 }
 
 /// @notice Personal managers on the real FWA, Shapes and ShapePacks at the pinned block, beside the
@@ -68,7 +68,7 @@ contract ForkManagerTest is ForkBase {
     function _create(address who, uint256 funding) internal returns (PackManager m) {
         bytes32 _expected19 = TestVaultOps.factoryHash(factory, managerParams());
         vm.prank(who);
-        m = factory.create{value: funding}(who, managerParams(), _expected19);
+        m = factory.create{value: funding}(who, managerParams(), ANY_DESIGN, _expected19);
     }
 
     function _build(PackAccount a, uint256 n) internal returns (uint256 pay) {
@@ -88,11 +88,11 @@ contract ForkManagerTest is ForkBase {
         bytes32 _expected20 = TestVaultOps.factoryHash(factory, managerParams());
         vm.prank(alice);
         vm.expectRevert(Ownable.Unauthorized.selector);
-        factory.create{value: 1 ether}(address(factory), managerParams(), _expected20);
+        factory.create{value: 1 ether}(address(factory), managerParams(), ANY_DESIGN, _expected20);
         bytes32 _expected21 = TestVaultOps.factoryHash(factory, managerParams());
         vm.prank(alice);
         vm.expectRevert(Ownable.Unauthorized.selector);
-        factory.create{value: 1 ether}(predicted, managerParams(), _expected21);
+        factory.create{value: 1 ether}(predicted, managerParams(), ANY_DESIGN, _expected21);
     }
 
     function test_createInitializesAtomically() public {
@@ -112,9 +112,7 @@ contract ForkManagerTest is ForkBase {
         assertTrue(factory.isManager(address(m)));
         assertEq(keccak256(abi.encode(m.getParams())), keccak256(abi.encode(managerParams())));
 
-        (uint256 r, uint256 e) = m.budget();
-        assertEq(r, managerParams().routineCap);
-        assertEq(e, managerParams().essentialCap);
+        assertEq(m.budget(), managerParams().routineCap);
         assertEq(m.deploymentBlock(), block.number);
         assertEq(m.acquisitionCursor(), FWA.nextSequenceToProcess());
         assertTrue(IApproval(address(PACKS)).isApprovedForAll(address(m), address(FWA)), "FWA may take listed packs");
@@ -123,7 +121,7 @@ contract ForkManagerTest is ForkBase {
         assertFalse(m.listingPaused());
         assertFalse(m.windingDown());
         // The implementation never gets an owner.
-        assertEq(factory.implementation().owner(), address(0));
+        assertEq(PackManager(payable(factory.implementation())).owner(), address(0));
     }
 
     /// @dev Deployment gas of the shared contracts (libraries are deployed by the test harness and
@@ -142,19 +140,76 @@ contract ForkManagerTest is ForkBase {
 
     function test_initializeOnlyOnceOnlyByFactory() public {
         PackManager m = _create(alice, 0.1 ether);
-        PackManager impl = factory.implementation();
+        PackManager impl = PackManager(payable(factory.implementation()));
 
         VaultLib.Params memory p = managerParams();
         vm.prank(address(factory));
         vm.expectRevert(Ownable.AlreadyInitialized.selector);
-        impl.initialize(bob, p);
+        impl.initialize(bob, p, 0);
         vm.prank(address(factory));
         vm.expectRevert(Ownable.AlreadyInitialized.selector);
-        m.initialize(bob, p);
+        m.initialize(bob, p, 0);
         vm.prank(bob);
         vm.expectRevert(Ownable.Unauthorized.selector);
-        m.initialize(bob, p);
+        m.initialize(bob, p, 0);
         assertEq(m.owner(), alice);
+    }
+
+    /// @dev The admin may point new creations at another implementation; managers already created
+    ///      keep their code, a hash reviewed against the old implementation is refused, and only an
+    ///      implementation bound to this factory is accepted.
+    function test_adminChangesImplementationForNewManagersOnly() public {
+        assertEq(factory.admin(), address(this));
+        PackManager oldM = _create(alice, 0.1 ether);
+        address oldImpl = factory.implementation();
+        bytes32 staleHash = TestVaultOps.factoryHash(factory, managerParams());
+
+        PackManager foreign = new PackManager(FWA, SHAPES, PACKS, address(this)); // bound to another factory
+        vm.expectRevert(PackManagerFactory.InvalidImplementation.selector);
+        factory.setImplementation(address(foreign));
+        vm.expectRevert(PackManagerFactory.InvalidImplementation.selector);
+        factory.setImplementation(carol);
+
+        vm.prank(alice); // anyone may deploy a replacement; only the admin may select it
+        PackManager next = new PackManager(FWA, SHAPES, PACKS, address(factory));
+        vm.prank(alice);
+        vm.expectRevert(PackManagerFactory.Unauthorized.selector);
+        factory.setImplementation(address(next));
+        factory.setImplementation(address(next));
+        assertEq(factory.implementation(), address(next));
+
+        vm.prank(bob);
+        vm.expectRevert(PackManagerFactory.ConfigurationChanged.selector);
+        factory.create{value: 0.1 ether}(bob, managerParams(), ANY_DESIGN, staleHash);
+
+        PackManager newM = _create(bob, 0.1 ether);
+        assertEq(keccak256(address(oldM).code), keccak256(_clone(oldImpl)), "old manager keeps its code");
+        assertEq(keccak256(address(newM).code), keccak256(_clone(address(next))), "new manager clones next");
+        assertEq(oldM.owner(), alice);
+        assertEq(newM.owner(), bob);
+        assertTrue(factory.isManager(address(oldM)) && factory.isManager(address(newM)));
+    }
+
+    function test_adminTransferIsTwoStep() public {
+        vm.prank(alice);
+        vm.expectRevert(PackManagerFactory.Unauthorized.selector);
+        factory.transferAdmin(alice);
+        factory.transferAdmin(alice);
+        assertEq(factory.admin(), address(this), "pending until accepted");
+        vm.prank(bob);
+        vm.expectRevert(PackManagerFactory.Unauthorized.selector);
+        factory.acceptAdmin();
+        vm.prank(alice);
+        factory.acceptAdmin();
+        assertEq(factory.admin(), alice);
+        assertEq(factory.pendingAdmin(), address(0));
+        address impl = factory.implementation();
+        vm.expectRevert(PackManagerFactory.Unauthorized.selector);
+        factory.setImplementation(impl);
+    }
+
+    function _clone(address impl) internal pure returns (bytes memory) {
+        return abi.encodePacked(hex"3d3d3d3d363d3d37363d73", impl, hex"5af43d3d93803e602a57fd5bf3");
     }
 
     function test_createRejectsBadInputs() public {
@@ -163,12 +218,158 @@ contract ForkManagerTest is ForkBase {
         bytes32 _expected22 = TestVaultOps.factoryHash(factory, p);
         vm.prank(alice);
         vm.expectRevert(VaultLib.OutOfBounds.selector);
-        factory.create(alice, p, _expected22);
+        factory.create(alice, p, ANY_DESIGN, _expected22);
         bytes32 _expected23 = TestVaultOps.factoryHash(factory, managerParams());
         vm.prank(alice);
         vm.expectRevert(Ownable.NewOwnerIsZeroAddress.selector);
-        factory.create(address(0), managerParams(), _expected23);
+        factory.create(address(0), managerParams(), ANY_DESIGN, _expected23);
         assertEq(factory.managerCount(), 0);
+    }
+
+    /// @dev A9.5: every manager has an exact owner mix. Zero (no count limit) is refused at
+    ///      creation and by `setDesign`, so no caller can build past what the owner chose.
+    function test_zeroDesignRefused() public {
+        bytes32 expected = TestVaultOps.factoryHash(factory, managerParams());
+        vm.prank(alice);
+        vm.expectRevert(PackAccount.InvalidDesign.selector);
+        factory.create{value: 1 ether}(alice, managerParams(), 0, expected);
+        PackManager m = _create(alice, 1 ether);
+        vm.prank(alice);
+        vm.expectRevert(PackAccount.InvalidDesign.selector);
+        m.setDesign(0);
+        assertEq(m.design(), ANY_DESIGN);
+    }
+
+    /// @dev `preview`'s configuration hash is the one `create` checks.
+    function test_previewHashCreates() public {
+        (,,,,, bytes32 h) = factory.preview(managerParams());
+        assertEq(h, factory.configHashFor(managerParams()));
+        vm.prank(alice);
+        PackManager m = factory.create{value: 0.1 ether}(alice, managerParams(), ANY_DESIGN, h);
+        assertEq(m.owner(), alice);
+    }
+
+    /// @dev Identical work pays the same whatever gas limit the keeper sets: measurement is
+    ///      re-anchored in each library frame, so EIP-150's withheld 1/64 is never counted.
+    function test_gasLimitDoesNotChangeMeasuredPay() public {
+        vm.fee(0.15 gwei);
+        vm.txGasPrice(0.2 gwei);
+        assertEq(block.basefee, 0.15 gwei);
+        assertEq(tx.gasprice, 0.2 gwei);
+        VaultLib.Params memory p = managerParams();
+        p.gasSchedule.build += 1_000_000; // headroom so the measured value is never clipped
+        bytes32 h = TestVaultOps.factoryHash(factory, p);
+        vm.prank(alice);
+        PackManager m = factory.create{value: 2 ether}(alice, p, ANY_DESIGN, h);
+        uint256[] memory quotes = TestVaultOps.proposals(m, 1, UNITS);
+        bytes32 expected = TestVaultOps.configurationHash(m);
+        uint256 snap = vm.snapshotState();
+        (uint256 payLow, uint256 measuredLow, uint256 allowance) = _buildAt(m, quotes, expected, 3_000_000);
+        vm.revertToState(snap);
+        (uint256 payHigh, uint256 measuredHigh,) = _buildAt(m, quotes, expected, 15_000_000);
+        assertGt(payLow, 0);
+        assertLt(measuredLow, allowance, "unclipped, so a forwarding error would show");
+        assertEq(measuredHigh, measuredLow, "measured gas independent of the gas limit");
+        assertEq(payHigh, payLow, "pay independent of the gas limit");
+    }
+
+    function _buildAt(PackManager m, uint256[] memory quotes, bytes32 expected, uint256 gasLimit)
+        internal returns (uint256 pay, uint256 measured, uint256 allowance)
+    {
+        vm.recordLogs();
+        vm.prank(keeper);
+        pay = m.build{gas: gasLimit}(UNITS, quotes, 0, expected);
+        bytes32 topic = keccak256("KeeperWorkMeasured(uint256,uint256,uint256,uint256,bool)");
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics[0] == topic) (measured, allowance) = abi.decode(logs[i].data, (uint256, uint256));
+        }
+        assertGt(measured, 0, "work measured");
+    }
+
+    /// The owner's pack mix caps each size's held packs; builds below it run on the real pool,
+    /// builds past it revert, and only the owner can change it.
+    function test_designCapsEachPackSize() public {
+        VaultLib.Params memory p = managerParams();
+        p.packUnitsMask = uint64(1 << 3 | 1 << 5);
+        uint256 design = 2 << 24 | 1 << 40; // two 0.03 ETH packs, one 0.05 ETH pack
+        bytes32 expected = TestVaultOps.factoryHash(factory, p);
+        vm.prank(alice);
+        PackManager m = factory.create{value: 1 ether}(alice, p, design, expected);
+        assertEq(m.design(), design);
+
+        vm.startPrank(keeper);
+        TestVaultOps.restock(m, 2, 3, 0);
+        TestVaultOps.restock(m, 1, 5, 0);
+        assertEq(m.recipeCount(3), 2);
+        assertEq(m.recipeCount(5), 1);
+        assertEq(m.openListingCount(), 3, "every designed pack lists");
+        uint256[] memory one = TestVaultOps.proposals(m, 1, 3);
+        bytes32 h = TestVaultOps.configurationHash(m);
+        vm.expectRevert(VaultLib.BadBatch.selector);
+        m.build(3, one, 0, h);
+        one = TestVaultOps.proposals(m, 1, 5);
+        vm.expectRevert(VaultLib.BadBatch.selector);
+        m.build(5, one, 0, h);
+        vm.stopPrank();
+
+        vm.prank(bob);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        m.setDesign(3 << 24);
+        vm.startPrank(alice);
+        vm.expectRevert(PackAccount.InvalidDesign.selector);
+        m.setDesign(1 << 16); // 0.02 ETH packs do not exist
+        vm.expectRevert(PackAccount.InvalidDesign.selector);
+        m.setDesign(1 << 248);
+        m.setDesign(3 << 24 | 1 << 40);
+        vm.stopPrank();
+        vm.prank(keeper);
+        TestVaultOps.restock(m, 1, 3, 0);
+        assertEq(m.recipeCount(3), 3, "a raised count builds again");
+
+        bytes32 e2 = TestVaultOps.factoryHash(factory, p);
+        vm.prank(alice);
+        vm.expectRevert(PackAccount.InvalidDesign.selector);
+        factory.create{value: 1 ether}(alice, p, uint256(1) << 8, e2);
+    }
+
+    /// @dev Audit B E1: a build may not spend the backing booked for a returned pack (reuse first).
+    function test_buildCannotSpendReturnedPackBacking() public {
+        VaultLib.Params memory p = managerParams();
+        p.packUnitsMask = uint64(1 << 3 | 1 << 5);
+        bytes32 expected = TestVaultOps.factoryHash(factory, p);
+        vm.prank(alice);
+        PackManager m = factory.create{value: 1 ether}(alice, p, uint256(1) << 24 | uint256(1) << 40, expected);
+        vm.prank(keeper);
+        TestVaultOps.restock(m, 1, 3, 0);
+        uint256[] memory ids = TestVaultOps.open(m);
+        vm.prank(alice);
+        m.unlistForWithdrawal(ids);
+        uint256 booked = m.idleFunding();
+        assertGt(booked, 0, "returned pack books its backing");
+        assertEq(m.idlePackCount(), 1);
+
+        // Cash for exactly one 0.05 ETH build above the reserve, so not also the returned pack's backing.
+        uint256[] memory five = TestVaultOps.proposals(m, 1, 5);
+        uint256 need5 = 0.05 ether + m.buildCost(5) + five[0] + 0.001 ether;
+        uint256 target = m.operatingReserve() + need5;
+        assertLt(0.001 ether, booked);
+        vm.prank(alice);
+        m.withdraw(alice, address(m).balance - target);
+        assertEq(address(m).balance, target);
+
+        uint256 supply0 = SHAPES.totalSupply();
+        bytes32 h = TestVaultOps.configurationHash(m);
+        vm.prank(keeper);
+        vm.expectRevert(VaultLib.InsufficientBacking.selector);
+        m.build(5, five, 0, h);
+        assertEq(SHAPES.totalSupply(), supply0, "no fresh mint while the returned pack waits");
+
+        vm.prank(keeper);
+        TestVaultOps.list(m, 1, 0);
+        assertEq(m.idlePackCount(), 0, "the returned pack relists intact");
+        assertEq(m.idleFunding(), 0);
+        assertEq(SHAPES.totalSupply(), supply0, "relisting mints nothing");
     }
 
     // ------------------------------------------------------------------ owner controls
@@ -260,8 +461,7 @@ contract ForkManagerTest is ForkBase {
         assertEq(alice.balance - a0, spare);
         assertEq(address(m).balance, 0);
 
-        // Exit: anyone unlists (essential work, paid from the manager's own essential budget, which
-        // needs free ETH: with none left, the keeper is paid nothing and the work still happens).
+        // Exit: anyone unlists, unpaid (owner decision: keepers are not paid for exits).
         vm.prank(alice);
         m.setExiting(true);
         assertTrue(m.listingPaused());
@@ -269,7 +469,7 @@ contract ForkManagerTest is ForkBase {
         uint256 b0 = bob.balance;
         vm.prank(bob);
         uint256 exitPay = TestVaultOps.unlist(m, ids, 0);
-        assertGt(exitPay, 0, "exit work is paid from the returned backing, after the work");
+        assertEq(exitPay, 0, "exit work is unpaid");
         assertEq(bob.balance - b0, exitPay);
         assertEq(m.openListingCount(), 0);
         assertEq(m.idlePackCount(), 7);
@@ -288,6 +488,59 @@ contract ForkManagerTest is ForkBase {
         assertEq(spare + (backing - exitPay) + 7 * P + 7 * FEE_PER_PACK + pay + exitPay, start, "every wei");
     }
 
+    /// @dev FWA's owner removes ShapePacks from the whitelist with packs listed. New exposure stops
+    ///      (no cap means no build and no relist); every exit path still returns every wei and pack.
+    function test_dewhitelistedPacksNeverBrickExit() public {
+        PackManager m = _create(alice, 1 ether);
+        _build(m, 3);
+        uint256 backing = _sumBacking(m);
+        address[] memory cols = new address[](1);
+        cols[0] = address(PACKS);
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaPurchaser(address(FWA)).setCollectionsWhitelisted(cols, false);
+        assertFalse(FWA.canDeposit(address(PACKS)), "real FWA removal");
+        (,, bool admitted) = m.edge(UNITS);
+        assertFalse(admitted, "no new exposure once the collection is removed");
+        uint256[] memory planned = new uint256[](1);
+        planned[0] = 0.07 ether;
+        bytes32 h = m.configurationHash();
+        vm.prank(keeper);
+        vm.expectRevert(VaultLib.InvalidBacking.selector);
+        m.build(UNITS, planned, 0, h);
+
+        // Owner pulls one pack: it returns, and relisting it is refused, not stuck.
+        uint256[] memory ids = TestVaultOps.open(m);
+        vm.prank(alice);
+        m.unlistForWithdrawal(_first(ids));
+        assertEq(m.idlePackCount(), 1);
+        h = m.configurationHash();
+        vm.prank(keeper);
+        vm.expectRevert();
+        m.list(planned, 0, h);
+
+        // Exit the rest unpaid, then every pack and every wei leaves.
+        vm.prank(alice);
+        m.setExiting(true);
+        ids = TestVaultOps.open(m);
+        vm.prank(bob);
+        assertEq(TestVaultOps.unlist(m, ids, 0), 0, "exit work is unpaid");
+        assertEq(m.openListingCount(), 0);
+        assertEq(m.idlePackCount(), 3);
+        vm.prank(alice);
+        m.withdrawPacks(alice, 3);
+        uint256 cash = address(m).balance;
+        assertGe(cash, backing, "every backing returned");
+        vm.prank(alice);
+        m.withdraw(alice, cash);
+        (uint256 tracked, uint256 idle,,,,) = m.totals();
+        assertEq(tracked + idle + address(m).balance, 0, "empty book, empty balance");
+    }
+
+    function _first(uint256[] memory ids) internal pure returns (uint256[] memory one) {
+        one = new uint256[](1);
+        one[0] = ids[0];
+    }
+
     function test_pauseStopsBuildsNotMaintenance() public {
         PackManager m = _create(alice, 1 ether);
         _build(m, 2);
@@ -300,12 +553,11 @@ contract ForkManagerTest is ForkBase {
         m.build(UNITS, quotes, 0, _expected1);
         // Stopping paid automation: zero budgets. Strategy work then pays nothing.
         VaultLib.Params memory p = managerParams();
-        (p.routineCap, p.routineRate, p.essentialCap, p.essentialRate) = (0, 0, 0, 0);
+        (p.routineCap, p.routineRate) = (0, 0);
         bytes32 _expected2 = TestVaultOps.configurationHash(m);
         vm.prank(alice);
         m.setParams(p, _expected2);
-        (uint256 r, uint256 e) = m.budget();
-        assertEq(r + e, 0);
+        assertEq(m.budget(), 0);
         vm.prank(alice);
         m.setListingPaused(false);
         uint256 k0 = keeper.balance;
@@ -502,7 +754,7 @@ contract ForkManagerSelectionTest is Test {
         replayParams.maxTip = 0;
         bytes32 _expected24 = TestVaultOps.factoryHash(factory, replayParams);
         vm.prank(owner);
-        m = factory.create{value: 2 ether}(owner, replayParams, _expected24);
+        m = factory.create{value: 2 ether}(owner, replayParams, ANY_DESIGN, _expected24);
         (, uint256 target, bool ok) = m.edge(6);
         assertTrue(ok);
         assertEq(target, BACKING, "exact backing the replayed word was found for");
@@ -631,6 +883,35 @@ contract ForkManagerSelectionTest is Test {
         assertEq(SHAPES.totalSupply(), supply, "reuse mints nothing");
         assertEq(m.openListingCount(), 1);
         assertEq(m.idlePackCount(), 0);
+    }
+
+    /// @dev Removal while a listing is allocated: the real settlement still completes and syncs,
+    ///      the returned pack cannot relist, and the owner still takes it out.
+    function test_dewhitelistedDuringSelectionStillSettles() public {
+        _select();
+        address[] memory cols = new address[](1);
+        cols[0] = address(PACKS);
+        vm.prank(IOwnable(address(FWA)).owner());
+        IFwaPurchaser(address(FWA)).setCollectionsWhitelisted(cols, false);
+        assertFalse(FWA.canDeposit(address(PACKS)));
+        (,,, uint256 packId,,,,,,,) = FWA.listings(selected);
+        vm.prank(PURCHASER);
+        IFwaPurchaser(address(FWA)).acceptDepositorBid(selected);
+        bytes32 h = m.configurationHash();
+        vm.prank(keeper);
+        m.sync(_one(selected), 0, 0, h);
+        assertEq(m.openListingCount(), 0);
+        assertEq(m.idlePackCount(), 1, "pack back in inventory");
+        (,, bool admitted) = m.edge(6);
+        assertFalse(admitted, "no relist after removal");
+        vm.prank(owner);
+        m.withdrawPacks(owner, 1);
+        assertEq(PACKS.ownerOf(packId), owner, "owner recovers the pack");
+        uint256 cash = address(m).balance;
+        vm.prank(owner);
+        m.withdraw(owner, cash);
+        (uint256 tracked, uint256 idle,,,,) = m.totals();
+        assertEq(tracked + idle + address(m).balance, 0, "empty book, empty balance");
     }
 
     /// @dev A silent purchaser: after the settlement window the manager reclaims B (1 - s), which

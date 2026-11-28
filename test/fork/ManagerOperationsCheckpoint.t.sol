@@ -44,7 +44,7 @@ contract ManagerOperationsCheckpointTest is MainRenewalBase {
         p = super.parameters();
         p.essentialCeiling = 0.5 gwei;
         p.routineCap = 0.03 ether;
-        p.essentialCap = 0.01 ether;
+
         p.tvlCap = 0;
         p.minDeposit = 0.01 ether;
         p.minDistribution = 0.01 ether;

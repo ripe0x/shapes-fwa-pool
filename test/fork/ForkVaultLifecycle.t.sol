@@ -163,15 +163,14 @@ contract ForkVaultLifecycleTest is ForkBase {
         assertGe(got, (inflow - mintFees - allPay) * (shares) / supply - charge);
         payBeforeLast;
         // Ten packs built in three batches (4 + 4 + 2), one unlist of ten, one liquidation of ten packs
-        // (20 Shapes burned). Only two checkpoints have requester funding; the final fill's pool is 0.
+        // (20 Shapes burned). The unlist covers a redemption shortfall and the liquidation is exit work:
+        // both are unpaid. Only two checkpoints have requester funding; the final fill's pool is 0.
         uint256 quotedGas = 3 * GasQuotes.Q_BUILD + 10 * (GasQuotes.buildGas(2) + GasQuotes.Q_LISTED)
-            + GasQuotes.Q_UNLIST + 10 * GasQuotes.Q_UNLISTED
-            + GasQuotes.Q_LIQUIDATE + 10 * GasQuotes.Q_LIQ_PACK + 20 * GasQuotes.Q_REDEEM_SHAPE
             + 2 * GasQuotes.Q_CHECKPOINT;
-        // Work units: 20 (2 per built pack) + 10 unlisted + 10 liquidated + 2 checkpoints = 42.
+        // Work units: 20 (2 per built pack) + 2 checkpoints = 22 (exit unlist and liquidation are unpaid).
         (uint256 actualPaid, uint256 serviceUnits, uint256 verifiedCaps) = MeasuredPay.total(vault, keeper, 0.2 gwei);
         assertEq(allPay, actualPaid, "all keeper cash equals actual payment events");
-        assertEq(serviceUnits, 42, "actual paid work units across the complete round trip");
+        assertEq(serviceUnits, 22, "actual paid work units across the complete round trip");
         assertEq(verifiedCaps, quotedGas, "each verified call retains its independent work cap");
         emit log_named_uint("complete holder round-trip keeper pay wei", allPay);
     }

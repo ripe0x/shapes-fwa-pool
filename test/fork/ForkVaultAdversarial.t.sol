@@ -441,13 +441,7 @@ contract ForkVaultAdversarialTest is ForkBase {
         bytes32 _expected25 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(VaultLib.InsufficientBacking.selector);
         vault.build(UNITS, planned16, 0, _expected25);
-        uint256[] memory planned15 = TestVaultOps.proposals(vault, 1, UNITS);
-        // Gas: at 3 gwei (under the 5 gwei ceiling) a pack's build cost exceeds one cycle's net.
-        vm.fee(3 gwei);
-        vm.txGasPrice(3 gwei);
-        bytes32 _expected26 = TestVaultOps.configurationHash(vault);
-        vm.expectRevert(VaultLib.InvalidBacking.selector);
-        vault.build(UNITS, planned15, 0, _expected26);
+        // Gas is not a build gate (VaultLib._profitable): one pack fits the capital and builds.
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
         TestVaultOps.restock(vault, 1, UNITS, 0);

@@ -24,7 +24,7 @@ contract ScanGasTest is ForkBase {
     function setUp() public override {
         super.setUp();
         VaultLib.Params memory p = vault.getParams();
-        p.payMarkupBps = 0;
+
         p.gasCeiling = 0.5 gwei;
         p.essentialCeiling = 2 gwei;
         bytes32 _expected0 = TestVaultOps.configurationHash(vault);
@@ -200,7 +200,7 @@ contract ScanPaidGasTest is SelectionBase {
         assertGe(backlog, 2, "scan triggers for one own listing");
 
         VaultLib.Params memory p = vault.getParams();
-        p.payMarkupBps = 0;
+
         p.workFee = 0;
         p.maxTip = 0;
         bytes32 _expected1 = TestVaultOps.configurationHash(vault);

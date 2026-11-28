@@ -178,7 +178,6 @@ def main():
             calibrated = packet['calibrationOverride'] is not None
             assert meter['gasPrice'] == (min(price, calibration['gasCeilingWei']) if calibrated else price)
             expected = (min(meter['measuredGas'], meter['gasAllowance']) + settings['gasSchedule']['overhead']) * meter['gasPrice']
-            expected = expected * (10_000 + (0 if meter['essential'] else settings['payMarkupBps'])) // 10_000
             expected += meter['workUnits'] * settings['workFeeWei']
             assert compensation == expected
             if not calibrated:

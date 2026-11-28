@@ -133,7 +133,7 @@ def main():
     def apply_candidate(mode=0,zero=False):
         settings=copy.deepcopy(candidate);settings['renewalMode']=mode
         if zero:
-            for key in ('routineCapWei','routineRatePerDayWei','essentialCapWei','essentialRatePerDayWei'):settings[key]=0
+            for key in ('routineCapWei','routineRatePerDayWei'):settings[key]=0
         send(owner.address,manager,f'setParams({PARAMS_T},bytes32)',[PARAMS_T,'bytes32'],[params_values(settings),config()],'setParams')
         assert rpc('eth_call',dict(to=manager,data=calldata('getParams()')),'latest').lower()=='0x'+encode([PARAMS_T],[params_values(settings)]).hex()
         if number(SHAPES,'mintFee()')!=500000000000000:
@@ -188,8 +188,7 @@ def main():
         if operation=='syncCombined':return (sync+journal+selected+synced+pruned)*price+work
         if operation=='list':return (q['list']+q['listed'])*price+work
         if operation=='build':return build*price+2*work
-        if operation=='renew':return (build+q['liquidate']+q['liquidatePack']+3*q['redeemShape'])*price+3*work
-        raise ValueError(operation)
+        raise ValueError(operation)  # 'renew' is retired (reuse-only strategy)
     def explicit(step,label):
         parent=prime();client.RPC=url
         state_path=work/f'{branch}-{label}-tx.json';assert not state_path.exists()

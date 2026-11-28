@@ -8,8 +8,8 @@ Normal work is paid for bounded measured gas. Verified counts cap the gas span; 
 overhead covers the unmetered transaction tail. Quotes are maximum envelopes.
 The keeper estimates the exact signed calldata, pads 25%, enforces the transaction cap, simulates
 minPay and inspects receipt status. Receipt gasUsed is the keeper expense; the gasleft span is gross before refunds. Both must be
-reported. Actual compensation also respects tx.gasprice, class ceiling, configured priority, routine
-markup, actual service units and source/cash/budget limits.
+reported. Actual compensation also respects tx.gasprice, class ceiling, configured priority,
+actual service units and source/cash/budget limits (exit work is unpaid).
 Configuration hydration and pending preflight must agree. Each receipt triggers a fresh read/plan.
 
 ```sh

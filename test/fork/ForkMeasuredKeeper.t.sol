@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {ANY_DESIGN} from "../utils/TestVaultOps.sol";
 import {ForkBase} from "./ForkBase.sol";
 import {MainRenewalBase, IFwaSettle} from "./ForkMainRenewal.t.sol";
 import {PackVault} from "../../src/PackVault.sol";
@@ -21,7 +22,7 @@ contract ForkMeasuredKeeperTest is ForkBase {
         p.reserve = 0.005 ether;
         p.gasCeiling = 0.5 gwei;
         p.essentialCeiling = 0.1 gwei;
-        p.payMarkupBps = 1_000;
+
         p.gasSchedule.build = 1;
         p.gasSchedule.buildPack = 0;
         p.gasSchedule.buildShape = 0;
@@ -32,7 +33,7 @@ contract ForkMeasuredKeeperTest is ForkBase {
 
     function manager(VaultLib.Params memory p) private returns (PackManager m) {
         PackManagerFactory factory = new PackManagerFactory(FWA, SHAPES, PACKS);
-        m = factory.create{value: 1 ether}(owner, p, factory.configHashFor(p));
+        m = factory.create{value: 1 ether}(owner, p, ANY_DESIGN, factory.configHashFor(p));
     }
 
     function proposals() private pure returns (uint256[] memory ids) {
@@ -82,21 +83,21 @@ contract ForkMeasuredKeeperTest is ForkBase {
         uint256 before = address(m).balance;
         uint256 supply = SHAPES.totalSupply();
         uint256 paid = this.buildAt(m, 0.16 gwei, 0);
-        // 100001 gas x .16 gwei x 1.1 + two actual work fees; not the .20 gwei envelope.
-        assertEq(paid, 57_600_176_000_000, "absolute bounded actual-price payment");
+        // 100001 gas x .16 gwei + two actual work fees (no markup); not the .20 gwei envelope.
+        assertEq(paid, 56_000_160_000_000, "absolute bounded actual-price payment");
         assertGt(measurement(address(m), 1, 0.16 gwei, 2, false), 1);
         assertEq(before - address(m).balance, 0.24 ether + 0.003 ether + paid);
         assertEq(SHAPES.totalSupply() - supply, 3, "real three paid primary mints");
         assertGt(m.quote(1, 2, false), paid, "quote remains a ceiling independent of caller bid");
     }
 
-    function test_priceAndEssentialMarkupLimitsApplyToMeasuredPayment() public {
+    function test_priceCeilingAppliesAndExitWorkIsUnpaid() public {
         PackManager m = manager(params());
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.7 gwei);
         // The account reimburses only .15 base + .05 tip, even when the caller bids more.
         uint256 paid = this.buildAt(m, 0.7 gwei, 0);
-        assertEq(paid, 62_000_220_000_000);
+        assertEq(paid, 60_000_200_000_000);
         assertGt(measurement(address(m), 1, 0.2 gwei, 2, false), 1);
         uint256 id = m.openListingAt(0);
         uint256[] memory ids = new uint256[](1);
@@ -105,9 +106,8 @@ contract ForkMeasuredKeeperTest is ForkBase {
         if (FWA.topListingId() == id) vm.warp(vm.getBlockTimestamp() + 12 hours);
         vm.fee(0.15 gwei); vm.txGasPrice(0.7 gwei);
         paid = this.unlistAt(m, ids);
-        // Essential ceiling .1 gwei; no routine 10% markup; one actual unlisting fee.
-        assertEq(paid, 30_000_100_000_000);
-        assertGt(measurement(address(m), 1, 0.1 gwei, 1, true), 1);
+        // Exit work (wind-down unlist) is unpaid: the pack still returns to idle inventory.
+        assertEq(paid, 0, "exit work pays the keeper nothing");
         assertEq(m.idlePackCount(), 1);
     }
 
@@ -128,7 +128,7 @@ contract ForkMeasuredKeeperTest is ForkBase {
         assertLt(paid, envelope / 2, "unused allowance is not paid");
         uint256 measured = measurement(address(m), 16_000_000, 0.2 gwei, 2, false);
         assertLt(measured, 16_000_000);
-        assertEq(paid, (measured + 100_000) * 0.2 gwei * 11_000 / 10_000 + 2 * p.workFee);
+        assertEq(paid, (measured + 100_000) * 0.2 gwei + 2 * p.workFee);
         assertEq(m.openListingCount(), 1);
     }
 
@@ -137,16 +137,14 @@ contract ForkMeasuredKeeperTest is ForkBase {
         uint256 supply = SHAPES.totalSupply();
         uint256 active = FWA.activeListingCount();
         uint256 cash = address(m).balance;
-        (uint256 routine, uint256 essential) = m.budget();
+        uint256 routine = m.budget();
         vm.expectRevert(VaultLib.Payment.selector);
         this.buildAt(m, 0.2 gwei, 62_000_220_000_001);
         assertEq(SHAPES.totalSupply(), supply);
         assertEq(FWA.activeListingCount(), active);
         assertEq(address(m).balance, cash);
         assertEq(m.openListingCount(), 0);
-        (uint256 afterRoutine, uint256 afterEssential) = m.budget();
-        assertEq(afterRoutine, routine);
-        assertEq(afterEssential, essential);
+        assertEq(m.budget(), routine);
     }
 
     function test_noVerifiedWorkEarnsNoOverheadAndRecoveryStaysUnpaid() public {

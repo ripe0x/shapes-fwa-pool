@@ -83,18 +83,17 @@ library ScanLib {
 
     function _checkBounds(VaultLib.Params storage p) private view {
         if (
-            p.minEdgeBps > VaultLib.MAX_MIN_EDGE_BPS || p.bufferBps > VaultLib.MAX_BUFFER_BPS || p.distributionBps > VaultLib.MAX_DISTRIBUTION_BPS
-                || p.payMarkupBps > VaultLib.MAX_PAY_MARKUP_BPS || p.workFee > VaultLib.MAX_WORK_FEE || p.keeperShareBps > VaultLib.MAX_KEEPER_SHARE_BPS
+            p.minEdgeBps > VaultLib.MAX_MIN_EDGE_BPS || p.distributionBps > VaultLib.MAX_DISTRIBUTION_BPS
+                || p.workFee > VaultLib.MAX_WORK_FEE || p.keeperShareBps > VaultLib.MAX_KEEPER_SHARE_BPS
                 || p.upliftBoundBps > VaultLib.MAX_UPLIFT_BOUND_BPS
                 || p.gasCeiling > VaultLib.MAX_GAS_CEILING || p.essentialCeiling > VaultLib.MAX_GAS_CEILING || p.maxTip > p.gasCeiling
-                || p.routineCap > VaultLib.MAX_ROUTINE_CAP || p.routineRate > VaultLib.MAX_ROUTINE_RATE || p.essentialCap > VaultLib.MAX_ESSENTIAL_CAP
-                || p.essentialRate > VaultLib.MAX_ESSENTIAL_RATE
+                || p.routineCap > VaultLib.MAX_ROUTINE_CAP || p.routineRate > VaultLib.MAX_ROUTINE_RATE
                 || p.backingRatioBps < VaultLib.BPS || p.backingRatioBps > VaultLib.MAX_BACKING_RATIO_BPS
                 || p.minDeposit > 1 ether || p.minDistribution > 1 ether
                 || p.packUnitsMask >> (VaultLib.MAX_PACK_UNITS + 1) != 0 || p.packUnitsMask & ((1 << VaultLib.MIN_PACK_UNITS) - 1) != 0
         ) revert VaultLib.OutOfBounds();
         VaultLib.GasSchedule memory g = p.gasSchedule;
-        uint32[29] memory entries;
+        uint32[22] memory entries;
         assembly ("memory-safe") { entries := g }
         for (uint256 i; i < entries.length; ++i) if (entries[i] > VaultLib.MAX_GAS_QUOTE) revert VaultLib.OutOfBounds();
     }
@@ -110,7 +109,7 @@ library ScanLib {
         uint256 gasQ = uint256(p.gasSchedule.build) + p.gasSchedule.buildPack
             + n * p.gasSchedule.buildShape + p.gasSchedule.listed;
         uint256 compensation = VaultLib.calculatePayment(gasQ + p.gasSchedule.overhead, 2,
-            M.min(block.basefee + p.maxTip, p.gasCeiling), p.payMarkupBps, p.workFee);
+            M.min(block.basefee + p.maxTip, p.gasCeiling), p.workFee);
         openingCash = principal + backing + mintCost + compensation + p.reserve;
         expectedConfigHash = keccak256(abi.encode(p, mintFee, false, false));
     }
@@ -143,58 +142,6 @@ library ScanLib {
             if ((p.packUnitsMask >> u) & 1 == 0) continue;
             uint256 capital = u * VaultLib.UNIT * (VaultLib.BPS + p.backingRatioBps) / VaultLib.BPS;
             cost = M.max(cost, M.mulDivUp(_buildCost(p, u, mintFee), refCapital, capital));
-        }
-    }
-
-    function unwindCharge(VaultLib.Params storage p, VaultLib.Book storage b) external view returns (uint256 cost) {
-        if (p.essentialCap == 0) return 0;
-        uint256 refCapital = VaultLib.refUnits(p) * VaultLib.UNIT * (VaultLib.BPS + p.backingRatioBps) / VaultLib.BPS;
-        uint256 count;
-        uint256 largestUnits;
-        uint256 ordinaryValue;
-        for (uint256 u = 1; u <= VaultLib.MAX_PACK_UNITS; ++u) {
-            uint256 n = b.recipeCounts[u];
-            if (n == 0) continue;
-            count += n;
-            largestUnits = u;
-            ordinaryValue += n * u * VaultLib.UNIT;
-        }
-        uint256 capital = b.trackedValue + b.activeBacking;
-        uint256 recoveryPacks = b.recoveryPacks.length;
-        if ((count != 0 || recoveryPacks != 0) && capital != 0) {
-            // Full bounded calls fit this many packs even in an arbitrarily interleaved LIFO
-            // book. Per-recipe grouped batch counts can underquote that actual order.
-            uint256 perCall = largestUnits == 0 ? VaultLib.MAX_BATCH
-                : M.min(VaultLib.MAX_BATCH, VaultLib.MAX_LIQUIDATE_UNITS / largestUnits);
-            uint256 gasQ = b.activeCount * p.gasSchedule.unlisted + count * p.gasSchedule.liquidatePack
-                + b.ordinaryShapeCount * p.gasSchedule.redeemShape
-                + ((b.activeCount + VaultLib.MAX_BATCH - 1) / VaultLib.MAX_BATCH) * p.gasSchedule.unlist
-                + ((count + perCall - 1) / perCall) * p.gasSchedule.liquidate;
-            uint256 serviceUnits = b.activeCount + count;
-            uint256 calls = (b.activeCount + VaultLib.MAX_BATCH - 1) / VaultLib.MAX_BATCH
-                + (count + perCall - 1) / perCall;
-            if (recoveryPacks != 0) {
-                // ShapePacks rejects unbacked Shapes; every packed Shape has at least UNIT.
-                // No contents enumeration: value bounds remaining Shapes, and all remaining
-                // packs are conservatively treated as sealed, even after partial recovery.
-                uint256 shapes = (b.trackedValue - ordinaryValue) / VaultLib.UNIT;
-                uint256 chunks = (shapes + VaultLib.MAX_REDEEM_SHAPES - 1) / VaultLib.MAX_REDEEM_SHAPES
-                    + recoveryPacks - 1;
-                gasQ += shapes * p.gasSchedule.recoveryShape + recoveryPacks * p.gasSchedule.recoveryUnseal
-                    + chunks * (uint256(p.gasSchedule.liquidate) + p.gasSchedule.recoveryBase);
-                serviceUnits += chunks;
-                calls += chunks;
-            }
-            return M.mulDivUp(VaultLib.quoteCalls(p, gasQ, serviceUnits, true, calls), refCapital, capital);
-        }
-        // No ordinary book yet: compare permitted recipes using their actual mint counts.
-        for (uint256 u = VaultLib.MIN_PACK_UNITS; u <= VaultLib.MAX_PACK_UNITS; ++u) {
-            if ((p.packUnitsMask >> u) & 1 == 0) continue;
-            (, uint256 n) = VaultLib.makeup(u);
-            uint256 gasQ = uint256(p.gasSchedule.unlist) + p.gasSchedule.unlisted + p.gasSchedule.liquidate
-                + p.gasSchedule.liquidatePack + n * p.gasSchedule.redeemShape;
-            uint256 recipeCapital = u * VaultLib.UNIT * (VaultLib.BPS + p.backingRatioBps) / VaultLib.BPS;
-            cost = M.max(cost, M.mulDivUp(VaultLib.quoteCalls(p, gasQ, 2, true, 2), refCapital, recipeCapital));
         }
     }
 
@@ -239,13 +186,11 @@ library ScanLib {
         cap = ask * (VaultLib.BPS + f.oracleCeilingPremiumBps()) / VaultLib.BPS;
     }
 
-    function recoverInventory(VaultLib.Params storage p, VaultLib.Book storage b, IShapePacks packs, IShapes shapes) external returns (uint256 gasQ) {
+    function recoverInventory(VaultLib.Params storage, VaultLib.Book storage b, IShapePacks packs, IShapes shapes) external {
         uint256 id = b.recoveryPacks[b.recoveryPacks.length - 1];
-        gasQ = p.gasSchedule.recoveryBase;
         if (!b.recoveryUnsealed[id]) {
             packs.unseal(id, address(this));
             b.recoveryUnsealed[id] = true;
-            gasQ += p.gasSchedule.recoveryUnseal;
         }
         uint256 before = address(this).balance;
         uint256 supply = shapes.totalSupply();
@@ -255,7 +200,6 @@ library ScanLib {
         // No other supply mutation can interleave while this guarded vault receives that ETH.
         uint256 burned = supply - shapes.totalSupply();
         if (out == 0 || burned == 0 || burned > VaultLib.MAX_REDEEM_SHAPES) revert VaultLib.MissingInventory();
-        gasQ += burned * p.gasSchedule.recoveryShape;
         b.trackedValue -= out;
         b.idleValue -= out;
         b.idleValueOf[id] -= out;
@@ -318,17 +262,15 @@ library ScanLib {
     function initializeParams(VaultLib.Strategy storage s, VaultLib.Params memory p) external {
         s.params = p;
         _checkBounds(s.params);
-        s.budget = VaultLib.Budget(uint128(p.routineCap), uint128(p.essentialCap), block.timestamp);
+        s.budget = VaultLib.Budget(uint128(p.routineCap), block.timestamp);
     }
 
     function configure(VaultLib.Strategy storage s, VaultLib.Params calldata p) external {
         if (p.acceptedMintFee != s.params.acceptedMintFee) revert VaultLib.ExplicitFeeAcceptanceRequired();
-        (uint256 r, uint256 e) = VaultLib.budgetNow(s.params, s.budget);
-        s.budget = VaultLib.Budget(uint128(r), uint128(e), block.timestamp);
+        uint256 r = VaultLib.budgetNow(s.params, s.budget);
         s.params = p;
         _checkBounds(s.params);
-        s.budget.routine = uint128(M.min(r, p.routineCap));
-        s.budget.essential = uint128(M.min(e, p.essentialCap));
+        s.budget = VaultLib.Budget(uint128(M.min(r, p.routineCap)), block.timestamp);
     }
 
     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
@@ -348,7 +290,7 @@ library ScanLib {
 
 
 
-    function backingTerms(VaultLib.Params storage p, IFWAV2 f, address packs, uint256 units, uint256 mintFee, uint256)
+    function backingTerms(VaultLib.Params storage p, IFWAV2 f, address packs, uint256 units, uint256, uint256)
         external view returns (VaultLib.BackingTerms memory t)
     {
         (t.k, t.cap, t.settlementFee) = economics(f, packs);
@@ -357,13 +299,7 @@ library ScanLib {
         // must cover that mark; the incremental checkpoint guard bounds positive uplift only.
         t.floor = t.value + t.value / 19 + (t.value % 19 == 0 ? 0 : 1);
         t.desired = t.value * p.backingRatioBps / VaultLib.BPS / VaultLib.BPS * VaultLib.BPS;
-        if (t.cap != type(uint256).max) t.desired = M.min(t.desired, t.cap * (VaultLib.BPS - p.bufferBps) / VaultLib.BPS);
-        uint256 gasQ = uint256(p.gasSchedule.sync) + p.gasSchedule.journal + p.gasSchedule.selected
-            + p.gasSchedule.synced + p.gasSchedule.pruned + p.gasSchedule.fund + p.gasSchedule.harvested
-            + p.gasSchedule.credit;
-        t.initialCost = VaultLib.quote(p, gasQ, 1, false) + _buildCost(p, units, mintFee);
-        t.cycleCost = VaultLib.quote(p, gasQ, 1, false)
-            + VaultLib.quote(p, uint256(p.gasSchedule.list) + p.gasSchedule.listed, 1, false);
+        if (t.cap != type(uint256).max) t.desired = M.min(t.desired, t.cap);
         t.ok = t.cap != 0 && t.k >= 1e18 + uint256(p.minEdgeBps) * 1e14 && t.desired >= t.floor
             && VaultLib._profitable(t, t.desired, false);
         if (!t.ok) t.desired = 0;

@@ -2,31 +2,31 @@
 import re
 
 PARAM_FIELDS = [
-    ('minEdgeBps', 'uint16'), ('bufferBps', 'uint16'), ('distributionBps', 'uint16'),
-    ('payMarkupBps', 'uint16'), ('keeperShareBps', 'uint16'), ('upliftBoundBps', 'uint16'),
+    ('minEdgeBps', 'uint16'), ('distributionBps', 'uint16'),
+    ('keeperShareBps', 'uint16'), ('upliftBoundBps', 'uint16'),
     ('packUnitsMask', 'uint64'), ('gasCeilingWei', 'uint64'), ('essentialCeilingWei', 'uint64'),
     ('maxTipWei', 'uint64'), ('workFeeWei', 'uint64'), ('routineCapWei', 'uint64'),
-    ('routineRatePerDayWei', 'uint64'), ('essentialCapWei', 'uint64'), ('essentialRatePerDayWei', 'uint64'),
+    ('routineRatePerDayWei', 'uint64'),
     ('reserveWei', 'uint128'), ('tvlCapWei', 'uint128'), ('backingRatioBps', 'uint32'),
     ('acceptedMintFeeWei', 'uint64'),
     ('minDepositWei', 'uint64'), ('minDistributionWei', 'uint64'),
 ]
 GAS_FIELDS = ('checkpoint allocationEntry allocationRead build buildPack buildShape list listed sync requiredTail '
-              'distributionProof journal scan selected synced pruned unlist unlisted liquidate liquidatePack '
-              'redeemShape recoveryBase recoveryShape recoveryUnseal harvest harvested credit fund overhead').split()
+              'distributionProof journal scan selected synced pruned unlist unlisted '
+              'harvested credit fund overhead').split()
 GAS_T = '(' + ','.join(['uint32'] * len(GAS_FIELDS)) + ')'
 PARAMS_T = '(' + ','.join([t for _, t in PARAM_FIELDS] + [GAS_T]) + ')'
 PARAMS_ORDER = [k for k, _ in PARAM_FIELDS]
 GAS_DEFAULTS = dict(zip(GAS_FIELDS, (
     500_000, 6_000, 30_000, 360_000, 300_000, 130_000, 280_000, 825_000,
     125_000, 120_000, 80_000, 22_000, 30_000, 180_000, 120_000, 45_000,
-    340_000, 285_000, 75_000, 80_000, 35_000, 100_000, 35_000, 70_000,
-    125_000, 80_000, 40_000, 40_000, 100_000)))
+    340_000, 285_000,
+    80_000, 40_000, 40_000, 100_000)))
 GAS_KEYS = dict(zip(GAS_FIELDS, (
     'checkpoint', 'allocation_entry', 'allocation_read', 'build', 'build_pack', 'build_shape',
     'list', 'listed', 'sync', 'journal_tail', 'distribution_proof', 'journal', 'scan', 'selected',
-    'synced', 'pruned', 'unlist', 'unlisted', 'liquidate', 'liq_pack', 'redeem_shape',
-    'recovery_base', 'recovery_shape', 'recovery_unseal', 'harvest', 'harvested', 'sync_credit', 'sync_funding', 'overhead')))
+    'synced', 'pruned', 'unlist', 'unlisted',
+    'harvested', 'sync_credit', 'sync_funding', 'overhead')))
 
 
 def params_values(values):
@@ -64,6 +64,19 @@ def configuration_hash(values, live_mint_fee, listing_paused=False, winding_down
     from eth_abi import encode
     from eth_utils import keccak
     return '0x' + keccak(encode([PARAMS_T, 'uint256', 'bool', 'bool'], [params_values(values), live_mint_fee, listing_paused, winding_down])).hex()
+
+
+def full_design(values):
+    """PackAccount.design with the maximum 255 packs of every size packUnitsMask admits."""
+    return sum(0xFF << (8 * u) for u in range(3, 31) if (int(values['packUnitsMask']) >> u) & 1)
+
+
+def factory_configuration_hash(values, live_mint_fee, implementation):
+    """PackManagerFactory.configHashFor: the creation's settings bound to the implementation it clones."""
+    from eth_abi import encode
+    from eth_utils import keccak
+    return '0x' + keccak(encode([PARAMS_T, 'uint256', 'bool', 'bool', 'address'],
+                                [params_values(values), live_mint_fee, False, False, implementation])).hex()
 
 
 def guarded_call(sig, args, read):

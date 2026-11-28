@@ -116,7 +116,7 @@ abstract contract SelectionBase is Test {
         p.minDeposit = 0.01 ether;
         p.minDistribution = 0.01 ether;
         p.minEdgeBps = 100;
-        p.payMarkupBps = 0;
+
         p.maxTip = 0.05 gwei;
         p.keeperShareBps = 2_500;
         p.upliftBoundBps = 200;
@@ -128,8 +128,8 @@ abstract contract SelectionBase is Test {
         p.tvlCap = 100 ether;
         p.routineCap = 0.3 ether; // bytecode maxima: these suites test mechanics, not budgets
         p.routineRate = 0.01 ether;
-        p.essentialCap = 0.1 ether;
-        p.essentialRate = 0.005 ether;
+
+
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
         vm.deal(address(this), 10 ether);

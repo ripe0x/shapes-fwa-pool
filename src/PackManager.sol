@@ -43,20 +43,22 @@ contract PackManager is PackAccount {
 
     uint256 private constant PACK_CONTENTS_GAS = 150_000;
 
-    constructor(IFWAV2 fwa_, IShapes shapes_, IShapePacks packs_) PackAccount(fwa_, shapes_, packs_) {
-        factory = msg.sender;
+    /// @dev `factory_` lets a later implementation be deployed by anyone and bound to an existing factory.
+    constructor(IFWAV2 fwa_, IShapes shapes_, IShapePacks packs_, address factory_) PackAccount(fwa_, shapes_, packs_) {
+        factory = factory_;
         _initialized = true; // the implementation itself can never be initialized
     }
 
     /// @notice Set the owner, parameters (within bytecode bounds), and approve
     ///         FWA for pack listings. Once, by the factory, in the clone's creation transaction.
-    function initialize(address owner_, VaultLib.Params calldata p) external payable {
+    function initialize(address owner_, VaultLib.Params calldata p, uint256 design_) external payable {
         if (msg.sender != factory) revert Unauthorized();
         if (_initialized) revert AlreadyInitialized();
         _initialized = true;
         // Neither the factory nor the manager itself can act as an owner: funds would lock.
         if (owner_ == msg.sender || owner_ == address(this)) revert Unauthorized();
         _initStrategy(owner_, p);
+        _setDesign(design_);
     }
 
     // ------------------------------------------------------------------ account hooks
@@ -143,10 +145,6 @@ contract PackManager is PackAccount {
             if (actualValue != value) revert InvalidPack();
             if (holder == msg.sender) packs.transferFrom(msg.sender, address(this), packId);
             VaultLib.addInventory(b, packId, value);
-            // addInventory assumes one .01 Shape per unit for ordinary external returns.
-            if (value <= VaultLib.MAX_PACK_UNITS * VaultLib.UNIT) {
-                b.ordinaryShapeCount = b.ordinaryShapeCount - b.packShapeCount[packId] + contents.length;
-            }
             b.packShapeCount[packId] = contents.length;
             emit PackImported(packId, value, contents.length);
         }
@@ -195,7 +193,7 @@ contract PackManager is PackAccount {
     }
 
     /// @notice Exit mode: pauses listing and lets anyone unlist every Active position and
-    ///         liquidate idle packs (essential work, paid only if the essential budget allows).
+    ///         liquidate idle packs. This exit work is unpaid; callers cover their own gas.
     ///         Reversible; leaving exit mode keeps listing paused until the owner resumes it.
     function setExiting(bool exiting) external onlyOwner {
         s.windingDown = exiting;

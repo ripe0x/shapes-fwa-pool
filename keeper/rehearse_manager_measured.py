@@ -18,7 +18,7 @@ import time
 import urllib.request
 from eth_abi import decode, encode
 from eth_utils import keccak, to_checksum_address
-from config import PARAMS_T, params_values
+from config import PARAMS_T, full_design, params_values
 from rehearse_manager_r2 import ROOT, PUBLIC, FWA, SHAPES, PACKS, sources
 
 OUT = ROOT / 'docs/receipts/manager-measured-receipts.json'
@@ -229,11 +229,11 @@ def main():
             actual_settings = read(target,'getParams()',returns=(PARAMS_T,))[0]
             from config import PARAM_FIELDS,GAS_FIELDS
             p=dict(zip((k for k,_ in PARAM_FIELDS),actual_settings[:-1]));g=dict(zip(GAS_FIELDS,actual_settings[-1]))
-            overhead=g['overhead'];markup=0 if meter['essential'] else p['payMarkupBps']
-            expected=(min(meter['measuredGas'],meter['gasAllowance'])+overhead)*price*(10000+markup)//10000+meter['workUnits']*p['workFeeWei']
+            overhead=g['overhead']
+            expected=(min(meter['measuredGas'],meter['gasAllowance'])+overhead)*price+meter['workUnits']*p['workFeeWei']
             assert compensation==expected, 'actual receipt compensation differs from recorded meter/configuration'
             assert compensation>=row['gasCostWei'], ('unsubsidized keeper loss',row['operation'],compensation,row['gasCostWei'])
-            row.update(measuredWork=meter,overhead=overhead,markupBps=markup,workFeeWei=p['workFeeWei'],
+            row.update(measuredWork=meter,overhead=overhead,workFeeWei=p['workFeeWei'],
                 simulatedCompensationWei=simulated,minimumPaymentWei=floor,keeperNetWei=compensation-row['gasCostWei'])
         else:
             assert compensation==0 and not meters, 'owner work must not earn keeper rewards'
@@ -305,6 +305,19 @@ def main():
             assert read(manager,'owner()',returns=('address',))[0].lower()==owner.lower()
             setup_actor(owner,5*10**18,'manager owner')
             factory=read(manager,'factory()',returns=('address',))[0];report.update(factory=factory,manager=manager,owner=owner,keeper=keeper)
+            # Fee setup: the authenticated checkpoint block runs the live Shapes fee at 0.001 ETH, but
+            # current mainnet and this candidate accept 0.0005. Lower the fork's live fee to the accepted
+            # value via the real Shapes admin (builds need live <= accepted), then explicitly accept it on
+            # the manager, so setParams (which refuses to change acceptedMintFee) matches. Fork-only admin.
+            accepted=settings['acceptedMintFeeWei']
+            if number(SHAPES,'mintFee()')!=accepted:
+                shapes_admin=to_checksum_address(read(SHAPES,'admin()',returns=('address',))[0])
+                setup_actor(shapes_admin,10**18,'actual mint admin')
+                send(shapes_admin,SHAPES,'setMintFee(uint256)',['uint256'],[accepted],operation='setMintFee')
+                assert number(SHAPES,'mintFee()')==accepted
+                report['liveMintFeeAdminAdjusted']=dict(fromWei=meta['mintFeeWei'],toWei=accepted)
+                report['limitations'].append('Fork setup: the checkpoint-block live Shapes mint fee (0.001 ETH) was lowered to the accepted 0.0005 ETH by the real Shapes admin before configuration, matching current mainnet. This is a historical fork alignment, not a candidate economic input.')
+            send(owner,manager,'acceptMintFee(uint64,bytes32)',['uint64','bytes32'],[accepted,config(manager)],operation='acceptMintFee')
             send(owner,manager,f'setParams({PARAMS_T},bytes32)',[PARAMS_T,'bytes32'],[params_values(settings),config(manager)])
         else:
             assert rpc('eth_chainId')=='0x7a69' and rpc('anvil_nodeInfo')['hardFork']=='Osaka'
@@ -328,6 +341,12 @@ def main():
                 compensationWei=0,transaction=tx_setup,receipt=receipt))
             report['setupRecoveredWithoutResubmission']=h
             save()
+        # Canonical backing for the current config (backingRatioBps, live fee): the account owns the
+        # ratio, so every list/build proposal must equal preview().backing within one BPS. Batches use
+        # +i*BPS offsets for the per-listing uniqueness the contract requires.
+        backing=read(factory,f'preview({PARAMS_T})',[PARAMS_T],[params_values(settings)],
+            ('uint256','uint256','uint256','uint256','uint256','bytes32'))[2]
+        report['desiredBackingWei']=backing;save()
         origin=rpc('evm_snapshot')
         for price,base in ((200000000,150000000),(500000000,450000000)):
             assert rpc('evm_revert',origin);origin=rpc('evm_snapshot')
@@ -340,16 +359,19 @@ def main():
                 ['uint256[]','uint256','uint256','bytes32'],[[meta['listing']],0,0,config(manager)],operation='sync',paid=True)
             drain_queue()
             supply=number(SHAPES,'totalSupply()');creator=number(SHAPES,'pendingFees()')
-            send(keeper,manager,'list(uint256[],uint256,bytes32)',['uint256[]','uint256','bytes32'],[[21*10**16],0,config(manager)],paid=True)
+            send(keeper,manager,'list(uint256[],uint256,bytes32)',['uint256[]','uint256','bytes32'],[[backing],0,config(manager)],paid=True)
             assert number(SHAPES,'totalSupply()')==supply and number(SHAPES,'pendingFees()')==creator
             report.setdefault('reuseProofs',[]).append(dict(branch=branch,pack=meta['pack'],shapeSupplyUnchanged=supply,creatorMintFeesAddedWei=0))
+        # Post-setup snapshot (authenticated manager, listing still open) survives to end of run;
+        # downstream sync-context / owner-exit packets revert to it on the retained node.
+        report['postSetupSnapshot']=origin;save()
         report['phase']='migration and new paid batches';save()
         send(owner,manager,'setListingPaused(bool)',['bool'],[True])
         ids=[number(manager,'openListingAt(uint256)',['uint256'],[i]) for i in range(number(manager,'openListingCount()'))]
         send(owner,manager,'unlistForWithdrawal(uint256[])',['uint256[]'],[ids])
         count=number(factory,'managerCount()')
         expected=read(factory,f'configHashFor({PARAMS_T})',[PARAMS_T],[params_values(settings)],('bytes32',))[0]
-        send(owner,factory,f'create(address,{PARAMS_T},bytes32)',['address',PARAMS_T,'bytes32'],[owner,params_values(settings),expected],operation='create')
+        send(owner,factory,f'create(address,{PARAMS_T},uint256,bytes32)',['address',PARAMS_T,'uint256','bytes32'],[owner,params_values(settings),full_design(settings),expected],operation='create')
         destination=read(factory,'managerAt(uint256)',['uint256'],[count],('address',))[0]
         report['destination']=destination
         send(owner,destination,'setListingPaused(bool)',['bool'],[True])
@@ -375,7 +397,7 @@ def main():
         report['migration']['cashTransferredWei']=cash
         assert not any(state(manager).values())
         send(owner,destination,'setListingPaused(bool)',['bool'],[False])
-        send(keeper,destination,'list(uint256[],uint256,bytes32)',['uint256[]','uint256','bytes32'],[[21*10**16],0,config(destination)],paid=True)
+        send(keeper,destination,'list(uint256[],uint256,bytes32)',['uint256[]','uint256','bytes32'],[[backing],0,config(destination)],paid=True)
         assert number(SHAPES,'totalSupply()')==supply and number(SHAPES,'pendingFees()')==creator
         report['migration']['relistedWithoutRemint']=True
         report['retainedMigrationSnapshot']=rpc('evm_snapshot')
@@ -386,32 +408,44 @@ def main():
             branch=f'paid-batches-{price}';report['phase']=branch;save()
             index=number(factory,'managerCount()')
             expected=read(factory,f'configHashFor({PARAMS_T})',[PARAMS_T],[params_values(settings)],('bytes32',))[0]
-            send(owner,factory,f'create(address,{PARAMS_T},bytes32)',['address',PARAMS_T,'bytes32'],[owner,params_values(settings),expected],operation='create',value=3*10**18)
+            send(owner,factory,f'create(address,{PARAMS_T},uint256,bytes32)',['address',PARAMS_T,'uint256','bytes32'],[owner,params_values(settings),full_design(settings),expected],operation='create',value=3*10**18)
             target=read(factory,'managerAt(uint256)',['uint256'],[index],('address',))[0]
             opening=rpc('evm_snapshot')
             before_supply=number(SHAPES,'totalSupply()');before_fees=number(SHAPES,'pendingFees()')
-            send(keeper,target,'build(uint256,uint256[],uint256,bytes32)',['uint256','uint256[]','uint256','bytes32'],[3,[21*10**16],0,config(target)],operation='build',paid=True)
+            send(keeper,target,'build(uint256,uint256[],uint256,bytes32)',['uint256','uint256[]','uint256','bytes32'],[3,[backing],0,config(target)],operation='build',paid=True)
             assert number(SHAPES,'totalSupply()')-before_supply==3
             assert number(SHAPES,'pendingFees()')-before_fees==3*number(SHAPES,'mintFee()')
             assert rpc('evm_revert',opening)
             for offset in (0,4):
-                proposals=[21*10**16+i*10000 for i in range(offset,offset+4)]
+                proposals=[backing+i*10000 for i in range(offset,offset+4)]
                 send(keeper,target,'build(uint256,uint256[],uint256,bytes32)',['uint256','uint256[]','uint256','bytes32'],[3,proposals,0,config(target)],operation='build',paid=True,count=4)
             ids=[number(target,'openListingAt(uint256)',['uint256'],[i]) for i in range(8)]
             send(owner,target,'setExiting(bool)',['bool'],[True])
-            # One paid eight-pack withdrawal creates real inventory for list1/3/8.
-            send(keeper,target,'unlist(uint256[],uint256,bytes32)',['uint256[]','uint256','bytes32'],[ids,0,config(target)],operation='unlist',paid=True,count=8)
+            # One unpaid eight-pack withdrawal creates real inventory for list1/3/8. Exit unlist is
+            # caller-funded (D86): minPay 0, keeper paid 0, billed gas recorded as an owner-expense sample.
+            send(keeper,target,'unlist(uint256[],uint256,bytes32)',['uint256[]','uint256','bytes32'],[ids,0,config(target)],operation='unlist',paid=False,count=8)
             send(owner,target,'setExiting(bool)',['bool'],[False])
             send(owner,target,'setListingPaused(bool)',['bool'],[False])
             idle=rpc('evm_snapshot')
             for count in (1,3,8):
                 assert rpc('evm_revert',idle);idle=rpc('evm_snapshot')
-                proposals=[21*10**16+i*10000 for i in range(count)]
+                proposals=[backing+i*10000 for i in range(count)]
                 send(keeper,target,'list(uint256[],uint256,bytes32)',['uint256[]','uint256','bytes32'],[proposals,0,config(target)],operation='list',paid=True,count=count)
                 selected=[number(target,'openListingAt(uint256)',['uint256'],[i]) for i in range(count)]
                 send(owner,target,'setExiting(bool)',['bool'],[True])
-                send(keeper,target,'unlist(uint256[],uint256,bytes32)',['uint256[]','uint256','bytes32'],[selected,0,config(target)],operation='unlist',paid=True,count=count)
-                send(keeper,target,'liquidate(uint256,uint256,bytes32)',['uint256','uint256','bytes32'],[count,0,config(target)],operation='liquidate',paid=True,count=count)
+                if count==1 and price==200000000:
+                    # Exit work is unpaid: a keeper call with nonzero minPay must revert Payment (0xa33b1260).
+                    for sig,kinds,vals in (('unlist(uint256[],uint256,bytes32)',['uint256[]','uint256','bytes32'],[selected,10**12,config(target)]),
+                                           ('liquidate(uint256,uint256,bytes32)',['uint256','uint256','bytes32'],[count,10**12,config(target)])):
+                        try:
+                            rpc('eth_call',dict(to=target,data=data(sig,kinds,vals),**{'from':keeper}),'pending')
+                            raise AssertionError('exit work with nonzero minPay must revert Payment: '+sig)
+                        except RuntimeError as exc:
+                            assert '0xa33b1260' in str(exc),('expected Payment revert',sig,str(exc))
+                    report['exitUnpaidMinPayRevertsPayment']=True;save()
+                # Exit unlist and liquidate are caller-funded (D86): minPay 0, keeper paid 0, billed gas only.
+                send(keeper,target,'unlist(uint256[],uint256,bytes32)',['uint256[]','uint256','bytes32'],[selected,0,config(target)],operation='unlist',paid=False,count=count)
+                send(keeper,target,'liquidate(uint256,uint256,bytes32)',['uint256','uint256','bytes32'],[count,0,config(target)],operation='liquidate',paid=False,count=count)
         assert rpc('evm_revert',matrix)
         report['retainedMigrationSnapshot']=rpc('evm_snapshot')
         report['status']='PASS';report['elapsedSeconds']=time.monotonic()-start;save()
@@ -425,21 +459,20 @@ def main():
 
 def write_profile(report):
     assert report['status']=='PASS' and report['contractSourceSha256']==sources()
+    # Rebind to current sources from the minimal honest set: main measured packet (OUT) supplies
+    # build/list/sync/unlist/liquidate/create/setExiting/withdraw/processAcquisitions/harvest;
+    # sync-contexts supplies recover (recover_sync) + owner_sync_contexts; owner-exit supplies
+    # owner recoverUnlist/recoverLiquidate. The superseded multi-packet set is kept on disk as
+    # history but dropped here (see docs/receipts/manager-measured-verification.md for what that costs).
     paths=[OUT]
-    for name in ('manager-measured-splitting-50k.json','manager-measured-owner-exit.json',
-                 'manager-measured-sync-contexts.json','manager-measured-sync-scan-attempt2.json',
-                 'manager-measured-sync-scan-attempt3.json','manager-measured-sync-scan-one.json',
-                 'manager-measured-sync-scan-one-no-credit-blockfork.json',
-                 'manager-measured-sync-multi-two-attempt1.json',
-                 'manager-measured-sync-multi-three-blockfork.json',
-                 'manager-measured-sync-preselected-two-blockfork.json',
-                 'manager-measured-sync-multi-later-first.json',
-                 'manager-measured-sync-scan-three-blockfork.json',
-                 'manager-measured-sync-multi-two-no-credit.json',
-                 'manager-measured-owner-batch-exit.json',
-                 'manager-measured-ordinary-keeper.json','manager-measured-ordinary-relist.json'):
+    for name in ('manager-measured-sync-contexts-v4.json',
+                 'manager-measured-owner-exit-v4.json'):
         path=ROOT/'docs/receipts'/name
         if path.exists():paths.append(path)
+    if len(paths)<3:
+        # Inline call at the end of --execute: the recover packets are produced by later runs.
+        # Defer the profile build to the explicit --profile-only pass once all three exist.
+        print('profile deferred: run sync-contexts and owner-exit, then --profile-only');return
     rows={}
     for path in paths:
         packet=json.loads(path.read_text());assert packet['status']=='PASS'
@@ -465,9 +498,13 @@ def write_profile(report):
             result['single_'+name+'_gas']=baseline
             result[name+'_per_extra_work']=max([0]+[-(-(get(r)-baseline)//(r['workCount']-1)) for r in selected if r['workCount']>1])
         return result
-    paid=('build','list','sync','unlist','liquidate')
+    # D86: keeper pay only for routine build/list/sync. Exit unlist/liquidate are caller-funded and
+    # pay 0, so they carry billed-gas (owner-expense) curves, not work meters; their owner curves come
+    # from the owner-exit packet's recoverUnlist/recoverLiquidate.
+    paid=('build','list','sync')
+    unpaid_exit=('unlist','liquidate')
     aliases={'recover_sync':'recover'}
-    operations=(*paid,'create','setExiting','withdraw','recover_sync','processAcquisitions','harvest')
+    operations=(*paid,*unpaid_exit,'create','setExiting','withdraw','recover_sync','processAcquisitions','harvest')
     curves={op:curve(rows[aliases.get(op,op)],op in paid) for op in operations}
     owners={op:curve(rows[source]) for op,source in (('unlist','recoverUnlist'),('liquidate','recoverLiquidate'))}
     gas={op:c['single_billed_gas'] for op,c in curves.items()}

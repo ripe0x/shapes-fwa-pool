@@ -26,7 +26,7 @@ contract ScanSyncForeignTest is ForkBase {
     function setUp() public override {
         super.setUp();
         VaultLib.Params memory p = vault.getParams();
-        p.payMarkupBps = 0; p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei;
+ p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei;
         bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(owner); vault.setParams(p, _expected0);
         TestVaultOps.fundTo(vault, 5 ether);
@@ -151,7 +151,7 @@ contract ScanSyncSelectionTest is SelectionBase {
 
     function _clean() internal {
         VaultLib.Params memory p = vault.getParams();
-        p.payMarkupBps = 0; p.workFee = 0; p.maxTip = 0; p.keeperShareBps = 0;
+ p.workFee = 0; p.maxTip = 0; p.keeperShareBps = 0;
         vm.recordLogs();
         bytes32 _expected8 = TestVaultOps.configurationHash(vault);
         vm.prank(vault.owner()); vault.setParams(p, _expected8);
@@ -188,7 +188,7 @@ contract ScanSyncSelectionTest is SelectionBase {
         bytes32 _expected9 = TestVaultOps.configurationHash(vault);
         vm.prank(vault.owner()); vault.setParams(p, _expected9);
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
-        (uint256 routine,) = vault.budget();
+        uint256 routine = vault.budget();
         assertEq(routine, 0.00008 ether, "budget below the scan quote");
         assertLt(routine, vault.quote(SCAN_Q, 0, false), "upper envelope exceeds the budget");
         bytes32 _expected10 = TestVaultOps.configurationHash(vault);
@@ -196,7 +196,7 @@ contract ScanSyncSelectionTest is SelectionBase {
         uint256 gross = MeasuredPay.gross(vault, SCAN_Q, 0, false, 0.5 gwei);
         assertGe(gross, routine, "fixture reaches the actual budget clipping branch");
         assertEq(paid, routine, "pay is capped at the routine budget");
-        (uint256 after_,) = vault.budget();
+        uint256 after_ = vault.budget();
         assertEq(after_, 0, "budget drained to zero");
     }
 
@@ -225,7 +225,7 @@ contract ScanSyncSelectionTest is SelectionBase {
         bytes32 _expected12 = TestVaultOps.configurationHash(vault);
         vm.prank(vault.owner()); vault.setParams(p, _expected12);
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
-        (uint256 routine,) = vault.budget();
+        uint256 routine = vault.budget();
         assertEq(routine, 0, "budget exhausted");
         bytes32 _expected13 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
@@ -237,7 +237,7 @@ contract ScanSyncSelectionTest is SelectionBase {
         vm.prank(vault.owner()); vault.setParams(p, _expected14);
         vm.warp(block.timestamp + 12 hours);
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
-        (routine,) = vault.budget();
+        routine = vault.budget();
         assertGe(routine, vault.quote(SCAN_Q, 0, false), "budget refilled above the scan envelope");
         bytes32 _expected15 = TestVaultOps.configurationHash(vault);
         uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected15);
@@ -312,7 +312,7 @@ contract ScanSyncSelectionTest is SelectionBase {
     function test_j_fullRedemptionSettlesWithoutFundingPayFromLiabilities() public {
         _select(primary());
         VaultLib.Params memory p = vault.getParams();
-        p.payMarkupBps = 0; p.workFee = 0; p.maxTip = 0; p.keeperShareBps = 0;
+ p.workFee = 0; p.maxTip = 0; p.keeperShareBps = 0;
         p.gasCeiling = 0.5 gwei; p.essentialCeiling = 0.5 gwei; // pay capped at this ceiling
         bytes32 _expected20 = TestVaultOps.configurationHash(vault);
         vm.prank(vault.owner()); vault.setParams(p, _expected20);

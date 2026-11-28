@@ -1359,3 +1359,74 @@ stated wallet cap. Already burned pack NFTs cannot migrate intact. Unsupported p
 
 Earlier studies/receipts remain historical. New code needs fresh validation and unsigned artifacts;
 this decision grants no public transaction, signature, live cutover, shared vault deployment or merge.
+
+## Owner pack mix (2026-11-26)
+
+The owner asked for a pack designer like the community pool's: exact counts per pack size, presets,
+and a total-count control that scales the mix. `PackAccount.design` holds the mix in one word (byte u
+= most packs of u x 0.01 ETH held, u in 3..30); 0 means no counts and `packUnitsMask` alone decides,
+which keeps every existing caller and the pooled vault unchanged. `build` reverts once a size's held
+count (idle, listed or awaiting settlement) plus the batch would pass its count; imports and returned
+packs are never refused, and a lowered count only stops further builds. The factory gains a
+`create(owner, p, design, expected)` overload; the owner changes the mix with `setDesign`. The keeper
+builds the admitted size furthest below its count, the smaller size on a tie, never past it.
+Presets (small 0.03; balanced 2:1:1 of 0.03/0.05/0.10; large 0.10) are UI defaults, not owner rules.
+Backing stays one ratio for every size. Grants no deployment, signature or merge.
+
+## Manager backing 11053 bps (2026-11-26)
+
+New managers post backing of 11053 bps of pack value (0.033159 ETH on a 0.03 ETH pack). A kept pack
+then repays its Shapes and one 0.0005 ETH mint fee per 0.01 ETH unit (the worst Shapes makeup) even
+at FWA's immutable 5% settlement-fee cap; at today's 1% fee a kept 0.03 pack nets +0.0013 ETH. This
+supersedes 10607 bps, which broke even only at the 1% fee and lost 0.00127 ETH per kept 0.03 pack at
+5%. Cost: about 2% more capital per 0.03 pack and about 4% fewer picks per pack, with unchanged
+expected income per unit time. Owners keep the pack mix as their only design choice.
+
+## D86. Unused keeper settings removed; exits unpaid; one keeper budget (2026-11-27)
+
+The owner decided to delete contract code that was only ever left inactive at deploy, rather than
+keep dormant knobs. Removed from the shared `VaultLib.Params`: `payMarkupBps` (a percentage markup
+on routine gas pay, redundant with the flat `workFee`), `bufferBps` (a discount below the oracle
+cap; listings now use the cap directly, behaviour at 0 unchanged), and the whole essential keeper
+budget (`essentialCap`, `essentialRate`, `Budget.essential`). Routine pay is now
+`gasUnits * price + units * workFee`.
+
+Exit work — wind-down / shortfall `unlist` and `liquidate`, and recovery — is now **unpaid**: the
+work still runs and anyone may run it, the caller is paid 0, and a nonzero `minPay` on such a call
+reverts (`Payment`). This is the owner's position that "we shouldn't pay keepers for exits", and it
+makes `unwindCharge()` always 0, so redeemers are never charged for exit work (D64 generalised: the
+essential budget was already 0 in the vault's deploy config). The single remaining keeper budget is
+the routine one; `budget()` now returns just the routine amount.
+
+`essentialCeiling` is **kept**: the holder-funded redemption checkpoint path still reads it
+(`requestCharge`, `syncFunded`/`payFunded(..., essential=true)`) to price checkpoint work at its own
+ceiling from the requester's processing pool, independent of the routine budget. All vault holder
+features (distribution, redemption, claims, checkpoint) and `distributionBps` are unchanged.
+
+## D87. Factory implementation is replaceable for new managers only (A9.8, 2026-11-27)
+
+`PackManagerFactory.implementation` is a storage address the admin may change with
+`setImplementation`, following `BalancerFactory`. The deployer is the first admin; transfer is two
+steps (`transferAdmin`, `acceptAdmin`). `PackManager` takes its factory as a constructor argument, so
+anyone can deploy a replacement bound to this factory; `setImplementation` rejects one bound
+elsewhere, and its clones can only be initialized through this factory. Each clone is a fixed EIP-1167 proxy, so existing
+managers never change code, owner or settings. `configHashFor` now also binds the implementation:
+a creation reviewed against the previous implementation reverts `ConfigurationChanged`. A
+manager's own `configurationHash()` is unchanged. Trust added: the admin chooses the code future
+managers run. Tests: `ForkManager.t.sol` `test_adminChangesImplementationForNewManagersOnly`,
+`test_adminTransferIsTwoStep`.
+
+## D88. Launch-audit repairs: exact mix, same-frame gas, preview hash (2026-11-27)
+
+Launch audit of 8e9034d (A informed, B uninformed). Owner approved all four repairs.
+E1: `design == 0` meant no pack-count limit, so any caller could build with all idle ETH (0.01498
+ETH measured cost on 1 ETH with no demand). A9.5 requires exact owner counts: the three-argument
+`create` is removed and `_setDesign` rejects 0. PackVault never sets a design and is unaffected.
+E2: `measuredPayment` read `gasleft()` two delegatecall frames below the account's `gasStart`, so
+EIP-150's withheld 1/64 grew `measured` (and pay, up to the allowance) with the caller's gas limit.
+Accounts now pass gas spent across each library call and each external library entry re-anchors;
+the few thousand gas per call boundary are unmeasured and covered by `overhead`.
+I2: `preview` returned a hash without the implementation; it now returns `configHashFor`.
+I1 (app): the manager entry shows whenever a manager factory is configured, without a vault.
+Tests: `ForkManager.t.sol` `test_zeroDesignRefused`, `test_previewHashCreates`,
+`test_gasLimitDoesNotChangeMeasuredPay`.

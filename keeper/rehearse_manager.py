@@ -159,7 +159,7 @@ def main():
         assert dropped and int(dropped['status'],16)==1 and after['stats']['mined']>before['stats']['mined'] and after['head']>=before['head']
         evidence['steps'].append(dict(step='persistent replacement and lost response',stored=after,droppedHash=I.DropFirstSend.dropped[0],droppedReceipt=dropped,account=account()))
         replacement.stop();workers.remove(replacement)
-        zero=params|{'routineCapWei':0,'routineRatePerDayWei':0,'essentialCapWei':0,'essentialRatePerDayWei':0}
+        zero=params|{'routineCapWei':0,'routineRatePerDayWei':0}
         send(actors['owner'],I.MANAGER,f'setParams({PARAMS_T})',tuple_arg(zero))
         # Genuine external request: no fabricated fulfillment or protocol state.
         fee=I.num(I.rpc('eth_getBlockByNumber','pending',False)['baseFeePerGas']);fees=['--gas-price',str(2*fee+50_000_000),'--priority-gas-price','50000000']

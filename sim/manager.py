@@ -30,25 +30,24 @@ class Manager(Vault):
     def sync_budget(self, now):
         # Contract budget views accrue from the last payment/settings update, not each read.
         if not hasattr(self,'_stored_routine'):
-            self._stored_routine,self._stored_essential=self.routine_budget,self.essential_budget
+            self._stored_routine=self.routine_budget
         if now < self.budget_at:
             raise ValueError('manager time cannot precede its budget anchor')
         self._budget_now=now
         elapsed=now-self.budget_at
         self.routine_budget=min(self.routine_cap,self._stored_routine+elapsed*self.routine_rate//86400)
-        self.essential_budget=min(self.essential_cap,self._stored_essential+elapsed*self.essential_rate//86400)
 
     def _commit_budget(self):
         self.budget_at=getattr(self,'_budget_now',self.budget_at)
-        self._stored_routine,self._stored_essential=self.routine_budget,self.essential_budget
+        self._stored_routine=self.routine_budget
 
     def pay_keeper(self, amount, essential=False, cap=None, source=None):
         paid=super().pay_keeper(amount,essential,cap,source)
         self._commit_budget()
         return paid
 
-    def set_budget(self, now, routine_cap, routine_rate, essential_cap, essential_rate):
-        super().set_budget(now,routine_cap,routine_rate,essential_cap,essential_rate)
+    def set_budget(self, now, routine_cap, routine_rate):
+        super().set_budget(now,routine_cap,routine_rate)
         self._commit_budget()
 
     def free(self):

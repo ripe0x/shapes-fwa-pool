@@ -42,7 +42,14 @@ contract CompleteHarvestTest is ForkBase {
         vm.prank(IOwnable(address(FWA)).owner());
         IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         VaultLib.Params memory p = defaultParams();
-        p.payMarkupBps = 0; p.workFee = 0; p.reserve = 0; p.gasCeiling = 0.5 gwei;
+ p.workFee = 0; p.reserve = 0; p.gasCeiling = 0.5 gwei;
+        // E2 made measured keeper gas accurate, now below the default build quote, so a build would
+        // pay less than the quote and leave surplus free eth. This fixture's tests require the cash
+        // floor its comments name ("real construction spends exact opening cash", "cash shortage
+        // reached through actual construction"), so tighten the seed build's keeper quote below the
+        // measured two-pack work: the pay saturates the funding cap and construction spends all
+        // provisioned cash, exactly as the original (pre-E2) saturated build did.
+        p.gasSchedule.listed = 750_000; // baseGas 2,980,000 < measured 3,082,166, so the seed build saturates
         uint256 baseGas = uint256(p.gasSchedule.build) + 2 * (uint256(p.gasSchedule.buildPack)
             + 2 * p.gasSchedule.buildShape + p.gasSchedule.listed);
         uint256 exactOpening = 2 * (P + FEE_PER_PACK + P * p.backingRatioBps / 10_000)
@@ -200,8 +207,8 @@ contract CompleteHarvestTest is ForkBase {
         vm.roll(uint256(deadline) + 1); f.processAcquisitions(1);
         toBlackout();
         VaultLib.Params memory p = vault.getParams(); p.distributionBps = 5000;
-        p.essentialCap = 0;
-        p.essentialRate = 0;
+
+
         bytes32 _expected9 = TestVaultOps.configurationHash(vault);
         vm.prank(owner); vault.setParams(p, _expected9);
         uint256 allowance = GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_DISTRIBUTION_PROOF + GasQuotes.Q_JOURNAL;
@@ -210,7 +217,12 @@ contract CompleteHarvestTest is ForkBase {
         uint256 target = (vault.highWaterMark() * supply + 1e18 - 1) / 1e18
             + 0.02 ether + cost + GasQuotes.Q_CREDIT / 2;
         (uint256 tracked,, uint256 backing,,,) = vault.totals();
-        TestVaultOps.fundTo(vault, target - tracked - backing - FWA.pendingFees(second) - credit);
+        // E2: the earlier committing checkpoint now pays its measured work (below the charge) and
+        // leaves the unused charge in chargeRefundReserve, a liability excluded from NAV and free
+        // eth. fundTo targets NAV, so add that reserve back or the vault funds short of the gain
+        // and liquidity the distribution tail needs to qualify.
+        TestVaultOps.fundTo(vault,
+            target - tracked - backing - FWA.pendingFees(second) - credit + vault.chargeRefundReserve());
         bytes32 _expected10 = TestVaultOps.configurationHash(vault);
         uint256 paid = vault.sync(new uint256[](0), second, 1, _expected10);
         assertEq(paid, MeasuredPay.gross(vault, allowance, 0, false, 1));
@@ -227,7 +239,7 @@ contract CompleteHarvestTest is ForkBase {
         vault.sync(new uint256[](0), 0, 0, _expected12);
         uint256 nav = vault.accountedNav(first);
         uint256 pending = FWA.pendingFees(first);
-        (uint256 routine,) = vault.budget();
+        uint256 routine = vault.budget();
         uint256[] memory ids = new uint256[](1); ids[0] = first;
         vm.expectRevert(StrategyLib.Payment.selector);
         vault.harvest(ids, 1);
@@ -237,7 +249,7 @@ contract CompleteHarvestTest is ForkBase {
         assertEq(vault.harvest(ids, 0), 0);
         assertEq(address(vault).balance, cash + pending);
         assertEq(address(this).balance, keeperCash);
-        (uint256 afterRoutine,) = vault.budget();
+        uint256 afterRoutine = vault.budget();
         assertEq(afterRoutine, routine);
         assertEq(vault.accountedNav(second), nav);
     }
@@ -414,7 +426,7 @@ contract CompleteCreditTest is SelectionBase {
     function _selected(uint256 price) private {
         _select(primary());
         VaultLib.Params memory p = vault.getParams();
-        p.payMarkupBps = 0; p.workFee = 0; p.maxTip = 0;
+ p.workFee = 0; p.maxTip = 0;
         bytes32 _expected33 = TestVaultOps.configurationHash(vault);
         vm.prank(vault.owner()); vault.setParams(p, _expected33);
         vm.fee(price); vm.txGasPrice(price);

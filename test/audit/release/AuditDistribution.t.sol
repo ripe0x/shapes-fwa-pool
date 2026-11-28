@@ -19,7 +19,7 @@ contract AuditDistribution is ForkBase {
 
         p.gasCeiling = 0.5 gwei;
         p.essentialCeiling = 0.5 gwei;
-        p.payMarkupBps = 0;
+
         p.distributionBps = 5_000;
         bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);

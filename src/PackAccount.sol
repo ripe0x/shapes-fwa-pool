@@ -34,9 +34,16 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
 
     VaultLib.Strategy internal s;
     uint256 public deploymentBlock;
+    /// @notice Owner's pack mix: byte u (bits 8u to 8u+7, u in [MIN_PACK_UNITS, MAX_PACK_UNITS]) is
+    ///         the most packs of u x 0.01 ETH this account builds up to, counting every pack of that
+    ///         size it holds. 0 sets no counts: `packUnitsMask` alone decides. Imports and returned
+    ///         packs are never refused; a lowered count only stops further builds.
+    uint256 public design;
 
     event ParamsSet();
     event MintFeeAccepted(uint256 maximum);
+    event DesignSet(uint256 design);
+    error InvalidDesign();
     error ConfigurationChanged();
     error ExplicitFeeAcceptanceRequired();
 
@@ -126,7 +133,9 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
 
     function _build(uint256 units, uint256[] calldata backingProposals, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256) {
         _checkConfiguration(expected);
-        return StrategyLib.build(s, fwa, packs, shapes, units, backingProposals, minPay, gasStart);
+        if (design != 0 && (units > VaultLib.MAX_PACK_UNITS
+            || s.book.recipeCounts[units] + backingProposals.length > (design >> (units * 8)) & 0xFF)) revert VaultLib.BadBatch();
+        return StrategyLib.build(s, fwa, packs, shapes, units, backingProposals, minPay, gasStart - gasleft());
     }
 
     /// @notice Relist idle packs at bounded backing proposals, checked against live economics.
@@ -136,7 +145,7 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
 
     function _list(uint256[] calldata backingProposals, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256) {
         _checkConfiguration(expected);
-        return StrategyLib.list(s, fwa, packs, shapes, backingProposals, minPay, gasStart);
+        return StrategyLib.list(s, fwa, packs, shapes, backingProposals, minPay, gasStart - gasleft());
     }
 
     /// @notice Bounded journal or scan job, terminal resolutions and allocation cleanup.
@@ -146,7 +155,7 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
 
     function _sync(uint256[] calldata listingIds, uint256 witnessId, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256) {
         _checkConfiguration(expected);
-        return StrategyLib.sync(s, fwa, packs, listingIds, witnessId, _checkpointMode(), minPay, gasStart);
+        return StrategyLib.sync(s, fwa, packs, listingIds, witnessId, _checkpointMode(), minPay, gasStart - gasleft());
     }
 
     /// @notice Withdraw active listings: in wind-down, when FWA's live fees leave no edge, or for
@@ -157,7 +166,7 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
 
     function _unlist(uint256[] calldata listingIds, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256) {
         _checkConfiguration(expected);
-        return StrategyLib.unlist(s, fwa, packs, listingIds, minPay, _shortfall(), gasStart);
+        return StrategyLib.unlist(s, fwa, packs, listingIds, minPay, _shortfall(), gasStart - gasleft());
     }
 
     /// @notice Redeem idle packs to ETH while ETH is owed beyond liquid ETH, or in wind-down.
@@ -167,7 +176,7 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
 
     function _liquidate(uint256 maxCount, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256) {
         _checkConfiguration(expected);
-        return StrategyLib.liquidate(s, packs, shapes, maxCount, minPay, _need(), gasStart);
+        return StrategyLib.liquidate(s, packs, shapes, maxCount, minPay, _need(), gasStart - gasleft());
     }
 
     /// @notice Caller-funded fee collection (never paid).
@@ -209,6 +218,17 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
         emit ParamsSet();
     }
 
+    function setDesign(uint256 design_) external onlyOwner {
+        _setDesign(design_);
+    }
+
+    function _setDesign(uint256 design_) internal {
+        // Zero would mean no count limit; A9.5 requires exact owner counts.
+        if (design_ == 0 || design_ & 0xFFFFFF != 0 || design_ >> 248 != 0) revert InvalidDesign();
+        design = design_;
+        emit DesignSet(design_);
+    }
+
     function acceptMintFee(uint64 maximum, bytes32 expected) external onlyOwner {
         _checkConfiguration(expected);
         s.params.acceptedMintFee = maximum;
@@ -244,6 +264,8 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
     function operatingReserve() public view returns (uint256) { return VaultLib.operatingReserve(s.params); }
 
     function unresolvedUplift() public view returns (uint256) { return s.book.unresolvedKeepUplift; }
+    /// @notice Packs of `units` x 0.01 ETH this account holds: idle, listed or awaiting settlement.
+    function recipeCount(uint256 units) external view returns (uint256) { return s.book.recipeCounts[units]; }
     function inventoryShapeCount(uint256 packId) external view returns (uint256) { return s.book.packShapeCount[packId]; }
 
 
@@ -304,8 +326,8 @@ abstract contract PackAccount is ReentrancyGuard, Ownable {
     function freeEth() external view returns (uint256) { return _free(); }
     function idleEth() external view returns (uint256) { return _idle(); }
 
-    /// @notice Keeper budget available now: routine (strategy) and essential (exit work).
-    function budget() external view returns (uint256 routine, uint256 essential) {
+    /// @notice Keeper budget available now for routine strategy work. Exit work is unpaid.
+    function budget() external view returns (uint256 routine) {
         return VaultLib.budgetNow(s.params, s.budget);
     }
 }

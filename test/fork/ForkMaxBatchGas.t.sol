@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import {GasQuotes} from "../utils/GasQuotes.sol";
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
 
 import {ForkBase, IOwnable, ForceSender, IFwaAdmin} from "./ForkBase.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
@@ -286,19 +287,22 @@ contract ForkMaxBatchGasTest is ForkBase {
         vm.prank(owner); vault.setParams(p, _expected9);
         vm.fee(1.95 gwei); vm.txGasPrice(2 gwei); this.assertEssentialSpikeContext();
         uint256 spikeCharge = vault.requestCharge();
-        assertEq(spikeCharge, GasQuotes.Q_CHECKPOINT * 2 gwei + p.workFee);
+        // A8: the request charge prices one checkpoint plus the account-owned overhead (100_000,
+        // the deploy schedule's `overhead`) per call. Literal keeps this deep frame off stack-too-deep.
+        assertEq(spikeCharge, (GasQuotes.Q_CHECKPOINT + 100_000) * 2 gwei + p.workFee);
         deposit = Charges.grossFor(vault, 1 ether);
         bytes32 _expected10 = TestVaultOps.configurationHash(vault);
         vm.prank(bob); vault.deposit{value: deposit}(_expected10);
         toBlackout(); this.assertEssentialSpikeContext();
         assertGt(vault.lockedShares(), 0, "pending redemption makes this checkpoint essential");
         assertEq(vault.processingPool(), spikeCharge);
-        (uint256 routineBefore, uint256 essentialBefore) = vault.budget();
+        uint256 routineBefore = vault.budget();
         uint256 keeperBefore = keeper.balance;
         witness = TestVaultOps.witness(vault);
         input = abi.encodeCall(PackVault.checkpoint, (witness, 0, vault.configurationHash()));
         intrinsic = 21_000;
         for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
+        vm.getRecordedLogs(); // flush prior events so the next KeeperWorkMeasured is this checkpoint's
         _cold(); vm.prank(keeper);
         start = gasleft();
         (ok, result) = address(vault).call(input);
@@ -315,9 +319,14 @@ contract ForkMaxBatchGasTest is ForkBase {
         emit log_named_uint("essential spike checkpoint call meter plus intrinsic", callMeter);
         emit log_named_uint("essential spike checkpoint actual pay wei", abi.decode(result, (uint256)));
         assertLt((gross * 125 + 99) / 100, 16_777_216);
-        assertEq(keeper.balance - keeperBefore, spikeCharge, "essential ceiling is funded by the actual request charge");
-        (uint256 routineAfter, uint256 essentialAfter) = vault.budget();
-        assertEq(routineAfter, routineBefore); assertEq(essentialAfter, essentialBefore);
+        // E2: the essential checkpoint pays its measured work (below the full quote), not the whole
+        // charge. The request charge is the funding ceiling; the unused remainder stays refundable
+        // to the depositor who paid it, so the keeper never pockets more than the real work.
+        uint256 essentialPay = MeasuredPay.gross(vault, GasQuotes.Q_CHECKPOINT, 1, true, 2 gwei);
+        assertEq(keeper.balance - keeperBefore, essentialPay, "essential checkpoint pays its measured work");
+        assertLe(keeper.balance - keeperBefore, spikeCharge, "the request charge is the funding ceiling, never exceeded");
+        uint256 routineAfter = vault.budget();
+        assertEq(routineAfter, routineBefore);
         assertEq(vault.processingPool(), 0); assertEq(vault.pendingDepositTotal(), 0);
         assertEq(vault.lockedShares(), 0); assertGt(vault.shareBalance(bob), 0);
         protected = vault.redemptionReserve() + vault.distributionReserve() + vault.claimableTotal();

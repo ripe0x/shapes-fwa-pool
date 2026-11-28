@@ -83,9 +83,9 @@ abstract contract ForkBase is Test {
         p.minDeposit = 0.01 ether;
         p.minDistribution = 0.01 ether;
         p.minEdgeBps = 100;
-        p.bufferBps = 0;
+
         p.distributionBps = 0;
-        p.payMarkupBps = 0;
+
         p.maxTip = 0.05 gwei;
         p.workFee = 0.00002 ether;
         p.keeperShareBps = 2_500;
@@ -98,8 +98,8 @@ abstract contract ForkBase is Test {
         p.tvlCap = 100 ether;
         p.routineCap = 0.3 ether; // bytecode maxima: these suites test mechanics, not budgets
         p.routineRate = 0.01 ether;
-        p.essentialCap = 0.1 ether;
-        p.essentialRate = 0.005 ether;
+
+
     }
 
     /// @dev Owner sets caps and pay limits (everything else unchanged); the tip follows a lower ceiling.
@@ -112,10 +112,10 @@ abstract contract ForkBase is Test {
         vault.setParams(q, _expected0);
     }
 
-    /// @dev Owner sets the routine and essential budget caps.
-    function setCaps(uint64 routine, uint64 essential) internal {
+    /// @dev Owner sets the routine budget cap (exit work is unpaid; no essential budget).
+    function setCaps(uint64 routine) internal {
         VaultLib.Params memory q = vault.getParams();
-        (q.routineCap, q.essentialCap) = (routine, essential);
+        q.routineCap = routine;
         bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
         vault.setParams(q, _expected1);

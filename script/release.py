@@ -9,7 +9,8 @@
   script/release.py manifest|check <values> --target manager  separate manager-only identity/approval
   script/release.py postflight-manager <factory> <values> [manager owner fundingWei]
   script/release.py manager-package <Forge mainnet dry-run.json>  write unsigned manager deployment data
-  script/release.py manager-create <factory> <owner> <fundingWei>  print unsigned creation template
+  script/release.py manager-create <factory> <owner> <fundingWei> <design>  print unsigned creation template;
+      design (nonzero) is PackAccount.design (byte u = packs of u x 0.01 ETH) and sets packUnitsMask to its sizes
 
 The owner accepts a release by signing the sha256 of docs/release/acceptance.json (which names the
 manifest hash) with the key in deploy/allowed_signers, namespace packvault-release:
@@ -26,7 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "keeper"))
-from config import PARAMS_T, PARAM_FIELDS, GAS_FIELDS, decode_params, configuration_hash, params_values, tuple_arg
+from config import PARAMS_T, PARAM_FIELDS, GAS_FIELDS, decode_params, configuration_hash, factory_configuration_hash, params_values, tuple_arg
 MANIFEST = ROOT / "deploy/release-manifest.json"
 ACCEPTANCE = ROOT / "docs/release/acceptance.json"
 SIGNATURE = ROOT / "deploy/release-acceptance.sig"
@@ -204,8 +205,7 @@ MAIN_DEPENDENCIES = {
 PARAM_ABI_ALIASES = {
     "gasCeilingWei": "gasCeiling", "essentialCeilingWei": "essentialCeiling",
     "maxTipWei": "maxTip", "workFeeWei": "workFee", "routineCapWei": "routineCap",
-    "routineRatePerDayWei": "routineRate", "essentialCapWei": "essentialCap",
-    "essentialRatePerDayWei": "essentialRate", "reserveWei": "reserve", "tvlCapWei": "tvlCap",
+    "routineRatePerDayWei": "routineRate", "reserveWei": "reserve", "tvlCapWei": "tvlCap",
     "acceptedMintFeeWei": "acceptedMintFee", "minDepositWei": "minDeposit",
     "minDistributionWei": "minDistribution",
 }
@@ -279,8 +279,8 @@ def _validate_params_abi(component, label):
     if component.get("type") != "tuple" or _abi_fields(fields) != expected:
         raise ValueError(f"{label} Params names/types/order differ from keeper.config.PARAM_FIELDS aliases")
     gas = fields[-1].get("components", [])
-    if len(GAS_FIELDS) != 29 or _abi_fields(gas) != [(key, "uint32") for key in GAS_FIELDS]:
-        raise ValueError(f"{label} GasSchedule names/types/order differ from the complete 29 keeper.config.GAS_FIELDS")
+    if len(GAS_FIELDS) != 22 or _abi_fields(gas) != [(key, "uint32") for key in GAS_FIELDS]:
+        raise ValueError(f"{label} GasSchedule names/types/order differ from the complete 22 keeper.config.GAS_FIELDS")
 
 
 def validate_compiled_launch_abi(vault_abi, factory_abi):
@@ -298,10 +298,13 @@ def validate_compiled_launch_abi(vault_abi, factory_abi):
 
 
 def _validate_factory_abi(factory_abi):
-    create = _abi_entry(factory_abi, "function", "create")
-    if _abi_fields(create.get("inputs", [])) != [("owner", "address"), ("p", "tuple"), ("expected", "bytes32")]:
-        raise ValueError("compiled factory create must be only (owner, p, expected), without a policy")
-    _validate_params_abi(create["inputs"][1], "factory create")
+    # One create, always with the owner's exact pack counts (PackAccount.design, A9.5); no policy.
+    creates = [e for e in factory_abi if e.get("type") == "function" and e.get("name") == "create"]
+    shapes = [_abi_fields(e.get("inputs", [])) for e in creates]
+    if shapes != [[("owner", "address"), ("p", "tuple"), ("design", "uint256"), ("expected", "bytes32")]]:
+        raise ValueError("compiled factory create must be only (owner, p, design, expected)")
+    for create in creates:
+        _validate_params_abi(create["inputs"][1], "factory create")
     if _abi_fields(_abi_entry(factory_abi, "constructor").get("inputs", [])) != [
             ("fwa", "address"), ("shapes", "address"), ("packs", "address")]:
         raise ValueError("compiled factory constructor must have only the three main dependencies")
@@ -309,16 +312,16 @@ def _validate_factory_abi(factory_abi):
 
 def validate_compiled_manager_abi(manager_abi, factory_abi):
     if _abi_fields(_abi_entry(manager_abi, "constructor").get("inputs", [])) != [
-            ("fwa_", "address"), ("shapes_", "address"), ("packs_", "address")]:
-        raise ValueError("compiled manager constructor must have only the three main dependencies")
+            ("fwa_", "address"), ("shapes_", "address"), ("packs_", "address"), ("factory_", "address")]:
+        raise ValueError("compiled manager constructor must have only the three main dependencies and its factory")
     getter = _abi_entry(manager_abi, "function", "getParams")
     if getter.get("inputs") != [] or len(getter.get("outputs", [])) != 1:
         raise ValueError("compiled manager getParams must return one Params tuple")
     _validate_params_abi(getter["outputs"][0], "manager getParams")
     _validate_factory_abi(factory_abi)
     initial = _abi_entry(manager_abi, "function", "initialize")
-    if _abi_fields(initial.get("inputs", [])) != [("owner_", "address"), ("p", "tuple")]:
-        raise ValueError("compiled manager initialize must be only (owner_, p)")
+    if _abi_fields(initial.get("inputs", [])) != [("owner_", "address"), ("p", "tuple"), ("design_", "uint256")]:
+        raise ValueError("compiled manager initialize must be only (owner_, p, design_)")
     _validate_params_abi(initial["inputs"][1], "manager initialize")
     for name, fields in (("importPacks", [("ids", "uint256[]"), ("expected", "bytes32")]),
                          ("unlistForWithdrawal", [("listingIds", "uint256[]")]),
@@ -535,13 +538,15 @@ def postflight_manager(factory, values, manager=None, owner=None, funding=None, 
     fail = []
     check = lambda ok, what: ok or fail.append(what)
     implementation = cast("call", factory, "implementation()(address)")
+    admin = cast("call", factory, "admin()(address)")
     libs = {name: m["build"][name]["create2_address"] for name in LIBRARIES}
     deployed = [("PackManagerFactory", factory), ("PackManager", implementation)] + list(libs.items())
     _postflight_code(m, deployed, fail, "manager")
+    check(int(cast("call", factory, "pendingAdmin()(address)"), 16) == 0, "factory pending admin")
     check(cast("call", implementation, "factory()(address)").lower() == factory.lower(), "implementation factory")
     check(int(cast("call", implementation, "owner()(address)"), 16) == 0, "implementation has an owner")
     accounts = [("implementation", implementation)]
-    result = dict(context, deploymentTarget="manager", factory=factory, implementation=implementation,
+    result = dict(context, deploymentTarget="manager", factory=factory, implementation=implementation, admin=admin,
                   libraries=libs, managerCount=int(first(cast("call", factory, "managerCount()(uint256)"))),
                   factoryBalanceWei=int(cast("balance", factory)), implementationBalanceWei=int(cast("balance", implementation)))
     if manager:
@@ -553,6 +558,10 @@ def postflight_manager(factory, values, manager=None, owner=None, funding=None, 
         check(cast("call", manager, "factory()(address)").lower() == factory.lower(), "manager factory")
         check(cast("call", manager, "owner()(address)").lower() == owner.lower(), "manager owner")
         v = _launch_json(ROOT / "deploy/manager.json")
+        # A manager created with a pack mix admits exactly the mix's sizes (as manager_create sets them).
+        design = int(first(cast("call", manager, "design()(uint256)")))
+        if design:
+            v = v | {"packUnitsMask": sum(1 << u for u in range(3, 31) if (design >> (8 * u)) & 0xFF)}
         got = decode_params(cast("call", manager, f"getParams()({PARAMS_T})"))
         expected = {key: v[key] for key, _ in PARAM_FIELDS} | {"gasSchedule": v["gasSchedule"]}
         check(got == expected, "manager complete Params/GasSchedule")
@@ -561,8 +570,8 @@ def postflight_manager(factory, values, manager=None, owner=None, funding=None, 
         check(cast("call", manager, "configurationHash()(bytes32)").lower() == configuration_hash(v, mint_fee).lower(), "manager configuration hash")
         flags = {name: cast("call", manager, name + "()(bool)") for name in ("windingDown", "listingPaused")}
         check(all(value == "false" for value in flags.values()), "new manager pause/exit flags")
-        budget = [int(first(x)) for x in cast("call", manager, "budget()(uint256,uint256)").splitlines()]
-        check(budget == [v["routineCapWei"], v["essentialCapWei"]], "new manager budgets")
+        budget = int(first(cast("call", manager, "budget()(uint256)")))
+        check(budget == v["routineCapWei"], "new manager budget")
         cash = int(cast("balance", manager))
         if funding is not None:
             _unsigned(int(funding), 256, "manager funding")
@@ -618,8 +627,8 @@ def postflight(vault, values, owner=None, factory=None):
         check(cast('call', vault, key + '()(address)').lower() == expected_address.lower(), f'vault {key} immutable')
         if factory:
             check(cast('call', implementation, key + '()(address)').lower() == expected_address.lower(), f'implementation {key} immutable')
-    budget = [int(first(x)) for x in cast("call", vault, "budget()(uint256,uint256)").splitlines()]
-    check(budget[0] <= v["routineCapWei"] and budget[1] <= v["essentialCapWei"], "budgets above caps")
+    budget = int(first(cast("call", vault, "budget()(uint256)")))
+    check(budget <= v["routineCapWei"], "budget above cap")
     dead = first(cast("call", vault, "DEAD_SHARES()(uint256)"))
     check(first(cast("call", vault, "sharesOf(address)(uint256)", "0x000000000000000000000000000000000000dEaD")) == dead,
           "seed shares")
@@ -811,7 +820,7 @@ def manager_package(run_path):
     print("wrote unsigned manager-only deployment and keeper address data; no vault or seed")
 
 
-def manager_create(factory, owner, funding):
+def manager_create(factory, owner, funding, design):
     validate_launch_inputs(target="manager")
     _address(factory, "factory")
     _address(owner, "owner")
@@ -825,21 +834,29 @@ def manager_create(factory, owner, funding):
         context = {k: v for k, v in postflight_manager(factory, ROOT / "deploy/manager-factory.json", emit=False).items()
                    if k in ("chainId", "block", "blockHash", "rpc")}
     p = _launch_json(ROOT / "deploy/manager.json")
+    design = int(design, 0) if isinstance(design, str) else int(design)
+    # PackAccount._setDesign: sizes 3..30 units only, at most 255 packs each; the mask admits exactly those sizes.
+    if design == 0 or design & 0xFFFFFF or design >> 248:
+        raise ValueError("design must be a nonzero count of pack sizes 3 to 30 units")
+    if design:
+        p = p | {"packUnitsMask": sum(1 << u for u in range(3, 31) if (design >> (8 * u)) & 0xFF)}
     fee = int(first(cast("call", MAIN_DEPENDENCIES["shapes"], "mintFee()(uint256)")))
     if fee > p["acceptedMintFeeWei"]:
         raise ValueError("live mint fee exceeds the owner's accepted maximum")
-    expected = configuration_hash(p, fee)
+    implementation = (cast("call", factory, "implementation()(address)") if deployed
+                      else create_address(factory, 1))
+    expected = factory_configuration_hash(p, fee, implementation)
     if deployed and cast("call", factory, f"configHashFor({PARAMS_T})(bytes32)", tuple_arg(p)).lower() != expected.lower():
         raise ValueError("factory configuration hash disagrees with the reviewed encoding")
     from eth_abi import encode
     from eth_utils import keccak
-    signature = f"create(address,{PARAMS_T},bytes32)"
-    data = keccak(text=signature)[:4] + encode(["address", PARAMS_T, "bytes32"],
-                   [owner, params_values(p), bytes.fromhex(expected[2:])])
+    signature = f"create(address,{PARAMS_T},uint256,bytes32)"
+    data = keccak(text=signature)[:4] + encode(["address", PARAMS_T, "uint256", "bytes32"],
+                   [owner, params_values(p), design, bytes.fromhex(expected[2:])])
     result = dict(status="UNSIGNED_MANAGER_CREATION_TEMPLATE", **context, factoryAlreadyDeployed=deployed,
                   unsignedTransaction=dict(chainId=hex(context["chainId"]), **{"from": owner}, to=factory,
                                            value=hex(funding), input="0x" + data.hex()),
-                  reviewedOwner=owner, reviewedFundingWei=funding, reviewedLiveMintFeeWei=fee,
+                  reviewedOwner=owner, reviewedFundingWei=funding, reviewedDesign=hex(design), reviewedLiveMintFeeWei=fee,
                   fixtureExpectedMintFeeWei=p["expectedMintFeeWei"],
                   mintFeeChangedSinceFixture=fee != p["expectedMintFeeWei"],
                   acceptedMintFeeWei=p["acceptedMintFeeWei"], expectedConfigurationHash=expected,
@@ -847,7 +864,7 @@ def manager_create(factory, owner, funding):
                   conditions=["Refresh preview and estimate exact calldata before signing.",
                     "After factory deployment, independently verify its runtime, dependencies and links.",
                     "Creating an idle manager does not establish productive funding or positive returns.",
-                    "No factory or administrator can change this manager's owner/settings after creation."])
+                    "The factory admin changes only the implementation future managers clone; it cannot change this manager's owner, settings or code after creation."])
     print(json.dumps(result, indent=2))
     return result
 
@@ -919,7 +936,7 @@ def main():
         postflight_manager(*args)
     elif cmd == "manager-package" and len(args) == 1:
         manager_package(args[0])
-    elif cmd == "manager-create" and len(args) == 3:
+    elif cmd == "manager-create" and len(args) == 4:
         manager_create(*args)
     elif cmd == "postflight" and len(args) in (2, 3, 4, 5):
         if target == "manager":

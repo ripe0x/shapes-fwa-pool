@@ -3,5 +3,5 @@
   "fwa": "0x958C41181182e76F221331b2755b77D9e1426A98",
   "shapes": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
   "packs": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
-  "comment": "Unsigned manager-only deployment. No PackVault, seed, factory owner or factory economic authority. Per-owner creation settings are deploy/manager.json."
+  "comment": "Unsigned manager-only deployment. No PackVault, seed or factory economic authority. The deployer is the factory admin, who may change only the implementation future managers clone (A9.8). Per-owner creation settings are deploy/manager.json."
 }

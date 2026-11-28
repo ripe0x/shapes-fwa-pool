@@ -308,8 +308,8 @@ def main():
         # The charge is quoted at the basefee when the call runs; a build in between can raise it.
         # Pay double, as a holder should: the excess comes straight back.
         shares=call("shareBalance(address)(uint256)",holder)//4
-        unwind_charge=shares*call("lastNav()(uint256)")//call("totalShares()(uint256)")*call("unwindCharge()(uint256)")//call("referencePositionValue()(uint256)")
-        send(holder, VAULT, "requestRedeem(uint256)",shares,value=2*(call("requestCharge()(uint256)")+unwind_charge))
+        # Exit work is unpaid, so the redemption charge is just the checkpoint request charge.
+        send(holder, VAULT, "requestRedeem(uint256)",shares,value=2*call("requestCharge()(uint256)"))
         warp_to(42_360)
         expire_queue()
         unwind = evidence["holder_unwind"] = []

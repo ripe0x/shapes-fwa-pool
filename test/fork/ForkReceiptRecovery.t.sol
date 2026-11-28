@@ -4,7 +4,7 @@ pragma solidity 0.8.30;
 import {ForkBase, IFwaAdmin, IOwnable} from "./ForkBase.sol";
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
 import {managerParams} from "./ForkManager.t.sol";
-import {TestVaultOps} from "../utils/TestVaultOps.sol";
+import {TestVaultOps, ANY_DESIGN} from "../utils/TestVaultOps.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {PackManager} from "../../src/PackManager.sol";
 import {PackManagerFactory} from "../../src/PackManagerFactory.sol";
@@ -130,7 +130,7 @@ contract ForkReceiptRecoveryManagerTest is ForkBase {
     function _create(address who, uint256 funding) internal returns (PackManager m) {
         bytes32 _expected5 = TestVaultOps.factoryHash(factory, managerParams());
         vm.prank(who);
-        m = factory.create{value: funding}(who, managerParams(), _expected5);
+        m = factory.create{value: funding}(who, managerParams(), ANY_DESIGN, _expected5);
     }
 
     function test_recordedKickRefund_resolvesAndOwnerExits() public {

@@ -47,7 +47,7 @@ P = 3 * 10**16  # three paid 0.01 ETH primary mints
 BUILD_UNITS = 3
 SUR, CUT, S_FEE, BID_RATE = 0.05, 0.01, 0.01, 0.90
 ASK, PREMIUM = 0.033, 0.10
-MINT_FEE = 10**15
+MINT_FEE = 5*10**14
 # Backing follows the account ratio. Purchaser choices are separate explicit scenarios.
 KEEP_DEFAULT = 0.0  # no favorable purchaser behavior assumed
 POOL = None
@@ -179,7 +179,7 @@ def expectation(n, volume, gwei, B=None, crown=0.001, premium=0.0):
     W = np.sum(1 / pool) + n / B
     cycles = 365 * volume * (1 / B) / W
     # A bid cycle's keeper pay as the vault quotes it (D56): quoted gas at basefee + 0.05 gwei tip,
-    # capped at the ceiling, with the configured routine markup and verified service fees.
+    # capped at the ceiling, plus verified service fees (no markup, V1).
     gas = policy.quote(st, policy.cycle_gas(st), 2) / E
     net = B * (k_of(crown) - 1) - gas
     capital = n * (B + P / E)
@@ -228,7 +228,7 @@ class Scenario(dict):
 def charge_state(gas, open_positions, pool=0):
     """Minimal policy state for the request charges at `gas` wei basefee (canary parameters)."""
     return policy.State(now=0, gas_price=gas, base_fee=gas, gas_ceiling=int(CEILING * GWEI), max_tip=5 * 10**7,
-                        markup_bps=0, share_bps=2_500, k=0, backing=0, min_edge_bps=100, mint_fee=MINT_FEE,
+                        share_bps=2_500, k=0, backing=0, min_edge_bps=100, mint_fee=MINT_FEE,
                         settlement_window=0, blackout=False, queue_drained=True, checkpoint_done_this_interval=False,
                         open_positions=open_positions, work_fee=WORK_FEE,
                         essential_ceiling=int(ESSENTIAL_CEILING * GWEI), processing_pool=pool)
@@ -236,16 +236,16 @@ def charge_state(gas, open_positions, pool=0):
 
 def configured_state(base_fee, values=None):
     values = values or json.loads((ROOT.parent / 'deploy/mainnet.json').read_text())
-    s = charge_state(base_fee, 0)
-    s.gas_schedule = gas_schedule(values)
     if 'renewalMode' in values or 'renewalFloatCount' in values:
         raise ValueError('historical Fresh settings require their pinned revision; active strategy is reuse-only')
+    s = charge_state(base_fee, 0)
+    s.gas_schedule = gas_schedule(values)
     s.backing_ratio_bps = values['backingRatioBps']
     s.gas_ceiling, s.essential_ceiling = values['gasCeilingWei'], values['essentialCeilingWei']
-    s.max_tip, s.work_fee, s.markup_bps = values['maxTipWei'], values['workFeeWei'], values['payMarkupBps']
+    s.max_tip, s.work_fee = values['maxTipWei'], values['workFeeWei']
     s.pack_units_mask, s.accepted_mint_fee = values['packUnitsMask'], values['acceptedMintFeeWei']
     s.build_units = next((u for u in range(3,31) if s.pack_units_mask >> u & 1), 3)
-    s.routine_budget, s.essential_budget, s.essential_cap = values['routineCapWei'], values['essentialCapWei'], values['essentialCapWei']
+    s.routine_budget = values['routineCapWei']
     s.share_bps = values['keeperShareBps']
     return s
 
@@ -468,8 +468,8 @@ def run(sc, n_target, seed, days=365, values=None):
         limit=None if sc.get('exempt',True) else cap
         key=(k,gas,limit,units,newly_built,retirement_shapes)
         if not cached_economics or key not in edge_cache:
-            result=policy.edge_backing(k,limit,int(S_FEE*10_000),units,ceiling,values['payMarkupBps'],work_fee,
-                price=min(gas+tip,ceiling),mint_fee=mint_fee,buffer_bps=values['bufferBps'],min_edge_bps=values['minEdgeBps'],
+            result=policy.edge_backing(k,limit,int(S_FEE*10_000),units,ceiling,work_fee,
+                price=min(gas+tip,ceiling),mint_fee=mint_fee,min_edge_bps=values['minEdgeBps'],
                 backing_ratio_bps=values['backingRatioBps'],gas_schedule=schedule,
                 newly_built=newly_built,reference_units=build_units,retirement_shapes=retirement_shapes)
             if not cached_economics:return result
@@ -491,8 +491,7 @@ def run(sc, n_target, seed, days=365, values=None):
               accepted_mint_fee=values["acceptedMintFeeWei"],
               live_mint_fee=mint_fee, min_distribution=values["minDistributionWei"])
     v.routine_budget = v.routine_cap = values["routineCapWei"]
-    v.essential_budget = v.essential_cap = values["essentialCapWei"]
-    v.routine_rate, v.essential_rate = values["routineRatePerDayWei"], values["essentialRatePerDayWei"]
+    v.routine_rate = values["routineRatePerDayWei"]
     journal = deque()  # (our listing ID or None, actual selection time)
     journal_paid = journal_own = journal_foreign = journal_pruned = terminal_work = 0
     journal_rebased = journal_scans = journal_scanned = journal_skipped = 0
@@ -503,7 +502,7 @@ def run(sc, n_target, seed, days=365, values=None):
     g0 = g_of(0) if callable(g_of) else g_of
     st0 = charge_state(int(g0 * GWEI), 0)
     st0.gas_ceiling, st0.essential_ceiling, st0.max_tip = ceiling, essential_ceiling, tip
-    st0.work_fee, st0.essential_cap = work_fee, values["essentialCapWei"]
+    st0.work_fee = work_fee
     st0.mint_fee = mint_fee
     st0.gas_schedule = schedule
     st0.build_units, st0.pack_units_mask = build_units, values["packUnitsMask"]
@@ -557,6 +556,7 @@ def run(sc, n_target, seed, days=365, values=None):
     keeper_zero_loss = manager and bool(sc.get('manager_keeper_zero_loss', False))
     from keeper import profitability_gate, wallet_debit_bound, billed_ratio
     keeper_receipt_history_enabled = manager and bool(sc.get('manager_keeper_receipt_history',False))
+    keeper_executed_gas = manager and bool(sc.get('manager_keeper_executed_gas', False))
     if keeper_receipt_history_enabled and (not keeper_zero_loss or not gas_curves):
         raise ValueError('keeper receipt history requires calibrated curves and zero-loss admission')
     keeper_receipt_history=SimpleNamespace(state={'counted':[]})
@@ -657,7 +657,7 @@ def run(sc, n_target, seed, days=365, values=None):
                 return
             if credit and not (v.positions or v.idle_packs or v.recovery_packs or v.receipts):
                 # Collect once after retirement; no needless intermediate exit sweeps.
-                gas = owner_billed('harvest',st0.gas_schedule['harvest'])
+                gas = owner_billed('harvest',policy.HARVEST_GAS)
                 if not owner_preflight([owner_estimate('harvest', gas)], max(0, gas_price-tip), 'harvest'):
                     return
                 v.receive_fees(credit)
@@ -897,7 +897,7 @@ def run(sc, n_target, seed, days=365, values=None):
                 recent_volume = recent_total / len(recent) if len(recent) and 0 <= recent_total <= 2**53 else float(np.mean(recent))
                 st = policy.State(
                     now=absolute_now, gas_price=gas + tip, base_fee=gas, gas_ceiling=ceiling, max_tip=tip,
-                    markup_bps=values["payMarkupBps"], share_bps=values["keeperShareBps"], k=k, backing=backing,
+                    share_bps=values["keeperShareBps"], k=k, backing=backing,
                     pooled=not manager, winding_down=bool(manager and v.exiting), listing_paused=bool(manager and v.listing_paused),
                     min_edge_bps=values["minEdgeBps"], settlement_fee_bps=int(S_FEE * 10_000), mint_fee=mint_fee,
                     settlement_window=clock.SETTLEMENT if timed else 10**12,
@@ -917,7 +917,6 @@ def run(sc, n_target, seed, days=365, values=None):
                     idle_funding=v.idle_funding,
                     journal_cursor=v.acquisition_cursor, completed_prefix=v.completed_prefix,
                     pending_receipts=len(v.receipts), routine_budget=v.routine_budget,
-                    essential_budget=v.essential_budget, essential_cap=values["essentialCapWei"],
                     recent_volume=recent_volume, work_fee=work_fee,
                     slowdown_volume=sc.get("slowdown", 0.0), essential_ceiling=essential_ceiling,
                     pack_units_mask=values["packUnitsMask"], build_units=build_units,
@@ -932,7 +931,7 @@ def run(sc, n_target, seed, days=365, values=None):
                     own_journal_pending=any(v.positions[i].state == ACTIVE and v.positions[i].status in (ALLOCATED, SETTLED)
                                             for i in hydrated))
                 if backing or relist_backing:
-                    maximum = 2**256-1 if sc.get('exempt',True) else cap*(10_000-values['bufferBps'])//10_000
+                    maximum = 2**256-1 if sc.get('exempt',True) else cap
                     minimum, maximum = proposal_limits(st,face_value,int(S_FEE*10_000),int(BID_RATE*10_000),maximum,units=build_units)
                     # Speed only: with no idle pack and idle ETH below one backing, the planner can
                     # use neither list nor build proposals, so skipping them changes no decision.
@@ -991,7 +990,7 @@ def run(sc, n_target, seed, days=365, values=None):
                     cost_basis = physical_gas if gas_curves and physical_gas is not None else gas_q
                     recovery = self_serve and exit_all and exit_requested and liability and fn in ('sync','syncCheckpoint','unlist','liquidate','checkpoint')
                     offer = 0 if recovery or fn=='harvest' else policy.payment(st,gas_q,units,ess,measured_gas=0 if gas_q==0 and units==0 else work_meter(fn,work_count,gas_q,units))
-                    funds = funding_cap if funding_cap is not None else (v.essential_budget if ess else v.routine_budget)
+                    funds = funding_cap if funding_cap is not None else (0 if ess else v.routine_budget)
                     cash = max(0, v.free() + cash_delta) if ess else v.keeper_cash_after(cash_delta)
                     paid = min(offer, funds) if fn == 'syncCheckpoint' else min(offer, funds, cash)
                     holder_fallback = self_serve and liability and (not exit_all or fn != "sync"
@@ -1009,7 +1008,10 @@ def run(sc, n_target, seed, days=365, values=None):
                             sc.get('keeper_fail_rate_bps',0),sc.get('keeper_min_return_bps',0),0,ratio=ratio)
                         billed_cost,billed_need,billed_accepted=profitability_gate(billed_gas,st.gas_price,paid,
                             sc.get('keeper_fail_rate_bps',0),sc.get('keeper_min_return_bps',0),0,ratio=1.)
-                        cost,need,accepted=max(cost,billed_cost),max(need,billed_need),accepted and billed_accepted
+                        if keeper_executed_gas:  # keeper bills the simulated signed call: estimate only sets the limit
+                            cost,need,accepted=billed_cost,billed_need,billed_accepted
+                        else:
+                            cost,need,accepted=max(cost,billed_cost),max(need,billed_need),accepted and billed_accepted
                         if not accepted:
                             if final_candidate:
                                 manager_waits['KEEPER_LOSS'] = manager_waits.get('KEEPER_LOSS', 0) + 1
@@ -1265,12 +1267,13 @@ def run(sc, n_target, seed, days=365, values=None):
                             cash += value
                         if not packs:
                             continue
-                        gas_q = Q["liquidate"] + Q["liq_pack"] * packs + Q["redeem_shape"] * burned
-                        if not affordable(gas_q, packs, True, cash_delta=cash, liability=True,work_count=packs):
+                        # Liquidation is exit work: always unpaid, so no gas or units are quoted
+                        # (mirrors StrategyLib.liquidate -> _pay(..., 0, 0, true)).
+                        if not affordable(0, 0, True, cash_delta=cash, liability=True,work_count=packs):
                             continue
                         for _ in range(packs):
                             v.liquidate_one()
-                        pay(gas_q, packs, True, liability=True,work_count=packs)
+                        pay(0, 0, True, liability=True,work_count=packs)
                     elif fn == "checkpoint":
                         pool = v.processing_pool
                         flows = v.pending_total != 0 or v.locked_shares != 0
@@ -1430,12 +1433,11 @@ def run(sc, n_target, seed, days=365, values=None):
                 st1.book_max_units = max([p.units for p in v.positions.values()]+[value//policy.UNIT for value in v.idle_packs],default=0)
                 st1.checkpoint_proof_entries = min(32, len(v.allocation_queue)-v.allocation_head) + (len(v.positions) if not sc.get('exempt',True) and len(v.positions)<=32 and v.active_count else 0)
                 st1.gas_ceiling, st1.essential_ceiling, st1.max_tip = ceiling, essential_ceiling, tip
-                st1.work_fee, st1.essential_cap = work_fee, values["essentialCapWei"]
+                st1.work_fee = work_fee
                 ck = policy.request_charge(st1)
-                unwind = (sh * v.last_nav // v.total_shares) * policy.unwind_charge(st1) // policy.position_value(st1)
-                v.request_redeem("h", sh, ck, unwind)
+                v.request_redeem("h", sh, ck)
                 trace_state("request-redeem", d)
-                paid_in += ck + unwind
+                paid_in += ck
                 holder_gas += user_gas.get("request_redeem", 0) * (gas + tip)
                 unknown_user_gas += int(exit_all and "request_redeem" not in user_gas)
         if exit_all and exit_requested:
@@ -1560,7 +1562,7 @@ def run(sc, n_target, seed, days=365, values=None):
                 k_eff=accrued / selected_backing if selected_backing else 0.0, missed_alloc=missed_alloc,
                 keeper_unpaid=(holder_maintenance_gas - holder_keeper_pay if exit_all else self_serve_cost) / deposit,
                 issued_entries=v.completed_prefix, processed_entries=v.acquisition_cursor,
-                routine_budget_wei=v.routine_budget, essential_budget_wei=v.essential_budget,
+                routine_budget_wei=v.routine_budget,
                 economic_nav_wei=end_nav, free_wei=v.free(), keeper_paid_wei=v.keeper_paid,
                 principal_deposit_wei=deposit, holder_paid_in_wei=paid_in,
                 holder_end_value_before_external_gas_wei=(0 if exit_complete else holder + locked_val)

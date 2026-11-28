@@ -223,13 +223,20 @@ def stable_read_state(vault, slowdown, burn=False, pooled=True):
                 raise
 
 
-def build_units_for(mask):
-    """The pack size this keeper builds: REF_UNITS when the account admits it, else the smallest
-    admitted size. A valid mask always has an enabled size in [MIN_PACK_UNITS, MAX_PACK_UNITS]."""
-    if (mask >> policy.REF_UNITS) & 1:
-        return policy.REF_UNITS
-    return next((u for u in range(policy.MIN_PACK_UNITS, policy.MAX_PACK_UNITS + 1) if (mask >> u) & 1),
-                0)
+def build_units_for(mask, design=0, held=None):
+    """The pack size this keeper builds and how many more of it the account's design allows.
+
+    design 0: REF_UNITS when the mask admits it, else the smallest admitted size, without a count.
+    Otherwise the admitted size furthest below its design count (`held[u]` packs held), the
+    smaller size on a tie; (0, 0) once every size is at its count."""
+    if not design:
+        if (mask >> policy.REF_UNITS) & 1:
+            return policy.REF_UNITS, None
+        return next((u for u in range(policy.MIN_PACK_UNITS, policy.MAX_PACK_UNITS + 1) if (mask >> u) & 1), 0), None
+    room = {u: (design >> 8 * u & 0xFF) - held.get(u, 0) for u in range(policy.MIN_PACK_UNITS, policy.MAX_PACK_UNITS + 1)
+            if (mask >> u) & 1 and design >> 8 * u & 0xFF}
+    best = max(room, key=lambda u: (room[u], -u), default=0)
+    return (best, room[best]) if best and room[best] > 0 else (0, 0)
 
 
 def read_tokens(vault, candidate_ids, block):
@@ -245,24 +252,12 @@ def read_tokens(vault, candidate_ids, block):
 
 def proposal_limits(s, value, settlement_fee, discount, cap, build=False, units=policy.REF_UNITS, retirement_shapes=None):
     """VaultLib._profitable floors for a listing near the edge's desired backing; production preflight
-    authenticates each one. A listing clears the bid outcome B(k-1) > cycle and the keep outcome
-    B(k-s) >= value + cycle (+ the build when newly built); a build repays from the keep outcome, not
-    the bid, so its floor uses the k-s denominator (audit: the k-1 denominator planned no builds)."""
+    authenticates each one. A keep must return at least the face, B(k-s) >= value, and the NAV face
+    coverage holds at FWA's maximum settlement fee. Gas and the build are not charged to a selection."""
     if s.k <= 10**18 or not 0 < discount <= 10_000 or not 0 <= settlement_fee < 10_000:
         return 1, 0
     up = lambda a, b: -(-a // b)
-    pricing = replace(s, build_units=units)
-    if build:
-        q = s.gas_schedule
-        common = sum(q[k] for k in ('sync','journal','selected','synced','pruned','sync_funding','harvested','sync_credit'))
-        cycle = policy.quote(pricing, common, 1)
-    else:
-        q = s.gas_schedule
-        cycle = policy.quote(pricing, policy.cycle_gas(pricing)-q['list']-q['listed'], 1) + policy.quote(pricing,q['list']+q['listed'],1)
-    extra = policy.build_cost(s, units if build else (s.build_units or policy.REF_UNITS)) if build else 0
-    minimum = max(up(value * 10_000, 9500),  # NAV face coverage at the maximum settlement fee
-                  (cycle + extra) * 10**18 // (s.k - 10**18) + 1,              # bid outcome: B(k-1) > cycle
-                  up((value + cycle + extra) * 10**18, s.k - settlement_fee * 10**14))  # keep outcome
+    minimum = max(up(value * 10_000, 9500), up(value * 10**18, s.k - settlement_fee * 10**14))
     return minimum, cap
 
 
@@ -282,16 +277,18 @@ def read_state(vault, slowdown, burn=False, pooled=True):
     at = lambda to, sig, *args: call(to, sig, *args, block=head)
     account_owner = at(vault, 'owner()(address)') if not pooled else None
     p = decode_params(at(vault, f"getParams()({PARAMS_T})"))
-    min_edge, buf, dist_bps = (p[k] for k in ('minEdgeBps', 'bufferBps', 'distributionBps'))
-    premium, share, mask = (p[k] for k in ('payMarkupBps', 'keeperShareBps', 'packUnitsMask'))
+    min_edge, dist_bps = (p[k] for k in ('minEdgeBps', 'distributionBps'))
+    share, mask = (p[k] for k in ('keeperShareBps', 'packUnitsMask'))
     ceiling, ess_ceiling, tip, wfee, res = (p[k] for k in ('gasCeilingWei', 'essentialCeilingWei', 'maxTipWei', 'workFeeWei', 'reserveWei'))
-    _ec = p['essentialCapWei']
-    build_units = build_units_for(mask)
+    design = num(at(vault, 'design()(uint256)'))
+    held = {u: num(at(vault, 'recipeCount(uint256)(uint256)', u)) for u in range(policy.MIN_PACK_UNITS, policy.MAX_PACK_UNITS + 1)
+            if design >> 8 * u & 0xFF}
+    build_units, build_room = build_units_for(mask, design, held)
     idle_count = num(at(vault, 'idlePackCount()(uint256)'))
     idle_ids = [num(at(vault, 'idlePackAt(uint256)(uint256)', idle_count-1-i)) for i in range(min(idle_count, policy.MAX_BATCH['list']))]
     idle_candidates = [(i, num(at(vault, 'idleValueOf(uint256)(uint256)', i))) for i in idle_ids]
     quote_units = build_units or (idle_candidates[0][1] // policy.UNIT if idle_candidates else policy.REF_UNITS)
-    rbud, ebud = lines(at(vault, "budget()(uint256,uint256)"))
+    rbud = at(vault, "budget()(uint256)")
     k, backing = "0", "0"  # prospective economics are read after pinned financial hydration
     window = num(at(FWA, "settlementWindow()(uint256)"))
     top, top_since = num(at(FWA, "topListingId()(uint256)")), num(at(FWA, "topListingSince()(uint64)"))
@@ -331,7 +328,7 @@ def read_state(vault, slowdown, burn=False, pooled=True):
     tokens = read_tokens(vault, index.token_candidates(policy.MAX_BATCH["tokens"]) if burn else [], head)
     state = policy.State(
         now=now, gas_price=base_fee + tip, base_fee=base_fee, gas_ceiling=ceiling,
-        max_tip=tip, markup_bps=premium, share_bps=share, k=num(k), backing=num(backing), min_edge_bps=min_edge,
+        max_tip=tip, share_bps=share, k=num(k), backing=num(backing), min_edge_bps=min_edge,
         mint_fee=num(at(SHAPES, "mintFee()(uint256)")), settlement_window=window,
         blackout=at(FWA, "isPurchaseBlackout()(bool)") == "true",
         queue_drained=num(at(FWA, "unsettledAcquisitionCount()(uint256)")) == 0,
@@ -341,8 +338,8 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         recovery_packs=num(at(vault, "recoveryPackCount()(uint256)")),
         free=max(0, balance - reserves), idle_eth=num(at(vault, "idleEth()(uint256)")), owed_estimate=owed,
         pending_deposits=pending, locked_shares=locked, total_shares=supply, pack_units_mask=mask,
-        build_units=build_units, pooled=pooled, settlement_fee_bps=num(at(FWA, "ownerSettlementFeeBps()(uint256)")),
-        essential_ceiling=ess_ceiling, essential_cap=_ec, processing_pool=processing_pool,
+        build_units=build_units, build_room=build_room, pooled=pooled, settlement_fee_bps=num(at(FWA, "ownerSettlementFeeBps()(uint256)")),
+        essential_ceiling=ess_ceiling, processing_pool=processing_pool,
         gas_schedule=gas_schedule(p), backing_ratio_bps=p["backingRatioBps"],
         accepted_mint_fee=p["acceptedMintFeeWei"],
         fee_credit=num(at(FWA, "feeCredit(address)(uint256)", vault)),
@@ -354,7 +351,7 @@ def read_state(vault, slowdown, burn=False, pooled=True):
         winding_down=at(vault, "windingDown()(bool)") == "true",
         listing_paused=at(vault, "listingPaused()(bool)") == "true", distribution_bps=dist_bps,
         recent_volume=index.recent_volume(now), slowdown_volume=slowdown, burn_tokens=burn,
-        reserve=res, work_fee=wfee, routine_budget=num(rbud), essential_budget=num(ebud), **tokens,
+        reserve=res, work_fee=wfee, routine_budget=num(rbud), **tokens,
     )
     state.keeper_cash = num(at(vault, "keeperCash()(uint256)"))
     state.operating_reserve = res
@@ -393,7 +390,6 @@ def read_state(vault, slowdown, burn=False, pooled=True):
             oracle = prospective(FWA, "floorOracle()(address)")
             _, ask, _, _ = lines(prospective(oracle, "getFloorRange(address)(uint256,uint256,uint48,uint48)", packs))
             cap = num(ask) * (10_000 + num(prospective(FWA, "oracleCeilingPremiumBps()(uint256)"))) // 10_000
-            cap = cap * (10_000 - buf) // 10_000
         reserved = num(prospective(vault, "reservedCount()(uint256)"))
         lo, hi = proposal_limits(state, build_units * policy.UNIT, fee, discount, cap, build=True, units=build_units)
         # build lists every pack at once: each proposal must be a distinct identifier inside the
@@ -503,6 +499,13 @@ def billed_ratio(tm, label):
     if len(rows) >= 3:
         return min(1.0, sum(e["gas_used"] for e in rows[-20:]) / sum(e["est"] for e in rows[-20:]))
     return BILLED_PER_ESTIMATE.get(label, 1.0)
+
+
+def billed_basis(tm, target, args, est, fees, label):
+    """(gas, ratio) the cost check bills: the exact call's executed gas at its signed limit when
+    the node simulates it, else the estimate calibrated by receipts."""
+    executed = tm.executed_gas(target, args, (est * 5 + 3) // 4, fees) if tm else None
+    return (executed, 1.0) if executed else (est, billed_ratio(tm, label))
 
 
 def execution_cost(est, bid, fail_rate_bps, ratio=1.0):
@@ -652,8 +655,8 @@ def run_account(a, tm, account, pooled):
                 if not (shares or holder_locked or holder_claimable or num(own_pending[0])):
                     steps=[]
                 if shares and ('requestRedeem',) not in skip:
-                    last_nav = num(call(account, 'lastNav()(uint256)'))
-                    charge = num(call(account, 'requestCharge()(uint256)')) + shares * last_nav // state.total_shares * num(call(account, 'unwindCharge()(uint256)')) // num(call(account, 'positionValue()(uint256)'))
+                    # Exit work is unpaid, so the redemption charge is just the checkpoint charge.
+                    charge = num(call(account, 'requestCharge()(uint256)'))
                     steps.insert(0, ('requestRedeem', shares, charge))
                 if state.pending_deposits and ('cancelDeposit',) not in skip:
                     pending = call(account, 'pendingDeposits(address)(uint128,uint128)', tm.sender).splitlines()
@@ -715,8 +718,8 @@ def run_account(a, tm, account, pooled):
         bid = state.base_fee + state.max_tip
         fees = fee_args(state.base_fee, state.max_tip)
         pay = compensation(target, args, tm.sender, fees)
-        cost_, need, accepted = profitability_gate(est, bid, pay, a.fail_rate_bps, a.min_return_bps,
-                                                  max_loss, billed_ratio(tm, step[0]))
+        gas, ratio = billed_basis(tm, target, args, est, fees, step[0])
+        cost_, need, accepted = profitability_gate(gas, bid, pay, a.fail_rate_bps, a.min_return_bps, max_loss, ratio)
         if a.caller_funded_exit and step[0] not in ('build', 'list', 'burnTokens'):
             contribution = int(step[1]) if step[0] == 'fundCheckpoint' else int(step[2]) if step[0] == 'requestRedeem' else 0
             accepted=tm.can_reserve(tm.nonce('pending'),(est*5+3)//4,2*state.base_fee+state.max_tip,contribution)
@@ -748,8 +751,9 @@ def run_account(a, tm, account, pooled):
             tm.state["stats"]["skipped_expected"] += 1
             print(f"skip {step[0]}: the signed call would revert ({why2})")
             continue
-        if est2 > est and step[0] != "burnTokens" and not a.caller_funded_exit:
-            signed_cost = execution_cost(est2, bid, a.fail_rate_bps, billed_ratio(tm, step[0]))
+        if step[0] != "burnTokens" and not a.caller_funded_exit:
+            gas2, ratio2 = billed_basis(tm, target, args, est2, fees, step[0])
+            signed_cost = execution_cost(gas2, bid, a.fail_rate_bps, ratio2)
             if pay + max_loss < signed_cost * (10_000 + a.min_return_bps) // 10_000:
                 skip.add(plan_key(step))
                 tm.state["stats"]["skipped_loss"] += 1

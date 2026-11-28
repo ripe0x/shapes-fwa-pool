@@ -51,11 +51,8 @@ bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         assertEq(vault.lastCheckpointInterval(), priorInterval, "the interval slot stays free");
 
         uint256 request = vault.requestCharge();
-        uint256 unwind = M.mulDiv(M.mulDiv(aliceShares, vault.lastNav(), vault.totalShares()),
-            vault.unwindCharge(), 0.0663 ether);
-        uint256 exactCharge = request + unwind;
+        uint256 exactCharge = request; // exits are unpaid; the redemption charge is just the checkpoint
         emit log_named_uint("request charge wei", request);
-        emit log_named_uint("unwind charge wei", unwind);
         emit log_named_uint("exact redemption charge wei", exactCharge);
         bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);

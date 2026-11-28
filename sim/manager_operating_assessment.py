@@ -22,14 +22,18 @@ ROOT = Path(__file__).resolve().parent.parent
 CAPITAL = 5 * 10**17
 REQUIRED_GAS = ('create', 'setExiting', 'withdraw', 'unlist', 'liquidate', 'recover_sync',
                 'processAcquisitions', 'build', 'list', 'sync', 'harvest')
-METERED_OPERATIONS=('build','list','sync','unlist','liquidate')
+# D86: keeper pay is for routine build/list/sync only. Exit unlist/liquidate are caller-funded and
+# pay 0 (StrategyLib._pay essential path), so they are owner-expense ops priced via owner_gas_curves,
+# not keeper work meters. Routine (non-exit, underwater) paid unlist stays paid in the contract but
+# is unreachable for a personal manager (no holder shortfall) and so is an explicit untested gap here.
+METERED_OPERATIONS=('build','list','sync')
 OWNER_OPERATIONS=('create','setExiting','withdraw','unlist','liquidate','recover_sync','processAcquisitions','harvest')
 OWNER_SAMPLE_ALIASES={'recover_sync':'recover','unlist':'recoverUnlist','liquidate':'recoverLiquidate'}
 KNOWN_UNSUPPORTED=('larger sync batches',)
 CELLS = tuple(dict(id=f'b{backing}-r{reserve}-f{fee}-g{gas}',backing_bps=backing,
                   reserve_wei=reserve,mint_fee_wei=fee,total_gas_gwei=gas)
-              for backing in (70000,) for reserve in (5*10**15,6*10**15)
-              for fee in (5*10**14,10**15) for gas in (.2,.5))
+              for backing in (16667,70000) for reserve in (6*10**15,)
+              for fee in (5*10**14,) for gas in (.2,.5))
 WORKER = None
 
 
@@ -308,7 +312,7 @@ def manifest(args):
         verify_measurement_receipts(costs, packets)
     if observation.get('readOnly') is not True or observation.get('oracleExempt') is not True or observation.get('rpc') != 'https://mainnet.gateway.tenderly.co':
         raise ValueError('verified Tenderly oracle/fee observation required')
-    if observation['mintFeeWei'] != 5*10**14 or values['acceptedMintFeeWei'] != 10**15:
+    if observation['mintFeeWei'] != 5*10**14 or values['acceptedMintFeeWei'] != 5*10**14:
         raise ValueError('observed/accepted fees changed; rescope the declared fee comparison')
     protocol = observation['protocol']
     constants = dict(surchargeBps=round(F.SUR*10000), ownerAcquisitionFeeBps=round(F.CUT*10000),
@@ -365,7 +369,7 @@ def manifest(args):
         estimate_curve_sources={op:estimate_samples(operation_samples(costs,op))[0]['estimateKind'] for op in costs.get('gas_curves',{})},
         unmeasured_operations=costs.get('unmeasured_operations', []), manager_values=values,
         mint_fee_observation=observation, protocol_minimum_backing=minimum,
-        fee_cases={str(5*10**14):'Observed current mint fee',str(10**15):'Historical/accepted maximum comparison'},
+        fee_cases={str(5*10**14):'Observed current mint fee'},
         expected_rows=2*(2*args.paths_per_window+4)*len(CELLS),
         buyer_regimes=['observed-choices','forced-responsive-bid-stress'],
         physical_sync_cost_basis='Exact verified allowance/units context under recorded full GasSchedule; paid event spans and separately billed paired unpaid recovery receipts. Unknown contexts refuse; quote coefficients are not actual gas expense',
@@ -478,7 +482,7 @@ def run_path(task):
             user_gas_estimate_proxy=frozen['gas_estimate_proxy'],gas_curves=frozen['gas_curves'],gas_meter_proxy=frozen['gas_meter_proxy'],gas_meter_max_work=frozen['gas_meter_max_work'],
             owner_gas_curves=frozen['owner_gas_curves'],owner_gas_max_work=frozen['owner_gas_max_work'],
             full_gas_schedule=frozen['full_gas_schedule'],sync_contexts=frozen['sync_contexts'],owner_sync_contexts=frozen['owner_sync_contexts'],
-            manager_keeper_zero_loss=True,manager_keeper_receipt_history=True, owner_exit_spend_limit_wei=frozen['owner_exit_spend_limit_wei'])
+            manager_keeper_zero_loss=True,manager_keeper_receipt_history=True,manager_keeper_executed_gas=True, owner_exit_spend_limit_wei=frozen['owner_exit_spend_limit_wei'])
         started = time.monotonic()
         with admission(cell['backing_bps']==10000, frozen['protocol_minimum_backing']['value_wei']):
             raw = F.run(sc,1,seed,days=30,values=values)

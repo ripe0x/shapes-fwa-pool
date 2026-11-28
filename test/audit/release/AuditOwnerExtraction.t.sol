@@ -15,12 +15,12 @@ contract AuditOwnerExtraction is ForkBase {
         p.essentialCeiling = 0.5 gwei;
         p.maxTip = 0.05 gwei;
         p.workFee = 0.00002 ether;
-        p.payMarkupBps = 0;
+
         p.reserve = 0.005 ether;
         p.routineCap = 0.03 ether;
         p.routineRate = 0.0008 ether;
-        p.essentialCap = 0.01 ether;
-        p.essentialRate = 0.0002 ether;
+
+
         bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
         vault.setParams(p, _expected0);
@@ -43,39 +43,37 @@ contract AuditOwnerExtraction is ForkBase {
         p.essentialCeiling = 50 gwei;
         p.maxTip = 50 gwei;
         p.workFee = 0.00005 ether;
-        p.payMarkupBps = 1_000;
+
         p.routineCap = 0.3 ether;
         p.routineRate = 0.01 ether;
-        p.essentialCap = 0.1 ether;
-        p.essentialRate = 0.005 ether;
+
+
 
         p.tvlCap = type(uint128).max;
         bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
         vault.setParams(p, _expected2);
-        (uint256 routine, uint256 essential) = vault.budget();
+        uint256 routine = vault.budget();
         assertLt(routine, 0.03 ether, "raising cap did not refill spent budget");
-        assertEq(essential, 0.01 ether);
         emit log_named_uint("canary routine remaining before extraction", routine);
 
         uint256 beforePay = owner.balance;
         vm.prank(owner);
         uint256 paidUnlist = TestVaultOps.unlist(vault, ids, 0);
-        assertEq(paidUnlist, routine, "unlist pays entire remaining routine budget");
+        // A8 measured pay: a routine unlist pays only for measured work, and that pay can never
+        // exceed the routine budget. That budget is the sole value a compromised owner can extract.
+        assertGt(paidUnlist, 0, "routine unlist pays for the measured work done");
+        assertLe(paidUnlist, routine, "routine pay is bounded by the remaining routine budget");
         vm.prank(owner);
         vault.startWindDown();
         bytes32 _expected3 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
         uint256 paidLiquidate = vault.liquidate(40, 0, _expected3);
-        assertEq(paidLiquidate, essential, "liquidate pays entire essential budget");
-        assertEq(owner.balance - beforePay, routine + essential);
+        assertEq(paidLiquidate, 0, "liquidate is exit work and pays nothing");
+        assertEq(owner.balance - beforePay, paidUnlist, "owner extracts only the measured routine pay; exits are unpaid");
         emit log_named_uint("owner keeper pay extracted wei", owner.balance - beforePay);
-        (routine, essential) = vault.budget();
-        assertEq(routine, 0);
-        assertEq(essential, 0);
+        assertEq(vault.budget(), routine - paidUnlist, "only the measured routine pay leaves the budget");
         vm.warp(block.timestamp + 1 days);
-        (routine, essential) = vault.budget();
-        assertEq(routine, 0.01 ether);
-        assertEq(essential, 0.005 ether);
+        assertEq(vault.budget(), routine - paidUnlist + 0.01 ether, "budget refills one routine rate per day");
     }
 }

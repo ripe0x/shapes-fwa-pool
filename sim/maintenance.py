@@ -46,11 +46,11 @@ def analyze(database, values_path):
                          shortfall_30d_wei=max(0, pay - budget),
                          steady_refill_shortfall_per_day_wei=max(0, -(-pay // 30) - p['routineRatePerDayWei'])))
     state = policy.State(now=0, gas_price=200_000_000, base_fee=150_000_000,
-                         gas_ceiling=p['gasCeilingWei'], max_tip=p['maxTipWei'], markup_bps=p['payMarkupBps'],
+                         gas_ceiling=p['gasCeilingWei'], max_tip=p['maxTipWei'],
                          share_bps=p['keeperShareBps'], k=0, backing=0, min_edge_bps=p['minEdgeBps'],
                          mint_fee=10**15, settlement_window=0, blackout=False, queue_drained=True,
                          checkpoint_done_this_interval=False, work_fee=p['workFeeWei'],
-                         essential_cap=p['essentialCapWei'], essential_ceiling=p['essentialCeilingWei'])
+                         essential_ceiling=p['essentialCeilingWei'])
     catchup = (policy.Q['sync'] + policy.MAX_BATCH['journal'] * policy.Q['journal']) * p['gasCeilingWei']
     return dict(history=dict(end_block=block, end_timestamp=end, start_timestamp=end - 30 * DAY,
                              completed=entries, successful=successful, refunded=entries - successful),

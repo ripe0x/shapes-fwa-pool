@@ -1,0 +1,23 @@
+{
+  "status": "UNSIGNED_ADDRESS_DATA_NOT_LIVE_CONFIGURATION",
+  "deploymentTarget": "manager",
+  "chainId": 1,
+  "rpc": "https://mainnet.gateway.tenderly.co",
+  "factory": "0xbfff9760ec41a3a9167f641e17af8d93503c79a4",
+  "vault": null,
+  "environment": {
+    "FACTORY": "0xbfff9760ec41a3a9167f641e17af8d93503c79a4",
+    "RPC_URL": "https://mainnet.gateway.tenderly.co",
+    "KEEPER_KEYSTORE_PATH": "<existing read-only keystore mount path>",
+    "KEEPER_PASSWORD_FILE": "<existing read-only password mount path>"
+  },
+  "discoveryFromBlock": "set to the separately authorized factory deployment receipt block",
+  "command": [
+    "python3",
+    "keeper/keeper.py",
+    "--factory",
+    "0xbfff9760ec41a3a9167f641e17af8d93503c79a4"
+  ],
+  "signer": "existing separately selected external keystore; no secret is included",
+  "sharedVaultOpen": false
+}

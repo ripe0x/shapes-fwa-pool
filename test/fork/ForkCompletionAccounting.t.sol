@@ -13,6 +13,9 @@ import {ReconcileTrace} from "../utils/ReconcileTrace.sol";
 contract ForkCompletionAccountingTest is ForkBase {
     address carol = makeAddr("pack-vault-test-completion-carol");
     string constant TRACE = "sim/out/reconcile-contributions-trace.jsonl";
+    // Keeper cash delta for the next _trace, passed via storage (not a stack arg) so the wide trace
+    // string.concat in the deep reconcile test stays under the via_ir stack limit. Reset each trace.
+    uint256 private _ckPay;
 
     receive() external payable {}
 
@@ -26,8 +29,8 @@ contract ForkCompletionAccountingTest is ForkBase {
         p.backingRatioBps = 70_000;
         p.reserve = 0.005 ether;
         p.upliftBoundBps = 25;
-        p.essentialCap = 0;
-        p.essentialRate = 0;
+
+
         _settings(p);
     }
 
@@ -291,6 +294,10 @@ contract ForkCompletionAccountingTest is ForkBase {
         uint256 witnessId = TestVaultOps.witness(vault);
         vm.expectRevert(PackVault.MintFeeNotAccepted.selector);
         vault.checkpoint(witnessId, 0, expected);
+        // The reserve already holds the earlier committing checkpoint's unused charge (it now pays
+        // its measured work, below the charge), refundable to that payer. Recovery must not add to
+        // it: while pending holder work exists, bob's charge stays protected in processingPool.
+        uint256 reserveBefore = vault.chargeRefundReserve();
         uint256 beforeKeeper = keeper.balance;
         vm.prank(keeper);
         vault.recoverCheckpoint(witnessId);
@@ -301,7 +308,7 @@ contract ForkCompletionAccountingTest is ForkBase {
         assertEq(vault.epoch(), pricingEpoch, "uncommitted escrow retains its pricing epoch");
         assertEq(vault.chargeEra(), era, "unpriced deposits retain their relevant checkpoint sponsorship");
         assertGt(vault.processingPool(), 0);
-        assertEq(vault.chargeRefundReserve(), 0, "pending holder work keeps this funding protected");
+        assertEq(vault.chargeRefundReserve(), reserveBefore, "pending holder work keeps this funding protected");
         uint256 before = bob.balance;
         vm.prank(bob);
         vault.cancelDeposit();
@@ -332,7 +339,8 @@ contract ForkCompletionAccountingTest is ForkBase {
 
     function _trace(string memory action) internal {
         vm.writeLine(TRACE, string.concat('{', action, ',"expected":',
-            ReconcileTrace.render(vault, alice, bob, 0, "contribution"), '}'));
+            ReconcileTrace.render(vault, alice, bob, _ckPay, "contribution"), '}'));
+        _ckPay = 0;
     }
 
     function test_reconcileContributionErasEveryWei() public {
@@ -385,6 +393,10 @@ contract ForkCompletionAccountingTest is ForkBase {
         expected = vault.configurationHash();
         vm.prank(keeper);
         uint256 paid = vault.checkpoint(0, 0, expected);
+        // A funded (essential) checkpoint pays the keeper; hand that cash delta to render's
+        // measuredWork window (require(paidTotal == pay)) through _ckPay rather than a second _trace
+        // argument, which would add a call-argument slot and overflow this deep function (via_ir).
+        _ckPay = paid;
         _trace(string.concat('"action":"closeCheckpoint","pay":', vm.toString(paid),
             ',"constructionCost":', vm.toString(construction), ',"referenceCapital":', vm.toString(capital)));
         uint256 refundAlice = vault.checkpointRefund(2);

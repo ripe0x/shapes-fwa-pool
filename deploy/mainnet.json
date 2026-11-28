@@ -5,9 +5,7 @@
  "owner": "0xCB43078C32423F5348Cab5885911C3B5faE217F9",
  "seedWei": 10000000000000000,
  "minEdgeBps": 100,
- "bufferBps": 0,
  "distributionBps": 0,
- "payMarkupBps": 0,
  "keeperShareBps": 2500,
  "packUnitsMask": 8,
  "gasCeilingWei": 500000000,
@@ -18,11 +16,9 @@
  "tvlCapWei": 340282366920938463463374607431768211455,
  "routineCapWei": 100000000000000000,
  "routineRatePerDayWei": 20000000000000000,
- "essentialCapWei": 0,
- "essentialRatePerDayWei": 0,
  "upliftBoundBps": 25,
  "backingRatioBps": 70000,
- "acceptedMintFeeWei": 1000000000000000,
+ "acceptedMintFeeWei": 500000000000000,
  "minDepositWei": 10000000000000000,
  "minDistributionWei": 10000000000000000,
  "gasSchedule": {
@@ -44,18 +40,11 @@
   "pruned": 45000,
   "unlist": 340000,
   "unlisted": 285000,
-  "liquidate": 75000,
-  "liquidatePack": 80000,
-  "redeemShape": 35000,
-  "recoveryBase": 100000,
-  "recoveryShape": 35000,
-  "recoveryUnseal": 70000,
-  "harvest": 125000,
   "harvested": 80000,
   "credit": 40000,
   "fund": 40000,
   "overhead": 100000
  },
  "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
- "expectedMintFeeWei": 1000000000000000
+ "expectedMintFeeWei": 500000000000000
 }

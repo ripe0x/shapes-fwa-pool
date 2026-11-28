@@ -31,6 +31,9 @@ EXPOSURE_SHARE_HIGH_BPS = 1_000  # 10%
 
 # Default calibration only. Every observed account carries its own schedule.
 Q = {GAS_KEYS[k]: v for k, v in GAS_DEFAULTS.items()}
+# Keeper-side gas estimate for the (unpaid) harvest op. The account's Params no longer carries a
+# harvest field, so this one named constant is the single source for harvest gas modelling.
+HARVEST_GAS = 125_000
 REF_UNITS = 3
 MIN_PACK_UNITS, MAX_PACK_UNITS = 3, 30
 MAX_SCAN = 96  # hard work bound, independent of mutable quote coefficients
@@ -63,7 +66,6 @@ class State:
     base_fee: int
     gas_ceiling: int
     max_tip: int
-    markup_bps: int
     share_bps: int
     k: int  # 1e18 scale, live
     backing: int  # live gated backing for a build_units pack, 0 when the gate fails
@@ -115,12 +117,12 @@ class State:
     slowdown_volume: float = 0.0
     reserve: int = 0  # the vault's `reserve` parameter
     work_fee: int = 0  # flat wei per unit of work (D55)
-    routine_budget: int = 10**30  # keeper budgets available now (PackVault.budget())
-    essential_budget: int = 10**30
+    routine_budget: int = 10**30  # routine keeper budget available now (PackVault.budget())
     distribution_due: bool = False  # a no-flow checkpoint would distribute now (simulated)
     pack_units_mask: int = 1 << REF_UNITS  # account packUnitsMask: the pack sizes it admits
     build_units: int = REF_UNITS  # pack size the keeper builds; must be enabled in pack_units_mask
-    essential_ceiling: int = None  # redemption and wind-down work; None = same as gas_ceiling
+    build_room: int = None  # packs of build_units the account design still allows; None = no count
+    essential_ceiling: int = None  # holder-funded redemption checkpoints; None = same as gas_ceiling
     book_pack_count: int = 0
     book_shape_count: int = 0
     book_capital: int = 0
@@ -129,14 +131,13 @@ class State:
     book_recovery_value: int = 0
     checkpoint_proof_entries: int = 0
     processing_pool: int = 0  # request charges already held for the next checkpoint (pool only)
-    essential_cap: int = None  # essentialCap; 0 = exit work unpaid (withdrawers run it)
     pooled: bool = True  # a PackVault (shares, checkpoints); False for a personal PackManager
     settlement_fee_bps: int = 100
     gas_schedule: dict = field(default_factory=lambda: Q.copy())
     backing_ratio_bps: int = 70_000
     keeper_cash: int = None
     operating_reserve: int = 0
-    accepted_mint_fee: int = 10**15
+    accepted_mint_fee: int = 5*10**14
     configuration_hash: str = ""
     caller_funded_exit: bool = False
     request_funding_needed: int = 0
@@ -154,10 +155,7 @@ def quote(s, gas, units=0, essential=False):
     """Conservative payment envelope; work allowances cap measured gas."""
     if gas == 0 and units == 0:
         return 0
-    q = (gas + s.gas_schedule['overhead']) * price(s, essential)
-    if not essential:
-        q = q * (BPS + s.markup_bps) // BPS
-    return q + units * s.work_fee
+    return (gas + s.gas_schedule['overhead']) * price(s, essential) + units * s.work_fee
 
 
 def payment(s, gas, units=0, essential=False, *, measured_gas, tx_gas_price=None):
@@ -168,8 +166,6 @@ def payment(s, gas, units=0, essential=False, *, measured_gas, tx_gas_price=None
         raise ValueError('measured gas must be nonnegative')
     paid_price = min(s.gas_price if tx_gas_price is None else tx_gas_price, price(s, essential))
     amount = (min(measured_gas, gas) + s.gas_schedule['overhead']) * paid_price
-    if not essential:
-        amount = amount * (BPS + s.markup_bps) // BPS
     return amount + units * s.work_fee
 
 
@@ -185,32 +181,18 @@ def position_value(s, units=None):
     return value + value * s.backing_ratio_bps // BPS
 
 
-def edge_backing(k, cap, s_bps, units, gas_ceiling, markup_bps, work_fee, buffer_bps=0, min_edge_bps=100,
-                 discount_bps=9_150, price=None, mint_fee=10**15, backing_ratio_bps=70_000,
+def edge_backing(k, cap, s_bps, units, gas_ceiling, work_fee, min_edge_bps=100,
+                 discount_bps=9_150, price=None, mint_fee=5*10**14, backing_ratio_bps=11_053,
                  gas_schedule=None, newly_built=True, reference_units=None, retirement_shapes=None):
-    """Adjustable ratio backing, with actual FWA admission and no buyer-choice preference."""
-    q = Q if gas_schedule is None else gas_schedule
+    """Adjustable ratio backing, with actual FWA admission and no buyer-choice preference.
+    Gas and build arguments are accepted for callers but no longer priced (VaultLib._profitable)."""
     value = units * UNIT
     floor = -(-value * BPS // 9500)  # Conservative NAV coverage at the protocol maximum 5% keep settlement fee.
     desired = value * backing_ratio_bps // BPS // BPS * BPS
     if cap is not None:
-        desired = min(desired, cap * (BPS - buffer_bps) // BPS // BPS * BPS)
-    pr = gas_ceiling if price is None else price
-    gas = sum(q[x] for x in ('sync', 'journal', 'selected', 'synced', 'pruned', 'sync_funding', 'harvested', 'sync_credit'))
-    recipe = units if newly_built or reference_units is None else reference_units
-    construction = (q['build'] + q['build_pack'] + shape_count(recipe)*q['build_shape'] + q['listed']) * pr*(BPS+markup_bps)//BPS + 2*work_fee + shape_count(recipe)*mint_fee
-    service_units = 1 if newly_built else 2
-    if not newly_built:
-        gas += q['list'] + q['listed']
-        construction = 0
-    # A construction and a synchronization are distinct transactions; a returned
-    # pack instead requires synchronization and relisting.
-    overhead_calls = 1 if newly_built else 2
-    construction += (q['overhead'] * pr * (BPS + markup_bps) // BPS) if newly_built else 0
-    cycle = (gas + overhead_calls*q['overhead'])*pr*(BPS+markup_bps)//BPS + service_units*work_fee
+        desired = min(desired, cap // BPS * BPS)  # listing uses the oracle cap directly (no buffer)
     ok = (cap != 0 and k >= 10**18 + min_edge_bps * 10**14 and desired >= floor
-          and desired * (k - 10**18) // 10**18 > cycle + construction
-          and desired * (k - s_bps * 10**14) // 10**18 >= value + cycle + construction)
+          and desired * (k - s_bps * 10**14) // 10**18 >= value)  # VaultLib._profitable: no gas or build cost
     return desired if ok else 0
 
 
@@ -264,16 +246,13 @@ def cycle_net(s):
 
 
 def build_net(s):
-    """Worst purchaser outcome after the complete initial cost, including all paid primary mints."""
+    """Worst one-cycle purchaser outcome per pack: bid margin, or keep payout less Shapes principal.
+    Gas and mint fees are excluded by owner decision; the build gate charges neither."""
     if s.k <= 10**18 or not s.backing:
         return 0
-    q = s.gas_schedule
-    common = sum(q[k] for k in ('sync','journal','selected','synced','pruned','sync_funding','harvested','sync_credit'))
-    maintenance = quote(s, common, 1)
-    cost=maintenance+build_cost(s)
     bid=s.backing*(s.k-10**18)//10**18
     keep=s.backing*(s.k-s.settlement_fee_bps*10**14)//10**18-s.build_units*UNIT
-    return max(0,min(bid,keep)-cost)
+    return max(0,min(bid,keep)) if keep >= 0 else 0
 
 
 def build_cost(s, units=None):
@@ -305,35 +284,6 @@ def deploy_charge(s):
     reference = position_value(s)
     return max((-(-build_cost(s, u) * reference // position_value(s, u))
                 for u in range(MIN_PACK_UNITS, MAX_PACK_UNITS + 1) if (s.pack_units_mask >> u) & 1), default=0)
-
-
-def unwind_charge(s):
-    """Actual maintained book exposure, or bounded allowed-recipe comparison before first build."""
-    if s.essential_cap == 0:
-        return 0
-    q, reference = s.gas_schedule, position_value(s)
-    if (s.book_pack_count or s.book_recovery_count) and s.book_capital:
-        count = s.book_pack_count
-        gas = s.active_count*q['unlisted'] + count*q['liq_pack'] + s.book_shape_count*q['redeem_shape']
-        per_call=min(MAX_BATCH['liquidate'],60//(s.book_max_units or MAX_PACK_UNITS)) if count else MAX_BATCH['liquidate']
-        calls = -(-s.active_count//MAX_BATCH['unlist']) + -(-count//per_call)
-        gas += -(-s.active_count//MAX_BATCH['unlist'])*q['unlist'] + -(-count//per_call)*q['liquidate']
-        units=s.active_count+count
-        if s.book_recovery_count:
-            shapes=s.book_recovery_value//UNIT
-            chunks=-(-shapes//30)+s.book_recovery_count-1
-            gas+=shapes*q['recovery_shape']+s.book_recovery_count*q['recovery_unseal']+chunks*(q['liquidate']+q['recovery_base'])
-            units+=chunks
-            calls+=chunks
-        if calls == 0:
-            return 0
-        return -(-quote(s, gas + (calls-1)*q['overhead'], units, True)*reference//s.book_capital)
-    costs = []
-    for u in range(MIN_PACK_UNITS, MAX_PACK_UNITS+1):
-        if s.pack_units_mask >> u & 1:
-            gas = q['unlist']+q['unlisted']+q['liquidate']+q['liq_pack']+shape_count(u)*q['redeem_shape']
-            costs.append(-(-quote(s, gas + q['overhead'], 2, True)*reference//position_value(s,u)))
-    return max(costs, default=0)
 
 
 def sync_funding_candidates(s, terminal_ids, active, checkpoint_due):
@@ -437,7 +387,7 @@ def plan(s):
                 break
             earning.append(listing)
             amount += listing.pending_fees
-        hgas = q["harvest"] + q["harvested"] * len(earning)
+        hgas = HARVEST_GAS + q["harvested"] * len(earning)
         # A due checkpoint already sweeps fee credit without a separate transaction.
         if amount >= shortfall and hgas < q["unlist"] + q["unlisted"] and not (not earning and credit_checkpoint):
             out.append(("harvest", sorted(l.id for l in earning)))
@@ -507,8 +457,9 @@ def plan(s):
         proposals = s.build_proposals[:MAX_BATCH["build"]]
         build = build_cost(s, units)
         n = 0  # largest batch the vault's capital check accepts: per-pack mint cost plus backing
-        for c in range(min(len(proposals), MAX_BATCH["build"]), 0, -1):
-            if c * price + sum(proposals[:c]) + quote(s,q['build']+c*(q['build_pack']+shape_count(units)*q['build_shape']+q['listed']),2*c) <= idle:
+        limit = MAX_BATCH["build"] if s.build_room is None else min(MAX_BATCH["build"], s.build_room)
+        for c in range(min(len(proposals), limit), 0, -1):
+            if c * price + sum(proposals[:c]) + quote(s,q['build']+c*(q['build_pack']+shape_count(units)*q['build_shape']+q['listed']),2*c) <= max(0, idle - s.idle_funding):
                 n = c
                 break
         # The build repays from the keep outcome (build_net), not the bid-only cycle_net.
@@ -524,9 +475,9 @@ def reserve_need(s):
     only, with no per-entry work fee. Essential catchup is priced at its own ceiling.
     """
     q = s.gas_schedule
-    listing = (q["list"] + q["listed"] * MAX_BATCH["list"] + q["overhead"]) * s.gas_ceiling * (BPS + s.markup_bps) // BPS
+    listing = (q["list"] + q["listed"] * MAX_BATCH["list"] + q["overhead"]) * s.gas_ceiling
     catchup = (q["sync"] + MAX_BATCH["journal"] * q["journal"] + MAX_BATCH["prune"] * q["pruned"])
-    routine = (catchup + q["overhead"]) * s.gas_ceiling * (BPS + s.markup_bps) // BPS
+    routine = (catchup + q["overhead"]) * s.gas_ceiling
     return listing + MAX_BATCH["list"] * s.work_fee + routine
 
 
@@ -615,8 +566,8 @@ def status(s, planned=None):
         out.append(("MINT_FEE_NOT_ACCEPTED", "action", f"live mint fee {s.mint_fee} wei exceeds accepted {s.accepted_mint_fee} wei"))
     if s.routine_budget == 0:
         out.append(("ROUTINE_BUDGET_EMPTY", "wait", "strategy work is unpaid until the routine budget refills"))
-    if s.essential_budget == 0 and (s.locked_shares or s.winding_down):
-        out.append(("ESSENTIAL_BUDGET_EMPTY", "action", "unlisting and liquidation are unpaid; holders can run them; sync uses routine permission"))
+    if s.locked_shares or s.winding_down:
+        out.append(("EXITS_UNPAID", "action", "unlisting and liquidation are unpaid; holders can run them; sync uses routine permission"))
     if s.reserve < reserve_need(s) and not s.winding_down:
         out.append(("RESERVE_BELOW_NEED", "info", f"reserve {s.reserve / 1e18:.4f} ETH; maximum listing and sync batches quote {reserve_need(s) / 1e18:.4f} ETH"))
     if not out:

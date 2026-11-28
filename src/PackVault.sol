@@ -35,7 +35,6 @@ contract PackVault is PackAccount {
     uint256 internal constant BPS = 10_000;
     uint256 internal constant INTERVAL = 12 hours; // FWA purchase interval
     uint256 internal constant SCALE = 1e36;
-    uint256 internal constant OP_CHECKPOINT = 8;
     uint256 internal constant MIN_SEED = 0.01 ether;
     uint256 public constant DEAD_SHARES = VaultLib.DEAD_SHARES;
 
@@ -243,12 +242,10 @@ contract PackVault is PackAccount {
         _checkConfiguration(expected);
         _settleHolder(msg.sender);
         if (amount == 0 || amount > sharesOf[msg.sender]) revert Amount();
-        // Charges: the checkpoint (to the pool) and unwinding positions worth the shares' value
-        // (to the vault, which pays for that work).
-        uint256 ck = requestCharge();
-        uint256 charge = ck + M.mulDiv(M.mulDiv(amount, lastNav, totalShares), unwindCharge(), positionValue());
+        // Only charge the checkpoint (to the pool). Exit work is unpaid, so there is no unwind charge.
+        uint256 charge = requestCharge();
         if (msg.value < charge) revert Amount();
-        _contribute(msg.sender, ck);
+        _contribute(msg.sender, charge);
         if (msg.value > charge) msg.sender.forceSafeTransferETH(msg.value - charge);
         _settleDist(msg.sender);
         sharesOf[msg.sender] -= amount;
@@ -328,7 +325,7 @@ contract PackVault is PackAccount {
     function _syncCheckpoint(uint256[] calldata ids, uint256 witnessId, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256 paid) {
         _checkConfiguration(expected);
         if (pendingDepositTotal == 0 && lockedShares == 0) revert Nothing();
-        paid = StrategyLib.syncFunded(s, fwa, packs, ids, witnessId, 1, minPay, processingPool, gasStart);
+        paid = StrategyLib.syncFunded(s, fwa, packs, ids, witnessId, 1, minPay, processingPool, gasStart - gasleft());
         processingPool -= paid;
     }
 
@@ -506,13 +503,13 @@ contract PackVault is PackAccount {
         if (work) {
             // Source classification survives the final redemption. Contributions never become
             // general free cash; unused wei move directly to their payers' protected reserve.
-            uint256 paidKeeper = StrategyLib.payFunded(s, OP_CHECKPOINT, gasQ, 1, true, minPay, processingPool, gasStart);
+            uint256 paidKeeper = StrategyLib.payFunded(s, gasQ, 1, true, minPay, processingPool, gasStart - gasleft());
             processingPool -= paidKeeper;
             _closeChargeEra();
             return paidKeeper;
         }
         if (distributed != 0) {
-            return StrategyLib.pay(s, OP_CHECKPOINT, gasQ, 1, false, minPay, type(uint256).max, gasStart);
+            return StrategyLib.pay(s, gasQ, 1, false, minPay, type(uint256).max, gasStart - gasleft());
         }
         // No flows and nothing distributed: revert, so the interval's one slot stays free (audit E3).
         revert Nothing();
@@ -547,11 +544,6 @@ contract PackVault is PackAccount {
     ///         keeper margin that building it can pay out at any gas price.
     function deployCharge() public view returns (uint256) {
         return VaultLib.deployCharge(s.params, shapes.mintFee());
-    }
-
-    /// @notice Unwind allowance per reference position.
-    function unwindCharge() public view returns (uint256) {
-        return VaultLib.unwindCharge(s.params, s.book);
     }
 
     function positionValue() public view returns (uint256) {

@@ -79,7 +79,7 @@ library ReconcileTrace {
             out = string.concat(out, '{"measuredGas":', vm.toString(measured),
                 ',"gasAllowance":', vm.toString(allowance), ',"gasPrice":', vm.toString(price),
                 ',"workUnits":', vm.toString(units), ',"essential":', essential ? "true" : "false",
-                ',"overhead":', vm.toString(p.gasSchedule.overhead), ',"markupBps":', vm.toString(p.payMarkupBps),
+                ',"overhead":', vm.toString(p.gasSchedule.overhead),
                 ',"txGasPrice":', vm.toString(tx.gasprice), ',"baseFee":', vm.toString(block.basefee),
                 ',"paid":', vm.toString(amount), '}');
         }
@@ -95,9 +95,9 @@ library ReconcileTrace {
             ',"creatorFees":', vm.toString(creatorFees), ',"balance":', vm.toString(address(account).balance),
             ',"open":', vm.toString(account.openListingCount()), ',"idle":', vm.toString(account.idlePackCount()));
         line = string.concat(line, book(facade), ',"feeCredit":', vm.toString(account.fwa().feeCredit(address(account))), measuredWork(account, pay));
-        (uint256 routine, uint256 essential) = account.budget();
+        uint256 routine = account.budget();
         line = string.concat(line, ',"reserve":', vm.toString(account.getParams().reserve),
-            ',"routineBudget":', vm.toString(routine), ',"essentialBudget":', vm.toString(essential), '}');
+            ',"routineBudget":', vm.toString(routine), '}');
     }
 
     function render(PackVault v, address alice, address bob, uint256 pay, string memory step) internal view returns (string memory line) {

@@ -28,11 +28,10 @@ library MeasuredPay {
     }
 
     function amount(VaultLib.Params memory p, uint256 measured, uint256 allowance, uint256 price,
-        uint256 units, bool essential) private pure returns (uint256)
+        uint256 units, bool) private pure returns (uint256)
     {
         uint256 reimbursed = measured < allowance ? measured : allowance;
-        return (reimbursed + p.gasSchedule.overhead) * price
-            * (essential ? 10_000 : 10_000 + uint256(p.payMarkupBps)) / 10_000 + units * p.workFee;
+        return (reimbursed + p.gasSchedule.overhead) * price + units * p.workFee;
     }
 
     /// @dev Aggregate a whole lifecycle, retaining every call and any zero-clipped measurement.

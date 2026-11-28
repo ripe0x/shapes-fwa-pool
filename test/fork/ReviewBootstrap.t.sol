@@ -27,10 +27,10 @@ contract ReviewBootstrapTest is ForkBase {
             assertEq(actors[i].code.length, 0); assertEq(actors[i].balance, 0);
         }
         VaultLib.Params memory p = defaultParams();
-        p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei; p.payMarkupBps = 0;
+        p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei;
         p.reserve = 0.005 ether; p.tvlCap = 2 ether;
         p.routineCap = 0.03 ether; p.routineRate = 0.0008 ether;
-        p.essentialCap = 0; p.essentialRate = 0;
+
         vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
     }
 

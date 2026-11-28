@@ -53,7 +53,7 @@ contract ForkTokensTest is Test {
         p.minDeposit = 0.01 ether;
         p.minDistribution = 0.01 ether;
         p.minEdgeBps = 100;
-        p.payMarkupBps = 1_000;
+
         p.maxTip = 0.05 gwei;
         p.keeperShareBps = 2_500;
         p.upliftBoundBps = 200;
@@ -64,8 +64,8 @@ contract ForkTokensTest is Test {
         p.tvlCap = 100 ether;
         p.routineCap = 0.3 ether; // bytecode maxima: these suites test mechanics, not budgets
         p.routineRate = 0.01 ether;
-        p.essentialCap = 0.1 ether;
-        p.essentialRate = 0.005 ether;
+
+
         vm.deal(address(this), 6 ether);
         // Seed covers 16 six-unit packs: each costs P + 0.002 mint fee + backing (~0.13 ETH).
         vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 3 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));

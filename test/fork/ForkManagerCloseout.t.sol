@@ -30,8 +30,8 @@ abstract contract ManagerCloseoutBase is MainRenewalBase {
         p.tvlCap = 0;
         p.routineCap = 0.03 ether;
         p.routineRate = 0.01 ether;
-        p.essentialCap = 0.01 ether;
-        p.essentialRate = 0.005 ether;
+
+
     }
 
     function output() internal pure virtual returns (string memory);
@@ -162,7 +162,7 @@ abstract contract ManagerCloseoutBase is MainRenewalBase {
             ',"backings":[', vm.toString(replacement.backing), '],"feeDebt":', vm.toString(replacement.feeDebt), '}'));
 
         VaultLib.Params memory p = account.getParams();
-        p.routineCap = 0; p.routineRate = 0; p.essentialCap = 0; p.essentialRate = 0;
+        p.routineCap = 0; p.routineRate = 0;
         bytes32 expected = account.configurationHash();
         vm.prank(accountOwner); account.setParams(p, expected);
         _snapshot("permissionExhausted", "setParams", 0, "{}");
@@ -194,7 +194,7 @@ abstract contract ManagerCloseoutBase is MainRenewalBase {
         }
         assertEq(account.openListingCount(), 0); assertEq(account.idlePackCount(), 0); assertEq(account.recoveryPackCount(), 0);
         assertEq(FWA.feeCredit(address(account)), 0);
-        (uint256 routine, uint256 essential) = account.budget(); assertEq(routine, 0); assertEq(essential, 0);
+        assertEq(account.budget(), 0);
         uint256 returned = address(account).balance;
         vm.prank(accountOwner); manager.withdraw(accountOwner, returned);
         assertEq(accountOwner.balance - ownerInitial, returned, "withdrawal transfers actual cash only to the owner");

@@ -59,8 +59,8 @@ class LaunchValidationTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "missing"):
                         release.validate_launch_values(wrong, manager=manager)
 
-    def test_all_29_gas_fields_are_required_and_no_unknown_key_is_ignored(self):
-        self.assertEqual(len(release.GAS_FIELDS), 29)
+    def test_all_22_gas_fields_are_required_and_no_unknown_key_is_ignored(self):
+        self.assertEqual(len(release.GAS_FIELDS), 22)
         for key in release.GAS_FIELDS:
             with self.subTest(missing=key):
                 wrong = copy.deepcopy(self.main)
@@ -127,7 +127,7 @@ class LaunchValidationTests(unittest.TestCase):
                 elif change == "reorder":
                     fields[0], fields[1] = fields[1], fields[0]
                 else:
-                    fields.pop(20)
+                    fields.pop(16)
                 with self.assertRaisesRegex(ValueError, "Params names/types/order"):
                     release.validate_compiled_launch_abi(wrong, self.factory_abi)
 
@@ -157,7 +157,7 @@ class LaunchValidationTests(unittest.TestCase):
         wrong = copy.deepcopy(self.factory_abi)
         create = next(entry for entry in wrong if entry.get("name") == "create")
         create["inputs"].insert(2, {"name": "policy", "type": "address"})
-        with self.assertRaisesRegex(ValueError, "only.*owner, p, expected"):
+        with self.assertRaisesRegex(ValueError, "only.*owner, p, design, expected"):
             release.validate_compiled_launch_abi(self.vault_abi, wrong)
 
     def test_factory_and_constructor_nested_params_are_also_checked(self):
@@ -223,7 +223,7 @@ class ManagerDeploymentTests(unittest.TestCase):
                 release.validate_compiled_manager_abi(bad, self.factory_abi)
         bad = copy.deepcopy(self.factory_abi)
         next(e for e in bad if e.get("name") == "create")["inputs"].insert(2, {"name": "policy", "type": "address"})
-        with self.assertRaisesRegex(ValueError, "only.*owner, p, expected"):
+        with self.assertRaisesRegex(ValueError, "only.*owner, p, design, expected"):
             release.validate_compiled_manager_abi(self.manager_abi, bad)
         bad = copy.deepcopy(self.manager_abi)
         next(e for e in bad if e.get("type") == "constructor")["inputs"].append({"name": "policy", "type": "address"})

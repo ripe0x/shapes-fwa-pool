@@ -75,7 +75,7 @@ uplift needs at least 72 ETH preflow NAV at 25 bps; smaller pools wait for real 
 Verified completed work determines the gas allowance cap. Actual pay uses the lesser of the
 captured gasleft span and that cap, plus the account's named overhead allowance. The price is
 min(actual transaction gas price, basefee + configured priority allowance, class gas ceiling).
-Routine markup applies to routine gas compensation; verified service units add the work fee.
+Reimbursed gas is paid at that price (no markup); verified service units add the work fee.
 Cash, funding source and spending permission then clip the result. minPay rolls back all work
 when the final offer is too low. Quotes and holder charges remain conservative envelopes.
 No verified progress earns no overhead or repeat reward. Paid inputs must all be useful; stale,
@@ -84,7 +84,7 @@ foreign, duplicate or unnecessary hints revert atomically. Unpaid recovery toler
 The work span is gross gas before refunds, not receipt gasUsed. Keeper expense is measured from
 actual receipts and reported separately from account compensation. The candidate overhead of
 100,000 gas is provisional main-system calibration, not community's coefficient. Per-transaction
-overhead and positive markup can change incentives to split jobs; receipt comparisons must state
+overhead can change incentives to split jobs; receipt comparisons must state
 that tradeoff. Raising capacity never refills spent permission: old-rate accrual precedes a
 settings update and the new capacity clamps it. Numeric calibration remains immediately owner
 adjustable. Changing the algorithm requires new code.
@@ -96,8 +96,8 @@ use the journal. Receipt callbacks read no large configuration and call no exter
 Every real transaction remains subject to EIP-7825's 16,777,216 gas limit.
 
 Retained numerical bounds are explicit operating limits: gas ceilings 50 gwei, work fee 0.00005 ETH,
-routine capacity 0.3 ETH/refill 0.02 ETH per day, essential capacity 0.1 ETH/refill 0.005 ETH per day,
-routine markup 10%, harvest compensation share 50%, distribution share 50%, uplift tolerance 10%,
+routine capacity 0.3 ETH/refill 0.02 ETH per day (the single keeper budget; exit work is unpaid),
+harvest compensation share 50%, distribution share 50%, uplift tolerance 10%,
 backing ratio 100x and each gas coefficient 16,777,216. They constrain quoted spending, arithmetic
 and admission under the current algorithm; an owner cannot operate beyond them by settings alone.
 They are not a promise about owner-key compromise or sufficient keeper margins at every gas price.

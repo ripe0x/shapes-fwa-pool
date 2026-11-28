@@ -13,9 +13,8 @@ library Charges {
         return v.requestCharge() + escrow;
     }
 
-    /// @dev Exact charge for redeeming `shares` now.
-    function redeemCharge(PackVault v, uint256 shares) internal view returns (uint256) {
-        uint256 value = shares * v.lastNav() / v.totalShares();
-        return v.requestCharge() + value * v.unwindCharge() / v.positionValue();
+    /// @dev Exact charge for redeeming `shares` now: just the checkpoint charge (exits are unpaid).
+    function redeemCharge(PackVault v, uint256) internal view returns (uint256) {
+        return v.requestCharge();
     }
 }

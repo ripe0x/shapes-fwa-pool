@@ -1,0 +1,56 @@
+{
+  "status": "PASS",
+  "compensation_mode": "bounded-measured-v1",
+  "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python3",
+    "sim/manager_reconcile.py",
+    "--trace",
+    "sim/out/manager-measured-final-reuse-trace.jsonl",
+    "--output",
+    "docs/receipts/manager-gate-reconciliation.json"
+  ],
+  "source_sha256": {
+    "sim/manager.py": "c3bc13818bba8c2eeae5a12bfc8e2f1ecfb3d76a4ddb2780299066f1b74cfc68",
+    "sim/vault.py": "4a00ab89aa1f33f21761baeac0702f075dbdb3e8f5523637b79c57106b6bf829",
+    "sim/forward.py": "947f75e8f681890be4f5d0238d257cfa4dcd03e64420303bd656e350ed4a160b",
+    "keeper/policy.py": "73f5d953c707285e7e710ba81ed72bdc682428af13bb8b33c2387cf92584f78c",
+    "keeper/config.py": "c156e8ba3b178dd463a9adbfb6dd857557d750e8bf20027853b75d7e7b917458",
+    "sim/manager_reconcile.py": "f34f37ed41a2a6512e81d7959961ea86a59a281ab60043049c78394cfbb7590b"
+  },
+  "contract_source_sha256": {
+    "src/PackAccount.sol": "65b182c8e95e2bc45dcc2a1d17f5dede87edf5d2b9c345c9c7df181257537702",
+    "src/PackManager.sol": "d6d32b6e28fc8d14bfbc1f10208150e9f26e32a10a2c216457a79216cdf6f498",
+    "src/PackManagerFactory.sol": "e133a6e74d530288ab725006ad6af22eaf484cc666517b52e1fe83064bd47253",
+    "src/PackVault.sol": "321d2dc3f4e940033f71aa0fbd79924894d4aba956b9757ee01c8fed78b1b942",
+    "src/ScanLib.sol": "b58c10fd2c2310bbbb6779802496ef01f80c07853ed5b0232da23dc36b40255e",
+    "src/StrategyLib.sol": "14533fa5c10fa9bfd10d3a0146a713b47c64f445a9660e6f2144a359ff3ffeda",
+    "src/VaultLib.sol": "fb55231afb98887bda9f12dfd2a24ad1d035adf6cc9a25b6519f2c29b9dd4830",
+    "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+  },
+  "trace_writer_sha256": {
+    "test/fork/ForkManagerCloseout.t.sol": "5b082243247a433501ccfeba2a2e34443d31aa9eedd503858fe483ea52545ac2",
+    "test/utils/ReconcileTrace.sol": "2914b9c219f6dcea1f1d1ee21eb93c8ecca51666cb7c079b337fc7540482bc89"
+  },
+  "results": [
+    {
+      "trace": "sim/out/manager-measured-final-reuse-trace.jsonl",
+      "trace_sha256": "06714b519862057a1182837477974459decb41d6ab14a1c3a7d6754598c931a0",
+      "steps": 16,
+      "status": "PASS",
+      "failures": [],
+      "owner_withdrawn_wei": 786243722058121371,
+      "keeper_paid_wei": 781400000000000,
+      "gross_primary_fees_accrued_wei": 3000000000000000,
+      "external_fee_income_wei": 25122058121371,
+      "backing_lost_wei": 210000000000000000,
+      "final_balance_wei": 0,
+      "compensation_mode": "bounded-measured-v1",
+      "actual_mint_fee_wei": 1000000000000000
+    }
+  ],
+  "limits": [
+    "New real authenticated reuse transitions only; old Fresh/fixed receipts remain historical.",
+    "Compensation derives from genuine measured-work events and transaction prices, then independent cash/budget limits.",
+    "Measured work spans are not billed wallet gas; external owner/keeper gas uses a separate current-runtime receipt profile."
+  ]
+}

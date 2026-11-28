@@ -26,8 +26,8 @@ contract EfficientJournalTest is ForkBase {
     function setUp() public override {
         super.setUp();
         VaultLib.Params memory p = vault.getParams();
-        p.payMarkupBps = 0; p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei;
-        p.essentialCap = 0; p.essentialRate = 0; p.reserve = 0.005 ether;
+ p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei;
+ p.reserve = 0.005 ether;
         bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(owner); vault.setParams(p, _expected0);
         uint256 deposit = 1 ether + vault.requestCharge();
@@ -132,18 +132,16 @@ contract EfficientJournalTest is ForkBase {
         // Locked shares make the checkpoint tail required. A one-listing vault reaches its completed
         // prefix with one scan rather than the 128-record journal, so the routine sync it earns is
         // the required tail over that scan (Q_REQUIRED_TAIL + 1*Q_SCAN). It is still drawn from the
-        // routine budget while the essential budget stays zero, which is the point of the test.
+        // routine budget (exit work is unpaid; there is no essential budget).
         toBlackout();
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
-        (uint256 routineBefore, uint256 essentialBefore) = vault.budget();
-        assertEq(essentialBefore, 0);
+        uint256 routineBefore = vault.budget();
         uint256 pool = vault.processingPool();
         bytes32 _expected10 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected10);
-        (uint256 routineAfter, uint256 essentialAfter) = vault.budget();
+        uint256 routineAfter = vault.budget();
         assertEq(paid, MeasuredPay.gross(vault, GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_SCAN, 0, false, 0.2 gwei));
         assertEq(routineBefore - routineAfter, paid);
-        assertEq(essentialAfter, 0);
         assertEq(vault.processingPool(), pool);
     }
 

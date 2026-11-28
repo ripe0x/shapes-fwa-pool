@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {Vm} from "forge-std/Vm.sol";
 import {ForkBase, IOwnable, IFwaAdmin} from "./ForkBase.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
@@ -26,10 +25,10 @@ contract ForkPartialReconcileTest is ForkBase {
         vm.prank(IOwnable(address(FWA)).owner());
         IFwaAdmin(address(FWA)).setOracleExemptCollection(address(PACKS), true);
         VaultLib.Params memory p = defaultParams();
-        p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei; p.payMarkupBps = 0;
+        p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei;
         p.reserve = 0.005 ether; p.tvlCap = 2 ether;
         p.routineCap = 0.03 ether; p.routineRate = 0.0008 ether;
-        p.essentialCap = 0; p.essentialRate = 0;
+
         vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         preexisting = address(vault).balance - 0.01 ether;
         vm.deal(owner, 1 ether); vm.deal(keeper, 1 ether); vm.deal(alice, 50 ether); vm.deal(bob, 50 ether);
@@ -45,20 +44,6 @@ contract ForkPartialReconcileTest is ForkBase {
         ReconcileTrace.snapshot(vault, alice, bob, keeper.balance - lastKeeper, step, OUT);
         lastKeeper = keeper.balance;
         vm.recordLogs();
-    }
-
-    function _listedIds(uint256 count) private returns (uint256[] memory ids) {
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        ids = new uint256[](count);
-        bytes32 listed = keccak256("NFTListed(uint256,uint256,address,address,uint256,uint256,uint256)");
-        uint256 found;
-        for (uint256 i; i < logs.length; ++i) {
-            if (logs[i].emitter == address(FWA) && logs[i].topics.length == 4 && logs[i].topics[0] == listed
-                && address(uint160(uint256(logs[i].topics[3]))) == address(vault)) {
-                assertLt(found, count); ids[found++] = uint256(logs[i].topics[1]);
-            }
-        }
-        assertEq(found, count, "real FWA admission events identify every submitted position");
     }
 
     function test_reconcilePartialRedemptionAndWindDown() public {
@@ -81,7 +66,11 @@ contract ForkPartialReconcileTest is ForkBase {
         // once (no separate list step). Six fits a 1 ETH deposit at 0.06 ETH value plus backing.
         vm.recordLogs();
         vm.prank(keeper); TestVaultOps.restock(vault, 6, UNITS, 0);
-        uint256[] memory builtIds = _listedIds(6);
+        // Read the built listings from the book, NOT from the recorded logs: `_snap("build")` below
+        // consumes this same log window to reconcile the keeper pay (measuredWork), so a
+        // getRecordedLogs() here would steal it and make paidTotal 0 != the real cash delta.
+        uint256[] memory builtIds = TestVaultOps.open(vault);
+        assertEq(builtIds.length, 6, "six packs built and listed");
         uint256[] memory backings = new uint256[](builtIds.length);
         for (uint256 i; i < builtIds.length; ++i) { (,, uint128 b) = TestVaultOps.position(vault, builtIds[i]); backings[i] = b; }
         vm.writeLine(OUT, string.concat('{"step":"buildInputs","count":6,"units":', vm.toString(UNITS),
