@@ -294,6 +294,10 @@ contract ForkCompletionAccountingTest is ForkBase {
         uint256 witnessId = TestVaultOps.witness(vault);
         vm.expectRevert(PackVault.MintFeeNotAccepted.selector);
         vault.checkpoint(witnessId, 0, expected);
+        // The reserve already holds the earlier committing checkpoint's unused charge (it now pays
+        // its measured work, below the charge), refundable to that payer. Recovery must not add to
+        // it: while pending holder work exists, bob's charge stays protected in processingPool.
+        uint256 reserveBefore = vault.chargeRefundReserve();
         uint256 beforeKeeper = keeper.balance;
         vm.prank(keeper);
         vault.recoverCheckpoint(witnessId);
@@ -304,7 +308,7 @@ contract ForkCompletionAccountingTest is ForkBase {
         assertEq(vault.epoch(), pricingEpoch, "uncommitted escrow retains its pricing epoch");
         assertEq(vault.chargeEra(), era, "unpriced deposits retain their relevant checkpoint sponsorship");
         assertGt(vault.processingPool(), 0);
-        assertEq(vault.chargeRefundReserve(), 0, "pending holder work keeps this funding protected");
+        assertEq(vault.chargeRefundReserve(), reserveBefore, "pending holder work keeps this funding protected");
         uint256 before = bob.balance;
         vm.prank(bob);
         vault.cancelDeposit();

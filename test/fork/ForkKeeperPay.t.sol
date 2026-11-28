@@ -170,7 +170,11 @@ contract ForkKeeperPayTest is ForkBase {
         vm.prank(attacker);
         vault.cancelDeposit();
         RefundClaims.claim(vault, attacker);
-        assertEq(attacker.balance, b + gross, "deposit and charge refunded in full");
+        // The first checkpoint paid the attacker only its measured work (pay < ck), so the unused
+        // charge (ck - pay) stayed attributable to its payer and is refundable too. The attacker
+        // recovers the cancelled second deposit in full plus that unused first charge: every wei it
+        // put in and did not pay for real work comes back, so keeping manufactures no profit.
+        assertEq(attacker.balance, b + gross + (ck - pay), "cancelled deposit and unused charge refunded in full");
         assertGt(gross, 0.01 ether);
         toBlackout();
         uint256 planned4 = TestVaultOps.witness(vault);

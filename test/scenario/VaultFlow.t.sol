@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 import {RefundClaims} from "../utils/RefundClaims.sol";
 
 import {GasQuotes} from "../utils/GasQuotes.sol";
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
 
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
@@ -600,23 +601,28 @@ contract VaultFlowPinnedTest is VaultFlowBase {
         // The spike: 2 gwei, four times the ceiling.
         Snap memory a = flowBegin(2 gwei, 1.95 gwei, PINNED);
         uint256 paid0 = keeperPaidCum;
+        vm.recordLogs(); // capture the build's KeeperWorkMeasured for the measured-pay check
         assertTrue(_kTryRestock(keeper, 1, 3), "D51: a profitable build runs even at a 2 gwei spike");
         uint256 buildPay = keeperPaidCum - paid0;
         VaultLib.Params memory pp = vault.getParams();
         // Priced at the ceiling (min(basefee+tip, ceiling) = gasCeiling), not the 2 gwei basefee.
-        // A8: measured pay adds the account-owned overhead (100_000, the deploy schedule's `overhead`)
-        // to the gas allowance, priced at the ceiling.
-        assertEq(buildPay, (GasQuotes.Q_BUILD + GasQuotes.buildGas(3) + GasQuotes.Q_LISTED + 100_000) * pp.gasCeiling
-            + 2 * pp.workFee, "build paid at the ceiling price, not the spike");
+        // A8: measured pay adds the account-owned overhead to the measured gas, priced at the ceiling.
+        // E2: measured gas is accurate and below the full allowance, so the pay is the measured work
+        // (MeasuredPay reads the emitted meter), not the saturated full-allowance quote.
+        assertEq(buildPay, MeasuredPay.gross(vault, GasQuotes.Q_BUILD + GasQuotes.buildGas(3) + GasQuotes.Q_LISTED, 2, false, pp.gasCeiling),
+            "build paid at the ceiling price (measured work), not the spike");
         _deposit(bob, 0.5 ether);
         _toBlackout();
         uint256 kb = keeper.balance;
-        _kCheckpoint(keeper); // prices bob's deposit; keeper pay capped at the ceiling
+        vm.recordLogs(); // capture the checkpoint's KeeperWorkMeasured for the measured-pay check
+        _kCheckpoint(keeper); // prices bob's deposit; keeper pay is the measured work, priced at the essential ceiling
         uint256 pay = keeper.balance - kb;
         assertGt(pay, 0, "checkpoint compensation is funded");
-        assertEq(pay, 0.00122 ether, "actual absolute holder processing expense at the two-gwei ceiling");
-        assertEq(pay, (uint256(pp.gasSchedule.checkpoint) + 100_000) * pp.essentialCeiling + pp.workFee,
-            "funded holder pricing follows the current configured payment class (checkpoint + overhead)");
+        // E2: the funded checkpoint pays its measured work (below the full quote), priced at the
+        // essential ceiling (min(basefee+tip, essentialCeiling) = essentialCeiling, not the 2 gwei
+        // basefee), with the account-owned overhead. The unused charge stays refundable to bob.
+        assertEq(pay, MeasuredPay.gross(vault, uint256(pp.gasSchedule.checkpoint), 1, true, pp.essentialCeiling),
+            "funded holder pricing is the measured checkpoint work at the essential ceiling (checkpoint + overhead)");
         Fact[] memory f = _facts("open_listings", TestVaultOps.open(vault).length);
         f[1] = Fact("gas_price_gwei_x100", 200);
         f[2] = Fact("checkpoint_pay_wei", pay);

@@ -551,8 +551,11 @@ contract ForkProductionInventoryTest is ForkBase {
 
     /// @dev Financial existence comes from actual custody and external listing state, not book fields.
     function _fullReference() private view returns (uint256 nav, uint256 principal, uint256 idle, uint256 backing) {
+        // chargeRefundReserve holds unused checkpoint charges still owed to their payers (a
+        // checkpoint now pays its measured work, below the charge); like processingPool it is a
+        // holder liability the vault excludes from NAV, so the independent reference must too.
         uint256 liabilities = vault.pendingDepositTotal() + vault.redemptionReserve() + vault.distributionReserve()
-            + vault.claimableTotal() + vault.processingPool();
+            + vault.claimableTotal() + vault.processingPool() + vault.chargeRefundReserve();
         nav = address(vault).balance - liabilities + FWA.feeCredit(address(vault));
         for (uint256 i; i < knownShapes.length; ++i) {
             if (_seen(knownShapes, i) || _owner(address(SHAPES), knownShapes[i]) != address(vault)) continue;
