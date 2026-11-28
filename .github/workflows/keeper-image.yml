@@ -7,8 +7,8 @@ name: Keeper image rehearsal
 # volume and a lost RPC response. Local simulated funds only.
 on:
   push:
-    branches: [claude/unified-shapes-fwa-system-852d17]
-    paths: [keeper/**, .github/workflows/keeper-image.yml]
+    branches: [main]
+    paths: [keeper/**, fly.keeper-primary.toml, .github/workflows/keeper-image.yml]
   workflow_dispatch:
     inputs:
       target:

@@ -1,10 +1,12 @@
-# The PackVault primary keeper on Fly.io (as apeball's keepers). A worker: no public HTTP service.
-# From the repository root, after the vault is deployed and VAULT below is set:
+# The personal-manager keeper on Fly.io. A worker: no public HTTP service.
+# It discovers every manager the factory creates (managerCount/managerAt) and does their routine work.
+# The shared vault is closed: VAULT stays unset. From the repository root on main:
 #   fly volumes create keeper_state --config fly.keeper-primary.toml --size 1
 #   fly deploy --config fly.keeper-primary.toml
-# Secrets (never in this file or shell history): an encrypted keystore (cast wallet new) and its password:
-#   fly secrets set --config fly.keeper-primary.toml KEEPER_KEYSTORE_JSON="$(cat ~/.foundry/keystores/<name>)"
-#   read -rs "p?password: " && printf 'KEEPER_KEYSTORE_PASSWORD=%s\n' "$p" | fly secrets import --config fly.keeper-primary.toml; unset p
+# Signer: this app's own keystore, used by no other process (one signer per process, no nonce races).
+# The entrypoint refuses secrets in env, so both are written to files. Fly requires base64 values:
+#   fly secrets set --stage -a packvault-keeper KEEPER_KEYSTORE_B64="$(base64 < ~/.foundry/keystores/packvault-keeper)"
+#   read -rs "p?password: " && printf 'KEEPER_PASSWORD_B64=%s\n' "$(printf %s "$p" | base64)" | fly secrets import --stage -a packvault-keeper; unset p
 app = "packvault-keeper"
 primary_region = "iad"
 
@@ -12,10 +14,20 @@ primary_region = "iad"
   dockerfile = "keeper/Dockerfile"
 
 [env]
-  VAULT = "0x0000000000000000000000000000000000000000"  # set to the deployed PackVault before deploying
+  FACTORY = "0xBFfF9760EC41a3a9167f641E17AF8d93503C79a4"
   RPC_URL = "https://mainnet.gateway.tenderly.co"
-  POLL_SECONDS = "60"  # primary
-  KEEPER_ARGS = ""        # e.g. "--burn-tokens"; exit work is unpaid (D64), so neither keeper does it
+  POLL_SECONDS = "60"
+  KEEPER_ARGS = ""  # exit work is unpaid; owners run it with --caller-funded-exit
+  KEEPER_KEYSTORE_PATH = "/secrets/keystore.json"
+  KEEPER_PASSWORD_FILE = "/secrets/password"
+
+[[files]]
+  guest_path = "/secrets/keystore.json"
+  secret_name = "KEEPER_KEYSTORE_B64"
+
+[[files]]
+  guest_path = "/secrets/password"
+  secret_name = "KEEPER_PASSWORD_B64"
 
 [mounts]
   source = "keeper_state"
