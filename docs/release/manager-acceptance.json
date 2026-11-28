@@ -1,21 +1,34 @@
 {
- "name": "Main pool individual manager closeout",
+ "name": "Main pool individual manager launch",
  "deployment_target": "manager",
- "status": "A8_ENGINEERING_PREPARED_ECONOMICS_INCOMPLETE_UNSIGNED",
- "manifest_sha256": "b0b7c9a29731d4e8a672024c374df9a1e46c9d6357860d0541bf64ea2b67223b",
- "signature": null,
- "release_ready": false,
- "authorization": "Manager closeout implementation, isolated validation and draft PR updates only. No public transactions, production mint-fee changes, live cutover or merges.",
- "shared_vault_open": false,
- "pooled_vault_return_gate_applied_to_manager": false,
+ "status": "PREPARED_FOR_OWNER_SIGNATURE",
+ "manifest_sha256": "e877b9156788005f8c91d4af75db60c93d08eea1b78b63a2e24a4857a2d60bca",
+ "signature": "deploy/manager-release-acceptance.sig (absent until the owner signs the SHA-256 of this file)",
+ "implementation_revision": "0351fd9f3f7ce7f9d3f4a1013d5ddb2c99efaf13",
+ "app_revision": "c7a605a6bca197dbeee9de0a77d120853157d339",
  "manager_values": "deploy/manager.json",
- "economic_inputs_approved_for_production": false,
- "note": "A8 measured-pay/reuse-only engineering passed focused checks and an unsigned local manager postflight. Actual opening, keeper and owner-exit cash flows are reconciled. A bounded final economic run stopped before any financial row on unmeasured sync context 780000:1, so operating return and production economics remain unaccepted. No public action authority is granted.",
- "implementation_revision": null,
- "app_revision": null,
- "engineering_acceptance": false,
- "manager_return_hurdle": null,
- "production_recommendation": false,
- "engineering_status": "A8_REUSE_ONLY_MEASURED_PAY_AND_INTACT_MIGRATION",
- "economic_assessment": "CURRENT_RECEIPTS_RECONCILED_OPERATING_RETURN_UNMEASURED"
+ "deployment_values": "deploy/manager-factory.json",
+ "unsigned_package": "deploy/manager-unsigned-cutover.json (block 26,509,978, signer nonce 4259, factory 0xBFfF9760EC41a3a9167f641E17AF8d93503C79a4, implementation 0xEB1B5F61e1b4D4cd379DF9aA0421fb25cB34b52F)",
+ "shared_vault_open": false,
+ "owner_accepts_by_signing": [
+  "Deploying the manager-only release named by manifest_sha256: the factory, the PackManager implementation and the three libraries. No PackVault.",
+  "The deployer becomes the factory admin and may change the implementation future managers clone (A9.8).",
+  "Manager economics as in OWNER-REQUIREMENTS.md A8 and A9 and deploy/manager.json: 0.03 ETH packs at 11053 bps backing, 0.006 ETH reserve, one routine keeper budget (0.03 ETH cap, 0.01 ETH/day), bounded measured keeper pay, unpaid exit work, exact owner pack mix.",
+  "The operating return of a manager is not measured: no executed or modeled evidence shows a profitable reuse cycle. Launch accepts that."
+ ],
+ "evidence": [
+  "Launch audit of 8e9034d (A informed, B uninformed): no owner-only asset bypass; findings E1, E2, I1, I2 repaired in D88.",
+  "Release-candidate re-audit of 0351fd9: E1, E2, I2 held on executed paths; its I1 exception is the closed MAIN_POOL_OPEN cutover switch; its O6 exception concerns the closed vault's unsigned asset-flow.json.",
+  "Full CANDIDATE_RUN=1 fork suite passes except 4 trace-preservation guards and 2 scale tests that need a higher gas limit.",
+  "Gas profile v4 (docs/receipts/manager-measured-cost-calibration.json) bound to current src: no keeper-loss receipts for build, list or sync.",
+  "release.py check passes without signature."
+ ],
+ "not_executed": [
+  "Bid and silent-purchaser outcomes at launch backing.",
+  "Sixteen of a manager's own listings selected in one sync.",
+  "A keeper sync after a real completed VRF selection on a current-block fork.",
+  "Public inclusion, live gas markets and long idle periods."
+ ],
+ "authorization": "Preparation only. Signing accepts this release; it does not itself broadcast. Funding the signer, merging, signing deployment transactions, postflight, app cutover (MAIN_POOL_OPEN) and keeper start remain owner actions.",
+ "release_ready": "only with a valid owner signature over this file"
 }
