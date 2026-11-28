@@ -21,12 +21,14 @@ contract AuditDistribution is ForkBase {
         p.essentialCeiling = 0.5 gwei;
         p.payMarkupBps = 0;
         p.distributionBps = 5_000;
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected0);
 
         uint256 depositCharge = vault.requestCharge();
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: 1 ether + depositCharge}();
+        vault.deposit{value: 1 ether + depositCharge}(_expected1);
         toBlackout();
         checkpoint();
         assertEq(vault.pendingDepositTotal(), 0);

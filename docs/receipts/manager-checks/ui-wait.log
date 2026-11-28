@@ -1,0 +1,14 @@
+{
+  "stage": "wait",
+  "manager": "0xed1362EcFdE410735dfB70153D60FCFD20d38E74",
+  "checks": [
+    "Stable expected owner connected on31337 beforeanymanageraction",
+    "Manager-only navigation with shared vault closed and unset, no community-factory warning",
+    "One-wei limit refused beforewalletsubmission",
+    "Start owner-paid manager closeout",
+    "Zero-progress processor notoffered beforeactualFWAdeadline"
+  ],
+  "writes": 1,
+  "errors": [],
+  "afterBlock": 26486699
+}

@@ -1291,3 +1291,71 @@ is now 100,000 + 30,000 per Shape (`Q_PURCHASER_REDEEM_PACK`, `_SHAPE`; `makeup(
 in `keeper/policy.py`. Cold redeems on a fork: 2 Shapes 157,014, 5 Shapes 245,262, 7 Shapes 304,165
 (`ForkDirectMint.t.sol`); 7 is the most any allowed size holds. A 0.06 ETH pack is still 160,000, so
 its backing is unchanged.
+
+
+## Main completion decisions (2026-11-24, superseding D57/D80/D85 launch assumptions)
+
+- The selected launch is0.03ETH, three paid0.01ETH mints. Future recipe changes remain immediate
+  owner settings. Historical six-unit fixtures remain marked as regression inputs.
+- One on-account quote calculation replaces the external main keeper policy. Verified work,
+  routine markup, live basefee+priority, ceilings, budgets and protected cash determine compensation.
+  Numerical calibration is mutable; algorithm changes need new code and a replacement deployment.
+- Mint fee acceptance is explicit and separate from ordinary settings. Config hashes include
+  effective settings, mint fee and operating flags, excluding dynamic budgets and timestamps.
+- Contributions are indexed intervals of their era's canonical total. Refunds are adjacent floor
+  differences, making every unused wei attributable without payer enumeration. Closed era records
+  persist to support delayed claims; their IDs only increase. No fee refund is treated as vault NAV.
+- Deposits escrow gross principal. Construction is calculated at the committing checkpoint; lazy
+  epoch issuance floors each assignment and assigns the aggregate rounding residue to the final
+  settled deposit. The aggregate issued supply is fully attributable without holder enumeration.
+- Fresh renewal permission is not an asset. Growth keeps one configured conservative float and
+  maintenance reserve; eligible renewals can consume that float while preserving holder liabilities.
+- Caller-funded recovery is unpaid at the account. Its caller explicitly pays wallet gas under a
+  client spending cap. Request-sponsored pricing work uses processingPool directly; it never
+  temporarily joins free cash, including on the checkpoint that completes the final redemption.
+- Backing70,000bps and uplift25bps are local evaluation inputs, not production approval. The
+  historical return report and owner signatures remain tied to the old candidate.
+
+Things that don't make sense until validated: one float may not cover early repeated acquisitions;
+small pools may miss checkpoint windows under the proposed uplift limit; low activity may make net
+holder returns negative even while paid mints earn creator revenue.
+
+## Individual manager measured calibration (2026-11-25)
+
+The complete uncalibrated 960-case baseline and its exact settings are preserved in
+`sim/out/manager-operating-assessment/` and `docs/receipts/manager-baseline-settings.json`.
+Actual Osaka receipts identify cold-keeper underquotes despite some positive billed margins.
+Finishing the authorized manager work includes repairing those numerical inputs rather than
+promoting a stalled strategy into a production recommendation.
+
+The next local manager candidate changes only gasSchedule.selected from 180000 to 225000,
+gasSchedule.synced from 120000 to 285000, and gasSchedule.list from 280000 to 380000. These
+rounded allowances add headroom above the recorded zero-margin estimate shortfalls. Pack value,
+three paid primary mints, accepted/live fee handling, backing target, renewal mode/float, reserve,
+budgets, markup and gas ceilings remain unchanged. These are agent-selected evaluation settings,
+not owner-approved production defaults. Actual keeper preflight, compensation and receipts must
+validate them, and the same frozen cohort design is rerun without dropping unfavorable cases.
+The new shared vault stays undeployed. This grants no public transaction, fee change, signature,
+cutover or merge authority.
+
+## A8 reuse-only, measured work and intact migration (2026-11-25)
+
+The owner explicitly selected reuse as the sole returned-pack behavior, bounded measured-gas
+compensation and a first-version import function with UI migration. This supersedes the fixed-quote
+and fresh-renewal decisions above. No external payment policy, fresh-return retirement, eligibility
+ledger or renewal float remains. Three paid .01 Shapes per .03 launch pack remains unchanged.
+
+Caps come from verified completed operations; actual work uses min(gasleft span, allowance), named
+overhead and min(actual bid, basefee+priority, class ceiling), consistent routine markup and real
+work fees, then protected sources/budgets/minPay. Actual receipt expense remains independent.
+Numeric inputs remain immediate owner settings; algorithm changes need new code. The immutable
+factory gains no manager authority or implementation setter.
+
+Owner-paid paused migration unlists without exit mode, transfers sealed canonical packs, and imports
+at most16 packs/30 Shapes each with actual custody/principal/count checks. Indexed sealed recovery
+withdrawal cannot be blocked by a different partially redeemed claim. The UI verifies supported
+contents before transfer, both owners, official clones/dependencies, canonical receipts and its
+stated wallet cap. Already burned pack NFTs cannot migrate intact. Unsupported packs stay at source.
+
+Earlier studies/receipts remain historical. New code needs fresh validation and unsigned artifacts;
+this decision grants no public transaction, signature, live cutover, shared vault deployment or merge.

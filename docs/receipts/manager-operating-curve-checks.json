@@ -1,0 +1,50 @@
+{
+ "sourceSha256": {
+  "sim/forward.py": "64f95bb6ba033717544b060f6d74ea672b9ecbd84b901a6c3aca1a7880d17e7a",
+  "sim/test_manager.py": "cdadadf0679514d9eacf45ee3dae728f1aede8b3ab0b1de29f5fa747cb476dbe",
+  "sim/manager_operating_assessment.py": "f878c2276277bb034813d12f96f4d642d3d814ff59ea36fc8463fb783ca9d546",
+  "sim/test_manager_operating_assessment.py": "0da8c326e2c928235c10d8184f833b091560bc4cfed7da751a422bf82b25260f",
+  "script/release.py": "df243ffc63b83ddc5425d44886f41710a8e92d35fd652081cd0bec46d5a71ed0"
+ },
+ "checks": [
+  {
+   "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "sim/test_manager.py"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 2.525,
+   "log": "docs/receipts/manager-operating-curve-check-0.log"
+  },
+  {
+   "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "sim/test_manager_operating_assessment.py"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 0.778,
+   "log": "docs/receipts/manager-operating-curve-check-1.log"
+  },
+  {
+   "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "sim/manager_reconcile.py",
+    "--funded",
+    "--output",
+    "docs/receipts/manager-operating-reconciliation.json"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 0.183,
+   "log": "docs/receipts/manager-operating-curve-check-2.log"
+  },
+  {
+   "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "script/test_release.py"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 0.259,
+   "log": "docs/receipts/manager-operating-curve-check-3.log"
+  }
+ ]
+}

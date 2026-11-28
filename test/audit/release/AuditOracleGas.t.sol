@@ -22,12 +22,14 @@ contract AuditOracleGas is ForkBase {
         p.essentialCeiling = 0.5 gwei;
         p.payMarkupBps = 0;
         p.reserve = 0.005 ether;
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected0);
 
         uint256 charge = vault.requestCharge();
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: 1 ether + charge}();
+        vault.deposit{value: 1 ether + charge}(_expected1);
         toBlackout();
         checkpoint();
         toOpen();
@@ -46,9 +48,11 @@ contract AuditOracleGas is ForkBase {
         vault.startWindDown();
 
         // The rejected configuration cannot prevent a subsequent wind-down.
+        bytes32 expectedUnlist = vault.configurationHash();
+        bytes memory unlistCall = abi.encodeCall(vault.unlist, (ids, 0, expectedUnlist));
         uint256 g = gasleft();
         vm.prank(keeper);
-        (bool succeeded,) = address(vault).call{gas: 16_000_000}(abi.encodeCall(vault.unlist, (ids, 0)));
+        (bool succeeded,) = address(vault).call{gas: 16_000_000}(unlistCall);
         g -= gasleft();
         assertTrue(succeeded, "empty oracle configuration cannot block the exit");
         assertEq(TestVaultOps.open(vault).length, 0, "every position unlisted");
@@ -65,12 +69,14 @@ contract AuditOracleGas is ForkBase {
         p.essentialCeiling = 0.5 gwei;
         p.payMarkupBps = 0;
         p.reserve = 0.005 ether;
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected2);
 
         uint256 depositCharge = vault.requestCharge();
+        bytes32 _expected3 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: 1 ether + depositCharge}();
+        vault.deposit{value: 1 ether + depositCharge}(_expected3);
         toBlackout();
         checkpoint();
         toOpen();
@@ -80,8 +86,9 @@ contract AuditOracleGas is ForkBase {
         assertEq(ids.length, 1);
         uint256 shares = vault.shareBalance(alice);
         uint256 redeemCharge = Charges.redeemCharge(vault, shares);
+        bytes32 _expected4 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.requestRedeem{value: redeemCharge}(shares);
+        vault.requestRedeem{value: redeemCharge}(shares, _expected4);
         toBlackout();
         checkpoint();
         assertGt(vault.lockedShares(), 0, "listed pack leaves a holder exit shortfall");
@@ -94,14 +101,17 @@ contract AuditOracleGas is ForkBase {
         vault.startWindDown();
 
         // The real pack contract rejects the unknown oracle call and remains configured throughout.
+        bytes32 expectedUnlist = vault.configurationHash();
+        bytes memory unlistCall = abi.encodeCall(vault.unlist, (ids, 0, expectedUnlist));
         vm.prank(keeper);
-        (bool succeeded,) = address(vault).call{gas: 16_000_000}(abi.encodeCall(vault.unlist, (ids, 0)));
+        (bool succeeded,) = address(vault).call{gas: 16_000_000}(unlistCall);
         assertTrue(succeeded, "wrong oracle ABI cannot block the exit");
         assertEq(TestVaultOps.open(vault).length, 0);
         assertEq(FWA.floorOracle(), wrongOracle);
         originalOracle;
+        bytes32 _expected5 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper);
-        vault.liquidate(40, 0);
+        vault.liquidate(40, 0, _expected5);
         toBlackout();
         checkpoint();
         assertEq(vault.lockedShares(), 0, "redemption filled with the wrong oracle ABI");

@@ -1,0 +1,12 @@
+{
+ "block": 26493799,
+ "blockHash": "0x7bfcd3db7d38aaf22a3735f932b7969bebb1fc0795735b205c2aec1e86a8c588",
+ "timestamp": 1795629011,
+ "rpc": "https://mainnet.gateway.tenderly.co",
+ "shapes": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+ "mintFeeWei": 500000000000000,
+ "acceptedMaximumWei": 1000000000000000,
+ "method": "Pinned read-only mainnet eth_call from manager-existing-main-readback.json",
+ "previousObservation": "deploy/mint-fee-observation.json",
+ "note": "Externally observed live fee. No public transaction or fee change was sent by this task."
+}

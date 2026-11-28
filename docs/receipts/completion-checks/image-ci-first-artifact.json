@@ -1,0 +1,9 @@
+{
+ "steps": [],
+ "fork_block": 26484850,
+ "fork_hash": "0xb74960f39c4f4971c0e3732837afb49ecdfd20153c3d9d0631796f1d6e086f7c",
+ "image": "packvault-keeper:70b565819f2290ea2a6723537cd0e2526aa56872",
+ "foundry": "cast Version: 1.8.1",
+ "signing": "unlocked fresh actors on owned isolated Anvil; production keystore transport untested",
+ "retained_work_directory": "/tmp/pack-vault-image-x_hkg42q"
+}

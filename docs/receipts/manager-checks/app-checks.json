@@ -1,0 +1,51 @@
+[
+ {
+  "command": [
+   "npm",
+   "run",
+   "typecheck"
+  ],
+  "exit_status": 0,
+  "seconds": 8.9,
+  "log": "/tmp/shapes-manager-closeout-run/app-check-0.log"
+ },
+ {
+  "command": [
+   "npx",
+   "vitest",
+   "run",
+   "app/src/main-pool.test.ts",
+   "app/src/main-pool-settings.test.ts",
+   "app/src/main-pool-exit.test.ts",
+   "app/src/main-manager-exit.test.ts",
+   "app/src/errors.test.ts",
+   "app/src/creation.test.ts",
+   "app/src/creation-replacement.test.ts",
+   "app/src/chain.test.ts",
+   "app/src/policy.test.ts"
+  ],
+  "exit_status": 0,
+  "seconds": 1.46,
+  "log": "/tmp/shapes-manager-closeout-run/app-check-1.log"
+ },
+ {
+  "command": [
+   "npm",
+   "run",
+   "build:app"
+  ],
+  "exit_status": 0,
+  "seconds": 5.79,
+  "log": "/tmp/shapes-manager-closeout-run/app-check-2.log"
+ },
+ {
+  "command": [
+   "node",
+   "scripts/export-main-pool-abi.mjs",
+   "--check"
+  ],
+  "exit_status": 0,
+  "seconds": 0.03,
+  "log": "/tmp/shapes-manager-closeout-run/app-check-3.log"
+ }
+]

@@ -1,0 +1,135 @@
+Compiling 6 files with Solc 0.8.30
+Solc 0.8.30 finished in 40.72s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:254:35:
+    |
+254 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:654:5:
+    |
+654 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (8760): This declaration has the same name as another declaration.
+   --> src/VaultLib.sol:389:69:
+    |
+389 |     function renewalFundingGas(Params storage p, uint256 feeClaims, bool withdrawCredit)
+    |                                                                     ^^^^^^^^^^^^^^^^^^^
+Note: The other declaration is here:
+    --> src/VaultLib.sol:1001:5:
+     |
+1001 |     function withdrawCredit(Book storage b, IFWAV2 f) external { _withdrawCredit(b, f); }
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:15:9:
+   |
+15 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (3149): The result type of the shift operation is equal to the type of the first operand (uint64) ignoring the (larger) type of the second operand (uint256) which might be unexpected. Silence this warning by either converting the first or the second operand to the type of the other.
+  --> test/fork/ForkBase.sol:93:27:
+   |
+93 |         p.packUnitsMask = uint64(1) << UNITS;
+   |                           ^^^^^^^^^^^^^^^^^^
+
+Warning (3149): The result type of the shift operation is equal to the type of the first operand (uint64) ignoring the (larger) type of the second operand (uint256) which might be unexpected. Silence this warning by either converting the first or the second operand to the type of the other.
+   --> test/fork/ForkSelection.t.sol:124:27:
+    |
+124 |         p.packUnitsMask = uint64(1) << UNITS;
+    |                           ^^^^^^^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to pure
+   --> src/ScanLib.sol:329:5:
+    |
+329 |     function encodedParams(VaultLib.Params storage p) external view returns (bytes memory) {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to pure
+   --> src/ScanLib.sol:334:5:
+    |
+334 |     function configurationHash(VaultLib.Params storage p, uint256 liveMintFee, bool paused, bool windingDown)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/EfficientJournal.t.sol:20:5:
+   |
+20 |     function assertEnvironment() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkManagerCloseout.t.sol:40:5:
+   |
+40 |     function assertGasEnvironment() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkManagerFundingDeficit.t.sol:32:5:
+   |
+32 |     function assertContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Ran 1 test for test/fork/ForkManagerFundingDeficit.t.sol:ForkManagerHalfEthFundingTest
+[PASS] test_halfEthPaidFreshRenewalLeavesRealFloatDeficitAndCreditDoesNotSupplyPay() (gas: 48936071)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 9.34s (8.87s CPU time)
+
+Ran 1 test for test/fork/ForkManagerCloseout.t.sol:ForkManagerCloseoutReuseTest
+[PASS] test_managerReuseOwnerPaidExitReconcilesEveryWei() (gas: 51140146)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 9.39s (8.92s CPU time)
+
+Ran 1 test for test/fork/ForkManagerCloseout.t.sol:ForkManagerCloseoutFreshTest
+[PASS] test_managerFreshOwnerPaidExitReconcilesEveryWei() (gas: 52026196)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 9.39s (8.92s CPU time)
+
+Ran 5 tests for test/fork/ForkMainRenewal.t.sol:ForkMainRenewalTest
+[PASS] test_exitInventoryNeverCreatesFreshReplacement() (gas: 40723503)
+[PASS] test_launchVaultBidRetiresAndMintsThreePaidReplacementsExactlyOnce() (gas: 51238262)
+[PASS] test_managerKeepCreatesOnlyOnePaidReplacementPermission() (gas: 42148619)
+[PASS] test_managerRenewalCollectsRealCreditOnlyWhenCashNeedsItAndPermissionAllows() (gas: 98184845)
+[PASS] test_managerReuseModeRelistsReturnedPackWithoutPaidFreshMints() (gas: 41652774)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 9.43s (35.24s CPU time)
+
+Ran 4 tests for test/fork/ScanSync.t.sol:ScanSyncForeignTest
+[PASS] test_b_foreignOnlyScanPaysNothingAndRepeatIsNothing() (gas: 15868656)
+[PASS] test_c_unrelatedForeignAcquisitionsChargeNothing() (gas: 24327108)
+[PASS] test_g_oneScanClearsAnyBacklogAtBacklogIndependentCost() (gas: 65481145)
+Logs:
+  scan billed gas backlog 41: 179398
+  scan billed gas backlog 94: 179398
+
+[PASS] test_h_noManufacturedRepeatOrPaddedScan() (gas: 24302647)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 9.84s (14.80s CPU time)
+
+Ran 6 tests for test/fork/ScanSync.t.sol:ScanSyncSelectionTest
+[PASS] test_a_routinePayCappedByBudget() (gas: 68287347)
+[PASS] test_d_delayedMaintenanceLosesNoFees() (gas: 68640739)
+[PASS] test_e_delayedSyncCannotMispriceSharesCatchUpFirst() (gas: 68687802)
+[PASS] test_f_budgetExhaustionRecoverable() (gas: 68868045)
+[PASS] test_i_scanPaysSingleConfiguredQuote() (gas: 68067847)
+[PASS] test_j_fullRedemptionSettlesWithoutFundingPayFromLiabilities() (gas: 70246571)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 9.84s (44.83s CPU time)
+
+Ran 1 test for test/fork/ForkManagerFundingDeficit.t.sol:ForkManagerRenewalReserveDeficitTest
+[FAIL: actual Chainlink proof selected our listing: 1 != 2] test_renewalInsufficientRealFeesCannotConsumeReserveOrRetiredPrincipal() (block: 26272979) (gas: 104009298)
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 14.04s (13.56s CPU time)
+
+Ran 1 test for test/fork/ForkManagerFundingDeficit.t.sol:ForkManagerSyncFundingDeficitTest
+[FAIL: actual Chainlink proof selected our listing: 1 != 2] test_syncRefillsActualFloatGapBeforeSelectingSmallestPaidFeePrefix() (block: 26272979) (gas: 104001634)
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 14.04s (13.56s CPU time)
+
+Ran 8 test suites in 14.40s (85.30s CPU time): 18 tests passed, 2 failed, 0 skipped (20 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/fork/ForkManagerFundingDeficit.t.sol:ForkManagerRenewalReserveDeficitTest
+[FAIL: actual Chainlink proof selected our listing: 1 != 2] test_renewalInsufficientRealFeesCannotConsumeReserveOrRetiredPrincipal() (block: 26272979) (gas: 104009298)
+
+Encountered 1 failing test in test/fork/ForkManagerFundingDeficit.t.sol:ForkManagerSyncFundingDeficitTest
+[FAIL: actual Chainlink proof selected our listing: 1 != 2] test_syncRefillsActualFloatGapBeforeSelectingSmallestPaidFeePrefix() (block: 26272979) (gas: 104001634)
+
+Encountered a total of 2 failing tests, 18 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 2 failed tests
+Tip: Run `forge test --debug --match-test <TEST_NAME>` to inspect one failing test in the debugger

@@ -1,78 +1,52 @@
-# System map: where PackVault's assets sit and how they move
+# System map: assets, rights and funding
 
-Current design: one production vault and one capital pool. Exact running values live in
-`VaultLib.Book`; its inventory indexes describe custody, not additional assets. Historical
-measurements for earlier candidates remain under `docs/receipts/flow/` until regenerated.
-Owner requirements: `OWNER-REQUIREMENTS.md`; decisions: `docs/DECISIONS.md` (D65–D69).
+PackVault and each personal PackManager are separate FWA depositors and custodians. Shared linked
+libraries own no assets. The factory cannot change an existing manager. Current requirements:
+OWNER-REQUIREMENTS A5 and [MAIN-POOL-COMPLETION.md](MAIN-POOL-COMPLETION.md).
 
-| Actor | Brings | Receives |
+| Actor | Contributes | Receives or controls |
 | --- | --- | --- |
-| Holders | ETH deposits and existing request charges | nontransferable shares, redeemed ETH, distributions |
-| Permissionless keeper | gas for verified bounded work | replaceable policy's offer, capped by vault quotes, free cash and budgets |
-| FWA purchaser | acquisition and settlement calls | pack, ETH bid or token bid according to FWA's actual rules |
-| FWA main pool | custody, fee distribution and ordered acquisition journal | bid backing cut or ordinary keep fee |
-| Shapes / ShapePacks | redeemable NFT backing and pack construction | primary mint fees, unchanged: 0.001 ETH per 0.1 ETH mint in the pinned fixture |
-| FWA rewards | token entitlements | tokens are claimed and burned; zero NAV value |
-| Owner | configuration inside bytecode bounds | no privileged asset withdrawal; can earn only what any keeper can earn |
+| Vault holder | Gross escrow, checkpoint sponsorship and wallet gas | Priced shares, pro-rata redemption/distribution claims, attributed funding refunds |
+| Manager owner | Their own cash and wallet gas | Their manager's cash, packs and immediate settings |
+| Account owner | Economic configuration | No pooled-asset withdrawal; can perform verified keeper work like other callers |
+| Keeper | Actual transaction gas | Account's bounded measured compensation within source/cash/permission limits |
+| Purchaser | FWA acquisition and settlement | Actual pack or actual protocol bid, at their choice |
+| Shapes creator | Primary mint service | Actual paid mint fees, never assumed recycled as sponsorship |
+| FWA | Listing custody, acquisitions and fee accrual | Protocol cuts, bid backing and settlement fees under real deployed rules |
 
-| Bucket | Location and meaning | Required accounting |
-| --- | --- | --- |
-| Pending deposits | actual vault ETH, refundable before pricing | excluded from free cash and NAV |
-| Redemption / distribution reserves | actual vault ETH owed to holders | excluded from free cash and NAV |
-| Settled claimables | actual vault ETH owed to individual holders | excluded from free cash and NAV |
-| `processingPool` | actual vault ETH funding one shared fixed checkpoint charge | excluded until checkpoint; no journal funding |
-| Free cash | actual balance less all five protected buckets | NAV asset; only cash above reserve and estimated exits is deployable |
-| Tracked Shapes backing P | loose Shapes, idle packs, active/allocated packs and authenticated return claims | counted once across representation/custody changes |
-| Usable idle backing | subset of P available through bounded inventory redemption/recovery | liquidity estimate only; never added a second time to NAV |
-| Active FWA backing B | actual posted ETH for cached active memberships | removed once when journal selection, kick or withdrawal is accounted |
-| Active fee entitlement | FWA accumulator, exact authenticated witness and debt histogram | counted once; no portfolio enumeration |
-| FWA fee credit | live `feeCredit(vault)` | counted once, or harvested into actual cash before valuation |
-| Allocated P | subset of tracked backing; running exposure and FIFO queue | no additional asset; oldest unresolved entry enforces expiry guard |
-| Token pending / credit / balance | rewards module and token | zero ETH value; burn remains unpaid |
+| Bucket | Valuation and spending rights |
+| --- | --- |
+| Pending gross deposits | Cancellable payer escrow; excluded from NAV/free cash until commitment |
+| Redemption/distribution reserves and claimables | Owed holder cash; excluded from NAV and every keeper/growth source |
+| processingPool | Attributed active-era sponsorship; only verified required pricing work/checkpoint may spend it |
+| chargeRefundReserve | Closed-era payer refunds; never NAV, investment, compensation or liquidity |
+| Free cash | Actual account balance less every liability; part of NAV |
+| Renewal float | Target within free cash reserved against new growth and ordinary routine pay; eligible renewal may consume it |
+| Maintenance reserve | Target within free cash preserved by growth/renewal; pays real maintenance |
+| Tracked pack principal | Actual owned/allocated/owed redeemable principal, counted once across custody changes |
+| Active FWA backing | Posted cash, removed once at acquisition or withdrawal |
+| Pending fees / fee credit | Exact entitlement, counted once; not cash until actual collection |
+| Unresolved keep uplift | Conservative uncertainty bound; zero additional NAV |
+| FWA token rewards | Zero ETH NAV; public claim-and-burn remains unpaid |
 
-```
-NAV = free actual ETH + tracked Shapes backing + active posted FWA backing
-    + aggregate pending active fees + live FWA fee credit
-```
+NAV = free actual cash + tracked principal + active backing + exact pending fees + live fee credit.
 
-Uncredited crown rewards are excluded. Receipt tag reservations and `idleFunding` are identifiers
-and future capital commitments, not additional assets. They never increase NAV or create cash.
+Fresh construction exchanges principal cash for redeemable Shapes and pays mint fees permanently.
+Listing moves separate backing to FWA. Acquisition removes active backing; bid returns the pack,
+keep returns backing less the live settlement fee and transfers the pack. Retirement exchanges
+actual principal for cash; fresh renewal pays fresh creator fees again. Ordinary withdrawals and
+kicks do not create renewal permission. Recovery/terminal processing stays bounded.
 
-Minting adds actual redeemable backing once; mint fees leave cash permanently. Splitting and
-packing change representation. Listing exchanges cash B for active backing B and preserves P.
-Selection removes active B and fee membership, preserving P as the conservative allocation floor.
-A bid returns the pack or an authenticated claim to it. A keep receipt adds no synthetic cash:
-the ETH is already in the vault balance; consuming it removes old P. Kick/withdrawal remove active
-B while returned cash is counted by balance exactly once. Redemption exchanges P for actual ETH.
-An extended kept pack gifted back is adopted only after retirement, at its actual current backing.
-Oversized gifted packs use bounded unseal/claim recovery; unrelated gifts cannot create transitions.
+Cancellable deposits do not count as preparatory liquidation cash. At a successful checkpoint they
+commit atomically and may fund matched redemption. Sponsorship pays its own source directly; unused
+funding becomes attributed refunds. Refund claims do not consume general capital. Removing a request
+or lowering a quote does not erase a prior payer's record.
 
-Pricing requires blackout, drained FWA requests, a complete acquisition cursor, no pending payment
-receipts, a clean allocation head, no overdue allocation and acceptable allocation exposure. Then
-redemptions use preflow NAV, eligible distributions follow, and deposits use resulting NAV.
-Protected balances remain protected through maintenance, cancellation and wind-down.
+Ratchets: acquisition cursor, allocation head, epochs, contribution IDs/eras and interval markers
+advance to prevent duplicate work. Historical contribution intervals persist for lazy refunds.
+The high-water mark rises to prevent repeat distributions. Wind-down is one-way for the vault;
+manager exit is owner-reversible. Mint fees, settlement cuts, paid keeper compensation and wallet
+gas are irreversible expenses. Removing their trigger does not recover them.
 
-All journal synchronization, including mixed work during redemption or wind-down, draws from
-free vault ETH under routine permission. D64 keeps unlisting/liquidation caller-funded when
-essential permission is zero. Other maintenance retains its existing classes and cash sources.
-Foreign/refunded journal entries do not return backing: their completed-work gas cost is an
-explicit NAV expense with no per-entry flat work fee. This cost grows with new global activity.
-Checkpoint valuation work does not grow with unchanged positions. Processing charges remain for
-checkpoint work only. Token burning remains an operator expense. The new journal job automatically
-reads up to128 completed records with independent16-own/terminal/prune bounds. Paid small foreign
-tails need a real fresh checkpoint opportunity; no exposure means an unpaid completeness rebase.
-Vault expenses reduce holder NAV; creator mint revenue is not recycled as an assumed subsidy.
-The keeper can pause new exposure reversibly when known mandatory work exceeds free cash or
-routine permission, while leaving reconciliation/holder actions available.
-
-Returned-bid events and unseen selection events independently nominate bounded reconciliation
-candidates. The index moves no assets and proves no completeness: every selected transition still
-passes the onchain journal, identity, receipt and custody gates. Restock keeps immediately consumed
-new split IDs in memory; only actual leftover Shapes enter inventory storage, with unchanged
-principal, mint fee and representation flows.
-
-Monotone values: journal cursor, allocation head, epochs, redemption era and interval marker advance
-so completed work is not replayed. The high-water mark only rises so gains are not distributed
-again. Wind-down is one-way; pause flags can be resumed by the owner. Mint fees, FWA bid losses,
-settlement fees and paid gas do not reverse. Removing their trigger does not refund those costs.
-No lifetime backing-ID counter ratchets quotes upward: identifiers retire and may be reused.
+Things that don't make sense: accrued income cannot fund renewal until collected; an enlarged
+allowance supplies no cash; exact accounting alone does not establish fair pricing or viable returns.

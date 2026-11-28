@@ -16,7 +16,8 @@ BPS = 10_000
 SCALE = 10**36
 DEAD_SHARES = 10**15
 MIN_DISTRIBUTION = 10**16
-MAX_LIST_BATCH = 8  # VaultLib.MAX_LIST_BATCH: packs built-and-listed per call
+MAX_LIST_BATCH = 8
+MAX_BUILD_BATCH = 4  # VaultLib.MAX_BUILD_BATCH: packs built-and-listed per call
 
 ACTIVE, ALLOCATED, WITHDRAWN, SETTLED, STAGED = 1, 2, 3, 4, 5
 OWED = 3  # cached book state; distinct from the live FWA status namespace
@@ -48,6 +49,8 @@ class Position:
     fee_debt: int = 0
     state: int = ACTIVE  # cached book membership, independent of live FWA status
     allocated_at: int = 0
+    unresolved_uplift: int = 0
+    shapes: int = 0
 
 
 @dataclass
@@ -64,7 +67,15 @@ class Vault:
     balance: int  # deploy balance: seed plus any dust already at the address
     reserve: int = 5 * 10**16
     distribution_bps: int = 0
-    allocated_bound_bps: int = 1_000
+    uplift_bound_bps: int = 25
+    # Kept as an explicit deprecated constructor alias for historical fixtures only.
+    allocated_bound_bps: int = None
+    construction_cost: int = 0
+    reference_capital: int = 24 * 10**16
+    accepted_mint_fee: int = 10**15
+    live_mint_fee: int = 10**15
+    pack_units_mask: int = 8
+    min_distribution: int = MIN_DISTRIBUTION
     settlement_fee_bps: int = 100
 
     total_shares: int = DEAD_SHARES
@@ -74,10 +85,13 @@ class Vault:
     last_nav: int = 0
     pending: dict = field(default_factory=dict)  # holder -> [amount, epoch, deployment charge]
     pending_total: int = 0
-    pending_charge_total: int = 0
-    processing_pool: int = 0  # request charges held for the next checkpoint (D56)
-    epoch_nav: dict = field(default_factory=dict)
-    epoch_supply: dict = field(default_factory=dict)
+    processing_pool: int = 0
+    charge_era: int = 0
+    charge_eras: dict = field(default_factory=dict)  # era -> [total, refundable, closed]
+    contributions: list = field(default_factory=list)  # [payer, era, interval start, amount, claimed]
+    charge_refund_reserve: int = 0
+    issuances: dict = field(default_factory=dict)  # epoch -> [gross, issued, remaining gross, remaining shares]
+    unresolved_keep_uplift: int = 0
     epoch_dist: dict = field(default_factory=dict)
     redemptions: dict = field(default_factory=dict)
     locked_shares: int = 0
@@ -94,6 +108,7 @@ class Vault:
 
     positions: dict = field(default_factory=dict)  # listing id -> Position
     idle_packs: list = field(default_factory=list)  # exact wei backing of each idle pack
+    idle_shapes: list = field(default_factory=list)
     idle_quotes: list = field(default_factory=list)  # funding quote paired with the idle stack
     idle_funding: int = 0
     tracked_value: int = 0
@@ -128,11 +143,13 @@ class Vault:
 
     def __post_init__(self):
         self.high_water_mark = self.seed * E // DEAD_SHARES
+        if self.allocated_bound_bps is not None:
+            self.uplift_bound_bps = self.allocated_bound_bps
 
     # ------------------------------------------------------------ cash buckets
     def free(self):
         owed = (self.pending_total + self.redemption_reserve + self.distribution_reserve + self.claimable_total
-                + self.processing_pool)
+                + self.processing_pool + self.charge_refund_reserve)
         return self.balance - owed if self.balance > owed else 0
 
     def owed_estimate(self):
@@ -145,15 +162,34 @@ class Vault:
         f = self.free()
         return f - keep if f > keep else 0
 
+    def keeper_cash_after(self, proceeds=0):
+        return max(0, self.free() + proceeds)
+
     def sync_budget(self, now):
         elapsed = now - self.budget_at
         self.routine_budget = min(self.routine_cap, self.routine_budget + elapsed * self.routine_rate // 86400)
         self.essential_budget = min(self.essential_cap, self.essential_budget + elapsed * self.essential_rate // 86400)
         self.budget_at = now
 
-    def pay_keeper(self, amount, essential=False, cap=None):
+    def set_budget(self, now, routine_cap, routine_rate, essential_cap, essential_rate):
+        self.sync_budget(now)  # Accrue at the old rate before changing capacity.
+        self.routine_budget = min(self.routine_budget, routine_cap)
+        self.essential_budget = min(self.essential_budget, essential_cap)
+        self.routine_cap, self.routine_rate = routine_cap, routine_rate
+        self.essential_cap, self.essential_rate = essential_cap, essential_rate
+
+    def pay_keeper(self, amount, essential=False, cap=None, source=None):
+        if source == 'processing':
+            amount = min(amount, self.processing_pool, self.balance)
+            self.processing_pool -= amount
+            self.balance -= amount
+            self.keeper_paid += amount
+            return amount
         budget = self.essential_budget if essential else self.routine_budget
-        amount = min(amount, self.free(), budget if cap is None else cap)
+        cash = self.free() if essential else self.keeper_cash_after()
+        if source is not None:
+            raise ValueError('unsupported keeper cash source')
+        amount = min(amount, cash, budget if cap is None else cap)
         if cap is None:
             if essential:
                 self.essential_budget -= amount
@@ -168,13 +204,18 @@ class Vault:
         """Mirror of VaultLib.buildAndList: mint each pack of `units` straight into ShapePacks (one
         paid primary mint per Shape, no split, no loose Shapes) and list it at its backing proposal at
         once. `ids` are the FWA listing ids assigned on admission; one proposal per pack; `available`
-        ETH (idle()) must cover the pending idle funding, every pack's mint cost and every backing."""
+        ETH (idle()) must cover every pack's mint cost and every backing."""
         count = len(ids)
-        n = shape_count(units)
-        if count == 0 or count > MAX_LIST_BATCH or units < 3 or units > 30 or len(proposals) != count:
+        if mint_fee > self.accepted_mint_fee:
+            raise RuntimeError('MintFeeNotAccepted')
+        if (count == 0 or count > MAX_BUILD_BATCH or units < 3 or units > 30
+                or not (self.pack_units_mask >> units) & 1 or len(proposals) != count):
             raise RuntimeError("BadBatch")
+        n = shape_count(units)
+        if len(set(proposals)) != count or any(p.backing in proposals and p.state != OWED for p in self.positions.values()):
+            raise RuntimeError('Duplicate')
         price = units * UNIT + n * mint_fee  # createPack cost: the pack's face value plus mint fees
-        if self.idle() < self.idle_funding + count * price + sum(proposals):
+        if self.idle() < count * price + sum(proposals):
             raise RuntimeError("InsufficientBacking")
         for listing_id, backing in zip(ids, proposals):
             self.balance -= price
@@ -182,6 +223,7 @@ class Vault:
             self.tracked_value += units * UNIT
             self.idle_value += units * UNIT
             self.idle_packs.append(units * UNIT)
+            self.idle_shapes.append(n)
             self.idle_quotes.append(0)
             # Admission lists the pack at once (each widens the identifier interval, as on chain).
             self.list(listing_id, backing, fee_debt=fee_debt)
@@ -189,7 +231,7 @@ class Vault:
     def _debt_count(self, debt, change):
         self.count_by_debt[debt] = self.count_by_debt.get(debt, 0) + change
 
-    def adopt(self, value):
+    def adopt(self, value, shapes=None):
         """Explicitly register a gift at its actual current backing after old listing retirement."""
         self.tracked_value += value
         self.idle_value += value
@@ -197,6 +239,7 @@ class Vault:
             self.recovery_packs.append(value)
         else:
             self.idle_packs.append(value)
+            self.idle_shapes.append(shape_count(value//UNIT) if shapes is None else shapes)
             self.idle_quotes.append(0)
 
     def _remove_active(self, p):
@@ -208,13 +251,16 @@ class Vault:
     def list(self, listing_id, backing, status=ACTIVE, fee_debt=None):
         if status != ACTIVE:
             raise RuntimeError("InvalidListing")
+        if not self.idle_packs or self.balance<backing:
+            raise RuntimeError('InsufficientBacking')
         value = self.idle_packs.pop()
+        shapes = self.idle_shapes.pop()
         self.idle_funding -= self.idle_quotes.pop()
         self.advance_unexposed()
         units = value // UNIT
         self.balance -= backing
         debt = self.fee_accumulator if fee_debt is None else fee_debt
-        self.positions[listing_id] = Position(units, backing, status, value=value, fee_debt=debt)
+        self.positions[listing_id] = Position(units, backing, status, value=value, fee_debt=debt, shapes=shapes)
         self.idle_value -= value
         self.active_backing += backing
         self.active_count += 1
@@ -237,6 +283,8 @@ class Vault:
         if p.status == ACTIVE:
             p.status = ALLOCATED
         self.allocated_value += p.value
+        p.unresolved_uplift = max(0, p.backing - p.value)
+        self.unresolved_keep_uplift += p.unresolved_uplift
         self.allocation_queue.append(listing_id)
 
     def process_journal(self, entries):
@@ -256,13 +304,13 @@ class Vault:
             processed += 1
         return processed
 
-    def scan_rebase(self, found):
+    def scan_rebase(self, found, scan_gas=30_000, journal_gas=22_000):
         """ScanLib.rebase: read every open Active listing instead of FWA's journal when that costs no
         more than the next journal batch. `found` is the (allocation time, id) of each own listing FWA
         allocated that the book still holds Active. Returns the listings read, or None when the journal
         path runs instead (not eligible, more than 16 found, or an order the queue cannot take)."""
         backlog = self.completed_prefix - self.acquisition_cursor
-        if not backlog or len(self.positions) * 30_000 > min(backlog, 128) * 22_000:
+        if not backlog or len(self.positions) > 96 or len(self.positions) * scan_gas > min(backlog, 128) * journal_gas:
             return None
         found = sorted(found)
         if len(found) > 16 or (found and found[0][0] < max((p.allocated_at for p in self.positions.values()
@@ -292,7 +340,7 @@ class Vault:
             if p is None or p.state != ALLOCATED or p.expired:
                 return False
         nav = self.free() + self.tracked_value + self.active_backing + self.pending_active_fees() + credit - cost
-        if nav <= 0 or self.allocated_value * BPS > nav * self.allocated_bound_bps:
+        if nav <= 0 or self.unresolved_keep_uplift * BPS > nav * self.uplift_bound_bps:
             return False
         per_share = nav * E // self.total_shares
         if per_share <= self.high_water_mark:
@@ -323,17 +371,17 @@ class Vault:
         cost = quote(gas_q, units)
         if self.routine_budget < cost:
             return gas_q, 0, []
-        free, taken_credit = self.free() + cash_delta, 0
+        proceeds, taken_credit = cash_delta, 0
         original_credit = credit
         proof = lambda gas: not distribution_tail or self.distribution_tail(quote(gas, 0), original_credit)
         combined = quote(gas_q + credit_gas, units)
         if (credit and combined <= self.routine_budget
                 and (combined - cost) * BPS <= credit * share_bps and proof(gas_q + credit_gas)):
             taken_credit, credit = credit, 0
-            free += taken_credit
+            proceeds += taken_credit
             gas_q += credit_gas
             cost = combined
-        if free >= cost:
+        if self.keeper_cash_after(proceeds) >= cost:
             return gas_q, taken_credit, []
         claims, fees = [], credit
         for listing_id in ids:
@@ -345,7 +393,7 @@ class Vault:
             fees += p.pending_fees
             funded_gas = gas_q + funding_gas + len(claims) * claim_gas + (credit_gas if credit else 0)
             combined = quote(funded_gas, units)
-            if free + fees < combined:
+            if self.keeper_cash_after(proceeds + fees) < combined:
                 continue
             # The first cash-covering prefix is final. Padding cannot qualify a failing
             # fee share or permission check, or manufacture another claim's compensation.
@@ -411,6 +459,8 @@ class Vault:
             self._remove_active(p)
         elif p.state == ALLOCATED:
             self.allocated_value -= p.value
+            self.unresolved_keep_uplift -= p.unresolved_uplift
+            p.unresolved_uplift = 0
         elif p.state != OWED:
             raise RuntimeError("InvalidListing")
         if not owned:
@@ -420,6 +470,7 @@ class Vault:
         self.receipts.pop(listing_id, None)
         self.idle_value += p.value
         self.idle_packs.append(p.value)
+        self.idle_shapes.append(p.shapes or shape_count(p.units))
         self.idle_quotes.append(p.backing)
         self.idle_funding += p.backing
 
@@ -452,6 +503,7 @@ class Vault:
         del self.receipts[listing_id]
         del self.positions[listing_id]
         self.allocated_value -= p.value
+        self.unresolved_keep_uplift -= p.unresolved_uplift
         self.tracked_value -= p.value
         self.backing_lost += p.value  # the pack left: its value is the loss
 
@@ -461,6 +513,7 @@ class Vault:
         self.idle_value += p.value
         self.balance += p.backing
         self.idle_packs.append(p.value)
+        self.idle_shapes.append(p.shapes or shape_count(p.units))
         self.idle_quotes.append(p.backing)
         self.idle_funding += p.backing
 
@@ -468,6 +521,7 @@ class Vault:
         if not self.idle_packs:
             return
         value = self.idle_packs.pop()
+        self.idle_shapes.pop()
         self.idle_funding -= self.idle_quotes.pop()
         self.balance += value
         self.tracked_value -= value
@@ -485,39 +539,91 @@ class Vault:
             self.recovery_packs.pop()
 
     # ------------------------------------------------------------ holders
-    def deposit(self, h, amount, ck=0, charge=0):
-        """`amount` escrowed (deployment `charge` included), `ck` to the processing pool."""
+    def contribute(self, payer, amount):
+        if not amount:
+            return
+        era = self.charge_eras.setdefault(self.charge_era, [0, 0, False])
+        self.contributions.append([payer, self.charge_era, era[0], amount, False])
+        era[0] += amount
+        self.processing_pool += amount
+
+    def fund_checkpoint(self, payer, value, quote):
+        if not self.pending_total and not self.locked_shares:
+            raise RuntimeError('Nothing')
+        amount = min(value, max(0, quote - self.processing_pool))
+        self.balance += amount
+        self.contribute(payer, amount)
+        return value - amount
+
+    def close_charge_era(self):
+        era = self.charge_eras.setdefault(self.charge_era, [0, 0, False])
+        if not era[0]:
+            return
+        era[1], era[2] = self.processing_pool, True
+        self.charge_refund_reserve += self.processing_pool
+        self.processing_pool = 0
+        self.charge_era += 1
+
+    def checkpoint_refund(self, contribution_id):
+        payer, era_id, start, amount, claimed = self.contributions[contribution_id]
+        total, refund, closed = self.charge_eras[era_id]
+        return 0 if claimed or not closed else (start + amount) * refund // total - start * refund // total
+
+    def claim_checkpoint_refund(self, h, ids):
+        snapshot = copy.deepcopy(self.__dict__)
+        try:
+            return self._claim_checkpoint_refund(h, ids)
+        except Exception:
+            self.__dict__.update(snapshot)
+            raise
+
+    def _claim_checkpoint_refund(self, h, ids):
+        if not ids or len(ids) > 16:
+            raise RuntimeError('Amount')
+        if any(self.contributions[i][0] != h for i in ids):
+            raise RuntimeError('Amount')
+        amount = 0
+        for i in ids:
+            refund = self.checkpoint_refund(i)
+            if self.charge_eras[self.contributions[i][1]][2]:
+                self.contributions[i][4] = True
+                amount += refund
+        if not amount:
+            raise RuntimeError('Nothing')
+        self.charge_refund_reserve -= amount
+        self.balance -= amount
+        return amount
+
+    def deposit(self, h, amount, ck=0):
+        """Gross cancellable escrow; construction is computed only at commitment."""
         self._settle_holder(h)
-        d = self.pending.setdefault(h, [0, 0, 0, 0])
+        d = self.pending.setdefault(h, [0, self.epoch])
         d[0] += amount
         d[1] = self.epoch
-        d[2] += charge
-        d[3] += ck // 10**9
         self.pending_total += amount
-        self.pending_charge_total += charge
-        self.processing_pool += ck
+        self.contribute(h, ck)
         self.balance += amount + ck
 
     def cancel(self, h, keep=0):
-        """`keep`: one checkpoint's cost when other flows still wait (VaultLib.requestCharge)."""
         self._settle_holder(h)
-        d = self.pending.pop(h, [0, 0, 0, 0])
-        amount = d[0]
+        d = self.pending.get(h)
+        if not d or not d[0]:
+            raise RuntimeError('Nothing')
+        amount = self.pending.pop(h)[0]
         self.pending_total -= amount
-        self.pending_charge_total -= d[2]
-        keep = keep if self.pending_total or self.locked_shares else 0
-        back = min(d[3] * 10**9, self.processing_pool - keep if self.processing_pool > keep else 0)
-        self.processing_pool -= back
-        self.balance -= amount + back
-        return amount + back
+        if not self.pending_total and not self.locked_shares:
+            self.close_charge_era()
+        self.balance -= amount
+        return amount
 
     def request_redeem(self, h, amount, ck=0, unwind=0):
-        """Charges paid in ETH: `ck` to the processing pool, `unwind` to the vault."""
-        self.processing_pool += ck
-        self.balance += ck + unwind
         self._settle_holder(h)
+        if amount <= 0 or amount > self.shares.get(h, 0):
+            raise RuntimeError('Amount')
+        self.contribute(h, ck)
+        self.balance += ck + unwind
         self._settle_dist(h)
-        self.shares[h] = self.shares.get(h, 0) - amount
+        self.shares[h] -= amount
         self.dist_debt[h] = self.shares[h] * self.dist_per_share // E
         r = self.redemptions.setdefault(h, Redemption())
         r.shares += amount
@@ -527,6 +633,8 @@ class Vault:
         self._settle_holder(h)
         self._settle_dist(h)
         amount = self.claimable.get(h, 0)
+        if not amount:
+            raise RuntimeError("Nothing")
         self.claimable[h] = 0
         self.claimable_total -= amount
         self.balance -= amount
@@ -536,14 +644,18 @@ class Vault:
         s = self.shares.get(h, 0)
         d = self.pending.get(h)
         if d and d[0] and d[1] < self.epoch:
-            s += (d[0] - d[2]) * self.epoch_supply[d[1]] // self.epoch_nav[d[1]]
+            issuance = self.issuances[d[1]]
+            s += issuance[3] if d[0] == issuance[2] else d[0] * issuance[1] // issuance[0]
         return s
 
     def _settle_holder(self, h):
         d = self.pending.get(h)
         if d and d[0] and d[1] < self.epoch:
             self._settle_dist(h)
-            minted = (d[0] - d[2]) * self.epoch_supply[d[1]] // self.epoch_nav[d[1]]
+            issuance = self.issuances[d[1]]
+            minted = issuance[3] if d[0] == issuance[2] else d[0] * issuance[1] // issuance[0]
+            issuance[2] -= d[0]
+            issuance[3] -= minted
             self.shares[h] = self.shares.get(h, 0) + minted
             self.dist_debt[h] = self.dist_debt.get(h, 0) + minted * self.epoch_dist[d[1]] // E
             del self.pending[h]
@@ -573,7 +685,23 @@ class Vault:
             self.dist_debt[h] = self.dist_debt.get(h, 0) + owed
 
     # ------------------------------------------------------------ checkpoint
+    def checkpoint_proof_counts(self, oracle_exempt=True):
+        """Actual completed proof work; request funding separately reserves a conservative ceiling."""
+        entries=reads=0
+        if self.active_count and len(self.positions)<=32 and not oracle_exempt:
+            entries=len(self.positions)
+            reads=sum(p.state==ACTIVE for p in self.positions.values())
+        if self.allocated_value:
+            queued=self.allocation_queue[self.allocation_head:]
+            if len(queued)>32:
+                raise RuntimeError('CatchUpFirst')
+            entries+=len(queued)
+            reads+=sum(i in self.positions and self.positions[i].state==ALLOCATED for i in queued)
+        return entries,reads
+
     def nav_positions(self):
+        if self.allocated_value and len(self.allocation_queue) - self.allocation_head > 32:
+            raise RuntimeError('CatchUpFirst')
         expired = False
         if self.allocation_head < len(self.allocation_queue):
             p = self.positions.get(self.allocation_queue[self.allocation_head])
@@ -583,18 +711,23 @@ class Vault:
         return (self.tracked_value - self.idle_value + self.active_backing + self.pending_active_fees(),
                 self.allocated_value, expired)
 
-    def checkpoint(self, credit=0):
+    def checkpoint(self, credit=0, keeper_payment=0, recovery_only=False):
         snapshot = copy.deepcopy(self.__dict__)
         try:
-            return self._checkpoint(credit)
+            return self._checkpoint(credit, keeper_payment, recovery_only)
         except Exception:
             self.__dict__.update(snapshot)
             raise
 
-    def _checkpoint(self, credit):
+    def recover_checkpoint(self, credit=0):
+        return self.checkpoint(credit, recovery_only=True)
+
+    def _checkpoint(self, credit, keeper_payment, recovery_only=False):
         """Mirror of PackVault.checkpoint. `credit` is FWA fee credit harvested inside it.
         Returns True when holder flows made it a paid call."""
-        work = self.pending_total != 0 or self.locked_shares != 0
+        if recovery_only and not self.locked_shares:
+            raise RuntimeError("Nothing")
+        work = (not recovery_only and self.pending_total != 0) or self.locked_shares != 0
         if not work and not self.distribution_bps:
             raise RuntimeError("Nothing")
         self.advance_unexposed()
@@ -610,12 +743,13 @@ class Vault:
             self.fee_credit = 0
         inventory = self.idle_value
         nav = self.free() + nav_pos + inventory
-        if alloc * BPS > nav * self.allocated_bound_bps:
+        if self.unresolved_keep_uplift * BPS > nav * self.uplift_bound_bps:
             raise RuntimeError("AllocatedExposure")
         supply = self.total_shares
+        filled = 0
         if self.locked_shares:
             owed = mul_div_up(self.locked_shares, nav, supply)
-            liquid = self.free() + self.pending_total
+            liquid = self.free() + (0 if recovery_only else self.pending_total)
             frac = SCALE if owed <= liquid else mul_div(liquid - 2 if liquid > 2 else 0, SCALE, owed)
             filled = mul_div(self.locked_shares, frac, SCALE)
             unit = mul_div(frac, nav, supply)
@@ -634,34 +768,48 @@ class Vault:
             supply -= filled
         distributed = 0
         per_share = nav * E // supply
-        if (self.locked_shares == 0 and supply > DEAD_SHARES and per_share > self.high_water_mark
+        if (not recovery_only and self.locked_shares == 0 and supply > DEAD_SHARES and per_share > self.high_water_mark
                 and self.distribution_bps):
             gain = mul_div(per_share - self.high_water_mark, supply, E)
             distributed = min(gain * self.distribution_bps // BPS, self.idle())
-            if distributed >= MIN_DISTRIBUTION:
+            if distributed and distributed >= self.min_distribution:
                 self.dist_per_share += distributed * E // (supply - DEAD_SHARES)
                 self.distribution_reserve += distributed
                 nav -= distributed
             else:
                 distributed = 0
         per_share = nav * E // supply
-        if per_share > self.high_water_mark:
+        if not recovery_only and per_share > self.high_water_mark:
             self.high_water_mark = per_share
-        self.epoch_nav[self.epoch] = nav
-        self.epoch_supply[self.epoch] = supply
-        self.epoch_dist[self.epoch] = self.dist_per_share
-        if self.pending_total:
-            self.total_shares += (self.pending_total - self.pending_charge_total) * supply // nav
+        if not recovery_only:
+            self.epoch_dist[self.epoch] = self.dist_per_share
+        committed = not recovery_only and self.pending_total != 0
+        if committed:
+            if self.pack_units_mask and self.live_mint_fee > self.accepted_mint_fee:
+                raise RuntimeError('MintFeeNotAccepted')
+            gross = self.pending_total
+            cost = self.construction_cost if self.pack_units_mask else 0
+            charge = gross * cost // (self.reference_capital + cost)
+            issued = (gross - charge) * supply // nav
+            if not issued:
+                raise RuntimeError('Amount')
+            self.issuances[self.epoch] = [gross, issued, gross, issued]
+            self.total_shares += issued
             nav += self.pending_total
             self.pending_total = 0
-            self.pending_charge_total = 0
             per_share = nav * E // self.total_shares
             if per_share > self.high_water_mark:
                 self.high_water_mark = per_share
+        if not committed and not filled and not distributed:
+            raise RuntimeError("Nothing")
         self.last_nav = nav
-        self.epoch += 1
+        if not recovery_only:
+            self.epoch += 1
         if work:
-            self.processing_pool = 0  # keeper pay comes out of it (pay_keeper); the rest is free ETH
+            if not recovery_only:
+                self.pay_keeper(keeper_payment, essential=True, source='processing')
+            if not recovery_only or self.pending_total == 0:
+                self.close_charge_era()
         elif distributed == 0:
             raise RuntimeError("Nothing")
         return work or distributed != 0

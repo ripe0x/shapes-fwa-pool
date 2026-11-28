@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
+import {GasQuotes} from "../utils/GasQuotes.sol";
+
 import {ForkBase} from "./ForkBase.sol";
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
 import {JournalRequests} from "./EfficientJournal.t.sol";
-import {IKeeperPolicy} from "../../src/KeeperPolicy.sol";
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 import {Charges} from "../utils/Charges.sol";
 import {PackVault} from "../../src/PackVault.sol";
@@ -12,14 +15,6 @@ import {PackAccount} from "../../src/PackAccount.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {StrategyLib} from "../../src/StrategyLib.sol";
 import {LISTING_ALLOCATED} from "../../src/interfaces/External.sol";
-
-/// @dev A real deployed hostile keeper policy an owner could set: it always offers the maximum.
-contract PolicyMaxOffer is IKeeperPolicy {
-    function policyVersion() external pure returns (uint256) { return 1; }
-    function quote(uint256, uint256, uint256, bool, uint256, uint256, uint256) external pure returns (uint256) {
-        return type(uint256).max;
-    }
-}
 
 /// @notice Scan-path regression guards. A small vault reads its own positions instead of FWA's
 ///         global journal; keeper pay is earned only for real own work, never manufactured from
@@ -32,8 +27,9 @@ contract ScanSyncForeignTest is ForkBase {
         super.setUp();
         VaultLib.Params memory p = vault.getParams();
         p.payMarkupBps = 0; p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei;
-        vm.prank(owner); vault.setParams(p);
-        vm.deal(address(vault), 5 ether);
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected0);
+        TestVaultOps.fundTo(vault, 5 ether);
         vm.prank(keeper); TestVaultOps.restock(vault, 1, UNITS, 0); // build lists it at once
         assertEq(vault.openListingCount(), 1);
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
@@ -56,11 +52,10 @@ contract ScanSyncForeignTest is ForkBase {
     }
 
     function _billedScan() internal returns (uint256 billed, uint256 pay) {
-        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0)));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0), vault.configurationHash()));
         uint256 intrinsic = 21_000;
         for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
-        vm.cool(address(vault)); vm.cool(address(FWA)); vm.cool(address(vault.keeperPolicy()));
-        vm.cool(address(VaultLib)); vm.cool(keeper);
+        vm.cool(address(vault)); vm.cool(address(FWA)); vm.cool(address(VaultLib)); vm.cool(keeper);
         vm.prank(keeper);
         uint256 start = gasleft();
         (bool ok, bytes memory ret) = address(vault).call(input);
@@ -74,12 +69,14 @@ contract ScanSyncForeignTest is ForkBase {
     function test_b_foreignOnlyScanPaysNothingAndRepeatIsNothing() public {
         _backlog(32);
         uint256 cash = address(vault).balance;
-        vm.prank(keeper); uint256 pay = vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); uint256 pay = vault.sync(new uint256[](0), 0, 0, _expected1);
         assertEq(pay, 0, "no own selection, no checkpoint: unpaid");
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess(), "one scan cleared it");
         assertEq(address(vault).balance, cash, "no vault cash moved");
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Nothing.selector);
-        vm.prank(keeper); vault.sync(new uint256[](0), 0, 0);
+        vm.prank(keeper); vault.sync(new uint256[](0), 0, 0, _expected2);
     }
 
     // (c) Unrelated FWA acquisitions (real refunded foreign requests) cause no vault charge while
@@ -89,7 +86,8 @@ contract ScanSyncForeignTest is ForkBase {
         uint256 keeperCash = keeper.balance;
         _backlog(50);
         assertEq(address(vault).balance, cash, "foreign acquire/refund never touches vault cash");
-        vm.prank(keeper); uint256 pay = vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected3 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); uint256 pay = vault.sync(new uint256[](0), 0, 0, _expected3);
         assertEq(pay, 0);
         assertEq(address(vault).balance, cash, "scanning the foreign backlog costs the vault nothing");
         assertEq(keeper.balance, keeperCash, "keeper earns nothing for foreign-only work");
@@ -115,7 +113,7 @@ contract ScanSyncForeignTest is ForkBase {
         emit log_named_uint("scan billed gas backlog 94", billed94);
         // A journal would add (94-41)*Q_JOURNAL. The scan's cost is independent of backlog size.
         uint256 diff = billed94 > billed41 ? billed94 - billed41 : billed41 - billed94;
-        assertLt(diff, VaultLib.Q_JOURNAL, "scan cost does not scale with the backlog");
+        assertLt(diff, GasQuotes.Q_JOURNAL, "scan cost does not scale with the backlog");
     }
 
     // (h) A keeper cannot manufacture profitable repeat work: splitting a cleared backlog into a
@@ -125,16 +123,20 @@ contract ScanSyncForeignTest is ForkBase {
         uint256 snapshot = vm.snapshotState();
         uint256[] memory padded = new uint256[](16);
         for (uint256 i; i < padded.length; ++i) padded[i] = 1e9 + i;
-        vm.prank(keeper); uint256 paddedPay = vault.sync(padded, 0, 0);
+        bytes32 _expected4 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); uint256 paddedPay = vault.sync(padded, 0, 0, _expected4);
         assertEq(paddedPay, 0, "irrelevant ids do not manufacture pay");
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
+        bytes32 _expected5 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Nothing.selector);
-        vm.prank(keeper); vault.sync(new uint256[](0), 0, 0);
+        vm.prank(keeper); vault.sync(new uint256[](0), 0, 0, _expected5);
         assertTrue(vm.revertToState(snapshot));
-        vm.prank(keeper); uint256 plainPay = vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected6 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); uint256 plainPay = vault.sync(new uint256[](0), 0, 0, _expected6);
         assertEq(plainPay, paddedPay, "padding changes nothing: a split later call earns no second scan");
+        bytes32 _expected7 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Nothing.selector);
-        vm.prank(keeper); vault.sync(padded, 0, 0);
+        vm.prank(keeper); vault.sync(padded, 0, 0, _expected7);
     }
 }
 
@@ -143,14 +145,16 @@ contract ScanSyncForeignTest is ForkBase {
 ///         shares, budget exhaustion is recoverable, and a full redemption settles to the holder's
 ///         exact NAV share without ever funding keeper pay from liabilities.
 contract ScanSyncSelectionTest is SelectionBase {
-    uint256 constant SCAN_Q = VaultLib.Q_SYNC + VaultLib.Q_SCAN + VaultLib.Q_SELECTED; // 295_000
+    uint256 constant SCAN_Q = GasQuotes.Q_SYNC + GasQuotes.Q_SCAN + GasQuotes.Q_SELECTED; // 295_000
 
     receive() external payable {}
 
     function _clean() internal {
         VaultLib.Params memory p = vault.getParams();
         p.payMarkupBps = 0; p.workFee = 0; p.maxTip = 0; p.keeperShareBps = 0;
-        vm.prank(vault.owner()); vault.setParams(p);
+        vm.recordLogs();
+        bytes32 _expected8 = TestVaultOps.configurationHash(vault);
+        vm.prank(vault.owner()); vault.setParams(p, _expected8);
     }
 
     /// @dev Real foreign backlog (>= 41) so the vault takes the scan path over its one own listing.
@@ -181,29 +185,32 @@ contract ScanSyncSelectionTest is SelectionBase {
         _backlog(45);
         VaultLib.Params memory p = vault.getParams();
         p.routineRate = 0; p.routineCap = 0.00008 ether; // below SCAN_Q at 0.5 gwei (= 0.0001475 ETH)
-        vm.prank(vault.owner()); vault.setParams(p);
+        bytes32 _expected9 = TestVaultOps.configurationHash(vault);
+        vm.prank(vault.owner()); vault.setParams(p, _expected9);
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
         (uint256 routine,) = vault.budget();
         assertEq(routine, 0.00008 ether, "budget below the scan quote");
-        assertLt(routine, SCAN_Q * 0.5 gwei, "quote exceeds the budget");
-        uint256 paid = vault.sync(new uint256[](0), 0, 1);
+        assertLt(routine, vault.quote(SCAN_Q, 0, false), "upper envelope exceeds the budget");
+        bytes32 _expected10 = TestVaultOps.configurationHash(vault);
+        uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected10);
+        uint256 gross = MeasuredPay.gross(vault, SCAN_Q, 0, false, 0.5 gwei);
+        assertGe(gross, routine, "fixture reaches the actual budget clipping branch");
         assertEq(paid, routine, "pay is capped at the routine budget");
         (uint256 after_,) = vault.budget();
         assertEq(after_, 0, "budget drained to zero");
     }
 
     // (i) A hostile keeper policy (owner-set, always offers the maximum) cannot raise scan pay above
-    //     the vault's own fixed quote and budget.
-    function test_i_hostilePolicyCappedAtVaultQuote() public {
+    //     the vault's own work cap and budget.
+    function test_i_scanPaysBoundedActualWork() public {
         _select(primary()); _clean();
         _backlog(45);
-        PolicyMaxOffer greedy = new PolicyMaxOffer();
-        vm.prank(vault.owner()); vault.setPolicy(address(greedy));
-        assertEq(address(vault.keeperPolicy()), address(greedy));
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
         uint256 cash = address(vault).balance;
-        uint256 paid = vault.sync(new uint256[](0), 0, 1);
-        assertEq(paid, SCAN_Q * 0.5 gwei, "the vault caps the max offer at its own scan quote");
+        bytes32 _expected11 = TestVaultOps.configurationHash(vault);
+        uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected11);
+        assertEq(paid, MeasuredPay.gross(vault, SCAN_Q, 0, false, 0.5 gwei));
+        assertLe(paid, vault.quote(SCAN_Q, 0, false), "measured payment stays inside the work envelope");
         assertEq(cash - address(vault).balance, paid, "only the capped quote leaves the vault");
     }
 
@@ -215,22 +222,26 @@ contract ScanSyncSelectionTest is SelectionBase {
         uint64 cursor = vault.acquisitionCursor();
         VaultLib.Params memory p = vault.getParams();
         p.routineCap = 0; p.routineRate = 0;
-        vm.prank(vault.owner()); vault.setParams(p);
+        bytes32 _expected12 = TestVaultOps.configurationHash(vault);
+        vm.prank(vault.owner()); vault.setParams(p, _expected12);
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
         (uint256 routine,) = vault.budget();
         assertEq(routine, 0, "budget exhausted");
+        bytes32 _expected13 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
-        vault.sync(new uint256[](0), 0, 1);
+        vault.sync(new uint256[](0), 0, 1, _expected13);
         assertEq(vault.acquisitionCursor(), cursor, "refused pay rolls back the scan: selection still pending");
         // Owner restores a refill rate and cap; time then refills the routine budget.
         p.routineCap = 0.01 ether; p.routineRate = 0.01 ether;
-        vm.prank(vault.owner()); vault.setParams(p);
+        bytes32 _expected14 = TestVaultOps.configurationHash(vault);
+        vm.prank(vault.owner()); vault.setParams(p, _expected14);
         vm.warp(block.timestamp + 12 hours);
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
         (routine,) = vault.budget();
-        assertGe(routine, SCAN_Q * 0.5 gwei, "budget refilled above the scan quote");
-        uint256 paid = vault.sync(new uint256[](0), 0, 1);
-        assertEq(paid, SCAN_Q * 0.5 gwei, "the refilled budget pays the full scan quote");
+        assertGe(routine, vault.quote(SCAN_Q, 0, false), "budget refilled above the scan envelope");
+        bytes32 _expected15 = TestVaultOps.configurationHash(vault);
+        uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected15);
+        assertEq(paid, MeasuredPay.gross(vault, SCAN_Q, 0, false, 0.5 gwei));
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess(), "the selection is finally applied");
     }
 
@@ -247,7 +258,8 @@ contract ScanSyncSelectionTest is SelectionBase {
 
         // Journal path (backlog 1) applies the selection; price it and record the gas cost.
         uint256 snapshot = vm.snapshotState();
-        uint256 payJournal = vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected16 = TestVaultOps.configurationHash(vault);
+        uint256 payJournal = vault.sync(new uint256[](0), 0, 0, _expected16);
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
         uint256 navJournal = vault.accountedNav(0);
         assertTrue(vm.revertToState(snapshot));
@@ -256,7 +268,8 @@ contract ScanSyncSelectionTest is SelectionBase {
         // net of each path's own keeper gas quote (Q_JOURNAL vs Q_SCAN).
         _backlog(45);
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
-        uint256 payScan = vault.sync(new uint256[](0), 0, 1);
+        bytes32 _expected17 = TestVaultOps.configurationHash(vault);
+        uint256 payScan = vault.sync(new uint256[](0), 0, 1, _expected17);
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
         uint256 navScan = vault.accountedNav(0);
         assertEq(navScan + payScan, navJournal + payJournal,
@@ -274,7 +287,8 @@ contract ScanSyncSelectionTest is SelectionBase {
         credit; // silence: fees read after each sync below
         uint256 snapshot = vm.snapshotState();
         uint256 cashBefore = address(vault).balance;
-        uint256 payNow = vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected18 = TestVaultOps.configurationHash(vault);
+        uint256 payNow = vault.sync(new uint256[](0), 0, 0, _expected18);
         assertEq(cashBefore - address(vault).balance, payNow, "immediate sync outflow is only its gas quote");
         uint256 navNow = vault.accountedNav(0);
         uint256 feesNow = FWA.feeCredit(address(vault)) + FWA.pendingFees(selected);
@@ -283,7 +297,8 @@ contract ScanSyncSelectionTest is SelectionBase {
         _backlog(45);
         vm.fee(0.5 gwei); vm.txGasPrice(0.5 gwei);
         uint256 cashBefore2 = address(vault).balance;
-        uint256 payLate = vault.sync(new uint256[](0), 0, 1);
+        bytes32 _expected19 = TestVaultOps.configurationHash(vault);
+        uint256 payLate = vault.sync(new uint256[](0), 0, 1, _expected19);
         assertEq(cashBefore2 - address(vault).balance, payLate, "late sync outflow is only its gas quote");
         uint256 navLate = vault.accountedNav(0);
         uint256 feesLate = FWA.feeCredit(address(vault)) + FWA.pendingFees(selected);
@@ -299,7 +314,8 @@ contract ScanSyncSelectionTest is SelectionBase {
         VaultLib.Params memory p = vault.getParams();
         p.payMarkupBps = 0; p.workFee = 0; p.maxTip = 0; p.keeperShareBps = 0;
         p.gasCeiling = 0.5 gwei; p.essentialCeiling = 0.5 gwei; // pay capped at this ceiling
-        vm.prank(vault.owner()); vault.setParams(p);
+        bytes32 _expected20 = TestVaultOps.configurationHash(vault);
+        vm.prank(vault.owner()); vault.setParams(p, _expected20);
 
         // A holder funds a deposit and its request charge (the deposit is escrowed even while the
         // selection is still unapplied).
@@ -307,31 +323,39 @@ contract ScanSyncSelectionTest is SelectionBase {
         assertEq(holder.code.length, 0); assertEq(holder.balance, 0);
         uint256 gross = Charges.grossFor(vault, 1 ether);
         vm.deal(holder, gross);
-        vm.prank(holder); vault.deposit{value: gross}();
+        bytes32 _expected21 = TestVaultOps.configurationHash(vault);
+        vm.prank(holder); vault.deposit{value: gross}(_expected21);
 
         _backlog(45); // long real backlog: interrupted maintenance the vault clears with one scan
+        vm.recordLogs();
         vm.fee(5 gwei); vm.txGasPrice(5 gwei); // gas far above the 0.5 gwei ceiling
-        uint256 paidScan = vault.sync(new uint256[](0), 0, 0);
-        assertEq(paidScan, SCAN_Q * 0.5 gwei, "pay is capped at the 0.5 gwei ceiling, not the 5 gwei basefee");
+        bytes32 _expected22 = TestVaultOps.configurationHash(vault);
+        uint256 paidScan = vault.sync(new uint256[](0), 0, 0, _expected22);
+        assertEq(paidScan, MeasuredPay.gross(vault, SCAN_Q, 0, false, 0.5 gwei));
+        assertLe(paidScan, vault.quote(SCAN_Q, 0, false));
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess(), "one scan caught the cursor up");
 
         // The purchaser keeps the pack; the terminal resolves and the position closes, leaving the
         // vault holding the settlement proceeds against which the holder redeems.
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei);
         vm.prank(primary().purchaser); IFwaSettle(address(FWA)).keepNFT(selected);
-        vault.sync(_one(selected), 0, 0);
+        bytes32 _expected23 = TestVaultOps.configurationHash(vault);
+        vault.sync(_one(selected), 0, 0, _expected23);
         assertEq(vault.openListingCount(), 0, "selection resolved, no active exposure");
 
         // Price the deposit in (no active positions: witness 0), then the holder redeems every share.
         _toBlackout();
-        vault.checkpoint(0, 0);
+        bytes32 _expected24 = TestVaultOps.configurationHash(vault);
+        vault.checkpoint(0, 0, _expected24);
         uint256 shares = vault.shareBalance(holder);
         assertGt(shares, 0, "holder priced in");
         uint256 rc = Charges.redeemCharge(vault, shares);
         vm.deal(holder, rc);
-        vm.prank(holder); vault.requestRedeem{value: rc}(shares);
+        bytes32 _expected25 = TestVaultOps.configurationHash(vault);
+        vm.prank(holder); vault.requestRedeem{value: rc}(shares, _expected25);
         vm.warp(block.timestamp + 12 hours); vm.roll(block.number + 3600);
-        vault.checkpoint(0, 0);
+        bytes32 _expected26 = TestVaultOps.configurationHash(vault);
+        vault.checkpoint(0, 0, _expected26);
 
         // Liabilities are fully backed by cash: keeper pay was drawn from free ETH, never from them.
         uint256 liabilities = vault.redemptionReserve() + vault.claimableTotal()

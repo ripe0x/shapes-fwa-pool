@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/Users/dd/.agents/guidance/asset-flow-kit/asset_gate.py", line 276, in <module>
+    sys.exit(main(sys.argv))
+             ~~~~^^^^^^^^^^
+  File "/Users/dd/.agents/guidance/asset-flow-kit/asset_gate.py", line 213, in main
+    inc, fail, drifts, regs, shown, ms, cur = check(root, cfg_name, run)
+                                              ~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/dd/.agents/guidance/asset-flow-kit/asset_gate.py", line 187, in check
+    explained = {e["metric"] for e in cfg.get("explained", []) if e.get("reason")}
+                 ~^^^^^^^^^^
+KeyError: 'metric'

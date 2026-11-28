@@ -1,0 +1,21 @@
+{
+ "block": 26487484,
+ "blockHash": "0x14287488e917363ddef2ae8693a71053ca435828f2a2dc4375c947b594fa7939",
+ "timestamp": 1795552991,
+ "rpc": "https://mainnet.gateway.tenderly.co",
+ "readOnly": true,
+ "mintFeeWei": 500000000000000,
+ "protocol": {
+  "totalWeight": 52918485163442081987189,
+  "weightedBackingTotal": 2559999999999999999883966035229199543000,
+  "acquisitionFee": 50795104805021200,
+  "ownerAcquisitionFeeBps": 100,
+  "topListingShareBps": 10,
+  "ownerSettlementFeeBps": 100,
+  "settlementDiscountBps": 9000,
+  "tokenSettlementDiscountBps": 9150,
+  "settlementWindow": 3600,
+  "inferredGrossMultiplier1e18": 1038460499999999998
+ },
+ "oracleExempt": true
+}

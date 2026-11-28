@@ -1,0 +1,16 @@
+client {"__main__": {"loaded_code_sha256": "b51606395f7bd78a38c201c832dc27bd8cbe65b3d4ecf7df75deb204c7d3c4fd", "source_sha256_at_import": "34123373cd60522738dc2911ac60c07f308a38450d1dc659a7cb12d87993db00"}, "index": {"loaded_code_sha256": "d62be2e9d0dafba4d321d2737f03d22236689dfacf2b3f04f344ce0aeab3369e", "source_sha256_at_import": "321946551c971b6374cb37c37de93c6a79895e87492e08421956472376d3d96a"}, "policy": {"loaded_code_sha256": "172441b2b86926b3c14a5e638a8bd30c610cd6653da93270b0510da6c21cb5f7", "source_sha256_at_import": "633ed96b7b82c1a706cb28d5ae1d9a0c537d7d7ce300cc718757f7323f3511a8"}, "tx": {"loaded_code_sha256": "f5fc4655be2cb92f33d5a648f85ec1dfabec8cc561a186b9bd62a1adfc96d7b9", "source_sha256_at_import": "29aee05d3a2cbb7b99ad974a8dbe5ec236c6d1d305582702bf6c5a7a21e641d1"}}
+account 0x76693E082f4294717bA5Cd7812F13D707FE9d9d3 (manager) configuration 0x2d9597ec69d49c60b8295e95ba8183ea97e169787937968e35f6312d086a5285
+gas 0.181 gwei, 4 open, 0 idle packs, idle 0.0242 ETH, cycle net 7.644 mETH, 7d volume 134/day
+status ROUTINE_BUDGET_EMPTY [wait] strategy work is unpaid until the routine budget refills
+status RESERVE_BELOW_NEED [info] reserve 0.0050 ETH; maximum listing and sync batches quote 0.0055 ETH
+sent setExiting nonce 14 hash 0xb6b987250a971cc2238103ae423148c481e71e50bf2586ed24875367b3ff4acf
+mined setExiting gas 50645 (est 52211) cost 9182729726835 pay 0 net -9182729726835 wei
+sent unlist nonce 15 hash 0x5efe70ece99e8097ce4fb66dd498fac487c16d3b8f987c592526cc4e0f051b9a
+mined unlist gas 1325528 (est 1699668) cost 218617849774168 pay 0 net -218617849774168 wei
+sent liquidate nonce 16 hash 0xe98eeef82e77f55d4df404cab71efbfd3a6a51b3953fd9de1ce454203510a345
+mined liquidate gas 754700 (est 971991) cost 114108773626900 pay 0 net -114108773626900 wei
+sent withdraw nonce 17 hash 0x30ec970831d2ba1bf5d2b7ade5eb98e94146f356d229a6cb5b3eb5c59be6d163
+mined withdraw gas 38826 (est 44106) cost 5391613684386 pay 0 net -5391613684386 wei
+done: 4 sent, 0 failed
+exposure EXPOSURE_UNAVAILABLE [info] aggregate share is not calculated in bounded routine passes
+Error: server returned an error response: error code 3: execution reverted, data: "0x"

@@ -1,184 +1,604 @@
 {
- "fork_block": 26463991,
- "fork_hash": "0x45f94974426e2f5a2fb90b85ad7c21094934cb46ff952e17e592525bf89ed303",
- "rpc": "http://127.0.0.1:8593",
+ "fork_block": 26484850,
+ "fork_hash": "0xb74960f39c4f4971c0e3732837afb49ecdfd20153c3d9d0631796f1d6e086f7c",
+ "rpc": "http://127.0.0.1:18647",
  "docker": false,
  "steps": {
-  "1_deploy": {
-   "vault": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
-   "factory": "0x321d151f896c205ac5c747c2cff4e9a0e185a27c",
-   "fwa_admission": "already admitted at this fork block",
-   "edge6_backing": 64896174863380000,
-   "edge6_ok": true,
-   "k": 1038460499999999991
-  },
-  "2_managers": [
-   {
-    "manager": "0xf6b8c92E37556D372175EE2567A861265dE1Feaf",
-    "owner": "0xd3eFCe3EE81F36ca0aed496b23fa0779967EddCf",
-    "seed_wei": 1000000000000000000
-   },
-   {
-    "manager": "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F",
-    "owner": "0x1DC45F06F240c0eb792Ec97675845Af09Ad36EAe",
-    "seed_wei": 1000000000000000000
-   },
-   {
-    "manager": "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22",
-    "owner": "0x3beE064fA874964832762A5a7e4Ab9967164B735",
-    "seed_wei": 1000000000000000000
-   }
-  ],
-  "3_fund": {
-   "managers_seeded_wei": 1000000000000000000,
-   "vault_seed_wei": 10000000000000000,
-   "keeper_funded": true
-  },
-  "4_discovery": {
-   "keeper": "0x6B401c3364dFb17fe7D54237fC04aba3f7739dd0",
-   "discovers": [
-    "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
-    "0xf6b8c92E37556D372175EE2567A861265dE1Feaf",
-    "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F",
-    "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22"
-   ]
-  },
-  "5_build_list": {
-   "open_listings": {
-    "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f": 0,
-    "0xf6b8c92E37556D372175EE2567A861265dE1Feaf": 7,
-    "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F": 7,
-    "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22": 7
-   },
-   "keeper_stats": {
-    "sent": 3,
-    "mined": 3,
-    "reverted": 0,
-    "replaced": 0,
-    "dropped": 0,
-    "reorged": 0,
-    "skipped_expected": 0,
-    "skipped_loss": 0,
-    "spent_wei": 2771018697138433,
-    "paid_wei": 4141848150050000
-   }
-  },
   "8_pooled": {
-   "deposit_wei": 1990059649000000000,
-   "listed": 15,
-   "charges_wei": 95157000000000,
-   "holder_claims_wei": 1957457894059318658,
-   "keeper_pay_wei": 2684764722750000,
-   "fully_exited": true,
-   "redemption_reserve_residual": 2
+   "fullyExited": true,
+   "resumedPreservedPartialRequest": true,
+   "priorStatePreserved": true
+  },
+  "3b_receipt_calibration": {
+   "operation": "completion bounded receipt calibration",
+   "cells": [
+    {
+     "units": 3,
+     "count": 1,
+     "shapes": 3,
+     "actualMintFeeWei": 1000000000000000,
+     "acceptedMintFeeWei": 1000000000000000,
+     "configuration": {
+      "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
+      "minEdgeBps": 100,
+      "bufferBps": 0,
+      "distributionBps": 0,
+      "payMarkupBps": 0,
+      "keeperShareBps": 2500,
+      "packUnitsMask": 8,
+      "gasCeilingWei": 500000000,
+      "essentialCeilingWei": 500000000,
+      "maxTipWei": 50000000,
+      "workFeeWei": 20000000000000,
+      "reserveWei": 5000000000000000,
+      "tvlCapWei": 0,
+      "routineCapWei": 30000000000000000,
+      "routineRatePerDayWei": 10000000000000000,
+      "essentialCapWei": 10000000000000000,
+      "essentialRatePerDayWei": 5000000000000000,
+      "upliftBoundBps": 25,
+      "backingRatioBps": 70000,
+      "renewalMode": 0,
+      "renewalFloatCount": 1,
+      "acceptedMintFeeWei": 1000000000000000,
+      "minDepositWei": 10000000000000000,
+      "minDistributionWei": 10000000000000000,
+      "gasSchedule": {
+       "checkpoint": 500000,
+       "allocationEntry": 6000,
+       "allocationRead": 30000,
+       "build": 360000,
+       "buildPack": 300000,
+       "buildShape": 130000,
+       "list": 280000,
+       "listed": 825000,
+       "sync": 125000,
+       "requiredTail": 120000,
+       "distributionProof": 80000,
+       "journal": 22000,
+       "scan": 30000,
+       "selected": 180000,
+       "synced": 120000,
+       "pruned": 45000,
+       "unlist": 340000,
+       "unlisted": 285000,
+       "liquidate": 75000,
+       "liquidatePack": 80000,
+       "redeemShape": 35000,
+       "recoveryBase": 100000,
+       "recoveryShape": 35000,
+       "recoveryUnseal": 70000,
+       "harvest": 125000,
+       "harvested": 80000,
+       "credit": 40000,
+       "fund": 40000
+      },
+      "expectedMintFeeWei": 1000000000000000
+     },
+     "baseFeeWei": 150000000,
+     "totalGasPriceWei": 200000000,
+     "paidCreatorFeeWei": 3000000000000000,
+     "k": 1038460499999999985,
+     "backingWei": 210000000000000000
+    },
+    {
+     "units": 3,
+     "count": 1,
+     "shapes": 3,
+     "actualMintFeeWei": 1000000000000000,
+     "acceptedMintFeeWei": 1000000000000000,
+     "configuration": {
+      "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
+      "minEdgeBps": 100,
+      "bufferBps": 0,
+      "distributionBps": 0,
+      "payMarkupBps": 0,
+      "keeperShareBps": 2500,
+      "packUnitsMask": 8,
+      "gasCeilingWei": 500000000,
+      "essentialCeilingWei": 500000000,
+      "maxTipWei": 50000000,
+      "workFeeWei": 20000000000000,
+      "reserveWei": 5000000000000000,
+      "tvlCapWei": 0,
+      "routineCapWei": 30000000000000000,
+      "routineRatePerDayWei": 10000000000000000,
+      "essentialCapWei": 10000000000000000,
+      "essentialRatePerDayWei": 5000000000000000,
+      "upliftBoundBps": 25,
+      "backingRatioBps": 70000,
+      "renewalMode": 0,
+      "renewalFloatCount": 1,
+      "acceptedMintFeeWei": 1000000000000000,
+      "minDepositWei": 10000000000000000,
+      "minDistributionWei": 10000000000000000,
+      "gasSchedule": {
+       "checkpoint": 500000,
+       "allocationEntry": 6000,
+       "allocationRead": 30000,
+       "build": 360000,
+       "buildPack": 300000,
+       "buildShape": 130000,
+       "list": 280000,
+       "listed": 825000,
+       "sync": 125000,
+       "requiredTail": 120000,
+       "distributionProof": 80000,
+       "journal": 22000,
+       "scan": 30000,
+       "selected": 180000,
+       "synced": 120000,
+       "pruned": 45000,
+       "unlist": 340000,
+       "unlisted": 285000,
+       "liquidate": 75000,
+       "liquidatePack": 80000,
+       "redeemShape": 35000,
+       "recoveryBase": 100000,
+       "recoveryShape": 35000,
+       "recoveryUnseal": 70000,
+       "harvest": 125000,
+       "harvested": 80000,
+       "credit": 40000,
+       "fund": 40000
+      },
+      "expectedMintFeeWei": 1000000000000000
+     },
+     "baseFeeWei": 450000000,
+     "totalGasPriceWei": 500000000,
+     "paidCreatorFeeWei": 3000000000000000,
+     "k": 1038460499999999985,
+     "backingWei": 210000000000000000
+    },
+    {
+     "units": 3,
+     "count": 1,
+     "shapes": 3,
+     "actualMintFeeWei": 500000000000000,
+     "acceptedMintFeeWei": 1000000000000000,
+     "configuration": {
+      "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
+      "minEdgeBps": 100,
+      "bufferBps": 0,
+      "distributionBps": 0,
+      "payMarkupBps": 0,
+      "keeperShareBps": 2500,
+      "packUnitsMask": 8,
+      "gasCeilingWei": 500000000,
+      "essentialCeilingWei": 500000000,
+      "maxTipWei": 50000000,
+      "workFeeWei": 20000000000000,
+      "reserveWei": 5000000000000000,
+      "tvlCapWei": 0,
+      "routineCapWei": 30000000000000000,
+      "routineRatePerDayWei": 10000000000000000,
+      "essentialCapWei": 10000000000000000,
+      "essentialRatePerDayWei": 5000000000000000,
+      "upliftBoundBps": 25,
+      "backingRatioBps": 70000,
+      "renewalMode": 0,
+      "renewalFloatCount": 1,
+      "acceptedMintFeeWei": 1000000000000000,
+      "minDepositWei": 10000000000000000,
+      "minDistributionWei": 10000000000000000,
+      "gasSchedule": {
+       "checkpoint": 500000,
+       "allocationEntry": 6000,
+       "allocationRead": 30000,
+       "build": 360000,
+       "buildPack": 300000,
+       "buildShape": 130000,
+       "list": 280000,
+       "listed": 825000,
+       "sync": 125000,
+       "requiredTail": 120000,
+       "distributionProof": 80000,
+       "journal": 22000,
+       "scan": 30000,
+       "selected": 180000,
+       "synced": 120000,
+       "pruned": 45000,
+       "unlist": 340000,
+       "unlisted": 285000,
+       "liquidate": 75000,
+       "liquidatePack": 80000,
+       "redeemShape": 35000,
+       "recoveryBase": 100000,
+       "recoveryShape": 35000,
+       "recoveryUnseal": 70000,
+       "harvest": 125000,
+       "harvested": 80000,
+       "credit": 40000,
+       "fund": 40000
+      },
+      "expectedMintFeeWei": 1000000000000000
+     },
+     "baseFeeWei": 150000000,
+     "totalGasPriceWei": 200000000,
+     "paidCreatorFeeWei": 1500000000000000,
+     "k": 1038460499999999985,
+     "backingWei": 210000000000000000
+    },
+    {
+     "units": 3,
+     "count": 1,
+     "shapes": 3,
+     "actualMintFeeWei": 500000000000000,
+     "acceptedMintFeeWei": 1000000000000000,
+     "configuration": {
+      "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
+      "minEdgeBps": 100,
+      "bufferBps": 0,
+      "distributionBps": 0,
+      "payMarkupBps": 0,
+      "keeperShareBps": 2500,
+      "packUnitsMask": 8,
+      "gasCeilingWei": 500000000,
+      "essentialCeilingWei": 500000000,
+      "maxTipWei": 50000000,
+      "workFeeWei": 20000000000000,
+      "reserveWei": 5000000000000000,
+      "tvlCapWei": 0,
+      "routineCapWei": 30000000000000000,
+      "routineRatePerDayWei": 10000000000000000,
+      "essentialCapWei": 10000000000000000,
+      "essentialRatePerDayWei": 5000000000000000,
+      "upliftBoundBps": 25,
+      "backingRatioBps": 70000,
+      "renewalMode": 0,
+      "renewalFloatCount": 1,
+      "acceptedMintFeeWei": 1000000000000000,
+      "minDepositWei": 10000000000000000,
+      "minDistributionWei": 10000000000000000,
+      "gasSchedule": {
+       "checkpoint": 500000,
+       "allocationEntry": 6000,
+       "allocationRead": 30000,
+       "build": 360000,
+       "buildPack": 300000,
+       "buildShape": 130000,
+       "list": 280000,
+       "listed": 825000,
+       "sync": 125000,
+       "requiredTail": 120000,
+       "distributionProof": 80000,
+       "journal": 22000,
+       "scan": 30000,
+       "selected": 180000,
+       "synced": 120000,
+       "pruned": 45000,
+       "unlist": 340000,
+       "unlisted": 285000,
+       "liquidate": 75000,
+       "liquidatePack": 80000,
+       "redeemShape": 35000,
+       "recoveryBase": 100000,
+       "recoveryShape": 35000,
+       "recoveryUnseal": 70000,
+       "harvest": 125000,
+       "harvested": 80000,
+       "credit": 40000,
+       "fund": 40000
+      },
+      "expectedMintFeeWei": 1000000000000000
+     },
+     "baseFeeWei": 450000000,
+     "totalGasPriceWei": 500000000,
+     "paidCreatorFeeWei": 1500000000000000,
+     "k": 1038460499999999985,
+     "backingWei": 210000000000000000
+    },
+    {
+     "units": 29,
+     "count": 4,
+     "shapes": 28,
+     "actualMintFeeWei": 1000000000000000,
+     "baseFeeWei": 150000000,
+     "k": 1038460499999999985,
+     "backingWei": 2030000000000000000,
+     "configuration": {
+      "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
+      "minEdgeBps": 100,
+      "bufferBps": 0,
+      "distributionBps": 0,
+      "payMarkupBps": 0,
+      "keeperShareBps": 2500,
+      "packUnitsMask": 1610612744,
+      "gasCeilingWei": 500000000,
+      "essentialCeilingWei": 500000000,
+      "maxTipWei": 50000000,
+      "workFeeWei": 20000000000000,
+      "reserveWei": 5000000000000000,
+      "tvlCapWei": 0,
+      "routineCapWei": 30000000000000000,
+      "routineRatePerDayWei": 10000000000000000,
+      "essentialCapWei": 10000000000000000,
+      "essentialRatePerDayWei": 5000000000000000,
+      "upliftBoundBps": 25,
+      "backingRatioBps": 70000,
+      "renewalMode": 0,
+      "renewalFloatCount": 1,
+      "acceptedMintFeeWei": 1000000000000000,
+      "minDepositWei": 10000000000000000,
+      "minDistributionWei": 10000000000000000,
+      "gasSchedule": {
+       "checkpoint": 500000,
+       "allocationEntry": 6000,
+       "allocationRead": 30000,
+       "build": 360000,
+       "buildPack": 300000,
+       "buildShape": 130000,
+       "list": 280000,
+       "listed": 825000,
+       "sync": 125000,
+       "requiredTail": 120000,
+       "distributionProof": 80000,
+       "journal": 22000,
+       "scan": 30000,
+       "selected": 180000,
+       "synced": 120000,
+       "pruned": 45000,
+       "unlist": 340000,
+       "unlisted": 285000,
+       "liquidate": 75000,
+       "liquidatePack": 80000,
+       "redeemShape": 35000,
+       "recoveryBase": 100000,
+       "recoveryShape": 35000,
+       "recoveryUnseal": 70000,
+       "harvest": 125000,
+       "harvested": 80000,
+       "credit": 40000,
+       "fund": 40000
+      },
+      "expectedMintFeeWei": 1000000000000000
+     },
+     "transactionGasLimit": 16777216
+    },
+    {
+     "units": 30,
+     "count": 4,
+     "shapes": 12,
+     "actualMintFeeWei": 1000000000000000,
+     "baseFeeWei": 150000000,
+     "k": 1038460499999999985,
+     "backingWei": 2100000000000000000,
+     "configuration": {
+      "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
+      "minEdgeBps": 100,
+      "bufferBps": 0,
+      "distributionBps": 0,
+      "payMarkupBps": 0,
+      "keeperShareBps": 2500,
+      "packUnitsMask": 1610612744,
+      "gasCeilingWei": 500000000,
+      "essentialCeilingWei": 500000000,
+      "maxTipWei": 50000000,
+      "workFeeWei": 20000000000000,
+      "reserveWei": 5000000000000000,
+      "tvlCapWei": 0,
+      "routineCapWei": 30000000000000000,
+      "routineRatePerDayWei": 10000000000000000,
+      "essentialCapWei": 10000000000000000,
+      "essentialRatePerDayWei": 5000000000000000,
+      "upliftBoundBps": 25,
+      "backingRatioBps": 70000,
+      "renewalMode": 0,
+      "renewalFloatCount": 1,
+      "acceptedMintFeeWei": 1000000000000000,
+      "minDepositWei": 10000000000000000,
+      "minDistributionWei": 10000000000000000,
+      "gasSchedule": {
+       "checkpoint": 500000,
+       "allocationEntry": 6000,
+       "allocationRead": 30000,
+       "build": 360000,
+       "buildPack": 300000,
+       "buildShape": 130000,
+       "list": 280000,
+       "listed": 825000,
+       "sync": 125000,
+       "requiredTail": 120000,
+       "distributionProof": 80000,
+       "journal": 22000,
+       "scan": 30000,
+       "selected": 180000,
+       "synced": 120000,
+       "pruned": 45000,
+       "unlist": 340000,
+       "unlisted": 285000,
+       "liquidate": 75000,
+       "liquidatePack": 80000,
+       "redeemShape": 35000,
+       "recoveryBase": 100000,
+       "recoveryShape": 35000,
+       "recoveryUnseal": 70000,
+       "harvest": 125000,
+       "harvested": 80000,
+       "credit": 40000,
+       "fund": 40000
+      },
+      "expectedMintFeeWei": 1000000000000000
+     },
+     "transactionGasLimit": 16777216
+    },
+    {
+     "units": 3,
+     "count": 16,
+     "shapes": 48,
+     "operation": "unlist and liquidate hard-bound calibration",
+     "positiveMinPayWei": 1,
+     "totalGasPriceWei": 200000000
+    }
+   ],
+   "limitation": "No billed authenticated VRF renewal; gas proxy extrapolation requires its own stated margin",
+   "loaded_client": {
+    "rehearsal_batch": {
+     "source_sha256_at_import": "ce3c95612d38470a4b16e99c72183da62c2dfd3f9361974cf6a7286b37b17234",
+     "loaded_code_sha256": "5bcba11443aea20cd84c5b16ffb71ea78c1d019c3aea1745b04deec3338eb9dd"
+    },
+    "keeper": {
+     "source_sha256_at_import": "cc977b3348e768ad52852c660c8121e0ff2e15011513ff7f6b11471e26b14f6c",
+     "loaded_code_sha256": "b6a7e0db3a7ae4651106b61d2ab8073b8377fe12ecdb3395c870b78971f06a3b"
+    },
+    "policy": {
+     "source_sha256_at_import": "d95e141777131afd5a261dbcf19329c6f882d9745964b478cd097583fa68baaa",
+     "loaded_code_sha256": "8ffe3621392dad3faf3e59b09d36174eb471d81b86e8c73ff278d9fdb45bcb98"
+    },
+    "index": {
+     "source_sha256_at_import": "321946551c971b6374cb37c37de93c6a79895e87492e08421956472376d3d96a",
+     "loaded_code_sha256": "50662e588b0ea9e76b0a2a68c78d477ab7019d0e1330d7af88da5626350edff3"
+    },
+    "tx": {
+     "source_sha256_at_import": "65143ad53a0bbc68cce74b1dc71b7517e1a30a4f961d4d6ce7f366c12f1f5af1",
+     "loaded_code_sha256": "03a4046d9c3246c386b61a3f1a2803e560bb8a34fc1b0a248a484ada733b62ea"
+    }
+   },
+   "client_source_sha256": {
+    "keeper/keeper.py": "cc977b3348e768ad52852c660c8121e0ff2e15011513ff7f6b11471e26b14f6c",
+    "keeper/policy.py": "7ada7daf45599da296fe9b96d056485589dd4f63d0c5ee247d7bc62d7ab5253b",
+    "keeper/rehearsal_batch.py": "ce3c95612d38470a4b16e99c72183da62c2dfd3f9361974cf6a7286b37b17234"
+   },
+   "vault_context": {
+    "vault": "0xb0858bf1b8a167188847499b3008e597b57eaebc",
+    "source_sha256": {
+     "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
+     "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+     "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+     "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
+     "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+     "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+     "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
+     "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+    },
+    "source_unchanged_during_deploy": true,
+    "runtimes": [
+     {
+      "name": "ScanLib",
+      "address": "0x4ac701799b22e4c7a0f24301ccc904ad6fb3f005",
+      "runtime_bytes": 22993,
+      "runtime_sha256": "43cfcbbdd579daaa57805e3872b108c4ee413b7fe8df5176d314ed682462a750"
+     },
+     {
+      "name": "VaultLib",
+      "address": "0x650b28e26586dbfea4d2be777d3983816d0d1a2f",
+      "runtime_bytes": 22260,
+      "runtime_sha256": "41ca863d790c9998ede66ee20ada1f413567cc16c6bb9faeab0a954fe0d6fab3"
+     },
+     {
+      "name": "StrategyLib",
+      "address": "0xe899b8ac4712842d6af7a9f47a7b6951bda4b519",
+      "runtime_bytes": 18090,
+      "runtime_sha256": "4e4b25cc13bdeadd3bde15c831498635d46a0994ec08c3d1538e2eee08984cd8"
+     },
+     {
+      "name": "PackVault",
+      "address": "0xb0858bf1b8a167188847499b3008e597b57eaebc",
+      "runtime_bytes": 24095,
+      "runtime_sha256": "6a5c13f9d19ef1c4d908bf8918eec5c1e41cf145ac6bec4deed92d552c2ce87d"
+     },
+     {
+      "name": "PackManagerFactory",
+      "address": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+      "runtime_bytes": 4986,
+      "runtime_sha256": "1d42a16bd0777e1dcf6d3f63b63ac0e8ad770ca7170b80e2ff95a34ad9229a70"
+     }
+    ]
+   }
   },
   "6_7_outcomes_and_relist": {
-   "receipt": "docs/receipts/unified-selection-rehearsal.json",
-   "outcomes": {
-    "keep": {
-     "resolved": true
-    },
-    "bid": {
-     "relisted_open": 1,
-     "resolved": true
-    },
-    "expiry": {
-     "resolved": true
-    },
-    "forced_keep": {
-     "pending_receipts_at_force": 0,
-     "resolved": true
-    }
-   }
+   "gap": "No billed production-path VRF renewal receipt: inserting local contracts changes the request block hash required by the authentic historical Chainlink proof. Coordinator impersonation and receiver replacement are retired.",
+   "coverage": "Actual request and authenticated fulfillment are exercised by Forge fixtures; those are not billed transaction receipts."
   },
   "9_manager_exit": [
    {
-    "manager": "0xf6b8c92E37556D372175EE2567A861265dE1Feaf",
+    "manager": "0x11B9bcF5B469F8e73D019D085F18e4DE19446f90",
     "owner": "0xd3eFCe3EE81F36ca0aed496b23fa0779967EddCf",
     "funded_wei": 1000000000000000000,
     "manager_balance_after": 0,
     "open": 0,
     "idle": 0,
-    "keeper_pay_wei": 1854914788380000,
+    "keeper_pay_wei": 868403824235000,
     "exiting": "true"
    },
    {
-    "manager": "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F",
+    "manager": "0x742AD694c5d5e37Acf7BB375D734B1E982775A88",
     "owner": "0x1DC45F06F240c0eb792Ec97675845Af09Ad36EAe",
     "funded_wei": 1000000000000000000,
     "manager_balance_after": 0,
     "open": 0,
     "idle": 0,
-    "keeper_pay_wei": 1846358494265000,
+    "keeper_pay_wei": 835624613135000,
     "exiting": "true"
    },
    {
-    "manager": "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22",
+    "manager": "0xde8ff825AAdB8b013D544C07ffa313e62237F010",
     "owner": "0x3beE064fA874964832762A5a7e4Ab9967164B735",
     "funded_wei": 1000000000000000000,
     "manager_balance_after": 0,
     "open": 0,
     "idle": 0,
-    "keeper_pay_wei": 1841732047575000,
+    "keeper_pay_wei": 807017696515000,
     "exiting": "true"
    }
   ],
   "10_restart": {
    "index_heads_before": {
-    "index-1-0xf6b8c92e37556d372175ee2567a861265de1feaf-26463998.sqlite": 26464031,
-    "index-1-0x9d0a8f5db3779780dbbfe6652d8625cce3f6097f-26463999.sqlite": 26464031,
-    "index-1-0xbb7a7e1dec204ef9633af7ebf285c3b73e340d22-26464000.sqlite": 26464033,
-    "index-1-0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f-26463996.sqlite": 26464031
+    "index-31337-0xb0858bf1b8a167188847499b3008e597b57eaebc-26484854.sqlite": 26484889,
+    "index-31337-0xde8ff825aadb8b013d544c07ffa313e62237f010-26484858.sqlite": 26484891,
+    "index-31337-0x11b9bcf5b469f8e73d019d085f18e4de19446f90-26484856.sqlite": 26484889,
+    "index-31337-0x742ad694c5d5e37acf7bb375d734b1e982775a88-26484857.sqlite": 26484889
    },
    "index_heads_after": {
-    "index-1-0xf6b8c92e37556d372175ee2567a861265de1feaf-26463998.sqlite": 26464034,
-    "index-1-0x9d0a8f5db3779780dbbfe6652d8625cce3f6097f-26463999.sqlite": 26464034,
-    "index-1-0xbb7a7e1dec204ef9633af7ebf285c3b73e340d22-26464000.sqlite": 26464034,
-    "index-1-0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f-26463996.sqlite": 26464034
+    "index-31337-0xb0858bf1b8a167188847499b3008e597b57eaebc-26484854.sqlite": 26484892,
+    "index-31337-0xde8ff825aadb8b013d544c07ffa313e62237f010-26484858.sqlite": 26484892,
+    "index-31337-0x11b9bcf5b469f8e73d019d085f18e4de19446f90-26484856.sqlite": 26484892,
+    "index-31337-0x742ad694c5d5e37acf7bb375d734b1e982775a88-26484857.sqlite": 26484892
    },
    "durable": true,
-   "sent_before": 19,
-   "sent_after": 19
+   "sent_before": 7,
+   "sent_after": 7
   },
   "11_replace_container": {
-   "docker_available": false,
+   "docker_cli_present": false,
    "ran_outside_docker": true,
+   "gap": "Production Docker image and keystore transport are not exercised by this unlocked local process",
    "index_heads_preserved": true,
-   "volume": "<tmp>/pack-vault-keeper-yw5mqldu/data",
-   "image_steps": "see .github/workflows/keeper-image.yml and keeper/test_packaging.py"
+   "volume": "<tmp>/pack-vault-local-keeper-90pniooh/data",
+   "image_steps": "Current-source Docker image and production keystore transport are not exercised by this unlocked local process"
   },
   "12_backup_keeper": {
-   "backup_keeper": "0x0BA913F7aFF2B5612F8Be5162B8BeBFF38135251",
-   "own_state_volume": "<tmp>/pack-vault-backup-8xrq0hfd/data-backup",
+   "backup_keeper": "0x3789173a710857fAB8d9F509513E97d42767972D",
+   "own_state_volume": "<tmp>/pack-vault-local-backup-g5wwf4sb/data-backup",
    "own_nonce_stream": true,
    "backup_sent_while_primary_stopped": 2,
-   "open_listings_built_by_backup": 3,
-   "primary_contend_sent": 19,
+   "open_listings_built_by_backup": 1,
+   "primary_contend_sent": 7,
    "backup_contend_sent": 2,
    "note": "the backup worker built real packs on its own keystore and volume while the primary was stopped; when both ran, each used its own nonce stream, an already-mined or replaced tx reconciled per keeper by tx.py, no double build"
   },
   "16_index_persistence": {
    "index_files": [
-    "index-1-0xf6b8c92e37556d372175ee2567a861265de1feaf-26463998.sqlite",
-    "index-1-0x9d0a8f5db3779780dbbfe6652d8625cce3f6097f-26463999.sqlite",
-    "index-1-0xbb7a7e1dec204ef9633af7ebf285c3b73e340d22-26464000.sqlite",
-    "index-1-0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f-26463996.sqlite"
+    "index-31337-0xb0858bf1b8a167188847499b3008e597b57eaebc-26484854.sqlite",
+    "index-31337-0xde8ff825aadb8b013d544c07ffa313e62237f010-26484858.sqlite",
+    "index-31337-0x11b9bcf5b469f8e73d019d085f18e4de19446f90-26484856.sqlite",
+    "index-31337-0x742ad694c5d5e37acf7bb375d734b1e982775a88-26484857.sqlite"
    ],
    "per_account": true,
    "heads": {
-    "index-1-0xf6b8c92e37556d372175ee2567a861265de1feaf-26463998.sqlite": 26464045,
-    "index-1-0x9d0a8f5db3779780dbbfe6652d8625cce3f6097f-26463999.sqlite": 26464045,
-    "index-1-0xbb7a7e1dec204ef9633af7ebf285c3b73e340d22-26464000.sqlite": 26464045,
-    "index-1-0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f-26463996.sqlite": 26464045
+    "index-31337-0xb0858bf1b8a167188847499b3008e597b57eaebc-26484854.sqlite": 26484902,
+    "index-31337-0xde8ff825aadb8b013d544c07ffa313e62237f010-26484858.sqlite": 26484902,
+    "index-31337-0x11b9bcf5b469f8e73d019d085f18e4de19446f90-26484856.sqlite": 26484902,
+    "index-31337-0x742ad694c5d5e37acf7bb375d734b1e982775a88-26484857.sqlite": 26484902
    },
    "stable_across_restart": true
   },
   "15_one_account_fails": {
-   "paused_account": "0xf6b8c92E37556D372175EE2567A861265dE1Feaf",
+   "paused_account": "0x11B9bcF5B469F8e73D019D085F18e4DE19446f90",
    "other_accounts": [
-    "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
-    "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F",
-    "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22"
+    "0xb0858bf1b8a167188847499b3008e597b57eaebc",
+    "0x742AD694c5d5e37Acf7BB375D734B1E982775A88",
+    "0xde8ff825AAdB8b013D544C07ffa313e62237F010"
    ],
    "keeper_completed_pass": true,
    "note": "per-account error isolation in keeper.run_pass; paused account reports LISTING_PAUSED"
@@ -186,7 +606,7 @@
   "13_14_17_tx_recovery": {
    "lost_response": true,
    "restart": true,
-   "actual_receipt": "0x87c006fdb20320bfd12ba6cfd44d17df4929f3fb224901ddc29c968bf55e72e5",
+   "actual_receipt": "0x4df88dd6855db9a06e541e7bd8318956f188433b7d06964789fc04d3fbbeab31",
    "reorg": true,
    "canonical_hash_unique": true,
    "token_supply_restored": true,
@@ -194,28 +614,54 @@
    "same_nonce_replacement": true,
    "uncertain_replacement_attempt_cap": true,
    "index_reorg": {
-    "vault": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
-    "deployment_block": 26463996,
+    "vault": "0xb0858bf1b8a167188847499b3008e597b57eaebc",
+    "deployment_block": 26484854,
     "real_withdrawal": true,
     "durable_restart": true,
     "canonical_projection_restore": true
+   },
+   "value_reorg": {
+    "same_hash": true,
+    "reverted_then_successful": true,
+    "contributed_wei": 45020287500000,
+    "value_sent_wei": 100000000000000,
+    "signedMaximumReservedWei": 112530198000000,
+    "newNonceRefusedWhileOrphaned": true
+   },
+   "identity": {
+    "wrongSignerRejected": true,
+    "wrongChainRejected": true,
+    "chain": 31337
    }
   },
+  "19_pull_refunds": {
+   "knownContributionIds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "refundClaimedWei": 59247656500000,
+   "remainingRefundWei": 0
+  },
   "reconcile": {
-   "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f": {
-    "account": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+   "0xb0858bf1b8a167188847499b3008e597b57eaebc": {
+    "account": "0xb0858bf1b8a167188847499b3008e597b57eaebc",
     "pooled": true,
-    "balance": 10059550286111110,
+    "balance": 10137877518825616,
     "open": 0,
     "idle": 0,
-    "idle_eth": 5059550286111106,
+    "idle_eth": 0,
     "total_shares": 1000000000000000,
     "dead_shares": 1000000000000000,
     "locked_shares": 0,
-    "last_nav": 10059528898511106
+    "last_nav": 10137877518825612
    },
-   "0xf6b8c92E37556D372175EE2567A861265dE1Feaf": {
-    "account": "0xf6b8c92E37556D372175EE2567A861265dE1Feaf",
+   "0x11B9bcF5B469F8e73D019D085F18e4DE19446f90": {
+    "account": "0x11B9bcF5B469F8e73D019D085F18e4DE19446f90",
     "pooled": false,
     "balance": 0,
     "open": 0,
@@ -223,8 +669,8 @@
     "idle_eth": 0,
     "winding_down": true
    },
-   "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F": {
-    "account": "0x9d0A8F5Db3779780DbBfE6652d8625CcE3f6097F",
+   "0x742AD694c5d5e37Acf7BB375D734B1E982775A88": {
+    "account": "0x742AD694c5d5e37Acf7BB375D734B1E982775A88",
     "pooled": false,
     "balance": 0,
     "open": 0,
@@ -232,8 +678,8 @@
     "idle_eth": 0,
     "winding_down": true
    },
-   "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22": {
-    "account": "0xbB7A7E1DEC204Ef9633Af7eBf285c3B73E340d22",
+   "0xde8ff825AAdB8b013D544C07ffa313e62237F010": {
+    "account": "0xde8ff825AAdB8b013D544C07ffa313e62237F010",
     "pooled": false,
     "balance": 0,
     "open": 0,
@@ -243,10 +689,273 @@
    },
    "pool_fully_exited": true,
    "managers_emptied": true
-  }
+  },
+  "18_required_tails": [
+   {
+    "foreignRecords": 1,
+    "openPositions": 4,
+    "progress": 1,
+    "totalGasPriceWei": 200000000,
+    "keeperPaidWei": 28400000000000,
+    "unpaidRecoveryKeeperPayWei": 0
+   },
+   {
+    "foreignRecords": 17,
+    "openPositions": 4,
+    "progress": 17,
+    "totalGasPriceWei": 200000000,
+    "keeperPaidWei": 48000000000000,
+    "unpaidRecoveryKeeperPayWei": 0
+   }
+  ]
  },
- "gaps": [],
- "vault": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
- "factory": "0x321d151f896c205ac5c747c2cff4e9a0e185a27c",
- "errors": {}
+ "gaps": [
+  "6_7_outcomes_and_relist: No billed production-path VRF renewal receipt: inserting local contracts changes the request block hash required by the authentic historical Chainlink proof. Coordinator impersonation and receiver replacement are retired.",
+  "11_replace_container: Production Docker image and keystore transport are not exercised by this unlocked local process"
+ ],
+ "vault": "0xb0858bf1b8a167188847499b3008e597b57eaebc",
+ "factory": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+ "resumedExistingDeployment": true,
+ "errors": {},
+ "preserved_deployment_evidence": {
+  "values": {
+   "fwa": "0x958C41181182e76F221331b2755b77D9e1426A98",
+   "shapes": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+   "packs": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+   "owner": "0x37Dcd875c4E367e080f1e05F18F10dB0D45a65B5",
+   "seedWei": 10000000000000000,
+   "minEdgeBps": 100,
+   "bufferBps": 0,
+   "distributionBps": 0,
+   "payMarkupBps": 0,
+   "keeperShareBps": 2500,
+   "packUnitsMask": 8,
+   "gasCeilingWei": 500000000,
+   "essentialCeilingWei": 2000000000,
+   "maxTipWei": 50000000,
+   "workFeeWei": 20000000000000,
+   "reserveWei": 5000000000000000,
+   "tvlCapWei": 340282366920938463463374607431768211455,
+   "routineCapWei": 100000000000000000,
+   "routineRatePerDayWei": 20000000000000000,
+   "essentialCapWei": 0,
+   "essentialRatePerDayWei": 0,
+   "upliftBoundBps": 25,
+   "backingRatioBps": 70000,
+   "renewalMode": 0,
+   "renewalFloatCount": 1,
+   "acceptedMintFeeWei": 1000000000000000,
+   "minDepositWei": 10000000000000000,
+   "minDistributionWei": 10000000000000000,
+   "gasSchedule": {
+    "checkpoint": 500000,
+    "allocationEntry": 6000,
+    "allocationRead": 30000,
+    "build": 360000,
+    "buildPack": 300000,
+    "buildShape": 130000,
+    "list": 280000,
+    "listed": 825000,
+    "sync": 125000,
+    "requiredTail": 120000,
+    "distributionProof": 80000,
+    "journal": 22000,
+    "scan": 30000,
+    "selected": 180000,
+    "synced": 120000,
+    "pruned": 45000,
+    "unlist": 340000,
+    "unlisted": 285000,
+    "liquidate": 75000,
+    "liquidatePack": 80000,
+    "redeemShape": 35000,
+    "recoveryBase": 100000,
+    "recoveryShape": 35000,
+    "recoveryUnseal": 70000,
+    "harvest": 125000,
+    "harvested": 80000,
+    "credit": 40000,
+    "fund": 40000
+   },
+   "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
+   "expectedMintFeeWei": 1000000000000000
+  },
+  "source_sha256": {
+   "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
+   "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+   "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+   "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
+   "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+   "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+   "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
+   "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+  },
+  "contracts": [
+   {
+    "name": "ScanLib",
+    "address": "0x4ac701799b22e4c7a0f24301ccc904ad6fb3f005",
+    "runtime_bytes": 22993,
+    "runtime_sha256": "43cfcbbdd579daaa57805e3872b108c4ee413b7fe8df5176d314ed682462a750",
+    "gas_used": 5032914,
+    "receipt": {
+     "transactionHash": "0x5187eac8d8a0cfc552cd418f1f3f9a9a1261933d3a940bf2bf83886870f27f0d",
+     "status": "0x1",
+     "blockNumber": "0x1942073",
+     "blockHash": "0x1cbf86389fe822455eb55235d55d9c0b1a98af8945517ad772a2e9ff131ebd61",
+     "gasUsed": "0x4ccbd2",
+     "effectiveGasPrice": "0x8f1061b",
+     "from": "0xe0980b9f7f5fb4a98813552894f4e980836cda7c",
+     "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+     "contractAddress": null
+    }
+   },
+   {
+    "name": "VaultLib",
+    "address": "0x650b28e26586dbfea4d2be777d3983816d0d1a2f",
+    "runtime_bytes": 22260,
+    "runtime_sha256": "41ca863d790c9998ede66ee20ada1f413567cc16c6bb9faeab0a954fe0d6fab3",
+    "gas_used": 4875283,
+    "receipt": {
+     "transactionHash": "0x19b6c1be3963781a0075230e9254a1945a77ddcd402c399b6ccdd1bd180dbdb5",
+     "status": "0x1",
+     "blockNumber": "0x1942074",
+     "blockHash": "0x689c58908745d7125d67cb7a367d2550a33852f318e280fde95f2bb39667330b",
+     "gasUsed": "0x4a6413",
+     "effectiveGasPrice": "0x802eb4f",
+     "from": "0xe0980b9f7f5fb4a98813552894f4e980836cda7c",
+     "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+     "contractAddress": null
+    }
+   },
+   {
+    "name": "StrategyLib",
+    "address": "0xe899b8ac4712842d6af7a9f47a7b6951bda4b519",
+    "runtime_bytes": 18090,
+    "runtime_sha256": "4e4b25cc13bdeadd3bde15c831498635d46a0994ec08c3d1538e2eee08984cd8",
+    "gas_used": 3972819,
+    "receipt": {
+     "transactionHash": "0x75563306c8be069e5e814ac427e635b2c5c5de45654a62102af2d8003065d89d",
+     "status": "0x1",
+     "blockNumber": "0x1942075",
+     "blockHash": "0x63057e46da29394369ae4e9c88452cf8850c4e86eb415bf52bf4490510fec1f9",
+     "gasUsed": "0x3c9ed3",
+     "effectiveGasPrice": "0x72c3cce",
+     "from": "0xe0980b9f7f5fb4a98813552894f4e980836cda7c",
+     "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+     "contractAddress": null
+    }
+   },
+   {
+    "name": "PackVault",
+    "address": "0xb0858bf1b8a167188847499b3008e597b57eaebc",
+    "runtime_bytes": 24095,
+    "runtime_sha256": "6a5c13f9d19ef1c4d908bf8918eec5c1e41cf145ac6bec4deed92d552c2ce87d",
+    "gas_used": 5839256,
+    "receipt": {
+     "transactionHash": "0x4facba100fc62b83d7eb2a8a6c624a5b3bf0522be8c5964e3cde75f620e83c53",
+     "status": "0x1",
+     "blockNumber": "0x1942076",
+     "blockHash": "0x1f869ab0b812222c0c341b57ce4b3d44173831fe87963f77f1e72d14eb349550",
+     "gasUsed": "0x591998",
+     "effectiveGasPrice": "0x6652049",
+     "from": "0xe0980b9f7f5fb4a98813552894f4e980836cda7c",
+     "to": null,
+     "contractAddress": "0xb0858bf1b8a167188847499b3008e597b57eaebc"
+    }
+   },
+   {
+    "name": "PackManagerFactory",
+    "address": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+    "runtime_bytes": 4986,
+    "runtime_sha256": "1d42a16bd0777e1dcf6d3f63b63ac0e8ad770ca7170b80e2ff95a34ad9229a70",
+    "gas_used": 5035708,
+    "receipt": {
+     "transactionHash": "0x3d24b2f67bda425c2616eed9d96bfb539d04f7aa29352be23b63d363cbc4a9ac",
+     "status": "0x1",
+     "blockNumber": "0x1942077",
+     "blockHash": "0x8a9072f212412d10de4c4c9b2c8292ce2a4c14ebb53f89dfe1957e4c63912c0f",
+     "gasUsed": "0x4cd6bc",
+     "effectiveGasPrice": "0x5c05674",
+     "from": "0xe0980b9f7f5fb4a98813552894f4e980836cda7c",
+     "to": null,
+     "contractAddress": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f"
+    }
+   }
+  ],
+  "onchainPostflightPassed": true,
+  "managerCreations": [
+   {
+    "sender": "0xd3eFCe3EE81F36ca0aed496b23fa0779967EddCf",
+    "to": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+    "function": "create(address,(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint128,uint128,uint32,uint8,uint16,uint64,uint64,uint64,(uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32)),bytes32)",
+    "arguments": [
+     "0xd3eFCe3EE81F36ca0aed496b23fa0779967EddCf",
+     "(100,0,0,0,2500,25,8,500000000,500000000,50000000,20000000000000,30000000000000000,10000000000000000,10000000000000000,5000000000000000,5000000000000000,0,70000,0,1,1000000000000000,10000000000000000,10000000000000000,(500000,6000,30000,360000,300000,130000,280000,825000,125000,120000,80000,22000,30000,180000,120000,45000,340000,285000,75000,80000,35000,100000,35000,70000,125000,80000,40000,40000))",
+     "0xd5f1091e06b62fddb2f60175184449a9fb51f30bee3303dbd07308752c72c245"
+    ],
+    "value_wei": 1000000000000000000,
+    "calldata": "0xeb7d4d46000000000000000000000000d3efce3ee81f36ca0aed496b23fa0779967eddcf000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009c400000000000000000000000000000000000000000000000000000000000000190000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000001dcd6500000000000000000000000000000000000000000000000000000000001dcd65000000000000000000000000000000000000000000000000000000000002faf080000000000000000000000000000000000000000000000000000012309ce54000000000000000000000000000000000000000000000000000006a94d74f430000000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000002386f26fc100000000000000000000000000000000000000000000000000000011c37937e080000000000000000000000000000000000000000000000000000011c37937e08000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000038d7ea4c68000000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000000000000007a120000000000000000000000000000000000000000000000000000000000000177000000000000000000000000000000000000000000000000000000000000075300000000000000000000000000000000000000000000000000000000000057e4000000000000000000000000000000000000000000000000000000000000493e0000000000000000000000000000000000000000000000000000000000001fbd000000000000000000000000000000000000000000000000000000000000445c000000000000000000000000000000000000000000000000000000000000c96a8000000000000000000000000000000000000000000000000000000000001e848000000000000000000000000000000000000000000000000000000000001d4c0000000000000000000000000000000000000000000000000000000000001388000000000000000000000000000000000000000000000000000000000000055f00000000000000000000000000000000000000000000000000000000000007530000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000001d4c0000000000000000000000000000000000000000000000000000000000000afc80000000000000000000000000000000000000000000000000000000000053020000000000000000000000000000000000000000000000000000000000004594800000000000000000000000000000000000000000000000000000000000124f8000000000000000000000000000000000000000000000000000000000001388000000000000000000000000000000000000000000000000000000000000088b800000000000000000000000000000000000000000000000000000000000186a000000000000000000000000000000000000000000000000000000000000088b80000000000000000000000000000000000000000000000000000000000011170000000000000000000000000000000000000000000000000000000000001e84800000000000000000000000000000000000000000000000000000000000138800000000000000000000000000000000000000000000000000000000000009c400000000000000000000000000000000000000000000000000000000000009c40d5f1091e06b62fddb2f60175184449a9fb51f30bee3303dbd07308752c72c245",
+    "receipt": {
+     "transactionHash": "0x875c4707a70d9d9cd688d7e67310bc8ae9ca80eab2d185164239c6937981d7d6",
+     "status": "0x1",
+     "blockNumber": "0x1942078",
+     "blockHash": "0xa758fdc0c64da221d1de9b2db7db2c20e1502fd1b9b1e97339c1ff1d18023c14",
+     "gasUsed": "0x93fdc",
+     "effectiveGasPrice": "0x821f190",
+     "from": "0xd3efce3ee81f36ca0aed496b23fa0779967eddcf",
+     "to": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+     "contractAddress": null
+    }
+   },
+   {
+    "sender": "0x1DC45F06F240c0eb792Ec97675845Af09Ad36EAe",
+    "to": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+    "function": "create(address,(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint128,uint128,uint32,uint8,uint16,uint64,uint64,uint64,(uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32)),bytes32)",
+    "arguments": [
+     "0x1DC45F06F240c0eb792Ec97675845Af09Ad36EAe",
+     "(100,0,0,0,2500,25,8,500000000,500000000,50000000,20000000000000,30000000000000000,10000000000000000,10000000000000000,5000000000000000,5000000000000000,0,70000,0,1,1000000000000000,10000000000000000,10000000000000000,(500000,6000,30000,360000,300000,130000,280000,825000,125000,120000,80000,22000,30000,180000,120000,45000,340000,285000,75000,80000,35000,100000,35000,70000,125000,80000,40000,40000))",
+     "0xd5f1091e06b62fddb2f60175184449a9fb51f30bee3303dbd07308752c72c245"
+    ],
+    "value_wei": 1000000000000000000,
+    "calldata": "0xeb7d4d460000000000000000000000001dc45f06f240c0eb792ec97675845af09ad36eae000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009c400000000000000000000000000000000000000000000000000000000000000190000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000001dcd6500000000000000000000000000000000000000000000000000000000001dcd65000000000000000000000000000000000000000000000000000000000002faf080000000000000000000000000000000000000000000000000000012309ce54000000000000000000000000000000000000000000000000000006a94d74f430000000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000002386f26fc100000000000000000000000000000000000000000000000000000011c37937e080000000000000000000000000000000000000000000000000000011c37937e08000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000038d7ea4c68000000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000000000000007a120000000000000000000000000000000000000000000000000000000000000177000000000000000000000000000000000000000000000000000000000000075300000000000000000000000000000000000000000000000000000000000057e4000000000000000000000000000000000000000000000000000000000000493e0000000000000000000000000000000000000000000000000000000000001fbd000000000000000000000000000000000000000000000000000000000000445c000000000000000000000000000000000000000000000000000000000000c96a8000000000000000000000000000000000000000000000000000000000001e848000000000000000000000000000000000000000000000000000000000001d4c0000000000000000000000000000000000000000000000000000000000001388000000000000000000000000000000000000000000000000000000000000055f00000000000000000000000000000000000000000000000000000000000007530000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000001d4c0000000000000000000000000000000000000000000000000000000000000afc80000000000000000000000000000000000000000000000000000000000053020000000000000000000000000000000000000000000000000000000000004594800000000000000000000000000000000000000000000000000000000000124f8000000000000000000000000000000000000000000000000000000000001388000000000000000000000000000000000000000000000000000000000000088b800000000000000000000000000000000000000000000000000000000000186a000000000000000000000000000000000000000000000000000000000000088b80000000000000000000000000000000000000000000000000000000000011170000000000000000000000000000000000000000000000000000000000001e84800000000000000000000000000000000000000000000000000000000000138800000000000000000000000000000000000000000000000000000000000009c400000000000000000000000000000000000000000000000000000000000009c40d5f1091e06b62fddb2f60175184449a9fb51f30bee3303dbd07308752c72c245",
+    "receipt": {
+     "transactionHash": "0x0dd53078c41d33a39da2de0bc9f862a8caa2500e210b1045682602134dcadd92",
+     "status": "0x1",
+     "blockNumber": "0x1942079",
+     "blockHash": "0x543f93c5418d9bf876690476573bf51427a05064a1dfaad11fbf7a61fd73fd8d",
+     "gasUsed": "0x8fd10",
+     "effectiveGasPrice": "0x7806647",
+     "from": "0x1dc45f06f240c0eb792ec97675845af09ad36eae",
+     "to": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+     "contractAddress": null
+    }
+   },
+   {
+    "sender": "0x3beE064fA874964832762A5a7e4Ab9967164B735",
+    "to": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+    "function": "create(address,(uint16,uint16,uint16,uint16,uint16,uint16,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint64,uint128,uint128,uint32,uint8,uint16,uint64,uint64,uint64,(uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32,uint32)),bytes32)",
+    "arguments": [
+     "0x3beE064fA874964832762A5a7e4Ab9967164B735",
+     "(100,0,0,0,2500,25,8,500000000,500000000,50000000,20000000000000,30000000000000000,10000000000000000,10000000000000000,5000000000000000,5000000000000000,0,70000,0,1,1000000000000000,10000000000000000,10000000000000000,(500000,6000,30000,360000,300000,130000,280000,825000,125000,120000,80000,22000,30000,180000,120000,45000,340000,285000,75000,80000,35000,100000,35000,70000,125000,80000,40000,40000))",
+     "0xd5f1091e06b62fddb2f60175184449a9fb51f30bee3303dbd07308752c72c245"
+    ],
+    "value_wei": 1000000000000000000,
+    "calldata": "0xeb7d4d460000000000000000000000003bee064fa874964832762a5a7e4ab9967164b735000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009c400000000000000000000000000000000000000000000000000000000000000190000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000001dcd6500000000000000000000000000000000000000000000000000000000001dcd65000000000000000000000000000000000000000000000000000000000002faf080000000000000000000000000000000000000000000000000000012309ce54000000000000000000000000000000000000000000000000000006a94d74f430000000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000002386f26fc100000000000000000000000000000000000000000000000000000011c37937e080000000000000000000000000000000000000000000000000000011c37937e08000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000038d7ea4c68000000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000000000000007a120000000000000000000000000000000000000000000000000000000000000177000000000000000000000000000000000000000000000000000000000000075300000000000000000000000000000000000000000000000000000000000057e4000000000000000000000000000000000000000000000000000000000000493e0000000000000000000000000000000000000000000000000000000000001fbd000000000000000000000000000000000000000000000000000000000000445c000000000000000000000000000000000000000000000000000000000000c96a8000000000000000000000000000000000000000000000000000000000001e848000000000000000000000000000000000000000000000000000000000001d4c0000000000000000000000000000000000000000000000000000000000001388000000000000000000000000000000000000000000000000000000000000055f00000000000000000000000000000000000000000000000000000000000007530000000000000000000000000000000000000000000000000000000000002bf20000000000000000000000000000000000000000000000000000000000001d4c0000000000000000000000000000000000000000000000000000000000000afc80000000000000000000000000000000000000000000000000000000000053020000000000000000000000000000000000000000000000000000000000004594800000000000000000000000000000000000000000000000000000000000124f8000000000000000000000000000000000000000000000000000000000001388000000000000000000000000000000000000000000000000000000000000088b800000000000000000000000000000000000000000000000000000000000186a000000000000000000000000000000000000000000000000000000000000088b80000000000000000000000000000000000000000000000000000000000011170000000000000000000000000000000000000000000000000000000000001e84800000000000000000000000000000000000000000000000000000000000138800000000000000000000000000000000000000000000000000000000000009c400000000000000000000000000000000000000000000000000000000000009c40d5f1091e06b62fddb2f60175184449a9fb51f30bee3303dbd07308752c72c245",
+    "receipt": {
+     "transactionHash": "0xdb162d37afc3dfca2794305f41bde2f10453a620de846eeca4707226037d45eb",
+     "status": "0x1",
+     "blockNumber": "0x194207a",
+     "blockHash": "0x72cd72d35123a3432b74f86735ae696710e978a4e8dfe0f521255962f5034738",
+     "gasUsed": "0x8fd10",
+     "effectiveGasPrice": "0x6f28ed7",
+     "from": "0x3bee064fa874964832762a5a7e4ab9967164b735",
+     "to": "0x67bc465229c9b1c92f5efbbf0f3d61aec91a496f",
+     "contractAddress": null
+    }
+   }
+  ],
+  "note": "Preserved actual receipts from the same candidate; later phases resumed without repeating deployment."
+ },
+ "public_actions_sha256": "2970c43a94c194f78fcf96a2b9fd9bfefd75b3df7c756ec93ec4672170288fe3",
+ "public_actions_records": 331
 }

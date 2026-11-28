@@ -1,0 +1,5 @@
+{
+  "error": "RuntimeError(\"path ('w1795521275', 200008, 'recorded-month', 'observed-choices') failed: ValueError('unmeasured sync context: 960000:1:2 count=2')\")",
+  "persisted_rows": 104,
+  "runtime_seconds": 445.3110676659271
+}

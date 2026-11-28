@@ -1,0 +1,106 @@
+{
+ "status": "PASS",
+ "command": [
+  "RPC_URL=http://127.0.0.1:18816",
+  "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+  "script/release.py",
+  "postflight-manager",
+  "0xdc9691d75dfc8d45fb44b5369dbb83e206aaf10b",
+  "deploy/manager-factory.json",
+  "0x3e11af159fad319384f2908fce0d9d48f48ac22b",
+  "0x25EC2545E45989F754C67926a6e0Ff94D7e3C3f8",
+  "0"
+ ],
+ "exitStatus": 0,
+ "result": {
+  "chainId": 31337,
+  "block": 26493479,
+  "blockHash": "0x2e3ab857ef2ee4bc1b23d5665e29419017873f3a0145a8b4e843f228f4baaf7d",
+  "rpc": "http://127.0.0.1:18816",
+  "deploymentTarget": "manager",
+  "factory": "0xdc9691d75dfc8d45fb44b5369dbb83e206aaf10b",
+  "implementation": "0x67b83dbc0b79bF6165A6dE057E67701C1a60e657",
+  "libraries": {
+   "ScanLib": "0x8148D8b4621ce009275D88E5DfDf1302a700CBc0",
+   "VaultLib": "0x1e7A9CD8aCf72F5DffDa172497d41f5471d15317",
+   "StrategyLib": "0xc3AB28505D386eA4F77b4B121e0e8C4b8B828A30"
+  },
+  "managerCount": 3,
+  "factoryBalanceWei": 0,
+  "implementationBalanceWei": 0,
+  "manager": {
+   "address": "0x3e11af159fad319384f2908fce0d9d48f48ac22b",
+   "owner": "0x25EC2545E45989F754C67926a6e0Ff94D7e3C3f8",
+   "params": {
+    "minEdgeBps": 100,
+    "bufferBps": 0,
+    "distributionBps": 0,
+    "payMarkupBps": 0,
+    "keeperShareBps": 2500,
+    "upliftBoundBps": 25,
+    "packUnitsMask": 8,
+    "gasCeilingWei": 500000000,
+    "essentialCeilingWei": 500000000,
+    "maxTipWei": 50000000,
+    "workFeeWei": 20000000000000,
+    "routineCapWei": 30000000000000000,
+    "routineRatePerDayWei": 10000000000000000,
+    "essentialCapWei": 10000000000000000,
+    "essentialRatePerDayWei": 5000000000000000,
+    "reserveWei": 5000000000000000,
+    "tvlCapWei": 0,
+    "backingRatioBps": 70000,
+    "acceptedMintFeeWei": 1000000000000000,
+    "minDepositWei": 10000000000000000,
+    "minDistributionWei": 10000000000000000,
+    "gasSchedule": {
+     "checkpoint": 500000,
+     "allocationEntry": 6000,
+     "allocationRead": 30000,
+     "build": 360000,
+     "buildPack": 300000,
+     "buildShape": 130000,
+     "list": 380000,
+     "listed": 825000,
+     "sync": 125000,
+     "requiredTail": 120000,
+     "distributionProof": 80000,
+     "journal": 22000,
+     "scan": 30000,
+     "selected": 225000,
+     "synced": 285000,
+     "pruned": 45000,
+     "unlist": 340000,
+     "unlisted": 285000,
+     "liquidate": 75000,
+     "liquidatePack": 80000,
+     "redeemShape": 35000,
+     "recoveryBase": 100000,
+     "recoveryShape": 35000,
+     "recoveryUnseal": 70000,
+     "harvest": 125000,
+     "harvested": 80000,
+     "credit": 40000,
+     "fund": 40000,
+     "overhead": 50000
+    }
+   },
+   "budget": [
+    30000000000000000,
+    10000000000000000
+   ],
+   "cashWei": 0,
+   "flags": {
+    "windingDown": "false",
+    "listingPaused": "false"
+   },
+   "inventory": {
+    "openListingCount": 0,
+    "idlePackCount": 0,
+    "recoveryPackCount": 0
+   },
+   "liveMintFeeWei": 500000000000000
+  }
+ },
+ "confirmation": "manager postflight passed; shared vault not required"
+}

@@ -1,0 +1,17 @@
+test_build_respects_disabled_recipe_and_fee_acceptance_atomically (test_completion.CompletionAccountingTest.test_build_respects_disabled_recipe_and_fee_acceptance_atomically) ... ok
+test_caller_checkpoint_keeps_pending_escrow_cancellable_and_refunds_contributions (test_completion.CompletionAccountingTest.test_caller_checkpoint_keeps_pending_escrow_cancellable_and_refunds_contributions) ... ok
+test_caller_recovery_preserves_remaining_holder_distribution_gain (test_completion.CompletionAccountingTest.test_caller_recovery_preserves_remaining_holder_distribution_gain) ... ok
+test_caller_recovery_retains_new_depositor_checkpoint_sponsorship (test_completion.CompletionAccountingTest.test_caller_recovery_retains_new_depositor_checkpoint_sponsorship) ... ok
+test_capacity_increase_does_not_refill_and_old_rate_accrues (test_completion.CompletionAccountingTest.test_capacity_increase_does_not_refill_and_old_rate_accrues) ... ok
+test_checkpoint_compensation_counts_only_actual_allocation_reads (test_completion.CompletionAccountingTest.test_checkpoint_compensation_counts_only_actual_allocation_reads) ... ok
+test_construction_at_commit_and_aggregate_issuance_rounding (test_completion.CompletionAccountingTest.test_construction_at_commit_and_aggregate_issuance_rounding) ... ok
+test_paid_checkpoint_refunds_partition_every_wei_any_order (test_completion.CompletionAccountingTest.test_paid_checkpoint_refunds_partition_every_wei_any_order) ... ok
+test_renewal_funding_collects_only_needed_prefix (test_completion.CompletionAccountingTest.test_renewal_funding_collects_only_needed_prefix) ... ok
+test_scan_bound_is_independent_of_mutable_prices (test_completion.CompletionAccountingTest.test_scan_bound_is_independent_of_mutable_prices) ... ok
+test_unresolved_allocation_proof_bound_precedes_large_nav_uplift_check (test_completion.CompletionAccountingTest.test_unresolved_allocation_proof_bound_precedes_large_nav_uplift_check) ... ok
+test_zero_quote_and_restored_topup_never_close_live_era (test_completion.CompletionAccountingTest.test_zero_quote_and_restored_topup_never_close_live_era) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.002s
+
+OK

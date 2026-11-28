@@ -1,0 +1,10 @@
+locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('.mp-settings').locator('summary').first()[22m
+
+    at /private/tmp/shapes-manager-closeout-preview/manager-closeout-flow.cjs:30:91 {
+  log: [
+    "  - waiting for locator('.mp-settings').locator('summary').first()"
+  ],
+  name: 'TimeoutError'
+}

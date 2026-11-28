@@ -1,0 +1,18 @@
+{
+  "stage": "create",
+  "manager": "0xed1362EcFdE410735dfB70153D60FCFD20d38E74",
+  "created": {
+    "manager": "0xed1362EcFdE410735dfB70153D60FCFD20d38E74",
+    "owner": "0x847bB5811963ee7Faf9626171fBeBcA81f745e3D",
+    "index": "0",
+    "funding": "1000000000000000000"
+  },
+  "checks": [
+    "Manager-only navigation with shared vault closed and unset",
+    "Created and funded own actual manager with1ETH; deploydust measured separately",
+    "Actual owner pause and resume confirmed whileempty"
+  ],
+  "writes": 3,
+  "errors": [],
+  "afterBlock": 26486693
+}

@@ -1,0 +1,22 @@
+[
+ {
+  "command": [
+   "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+   "sim/test_manager_closeout.py"
+  ],
+  "exitStatus": 0,
+  "elapsedSeconds": 0.196,
+  "log": "docs/receipts/manager-operating-curve-closeout-0.log"
+ },
+ {
+  "command": [
+   "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+   "sim/manager_closeout.py",
+   "--out",
+   "docs/receipts/manager-closeout-economics"
+  ],
+  "exitStatus": 0,
+  "elapsedSeconds": 0.194,
+  "log": "docs/receipts/manager-operating-curve-closeout-1.log"
+ }
+]

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
+import {GasQuotes} from "../utils/GasQuotes.sol";
+
 import {ForkBase} from "./ForkBase.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {StrategyLib} from "../../src/StrategyLib.sol";
@@ -24,9 +28,11 @@ contract EfficientJournalTest is ForkBase {
         VaultLib.Params memory p = vault.getParams();
         p.payMarkupBps = 0; p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei;
         p.essentialCap = 0; p.essentialRate = 0; p.reserve = 0.005 ether;
-        vm.prank(owner); vault.setParams(p);
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected0);
         uint256 deposit = 1 ether + vault.requestCharge();
-        vm.prank(alice); vault.deposit{value: deposit}();
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: deposit}(_expected1);
         toBlackout(); checkpoint(); toOpen();
         assertGt(vault.shareBalance(alice), 0, "the funded holder owns the priced deposit");
         vm.prank(keeper); TestVaultOps.restock(vault, 1, UNITS, 0);
@@ -61,7 +67,8 @@ contract EfficientJournalTest is ForkBase {
 
     function test_fullJournalJobCannotBeShrunkByIrrelevantTerminalIds() public {
         VaultLib.Params memory p = vault.getParams(); p.distributionBps = 5000;
-        vm.prank(owner); vault.setParams(p);
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected2);
         uint64 cursor = _refund(128);
         // A one-listing vault scans its own position instead of walking the 128-record journal, so
         // the paid 128-record journal job this test once pinned is unreachable here: the scan
@@ -70,13 +77,15 @@ contract EfficientJournalTest is ForkBase {
         // carries to the scan: a foreign-only scan in the same checkpoint interval earns nothing,
         // and irrelevant terminal ids neither inflate the pay nor change how much one call clears.
         uint256 snapshot = vm.snapshotState();
-        vm.prank(keeper); uint256 normalPay = vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected3 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); uint256 normalPay = vault.sync(new uint256[](0), 0, 0, _expected3);
         assertEq(vault.acquisitionCursor(), uint256(cursor) + 128, "one scan clears the whole backlog");
         assertEq(normalPay, 0, "foreign-only scan applies no own selection and is unpaid");
         assertTrue(vm.revertToState(snapshot));
         uint256[] memory irrelevant = new uint256[](16);
         for (uint256 i; i < irrelevant.length; ++i) irrelevant[i] = 1e9 + i;
-        vm.prank(keeper); uint256 paddedPay = vault.sync(irrelevant, 0, 0);
+        bytes32 _expected4 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); uint256 paddedPay = vault.sync(irrelevant, 0, 0, _expected4);
         assertEq(vault.acquisitionCursor(), uint256(cursor) + 128);
         assertEq(paddedPay, normalPay, "IDs do not shrink or increase the scan job");
         assertEq(vault.openListingCount(), 1);
@@ -86,22 +95,26 @@ contract EfficientJournalTest is ForkBase {
         uint64 cursor = _refund(32);
         uint256 snapshot = vm.snapshotState();
         uint256 cash = address(vault).balance;
+        bytes32 _expected5 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
-        vm.prank(keeper); vault.sync(new uint256[](0), 0, 1);
+        vm.prank(keeper); vault.sync(new uint256[](0), 0, 1, _expected5);
         assertEq(vault.acquisitionCursor(), cursor);
-        vm.prank(keeper); assertEq(vault.sync(new uint256[](0), 0, 0), 0);
+        bytes32 _expected6 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); assertEq(vault.sync(new uint256[](0), 0, 0, _expected6), 0);
         assertEq(address(vault).balance, cash);
         assertTrue(vm.revertToState(snapshot));
         uint256 charge = vault.requestCharge();
-        vm.prank(alice); vault.deposit{value: 0.1 ether + charge}();
+        bytes32 _expected7 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: 0.1 ether + charge}(_expected7);
         uint256 escrow = vault.pendingDepositTotal();
         toBlackout();
         uint256 pool = vault.processingPool();
         // The checkpoint window reaches its completed prefix with one scan of the single own
         // listing, not by walking 32 journal entries: the required tail now prices that scan
         // (Q_REQUIRED_TAIL + scanned*Q_SCAN, scanned == openListingCount == 1).
-        vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), 0, 1);
-        assertEq(paid, (VaultLib.Q_REQUIRED_TAIL + VaultLib.Q_SCAN) * 0.2 gwei);
+        bytes32 _expected8 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected8);
+        assertEq(paid, MeasuredPay.gross(vault, GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_SCAN, 0, false, 0.2 gwei));
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
         assertEq(vault.processingPool(), pool);
         assertEq(vault.pendingDepositTotal(), escrow);
@@ -113,7 +126,8 @@ contract EfficientJournalTest is ForkBase {
         _refund(128);
         uint256 charge = vault.requestCharge();
         uint256 shares = vault.shareBalance(alice) / 10;
-        vm.prank(alice); vault.requestRedeem{value: charge}(shares);
+        bytes32 _expected9 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.requestRedeem{value: charge}(shares, _expected9);
         assertGt(vault.lockedShares(), 0);
         // Locked shares make the checkpoint tail required. A one-listing vault reaches its completed
         // prefix with one scan rather than the 128-record journal, so the routine sync it earns is
@@ -124,9 +138,10 @@ contract EfficientJournalTest is ForkBase {
         (uint256 routineBefore, uint256 essentialBefore) = vault.budget();
         assertEq(essentialBefore, 0);
         uint256 pool = vault.processingPool();
-        vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), 0, 1);
+        bytes32 _expected10 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), 0, 1, _expected10);
         (uint256 routineAfter, uint256 essentialAfter) = vault.budget();
-        assertEq(paid, (VaultLib.Q_REQUIRED_TAIL + VaultLib.Q_SCAN) * 0.2 gwei);
+        assertEq(paid, MeasuredPay.gross(vault, GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_SCAN, 0, false, 0.2 gwei));
         assertEq(routineBefore - routineAfter, paid);
         assertEq(essentialAfter, 0);
         assertEq(vault.processingPool(), pool);
@@ -134,21 +149,25 @@ contract EfficientJournalTest is ForkBase {
 
     function test_distributionFlagCannotPayForTailWithoutDistributableGain() public {
         VaultLib.Params memory p = vault.getParams(); p.distributionBps = 5000;
-        vm.prank(owner); vault.setParams(p);
+        bytes32 _expected11 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected11);
         _refund(1); toBlackout();
         uint256 witness = TestVaultOps.witness(vault);
         uint256 cash = address(vault).balance;
-        vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), witness, 0);
+        bytes32 _expected12 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), witness, 0, _expected12);
         assertEq(paid, 0, "a configured percentage is not a payable checkpoint");
         assertEq(address(vault).balance, cash);
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
+        bytes32 _expected13 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(bytes4(keccak256("Nothing()")));
-        vault.checkpoint(witness, 0);
+        vault.checkpoint(witness, 0, _expected13);
     }
 
     function test_distributionOnlyTailAllowsRealCheckpointAfterItsExpense() public {
         VaultLib.Params memory p = vault.getParams(); p.distributionBps = 5000;
-        vm.prank(owner); vault.setParams(p);
+        bytes32 _expected14 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected14);
         _refund(1);
         vm.prank(bob); (bool accepted,) = address(vault).call{value: 1 ether}("");
         assertTrue(accepted);
@@ -157,16 +176,20 @@ contract EfficientJournalTest is ForkBase {
         uint256 snapshot = vm.snapshotState();
         uint256 cursor = vault.acquisitionCursor();
         uint256 cash = address(vault).balance;
+        bytes32 _expected15 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
-        vm.prank(keeper); vault.sync(new uint256[](0), witness + 1e9, 1);
+        vm.prank(keeper); vault.sync(new uint256[](0), witness + 1e9, 1, _expected15);
         assertEq(vault.acquisitionCursor(), cursor, "refused proof payment rolls back the journal");
-        vm.prank(keeper); assertEq(vault.sync(new uint256[](0), witness + 1e9, 0), 0);
+        bytes32 _expected16 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); assertEq(vault.sync(new uint256[](0), witness + 1e9, 0, _expected16), 0);
         assertEq(address(vault).balance, cash, "invalid witness earns no proof premium");
         assertTrue(vm.revertToState(snapshot));
-        vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), witness, 1);
-        assertEq(paid, (VaultLib.Q_REQUIRED_TAIL + VaultLib.Q_DISTRIBUTION_PROOF + VaultLib.Q_JOURNAL) * 0.2 gwei);
+        bytes32 _expected17 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); uint256 paid = vault.sync(new uint256[](0), witness, 1, _expected17);
+        assertEq(paid, MeasuredPay.gross(vault, GasQuotes.Q_REQUIRED_TAIL + GasQuotes.Q_DISTRIBUTION_PROOF + GasQuotes.Q_JOURNAL, 0, false, 0.2 gwei));
         assertEq(vault.pendingDepositTotal(), 0); assertEq(vault.lockedShares(), 0);
-        vm.prank(keeper); vault.checkpoint(witness, 0);
+        bytes32 _expected18 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); vault.checkpoint(witness, 0, _expected18);
         assertGe(vault.distributionReserve(), 0.01 ether);
         assertGe(address(vault).balance, vault.redemptionReserve() + vault.distributionReserve()
             + vault.claimableTotal() + vault.processingPool() + vault.pendingDepositTotal());

@@ -1,0 +1,35 @@
+{
+  "command": [
+    "forge",
+    "test",
+    "--rpc-url",
+    "https://mainnet.gateway.tenderly.co",
+    "--fork-retries",
+    "30",
+    "--fork-retry-backoff",
+    "5000",
+    "--compute-units-per-second",
+    "100",
+    "--match-test",
+    "(test_liveIncumbentAndEntrantKeepOrderingAt25bpsCompleteBothExits|test_multipleRealAllocationsNear25bpsCompleteBothHolderExits|test_lateAllocationCannotUseMissedWindowAndRecoversThroughRealSettlement|test_coldKickRefundIdentifiedUnderStipend|test_keep_replacementMintsFreshShapes|test_recordedKeepResolvesExactlyOnceAndStrangerCannotFabricateReceipt|test_defaultFinalizationUsesRealReceiverAndResolves|test_lowGasKeepNeverForcesAnUnrecordedPayment|test_recordedKickRefund_resolvesAndOwnerExits|test_profileRefundedRequiredSingletonAfterFundingGate)",
+    "--gas-limit",
+    "10000000000",
+    "-vv"
+  ],
+  "source_set_sha256": "d85c926518a689c73c6575937fd7d3dcde0d1a484d5abfe6de6faa22a4ca8e39",
+  "exit_status": 0,
+  "scope": [
+    "test_liveIncumbentAndEntrantKeepOrderingAt25bpsCompleteBothExits",
+    "test_multipleRealAllocationsNear25bpsCompleteBothHolderExits",
+    "test_lateAllocationCannotUseMissedWindowAndRecoversThroughRealSettlement",
+    "test_coldKickRefundIdentifiedUnderStipend",
+    "test_keep_replacementMintsFreshShapes",
+    "test_recordedKeepResolvesExactlyOnceAndStrangerCannotFabricateReceipt",
+    "test_defaultFinalizationUsesRealReceiverAndResolves",
+    "test_lowGasKeepNeverForcesAnUnrecordedPayment",
+    "test_recordedKickRefund_resolvesAndOwnerExits",
+    "test_profileRefundedRequiredSingletonAfterFundingGate"
+  ],
+  "log": "/tmp/shapes-completion-final-fairness-callback.log",
+  "purpose": "Final affected fairness and callback paths after PackVault recovery/proceeds repair; other unchanged suites reuse recorded evidence."
+}

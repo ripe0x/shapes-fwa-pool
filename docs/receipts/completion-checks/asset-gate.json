@@ -1,0 +1,9 @@
+{
+  "command": [
+    "python3",
+    "/Users/dd/.agents/guidance/asset-flow-kit/asset_gate.py",
+    "."
+  ],
+  "exit_status": 1,
+  "result": "FAILED: gate metadata KeyError metric after configured test subprocess. No gate pass claimed."
+}

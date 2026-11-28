@@ -1,0 +1,16 @@
+.............E
+======================================================================
+ERROR: setUpClass (__main__.ManagerDeploymentTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/script/test_release.py", line 183, in setUpClass
+    cls.compiled = release.build("manager")
+                   ~~~~~~~~~~~~~^^^^^^^^^^^
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/script/release.py", line 279, in build
+    from eth_utils import keccak, to_checksum_address
+ModuleNotFoundError: No module named 'eth_utils'
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.019s
+
+FAILED (errors=1)

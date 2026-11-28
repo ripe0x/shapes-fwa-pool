@@ -1,0 +1,10 @@
+steps: setup, selected, bid, charges, deposits, sync, harvest, catchup, relistBacking, list, checkpoint1, gas, redeemCharge, redeem, checkpoint2, claim, aliceReceived
+ledger: fees received 234653839582073, keeper paid 1430400000000000, mint fees 2000000000000000, backing lost 64800000000000000
+reconciled: every vault number matches the fork run to the wei
+partial/wind-down: claim 985914253586278017, keeper pay 2286000000000000, mint fees 12000000000000000, remaining redemption-rounding reserve 2 wei
+reconciled: partial fill, wind-down, full exit and every bucket match to the wei
+scan: backlog 46 entries cleared, keeper paid 395750000000000, fee credit still on FWA 234653839582073
+reconciled: scan path, one selection applied over a 47-entry backlog, every bucket to the wei
+reconciled: 14 real contribution transitions, every interval, issuance and wei
+reconciled fresh renewal: 6 real transitions; paid mint fees 6000000000000000, keeper 967400000000000, backing spent 210000000000000000, eligibility consumed once
+reconciled conditional funding: credit 72998385985353, paid 503000000000000, creator 3000000000000000, cash 36499192992677; every book and permission bucket matches

@@ -30,7 +30,7 @@ class CandidateProjectionTest(unittest.TestCase):
             else:
                 break
         self.assertEqual([step for step in alternatives if plan_key(step) not in failed], [('sync', [1, 2], 0)])
-        self.assertEqual((gas, claims), (689_000, [1, 2]))
+        self.assertEqual((gas, claims), (729_000, [1, 2]))
 
     def test_model_uses_the_index_bounds_order_and_owed_rotation(self):
         v = Vault(seed=1, balance=1)

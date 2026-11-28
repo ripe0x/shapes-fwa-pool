@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {TestVaultOps} from "../utils/TestVaultOps.sol";
+
 import {ForkBase} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {PackAccount} from "../../src/PackAccount.sol";
@@ -16,9 +18,9 @@ contract ForkJournalGasTest is ForkBase {
     }
 
     function _cold() private {
-        address policy = address(vault.keeperPolicy());
+
         vm.cool(address(vault)); vm.cool(address(FWA));
-        vm.cool(policy); vm.cool(address(VaultLib));
+        vm.cool(address(VaultLib));
     }
 
     function _intrinsic(bytes memory input) private pure returns (uint256 gas_) {
@@ -27,7 +29,7 @@ contract ForkJournalGasTest is ForkBase {
     }
 
     function _measure() private returns (uint256 used, uint256 pay) {
-        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), 0, 0));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), 0, 0, vault.configurationHash()));
         uint256 intrinsic = _intrinsic(input);
         uint256 keeperBefore = keeper.balance; // A real transaction sender is warm under EIP-2929.
         _cold();
@@ -45,7 +47,6 @@ contract ForkJournalGasTest is ForkBase {
         uint64 begin = vault.acquisitionCursor();
         uint256 seed = address(vault).balance;
         vm.makePersistent(address(vault));
-        vm.makePersistent(address(vault.keeperPolicy()));
         vm.makePersistent(address(VaultLib));
         vm.rollFork(BLOCK + 10_000);
         assertEq(keeper.code.length, 0, "real transaction sender has no delegated code");
@@ -78,7 +79,8 @@ contract ForkJournalGasTest is ForkBase {
         emit log_named_uint("actual fulfilled foreign sample", fulfilled);
         emit log_named_uint("actual refunded foreign sample", refunded);
         emit log_named_uint("unpaid rebase caller meter plus intrinsic proxy", callMeter);
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Nothing.selector);
-        vault.sync(new uint256[](0), 0, 0);
+        vault.sync(new uint256[](0), 0, 0, _expected0);
     }
 }

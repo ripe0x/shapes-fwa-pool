@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {TestVaultOps} from "../utils/TestVaultOps.sol";
+
 import {Test} from "forge-std/Test.sol";
 import {
     IShapes,
@@ -106,7 +108,7 @@ contract ForkMeasureTest is Test {
         assertEq(value, B);
         assertEq(status, LISTING_ACTIVE, "empty queue lists straight into the pool");
 
-        // Batch of 8 listings in one transaction (the vault's MAX_LIST_BATCH build shape).
+        // Batch of 8 listings in one transaction (the vault's MAX_LIST_BATCH relist shape).
         uint256[] memory packs8 = new uint256[](8);
         for (uint256 i; i < 8; ++i) packs8[i] = _pack6();
         _cool();

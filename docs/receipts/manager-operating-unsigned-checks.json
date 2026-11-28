@@ -1,0 +1,66 @@
+{
+ "publicTransactions": 0,
+ "sharedVaultDeployed": false,
+ "checks": [
+  {
+   "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "script/release.py",
+    "existing-readback",
+    "--target",
+    "manager"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 27.601,
+   "log": "docs/receipts/manager-operating-unsigned-0.log"
+  },
+  {
+   "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "script/release.py",
+    "manifest",
+    "--target",
+    "manager"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 0.168,
+   "log": "docs/receipts/manager-operating-unsigned-1.log"
+  },
+  {
+   "command": [
+    "bash",
+    "script/deploy.sh",
+    "deploy/manager-factory.json",
+    "--target",
+    "manager"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 6.23,
+   "log": "docs/receipts/manager-operating-unsigned-2.log"
+  },
+  {
+   "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "script/release.py",
+    "manager-package",
+    "broadcast/Deploy.s.sol/1/dry-run/run-latest.json"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 0.537,
+   "log": "docs/receipts/manager-operating-unsigned-3.log"
+  },
+  {
+   "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "script/release.py",
+    "manager-create",
+    "0xbb19536496e016ff33f15e8fae56bf17ccac9786",
+    "0xCB43078C32423F5348Cab5885911C3B5faE217F9",
+    "500000000000000000"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 0.896,
+   "log": "docs/receipts/manager-operating-unsigned-create.log"
+  }
+ ]
+}

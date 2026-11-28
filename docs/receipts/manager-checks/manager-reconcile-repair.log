@@ -1,0 +1,52 @@
+{
+ "status": "PASS",
+ "command": [
+  "/tmp/packvault-review-packaging-venv/bin/python3",
+  "sim/manager_reconcile.py"
+ ],
+ "source_sha256": {
+  "sim/manager.py": "901e776456b46b501af574562b41ac4f1b0e94f0e8edd3e6d5464e0a62a34a01",
+  "sim/vault.py": "b8545f3f17e1e2766a344aa45abf0ee421854d0e55bfec493ac2985e92e4dd66",
+  "sim/forward.py": "cf42419c7b18114560f40e0c4912580a4892f7aa6abe2f8adf5eff3d161657e4",
+  "keeper/policy.py": "b56d5b11c6cd387c6c623419a5c31012bbae509680d29f403c2ef5954ac7f107",
+  "keeper/config.py": "39acb35f93fb64916dd4c8c8ab64da76742ec8c8b1c90902c9c1b014a6a22f06",
+  "sim/manager_reconcile.py": "2c9c5e3590720151decd47902746cb6a737cae8a0c4627b82eeac1871b2e07c8"
+ },
+ "results": [
+  {
+   "trace": "sim/out/manager-fresh-trace.jsonl",
+   "trace_sha256": "b05ca04a2cbc551e2e42aca713c51a3fae5522dd443395b206bece1d61647e5f",
+   "steps": 16,
+   "status": "PASS",
+   "failures": [],
+   "owner_withdrawn_wei": 783057722058121371,
+   "keeper_paid_wei": 967400000000000,
+   "gross_primary_fees_accrued_wei": 6000000000000000,
+   "external_fee_income_wei": 25122058121371,
+   "backing_lost_wei": 210000000000000000,
+   "final_balance_wei": 0,
+   "renewal_mode": 0,
+   "actual_mint_fee_wei": 1000000000000000
+  },
+  {
+   "trace": "sim/out/manager-reuse-trace.jsonl",
+   "trace_sha256": "cd964fdb30d02675c70a99566e81d22f04bc28edd95e1e06dc4d8b20e5fa1d87",
+   "steps": 16,
+   "status": "PASS",
+   "failures": [],
+   "owner_withdrawn_wei": 786303722058121371,
+   "keeper_paid_wei": 721400000000000,
+   "gross_primary_fees_accrued_wei": 3000000000000000,
+   "external_fee_income_wei": 25122058121371,
+   "backing_lost_wei": 210000000000000000,
+   "final_balance_wei": 0,
+   "renewal_mode": 1,
+   "actual_mint_fee_wei": 1000000000000000
+  }
+ ],
+ "limits": [
+  "Actual historical fee0.001 traces; current publicfee is separately observed0.0005.",
+  "Fork state transitions and quoted payments, not billed wallet gas; owner wallet costs use the separate receipt calibration.",
+  "One authenticated allocation and complete reinvestment/exit in each mode; repeated and conditional funding mechanisms have separate contract coverage."
+ ]
+}

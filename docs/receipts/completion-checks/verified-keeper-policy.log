@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/test_policy.py", line 272, in <module>
+    main()
+    ~~~~^^
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/test_policy.py", line 108, in main
+    assert reserve_need(s) == 5_935_550_000_000_000
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

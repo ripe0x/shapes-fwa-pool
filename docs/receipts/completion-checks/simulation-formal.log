@@ -1,0 +1,176 @@
+EarningsAccrued checked 876,437; exact matches 876,437; mismatches 0; acquisition sequences contiguous
+89 runs, 4 workers
+formal mainnet 1.9601eth 0.5gwei seed1: claim=True net=-1.620322
+formal mainnet 1.9601eth 0.5gwei seed2: claim=True net=-0.484679
+formal mainnet 1.9601eth 0.5gwei seed3: claim=True net=-1.642985
+formal mainnet 1.9601eth 0.5gwei seed4: claim=True net=+12.926176
+formal mainnet 6.8eth 0.5gwei seed1: claim=True net=+0.265600
+formal mainnet 6.8eth 0.5gwei seed2: claim=True net=+16.306505
+formal mainnet 6.8eth 0.5gwei seed3: claim=True net=-3.917407
+formal mainnet 6.8eth 0.5gwei seed4: claim=True net=+20.580548
+formal mainnet 20eth 0.5gwei seed1: claim=True net=+8.273117
+formal mainnet 20eth 0.5gwei seed2: claim=True net=+22.014127
+formal mainnet 20eth 0.5gwei seed3: claim=True net=+14.676738
+formal mainnet 20eth 0.5gwei seed4: claim=True net=+17.648230
+formal mainnet 1.9601eth 0.2gwei seed1: claim=True net=-1.578117
+formal mainnet 1.9601eth 0.2gwei seed2: claim=True net=-0.574415
+formal mainnet 1.9601eth 0.2gwei seed3: claim=True net=-1.629768
+formal mainnet 1.9601eth 0.2gwei seed4: claim=True net=+11.650883
+formal mainnet 6.8eth 0.2gwei seed1: claim=True net=-0.462699
+formal mainnet 6.8eth 0.2gwei seed2: claim=True net=+8.457098
+formal mainnet 6.8eth 0.2gwei seed3: claim=True net=-5.603793
+formal mainnet 6.8eth 0.2gwei seed4: claim=True net=+20.200236
+formal mainnet 20eth 0.2gwei seed1: claim=True net=+11.173273
+formal mainnet 20eth 0.2gwei seed2: claim=True net=+21.282873
+formal mainnet 20eth 0.2gwei seed3: claim=True net=+8.361514
+formal mainnet 20eth 0.2gwei seed4: claim=True net=+19.782345
+half-fee-sensitivity mainnet 1.9601eth 0.2gwei seed1: claim=True net=-1.527407
+half-fee-sensitivity mainnet 1.9601eth 0.2gwei seed2: claim=True net=-1.656754
+half-fee-sensitivity mainnet 1.9601eth 0.2gwei seed3: claim=True net=-1.601404
+half-fee-sensitivity mainnet 1.9601eth 0.2gwei seed4: claim=True net=+14.308447
+half-fee-sensitivity mainnet 1.9601eth 0.5gwei seed1: claim=True net=-1.530438
+half-fee-sensitivity mainnet 1.9601eth 0.5gwei seed2: claim=True net=-1.175062
+half-fee-sensitivity mainnet 1.9601eth 0.5gwei seed3: claim=True net=-1.614621
+half-fee-sensitivity mainnet 1.9601eth 0.5gwei seed4: claim=True net=+13.327347
+recent-10-days mainnet 1.9601eth 0.5gwei seed1: claim=True net=-1.570744
+recent-10-days mainnet 1.9601eth 0.5gwei seed2: claim=True net=+1.107692
+recent-10-days mainnet 1.9601eth 0.5gwei seed3: claim=True net=-1.479389
+recent-10-days mainnet 1.9601eth 0.5gwei seed4: claim=True net=-0.274645
+zero-demand mainnet 1.9601eth 0.5gwei seed1: claim=True net=-0.031631
+recorded-timing mainnet 1.9601eth 0.5gwei seed1: claim=True net=+79.460313
+recorded-timing mainnet 1.9601eth 0.5gwei seed2: claim=True net=+47.787843
+recorded-timing mainnet 1.9601eth 0.5gwei seed3: claim=True net=+4.167378
+recorded-timing mainnet 1.9601eth 0.5gwei seed4: claim=True net=+82.517302
+recorded-choice mainnet 1.9601eth 0.5gwei seed1: claim=True net=+143.519800
+recorded-choice mainnet 1.9601eth 0.5gwei seed2: claim=True net=+128.440774
+recorded-choice mainnet 1.9601eth 0.5gwei seed3: claim=True net=+67.633328
+recorded-choice mainnet 1.9601eth 0.5gwei seed4: claim=True net=+172.499379
+oracle-capped mainnet 1.9601eth 0.5gwei seed1: claim=True net=-0.001203
+oracle-capped mainnet 1.9601eth 0.5gwei seed2: claim=True net=-0.001203
+oracle-capped mainnet 1.9601eth 0.5gwei seed3: claim=True net=-0.001203
+oracle-capped mainnet 1.9601eth 0.5gwei seed4: claim=True net=-0.001203
+backing-50000 mainnet 1.9601eth 0.2gwei seed1: claim=True net=-1.214206
+backing-50000 mainnet 1.9601eth 0.2gwei seed2: claim=True net=-0.906628
+backing-50000 mainnet 1.9601eth 0.2gwei seed3: claim=True net=-1.535751
+backing-50000 mainnet 1.9601eth 0.2gwei seed4: claim=True net=+11.803366
+backing-50000 mainnet 1.9601eth 0.5gwei seed1: claim=True net=-1.281603
+backing-50000 mainnet 1.9601eth 0.5gwei seed2: claim=True net=-0.613176
+backing-50000 mainnet 1.9601eth 0.5gwei seed3: claim=True net=-1.594900
+backing-50000 mainnet 1.9601eth 0.5gwei seed4: claim=True net=+13.573335
+backing-90000 mainnet 1.9601eth 0.2gwei seed1: claim=True net=-1.673926
+backing-90000 mainnet 1.9601eth 0.2gwei seed2: claim=True net=+1.879250
+backing-90000 mainnet 1.9601eth 0.2gwei seed3: claim=True net=-1.726869
+backing-90000 mainnet 1.9601eth 0.2gwei seed4: claim=True net=+17.865711
+backing-90000 mainnet 1.9601eth 0.5gwei seed1: claim=True net=-1.544621
+backing-90000 mainnet 1.9601eth 0.5gwei seed2: claim=True net=+0.218032
+backing-90000 mainnet 1.9601eth 0.5gwei seed3: claim=True net=-1.737018
+backing-90000 mainnet 1.9601eth 0.5gwei seed4: claim=True net=+15.891253
+float-2 mainnet 1.9601eth 0.2gwei seed1: claim=True net=-1.611349
+float-2 mainnet 1.9601eth 0.2gwei seed2: claim=True net=-0.496192
+float-2 mainnet 1.9601eth 0.2gwei seed3: claim=True net=-1.643741
+float-2 mainnet 1.9601eth 0.2gwei seed4: claim=True net=+13.304819
+float-2 mainnet 1.9601eth 0.5gwei seed1: claim=True net=-1.639940
+float-2 mainnet 1.9601eth 0.5gwei seed2: claim=True net=-1.001643
+float-2 mainnet 1.9601eth 0.5gwei seed3: claim=True net=-1.607918
+float-2 mainnet 1.9601eth 0.5gwei seed4: claim=True net=+12.217459
+early-burst-then-zero mainnet 1.9601eth 0.2gwei seed1: claim=True net=-1.475933
+early-burst-then-zero mainnet 1.9601eth 0.2gwei seed2: claim=True net=-1.457095
+early-burst-then-zero mainnet 1.9601eth 0.2gwei seed3: claim=True net=-1.552579
+early-burst-then-zero mainnet 1.9601eth 0.2gwei seed4: claim=True net=+9.670685
+early-burst-then-zero mainnet 1.9601eth 0.5gwei seed1: claim=True net=-1.497205
+early-burst-then-zero mainnet 1.9601eth 0.5gwei seed2: claim=True net=-0.749293
+early-burst-then-zero mainnet 1.9601eth 0.5gwei seed3: claim=True net=-1.578830
+early-burst-then-zero mainnet 1.9601eth 0.5gwei seed4: claim=True net=+7.550765
+early-burst-low-permission mainnet 1.9601eth 0.2gwei seed1: claim=True net=-0.465849
+early-burst-low-permission mainnet 1.9601eth 0.2gwei seed2: claim=True net=+0.051898
+early-burst-low-permission mainnet 1.9601eth 0.2gwei seed3: claim=True net=-0.593038
+early-burst-low-permission mainnet 1.9601eth 0.2gwei seed4: claim=True net=+1.408997
+early-burst-low-permission mainnet 1.9601eth 0.5gwei seed1: claim=True net=-0.228080
+early-burst-low-permission mainnet 1.9601eth 0.5gwei seed2: claim=True net=-0.037076
+early-burst-low-permission mainnet 1.9601eth 0.5gwei seed3: claim=True net=-0.167139
+early-burst-low-permission mainnet 1.9601eth 0.5gwei seed4: claim=True net=+0.599278
+{
+ "formal": {
+  "hurdle_bps": 1000,
+  "holder_return": false,
+  "holder_return_at_1_96_eth": {
+   "label": "formal",
+   "config": "mainnet",
+   "principal_eth": 1.9601,
+   "total_price_gwei": 0.5,
+   "runs": 4,
+   "completed_claims": 4,
+   "blocked_exits": 0,
+   "mean_return_bps": 11702,
+   "median_return_bps": -2473,
+   "p10_return_bps": -8380,
+   "worst_return_bps": -8380,
+   "best_return_bps": 65928,
+   "loss_runs": 3,
+   "below_hurdle_runs": 3,
+   "mean_creator_mint_fees_eth": 0.73575,
+   "mean_routine_keeper_eth": 0.3117885073573884,
+   "mean_request_funded_keeper_eth": 0.00027,
+   "mean_holder_gas_eth": 0.008226867875,
+   "mean_fees_received_eth": 50.902942899910904,
+   "mean_backing_lost_eth": 47.5350000000146,
+   "mean_positions": 10.8083408523636,
+   "unfunded_routine_attempts": 0,
+   "mean_exit_days": 0.12437500000000057,
+   "mean_selections": 228.5
+  },
+  "bid_outcome_positive_at_ceiling": true,
+  "usable_exit_window_every_day": true
+ },
+ "exit_windows": {
+  "blackouts": 60,
+  "usable_blackouts": 60,
+  "days_with_usable_window": 30,
+  "days": 30,
+  "minimum_per_day_met": true
+ },
+ "bid": [
+  {
+   "total_price_gwei": 0.2,
+   "backing_wei": 210000000000000000,
+   "k": 1.0384605,
+   "edge_before_gas_wei": 8076705000000000,
+   "cycle_quote_wei": 3637400000000000,
+   "net_wei": 4439305000000000,
+   "positive": true
+  },
+  {
+   "total_price_gwei": 0.5,
+   "backing_wei": 210000000000000000,
+   "k": 1.0384605,
+   "edge_before_gas_wei": 8076705000000000,
+   "cycle_quote_wei": 4473500000000000,
+   "net_wei": 3603205000000000,
+   "positive": true
+  }
+ ]
+}
+formal|mainnet|1960100000000000000|0.5 {'runs': 4, 'completed_claims': 4, 'median_return_bps': -2473, 'p10_return_bps': -8380, 'worst_return_bps': -8380, 'loss_runs': 3, 'mean_creator_mint_fees_eth': 0.73575, 'mean_positions': 10.8083408523636}
+formal|mainnet|6800000000000000000|0.5 {'runs': 4, 'completed_claims': 4, 'median_return_bps': 23978, 'p10_return_bps': -5761, 'worst_return_bps': -5761, 'loss_runs': 1, 'mean_creator_mint_fees_eth': 2.688, 'mean_positions': 40.46919517043122}
+formal|mainnet|20000000000000000000|0.5 {'runs': 4, 'completed_claims': 4, 'median_return_bps': 8823, 'p10_return_bps': 4136, 'worst_return_bps': 4136, 'loss_runs': 0, 'mean_creator_mint_fees_eth': 6.50175, 'mean_positions': 96.75165618793099}
+formal|mainnet|1960100000000000000|0.2 {'runs': 4, 'completed_claims': 4, 'median_return_bps': -2931, 'p10_return_bps': -8314, 'worst_return_bps': -8314, 'loss_runs': 3, 'mean_creator_mint_fees_eth': 0.7215, 'mean_positions': 10.514611448060357}
+formal|mainnet|6800000000000000000|0.2 {'runs': 4, 'completed_claims': 4, 'median_return_bps': 12436, 'p10_return_bps': -8241, 'worst_return_bps': -8241, 'loss_runs': 2, 'mean_creator_mint_fees_eth': 2.54475, 'mean_positions': 37.403512100765084}
+formal|mainnet|20000000000000000000|0.2 {'runs': 4, 'completed_claims': 4, 'median_return_bps': 9891, 'p10_return_bps': 4180, 'worst_return_bps': 4180, 'loss_runs': 0, 'mean_creator_mint_fees_eth': 6.95325, 'mean_positions': 104.4204279519907}
+half-fee-sensitivity|mainnet|1960100000000000000|0.2 {'runs': 4, 'completed_claims': 4, 'median_return_bps': -7792, 'p10_return_bps': -8452, 'worst_return_bps': -8452, 'loss_runs': 3, 'mean_creator_mint_fees_eth': 0.401625, 'mean_positions': 11.77333422666516}
+half-fee-sensitivity|mainnet|1960100000000000000|0.5 {'runs': 4, 'completed_claims': 4, 'median_return_bps': -5994, 'p10_return_bps': -8236, 'worst_return_bps': -8236, 'loss_runs': 3, 'mean_creator_mint_fees_eth': 0.3945, 'mean_positions': 11.682697585622671}
+recent-10-days|mainnet|1960100000000000000|0.5 {'runs': 4, 'completed_claims': 4, 'median_return_bps': -1401, 'p10_return_bps': -8012, 'worst_return_bps': -8012, 'loss_runs': 3, 'mean_creator_mint_fees_eth': 0.11325, 'mean_positions': 5.535611050292978}
+zero-demand|mainnet|1960100000000000000|0.5 {'runs': 1, 'completed_claims': 1, 'median_return_bps': -162, 'p10_return_bps': -162, 'worst_return_bps': -162, 'loss_runs': 1, 'mean_creator_mint_fees_eth': 0.021, 'mean_positions': 6.999940201194047}
+recorded-timing|mainnet|1960100000000000000|0.5 {'runs': 4, 'completed_claims': 4, 'median_return_bps': 405277, 'p10_return_bps': 21255, 'worst_return_bps': 21255, 'loss_runs': 0, 'mean_creator_mint_fees_eth': 4.4775, 'mean_positions': 62.28939610395072}
+recorded-choice|mainnet|1960100000000000000|0.5 {'runs': 4, 'completed_claims': 4, 'median_return_bps': 732004, 'p10_return_bps': 344955, 'worst_return_bps': 344955, 'loss_runs': 0, 'mean_creator_mint_fees_eth': 6.88875, 'mean_positions': 92.6331747283215}
+oracle-capped|mainnet|1960100000000000000|0.5 {'runs': 4, 'completed_claims': 4, 'median_return_bps': -7, 'p10_return_bps': -7, 'worst_return_bps': -7, 'loss_runs': 4, 'mean_creator_mint_fees_eth': 0.0, 'mean_positions': 0.0}
+backing-50000|mainnet|1960100000000000000|0.2 {'runs': 4, 'completed_claims': 4, 'median_return_bps': -4625, 'p10_return_bps': -7835, 'worst_return_bps': -7835, 'loss_runs': 3, 'mean_creator_mint_fees_eth': 1.341, 'mean_positions': 17.196320002221345}
+backing-50000|mainnet|1960100000000000000|0.5 {'runs': 4, 'completed_claims': 4, 'median_return_bps': -3128, 'p10_return_bps': -8135, 'worst_return_bps': -8135, 'loss_runs': 3, 'mean_creator_mint_fees_eth': 1.37475, 'mean_positions': 17.998901232962652}
+backing-90000|mainnet|1960100000000000000|0.2 {'runs': 4, 'completed_claims': 4, 'median_return_bps': 9586, 'p10_return_bps': -8810, 'worst_return_bps': -8810, 'loss_runs': 2, 'mean_creator_mint_fees_eth': 0.675, 'mean_positions': 11.116293672332628}
+backing-90000|mainnet|1960100000000000000|0.5 {'runs': 4, 'completed_claims': 4, 'median_return_bps': 1112, 'p10_return_bps': -8860, 'worst_return_bps': -8860, 'loss_runs': 2, 'mean_creator_mint_fees_eth': 0.6015, 'mean_positions': 9.834691979755144}
+float-2|mainnet|1960100000000000000|0.2 {'runs': 4, 'completed_claims': 4, 'median_return_bps': -2532, 'p10_return_bps': -8385, 'worst_return_bps': -8385, 'loss_runs': 3, 'mean_creator_mint_fees_eth': 0.78225, 'mean_positions': 11.724504801735302}
+float-2|mainnet|1960100000000000000|0.5 {'runs': 4, 'completed_claims': 4, 'median_return_bps': -5109, 'p10_return_bps': -8365, 'worst_return_bps': -8365, 'loss_runs': 3, 'mean_creator_mint_fees_eth': 0.63975, 'mean_positions': 9.554561614510288}
+early-burst-then-zero|mainnet|1960100000000000000|0.2 {'runs': 4, 'completed_claims': 4, 'median_return_bps': -7433, 'p10_return_bps': -7920, 'worst_return_bps': -7920, 'loss_runs': 3, 'mean_creator_mint_fees_eth': 0.2805, 'mean_positions': 11.730782988714445}
+early-burst-then-zero|mainnet|1960100000000000000|0.5 {'runs': 4, 'completed_claims': 4, 'median_return_bps': -3822, 'p10_return_bps': -8053, 'worst_return_bps': -8053, 'loss_runs': 3, 'mean_creator_mint_fees_eth': 0.213, 'mean_positions': 10.71014868593875}
+early-burst-low-permission|mainnet|1960100000000000000|0.2 {'runs': 4, 'completed_claims': 4, 'median_return_bps': 264, 'p10_return_bps': -3026, 'worst_return_bps': -3026, 'loss_runs': 2, 'mean_creator_mint_fees_eth': 0.0255, 'mean_positions': 4.751163660919398}
+early-burst-low-permission|mainnet|1960100000000000000|0.5 {'runs': 4, 'completed_claims': 4, 'median_return_bps': -190, 'p10_return_bps': -1164, 'worst_return_bps': -1164, 'loss_runs': 3, 'mean_creator_mint_fees_eth': 0.012, 'mean_positions': 3.0000728193574187}
+saved /Users/dd/CascadeProjects/shapes-fwa-pool-completion/docs/receipts/formal-assessment.json

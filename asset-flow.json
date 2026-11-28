@@ -43,9 +43,9 @@
  "outcomes": [
   {
    "id": "O1",
-   "text": "UNSIGNED, unified candidate. Where a bid ends: on a bid outcome the vault keeps the pack and the whole backing leaves (FWA's ETH bid 0.9 B to the purchaser, 0.1 B to FWA). Backing is the keep-incentive rule, B = floor_1e4((P - (0.0003 ETH + 160,000 gas x 2 gwei)) / max(ETH bid, token bid)) = 0.06490 ETH for the 0.06 ETH pack (D80, D85); FWA's own clamps bound B below 1.24 P = 0.0744 ETH. The vault's edge is the fee share the listing earned before selection.",
+   "text": "UNSIGNED local candidate. A bid transfers the separate 0.21 ETH backing to the purchaser and FWA; the account receives the 0.03 ETH pack. FreshAfterAcquisition retires that acquired return once and pays for three fresh primary mints and one replacement listing when cash and permission permit. 70,000 bps backing is an evaluation input, not an approved production value.",
    "metric": "destinations.backing to purchaser and FWA on a bid",
-   "max_wei": "75000000000000000",
+   "max_wei": "220000000000000000",
    "regimes": [
     "acquire_bid",
     "staged_activation"
@@ -53,7 +53,7 @@
   },
   {
    "id": "O2",
-   "text": "UNSIGNED, unified candidate. What building costs holders: keeper pay is a fixed quote per operation (D56, D57): quoted gas at min(basefee + 0.05 gwei, 0.5 gwei ceiling; 2 gwei for redemption and wind-down work) plus a flat 0.00002 ETH per unit of work, no premium; never the caller's measured gas. Quoted gas is at most 1.75M per position built and listed in keeper-sized batches. Units: 1 per pack built and per position listed, 2 per bid cycle (resolve and relist), 1 per pricing checkpoint (quoted at measured gas, D61), 1 per position unlisted or item liquidated. At the ceiling a build costs at most about 0.0009 ETH per position. Splitting calls earns no extra base worth its gas; routine budgets cap pay at 0.1 ETH plus 0.02 ETH a day at mainnet values (the bytecode maximum rate); the owner can stop pay at once. Measured worst: 1,425,000 quoted gas per position built and listed (max_load).",
+   "text": "UNSIGNED local candidate. Verified work is paid by the account GasSchedule at min(basefee + configured priority, class ceiling), routine markup on routine gas, plus workFee per service unit. One calculation supplies quote, compensation and relevant charges. Receipt gas is measured separately. The existing 1.75M per-position batch quote comparison remains visible; it does not prove keeper profitability or economic acceptance.",
    "metric": "facts.keeper_gas_per_position",
    "max": 1750000,
    "regimes": [
@@ -62,7 +62,7 @@
   },
   {
    "id": "O3",
-   "text": "UNSIGNED, unified candidate. How it ends for holders: after wind-down each holder's claim equals their share of the vault's value to the wei (value priced before that checkpoint's keeper pay, which falls on the shares that stay), and no shares are left locked.",
+   "text": "UNSIGNED local candidate. A successful checkpoint prices holder flows once. Redemptions fill pro rata using free cash and actually committing gross deposits. Caller-funded bounded work and funded checkpoints support complete exits. Every liability, including contribution refunds, stays excluded from free cash.",
    "metric": "facts.holder_claim_gap_wei",
    "max": 0,
    "regimes": [
@@ -71,7 +71,7 @@
   },
   {
    "id": "O4",
-   "text": "UNSIGNED, unified candidate. What is left at the end: only the dead-share seed slice remains in the vault, about 0.0101 ETH (the 0.01 ETH seed plus deploy-address dust; measured 0.010059 ETH).",
+   "text": "UNSIGNED local candidate. After complete wind-down the residual belongs only to dead shares and independently attributed rounding reserves; no holder, contribution refund or claim is treated as investable residual. The historical 0.012 ETH comparison is preserved for measurement, not reused approval.",
    "metric": "facts.vault_eth_at_end_wei",
    "max": 12000000000000000,
    "regimes": [
@@ -80,7 +80,7 @@
   },
   {
    "id": "O5",
-   "text": "UNSIGNED, unified candidate. Liabilities are never deployable (D32): escrowed deposits, redemption and distribution reserves and settled-but-unclaimed ETH never become spendable. Checked after every keeper call in every regime (the test fails otherwise) and measured here with an entitlement settled to claimable: spendable ETH above the unowed balance is 0 wei.",
+   "text": "UNSIGNED local candidate. Gross pending deposits, redemption/distribution reserves, claimables, processing contributions and finalized contribution refunds are protected liabilities. Pricing work debits its explicit source; contribution cash is never temporarily general free ETH.",
    "metric": "facts.spendable_over_unowed_wei",
    "regimes": [
     "settled_unclaimed"
@@ -89,7 +89,7 @@
   },
   {
    "id": "O6",
-   "text": "UNSIGNED, unified candidate. Can it stall and what restarts it (gas): no call is refused for gas price. Routine work is paid up to the 0.5 gwei ceiling; above it the keeper waits. Exit work (unlisting and liquidating for redemptions or wind-down) is unpaid at mainnet values (D64): withdrawers, or the owner in a wind-down, run it at their own gas, and redeemers pay no unwind charge. Checkpoints are paid from the request charges. A failing keeper policy never blocks work: it pays 0 and the call still runs. Claims are the holder's own, unpaid.",
+   "text": "UNSIGNED local candidate. Numerical gas calibration is immediately adjustable. Ordinary sync uses routine permissions; requested pricing scans/tails may use explicit sponsorship; checkpoint debits that era even when it completes the final redemption. Unpaid recovery is caller funded under a stated wallet cap. Raising an allowance creates no cash.",
    "metric": "facts.checkpoint_pay_wei",
    "max": 200000000000000,
    "regimes": [
@@ -116,7 +116,7 @@
   },
   {
    "id": "O9",
-   "text": "UNSIGNED, unified candidate. What a holder pays if nothing is ever bought: entering, building, unwinding and exiting with zero acquisitions costs holders at most 2.5% of deposits: two paid primary Shapes mints of 0.001 ETH per 0.06 ETH pack built (the creator's revenue, 1.6% of capital put to work) plus keeper gas. Measured 1.24% with 8 packs; launch audit B measured 1.78% (0.2 gwei) and 2.12% (0.5 gwei) with 15 packs on 1.96 ETH.",
+   "text": "UNSIGNED local candidate. Zero-acquisition loss includes three actual 0.001 ETH paid primary mint fees per fresh 0.03 ETH pack, actual keeper compensation once, construction/checkpoint/exit charges and wallet gas. Existing 250 bps comparison is retained as a measurement target, not a claim that the new candidate meets it.",
    "metric": "facts.holder_loss_bps",
    "max": 250,
    "regimes": [
@@ -134,9 +134,9 @@
   },
   {
    "id": "O11",
-   "text": "UNSIGNED, unified candidate. Where a keep ends: the purchaser keeps the pack (0.06 ETH of Shapes leaves to them) and the vault gets the backing back less FWA's settlement fee, B (1 - s) = 0.06425 ETH at s = 1%; the fee is at most 5% by FWA's immutable cap, so a keep never returns less than the pack's value (B >= P / 0.95). The replacement pack is minted fresh (two paid primary mints).",
+   "text": "UNSIGNED local candidate. A keep transfers the actual 0.03 ETH pack to the purchaser and returns backing less the live settlement fee to the account: 0.2079 ETH at 1% on the local 0.21 ETH backing. Three replacement mints pay the actual live primary fee. Zero-fee maximum B-P is stored incrementally as unresolved keep uplift; local checkpoint bound25bps is provisional.",
    "metric": "destinations.FWA settlement fee (keep/silent)",
-   "max_wei": "3300000000000000",
+   "max_wei": "11000000000000000",
    "regimes": [
     "acquire_keep",
     "acquire_silent"
@@ -144,10 +144,6 @@
   }
  ],
  "explained": [],
- "approval_history": "docs/release/history/asset-flow-signed-2026-11-17.json (older candidate). This unified candidate is unsigned; see docs/release/ACCEPTANCE.md.",
- "approval": {
-  "outcomes_sha256": "dbe267c39a299f3bf62424e35e52f9eae5d76090ba1e95f4c338c366e1b094f9",
-  "date": "2026-11-22",
-  "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgT10UwBigHu/hL3vKFUPPNoDIN6\n6Wsrnx17avHqp4qC8AAAAKYXNzZXQtZmxvdwAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gt\nZWQyNTUxOQAAAEC92ggGey722MlQM3622QKlJUbV2bOa1jqj9/5h6QLd9JQ7SdqzwdzJvr\nDz37nhp/joJhMKvuqaL8W1BGyfaksD\n-----END SSH SIGNATURE-----"
- }
+ "approval_history": "docs/release/history/e94fd99/asset-flow.json preserves original signed outcomes. Changed completion candidate is unsigned; no historical signature applies.",
+ "candidate_status": "LOCAL_EVALUATION_ONLY_NOT_PRODUCTION_APPROVAL"
 }

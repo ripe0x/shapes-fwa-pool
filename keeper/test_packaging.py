@@ -2,7 +2,7 @@
 """Build/smoke the production image and reuse one data volume across two containers.
 
 The stored marker and empty index range are serialization fixtures, not chain responses.
-No RPC, wallet, credentials or transaction is used. Test containers/volume are retained.
+A fresh accounts-zero Anvil supplies real chain identity reads. No fork, credentials or transaction is used. Test containers/volume are retained.
 """
 import argparse
 import json
@@ -12,6 +12,8 @@ import subprocess
 import sys
 import tempfile
 import uuid
+import socket
+import time
 from pathlib import Path
 
 
@@ -34,11 +36,32 @@ def persistence(mode, directory):
     directory.mkdir(parents=True, exist_ok=True)
     state, index = configured_storage()
     state_path = directory / state.name
-    index_path = directory / index.name
     vault = "0x0000000000000000000000000000000000001234"
+    index_path = directory / f'index-{vault.lower()}.sqlite'
     if mode == "seed":
         assert not state_path.exists() and not index_path.exists(), "use a fresh test volume"
-    manager = TxManager("http://127.0.0.1:1", str(state_path), vault, [], log=lambda _: None)
+    # The production constructor validates chain identity. Read a real isolated node instead
+    # of supplying a successful RPC answer or bypassing that validation for serialization.
+    with socket.socket() as available:
+        available.bind(('127.0.0.1',0))
+        port=available.getsockname()[1]
+    rpc=f'http://127.0.0.1:{port}'
+    node=subprocess.Popen(['anvil','--host','127.0.0.1','--port',str(port),'--chain-id','31337','--accounts','0','--silent'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    try:
+        for _ in range(100):
+            ready=subprocess.run(['cast','chain-id','--rpc-url',rpc],capture_output=True,text=True)
+            if ready.returncode==0:
+                assert int(ready.stdout.strip())==31337
+                break
+            if node.poll() is not None:
+                raise RuntimeError('packaging identity node exited before readiness')
+            time.sleep(.05)
+        else:
+            raise RuntimeError('packaging identity node did not become ready')
+        manager = TxManager(rpc, str(state_path), vault, [], log=lambda _: None)
+    finally:
+        node.terminate()
+        node.wait(10)
     book = EventIndex(index_path, 1, vault, 100)
     if mode == "seed":
         manager.state["packaging_marker"] = "persisted"
@@ -61,7 +84,7 @@ def persistence(mode, directory):
     book.close()
     manager._lockf.close()
     print(json.dumps({"mode": mode, "directory": str(directory), "index_head": 104,
-                      "transaction_marker": "persisted", "rpc_calls": 0, "broadcasts": 0}))
+                      "transaction_marker": "persisted", "chain_identity": "real isolated accounts-zero Anvil", "broadcasts": 0}))
 
 
 def main():

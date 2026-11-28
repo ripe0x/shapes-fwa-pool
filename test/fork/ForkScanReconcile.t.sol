@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {GasQuotes} from "../utils/GasQuotes.sol";
+
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
@@ -19,7 +21,7 @@ import {LISTING_ALLOCATED} from "../../src/interfaces/External.sol";
 ///         the wei. keeperShareBps is zeroed so the scan pays from the routine budget alone: the
 ///         fee credit is neither swept nor needed, keeping the scan step a clean state transition.
 contract ForkScanReconcileTest is SelectionBase {
-    string constant OUT = "sim/out/reconcile-scan-trace.jsonl";
+    string private output;
     address alice = makeAddr("pack-vault-test-alice");
     address bob = makeAddr("pack-vault-test-bob");
     uint256 lastBal;
@@ -32,8 +34,33 @@ contract ForkScanReconcileTest is SelectionBase {
     }
 
     function _snap(string memory step) internal {
-        ReconcileTrace.snapshot(vault, alice, bob, address(this).balance - lastBal, step, OUT);
+        ReconcileTrace.snapshot(vault, alice, bob, address(this).balance - lastBal, step, output);
         lastBal = address(this).balance;
+    }
+
+    /// @dev The snapshot owns the log window. Verify its persisted real meter without consuming
+    ///      recorded logs a second time before the exact cash/log reconciliation.
+    function _assertRecordedScan(uint256 pay) private view {
+        string[] memory lines = vm.split(vm.readFile(output), "\n");
+        uint256 n = lines.length;
+        while (n != 0 && bytes(lines[n - 1]).length == 0) --n;
+        require(n != 0, "missing scan trace");
+        string memory row = lines[n - 1];
+        assertEq(vm.parseJsonString(row, ".step"), "scan");
+        assertEq(vm.parseJsonUint(row, ".pay"), pay);
+        assertEq(vm.parseJsonUint(row, ".measuredWork[0].paid"), pay);
+        uint256 allowance = GasQuotes.Q_SYNC + GasQuotes.Q_SCAN + GasQuotes.Q_SELECTED;
+        assertEq(vm.parseJsonUint(row, ".measuredWork[0].gasAllowance"), allowance);
+        assertEq(vm.parseJsonUint(row, ".measuredWork[0].gasPrice"), 0.4 gwei);
+        assertEq(vm.parseJsonUint(row, ".measuredWork[0].txGasPrice"), 0.45 gwei);
+        assertEq(vm.parseJsonUint(row, ".measuredWork[0].baseFee"), 0.4 gwei);
+        assertEq(vm.parseJsonUint(row, ".measuredWork[0].workUnits"), 0);
+        assertFalse(vm.parseJsonBool(row, ".measuredWork[0].essential"));
+        uint256 measured = vm.parseJsonUint(row, ".measuredWork[0].measuredGas");
+        assertGt(measured, 0);
+        uint256 overhead = vault.getParams().gasSchedule.overhead;
+        assertEq(vm.parseJsonUint(row, ".measuredWork[0].overhead"), overhead);
+        assertEq(pay, ((measured < allowance ? measured : allowance) + overhead) * 0.4 gwei);
     }
 
     /// @dev Build a real completed foreign backlog: clear the forked block's own stray request, then
@@ -65,7 +92,8 @@ contract ForkScanReconcileTest is SelectionBase {
     }
 
     function test_reconcileScanPath() public {
-        if (vm.exists(OUT)) vm.removeFile(OUT);
+        output = vm.envOr("MEASURED_SCAN_TRACE", string("sim/out/reconcile-measured-scan-trace.jsonl"));
+        require(!vm.exists(output), "preserve prior measured scan trace");
         Candidate memory c = primary();
         _select(c); // deploy (3 ETH seed), restock 1, list 1 own, real request + fulfillment -> ALLOCATED
 
@@ -75,13 +103,14 @@ contract ForkScanReconcileTest is SelectionBase {
         p.workFee = 0;
         p.maxTip = 0;
         p.keeperShareBps = 0;
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(vault.owner());
-        vault.setParams(p);
+        vault.setParams(p, _expected0);
 
         vm.writeLine(
-            OUT,
+            output,
             string.concat(
-                '{"step":"setup","deployBalance":', vm.toString(deployBalance),
+                '{"compensationMode":"bounded-measured-v1","step":"setup","actors":', ReconcileTrace.actors(vault, alice, bob, address(this)), ',"deployBalance":', vm.toString(deployBalance),
                 ',"selectPay":', vm.toString(selectPay),
                 ',"count":', vm.toString(COUNT), ',"units":6,"backing":', vm.toString(B),
                 ',"activationDebt":', vm.toString(activationDebt), ',"initCursor":', vm.toString(vault.acquisitionCursor()),
@@ -109,11 +138,11 @@ contract ForkScanReconcileTest is SelectionBase {
         // One scan reads the single own position, applies the selection and clears the whole
         // backlog; it is a paid own-selection sync.
         uint256 before = address(this).balance;
-        uint256 pay = vault.sync(new uint256[](0), 0, 1);
-        // maxTip 0 and ceiling well above basefee, so the fixed quote is priced at the 0.4 gwei basefee.
-        assertEq(pay, (VaultLib.Q_SYNC + VaultLib.Q_SCAN + VaultLib.Q_SELECTED) * 0.4 gwei, "paid scan quote");
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
+        uint256 pay = vault.sync(new uint256[](0), 0, 1, _expected1);
         assertEq(address(this).balance - before, pay);
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess(), "scan jumped the cursor over the backlog");
         _snap("scan");
+        _assertRecordedScan(pay);
     }
 }

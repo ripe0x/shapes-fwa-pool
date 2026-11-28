@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
+import {GasQuotes} from "../utils/GasQuotes.sol";
+
 import {ForkBase} from "./ForkBase.sol";
 import {SelectionBase, IFwaSettle} from "./ForkSelection.t.sol";
 import {JournalRequests} from "./EfficientJournal.t.sol";
@@ -23,9 +27,10 @@ contract ScanGasTest is ForkBase {
         p.payMarkupBps = 0;
         p.gasCeiling = 0.5 gwei;
         p.essentialCeiling = 2 gwei;
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
-        vm.deal(address(vault), 5 ether); // fund inventory purchases (our own contract)
+        vault.setParams(p, _expected0);
+        TestVaultOps.fundTo(vault, 5 ether); // fund inventory purchases (our own contract)
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
     }
@@ -63,7 +68,6 @@ contract ScanGasTest is ForkBase {
     function _cold() internal {
         vm.cool(address(vault));
         vm.cool(address(FWA));
-        vm.cool(address(vault.keeperPolicy()));
         vm.cool(address(VaultLib));
         vm.cool(keeper);
     }
@@ -75,16 +79,17 @@ contract ScanGasTest is ForkBase {
 
     /// @dev Receipt-equivalent billed gas of the (unpaid, own==0) scan sync over N own listings.
     function _measureScan(uint256 n) internal returns (uint256 billed, uint256 pay) {
-        vm.deal(address(vault), 5 ether);
+        TestVaultOps.fundTo(vault, 5 ether);
         _listOwn(n);
         _backlog(50); // 50*22000 > 30*30000: scan path for every N here
         uint64 end = FWA.nextSequenceToProcess();
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
         this.assertGasContext();
-        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0)));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0), vault.configurationHash()));
         uint256 intrinsic = _intrinsic(input);
         _cold();
+        vm.recordLogs();
         vm.prank(keeper);
         uint256 start = gasleft();
         (bool ok, bytes memory ret) = address(vault).call(input);
@@ -120,22 +125,22 @@ contract ScanGasTest is ForkBase {
     ///         keeper's 25%-padded estimate fits EIP-7825. The own positions are foreign-refunded,
     ///         never selected, so the journal processes 128 foreign records with no own transition.
     function test_full128ForeignJournalReceiptGasFitsCap() public {
-        vm.deal(address(vault), 20 ether); // 94 six-unit own listings need ~6 ETH backing plus mints
+        TestVaultOps.fundTo(vault, 20 ether); // 94 six-unit own listings need ~6 ETH backing plus mints
         _listOwn(94); // 94*30000 = 2,820,000 > 128*22000 = 2,816,000: scan declines, journal runs
         _backlog(128);
         uint64 end = FWA.nextSequenceToProcess();
         vm.fee(0.15 gwei); vm.txGasPrice(0.2 gwei); this.assertGasContext();
-        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(1)));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(1), vault.configurationHash()));
         uint256 intrinsic = _intrinsic(input);
-        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(vault.keeperPolicy()));
-        vm.cool(address(FWA)); vm.cool(address(PACKS)); vm.cool(keeper);
+        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(address(PACKS)); vm.cool(keeper);
+        vm.recordLogs();
         vm.prank(keeper);
         uint256 start = gasleft();
         (bool ok, bytes memory ret) = address(vault).call(input);
         uint256 used = start - gasleft() + intrinsic;
         if (!ok) assembly ("memory-safe") { revert(add(ret, 32), mload(ret)) }
         uint256 pay = abi.decode(ret, (uint256));
-        assertEq(pay, (VaultLib.Q_SYNC + 128 * VaultLib.Q_JOURNAL) * 0.2 gwei, "paid 128-record journal job");
+        assertEq(pay, MeasuredPay.gross(vault, GasQuotes.Q_SYNC + 128 * GasQuotes.Q_JOURNAL, 0, false, 0.2 gwei));
         assertEq(vault.acquisitionCursor(), end, "one call drains the full 128-record journal");
         emit log_named_uint("full 128-record foreign journal receipt-equivalent gas (94 own)", used);
         assertLt((used * 125 + 99) / 100, 16_777_216, "128-record journal plus 25% keeper gas margin fits EIP-7825");
@@ -144,15 +149,16 @@ contract ScanGasTest is ForkBase {
     /// @dev Journal path over the same backlog with one own listing (backlog 1 forces the journal):
     ///      a reference for the per-journal-entry cost the scan displaces.
     function test_journalBilledGasBacklog1() public {
-        vm.deal(address(vault), 5 ether);
+        TestVaultOps.fundTo(vault, 5 ether);
         _listOwn(1);
         _backlog(1); // 1*22000 < 1*30000: journal path
         uint64 end = FWA.nextSequenceToProcess();
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
-        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0)));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0), vault.configurationHash()));
         uint256 intrinsic = _intrinsic(input);
         _cold();
+        vm.recordLogs();
         vm.prank(keeper);
         uint256 start = gasleft();
         (bool ok, bytes memory ret) = address(vault).call(input);
@@ -197,19 +203,20 @@ contract ScanPaidGasTest is SelectionBase {
         p.payMarkupBps = 0;
         p.workFee = 0;
         p.maxTip = 0;
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         vm.prank(vault.owner());
-        vault.setParams(p);
+        vault.setParams(p, _expected1);
         vm.fee(0.5 gwei);
         vm.txGasPrice(0.5 gwei);
 
-        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0)));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), uint256(0), uint256(0), vault.configurationHash()));
         uint256 intrinsic = 21_000;
         for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
         uint256 creditBefore = FWA.feeCredit(address(vault));
         vm.cool(address(vault));
         vm.cool(address(FWA));
-        vm.cool(address(vault.keeperPolicy()));
         vm.cool(address(VaultLib));
+        vm.recordLogs();
         uint256 start = gasleft();
         (bool ok, bytes memory ret) = address(vault).call(input);
         uint256 billed = start - gasleft() + intrinsic;
@@ -217,13 +224,13 @@ contract ScanPaidGasTest is SelectionBase {
         uint256 pay = abi.decode(ret, (uint256));
         // The selection fee credit is large enough that the scan economically sweeps it into the
         // vault (withdrawEarnings), adding Q_CREDIT to the quote; priced from the on-chain fact.
-        uint256 swept = creditBefore != 0 && FWA.feeCredit(address(vault)) == 0 ? VaultLib.Q_CREDIT : 0;
-        uint256 gasQ = VaultLib.Q_SYNC + 1 * VaultLib.Q_SCAN + VaultLib.Q_SELECTED + swept;
+        uint256 swept = creditBefore != 0 && FWA.feeCredit(address(vault)) == 0 ? GasQuotes.Q_CREDIT : 0;
+        uint256 gasQ = GasQuotes.Q_SYNC + 1 * GasQuotes.Q_SCAN + GasQuotes.Q_SELECTED + swept;
         emit log_named_uint("paid scan billed gas", billed);
         emit log_named_uint("paid scan quoted gasQ", gasQ);
         emit log_named_uint("paid scan pay wei (0.5 gwei)", pay);
-        assertEq(pay, gasQ * 0.5 gwei, "paid scan pays the fixed quote");
+        assertEq(pay, MeasuredPay.gross(vault, gasQ, 0, false, 0.5 gwei));
         assertGt(billed, 0);
-        assertGe(gasQ, billed, "fixed quote covers the keeper's billed gas: scan stays profitable");
+        assertGe(pay, billed * 0.5 gwei, "actual compensation covers this measured gross caller cost");
     }
 }

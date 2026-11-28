@@ -7,7 +7,6 @@ import {TestVaultOps} from "../utils/TestVaultOps.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {Test} from "forge-std/Test.sol";
 import {PackVault} from "../../src/PackVault.sol";
-import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {
     IShapes, IShapePacks, IFWAV2, LISTING_ACTIVE, LISTING_ALLOCATED
@@ -42,7 +41,7 @@ abstract contract SelectionBase is Test {
     // edge(6): floor(0.06 - (0.0003 + 160000 x 2 gwei)) x 10000 / 9150, to the 10,000 wei. The
     // purchaser's redeem gas is priced at the fixed PURCHASER_GAS_PRICE = 2 gwei bound, not the
     // keeper's gas ceiling. Every one of the 30 listings posts this exact backing.
-    uint256 constant B = 64_896_174_863_380_000;
+    uint256 constant B = 64_800_000_000_000_000;
 
     struct Candidate {
         bytes32 requestTx;
@@ -62,8 +61,8 @@ abstract contract SelectionBase is Test {
             26_310_897,
             26_310_902,
             1_793_427_491,
-            22,
-            3724,
+            7,
+            277,
             0x88d0e89E7f502Aa49a564b683e19089c771776c3
         );
     }
@@ -71,13 +70,13 @@ abstract contract SelectionBase is Test {
     // Block 26,335,398: likewise before admission. Our listing is index 10 of 30.
     function second() internal pure returns (Candidate memory) {
         return Candidate(
-            0x22e3edc95dcb85fe749565f45203d6a8c623db50813e46f1d2601e1313605a81,
-            26_335_398,
-            26_335_403,
-            1_793_722_463,
-            10,
-            8205,
-            0xD37DAbe2CccA72166F41c236b91Ca36494FE5919
+            0x89b2434d78c82537ce63f1cde0fd259f473ba88386fc52b02c6656d800b1bbaf,
+            26_233_490,
+            26_233_496,
+            1_792_495_679,
+            21,
+            4142,
+            address(bytes20(hex"6ba9ad599e6271252817933831e3148936cf742a"))
         );
     }
 
@@ -111,13 +110,19 @@ abstract contract SelectionBase is Test {
 
         _beforeSelectionDeploy();
         VaultLib.Params memory p;
+        p.gasSchedule = VaultLib.defaultGasSchedule();
+        p.backingRatioBps = 10_800;
+        p.acceptedMintFee = 0.001 ether;
+        p.minDeposit = 0.01 ether;
+        p.minDistribution = 0.01 ether;
         p.minEdgeBps = 100;
-        p.payMarkupBps = 1_000;
+        p.payMarkupBps = 0;
         p.maxTip = 0.05 gwei;
         p.keeperShareBps = 2_500;
-        p.allocatedBoundBps = 200;
+        p.upliftBoundBps = 200;
         p.packUnitsMask = uint64(1) << UNITS;
-        p.gasCeiling = 0.5 gwei; // the backing the VRF replay was searched against is edge(6) here
+        p.gasCeiling = 0.15 gwei; // historical inventory bootstrap; not keeper viability evidence
+        p.maxTip = 0;
         p.essentialCeiling = 0.5 gwei;
 
         p.tvlCap = 100 ether;
@@ -131,7 +136,7 @@ abstract contract SelectionBase is Test {
         address vaultOwner = makeAddr("pack-vault-test-selection-owner");
         assertEq(vaultOwner.code.length, 0);
         assertEq(vaultOwner.balance, 0);
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, vaultOwner, p, 3 ether);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, vaultOwner, p, 3 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         deployBalance = address(vault).balance;
         (, uint256 edgeBacking, bool edgeOk) = vault.edge(UNITS);
         assertTrue(edgeOk, "edge(6) lists at gasCeiling 0.5 gwei");
@@ -152,6 +157,12 @@ abstract contract SelectionBase is Test {
             }
         }
         selectPay = address(this).balance - b0;
+        p.gasCeiling = 0.5 gwei;
+        p.maxTip = 0.05 gwei;
+        p.backingRatioBps = 12_000;
+        bytes32 nextConfig = vault.configurationHash();
+        vm.prank(vaultOwner);
+        vault.setParams(p, nextConfig);
         (,,,,,,, uint256 liveActivationDebt, uint256 slot,, uint8 status) = FWA.listings(selected);
         activationDebt = liveActivationDebt;
         assertEq(slot, c.slot, "slot prediction");
@@ -172,7 +183,8 @@ abstract contract SelectionBase is Test {
         // and gas price. The fulfillment is the Chainlink node's call into the real coordinator
         // with the real proof; the coordinator checks the request block's real hash.
         string memory key = string.concat(".", vm.toString(c.requestBlock));
-        string memory fx = vm.readFile("test/fixtures/selection.json");
+        string memory fx = vm.readFile(c.requestBlock == 26_233_490
+            ? "test/fixtures/completion-selection.json" : "test/fixtures/selection.json");
         _call(fx, key, "req");
         vm.roll(c.fulfillBlock);
         vm.warp(c.fulfillTimestamp);
@@ -292,9 +304,11 @@ contract ForkSelectionTest is SelectionBase {
         uint256 packId = vault.position(selected).packId;
         uint256[] memory one = new uint256[](1);
         one[0] = selected;
-        vault.sync(new uint256[](0), 0, 0); // Journal work is paid even while the purchaser may still act.
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
+        vault.sync(new uint256[](0), 0, 0, _expected0); // Journal work is paid even while the purchaser may still act.
+        bytes32 expectedRegression1 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(VaultLib.Nothing.selector);
-        TestVaultOps.sync(vault, one, 0); // purchaser's window still open
+        vault.sync(one, 0, 0, expectedRegression1); // purchaser's window still open
         vm.warp(block.timestamp + FWA.settlementWindow());
         uint256 vBefore = address(vault).balance;
         uint256 kBefore = address(this).balance;

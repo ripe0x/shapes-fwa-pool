@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/test_policy.py", line 272, in <module>
+    main()
+    ~~~~^^
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/keeper/test_policy.py", line 134, in main
+    assert P.journal_backlog_floor(blocked) == 580_200_000_000_000
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

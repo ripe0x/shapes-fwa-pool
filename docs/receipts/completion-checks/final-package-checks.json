@@ -1,0 +1,45 @@
+[
+  {
+    "name": "release-check",
+    "command": [
+      "/tmp/shapes-completion-python/bin/python",
+      "script/release.py",
+      "check",
+      "deploy/mainnet.json"
+    ],
+    "revision": "a66d3cf5e53b33ecc78ab16c7460fde4ff79a527",
+    "exit_status": 0,
+    "expected_exit_status": 0,
+    "log": "docs/receipts/completion-checks/release-check.log",
+    "passed_as_expected": true
+  },
+  {
+    "name": "unsigned-broadcast-guard",
+    "command": [
+      "/tmp/shapes-completion-python/bin/python",
+      "script/release.py",
+      "check",
+      "deploy/mainnet.json",
+      "--broadcast"
+    ],
+    "revision": "a66d3cf5e53b33ecc78ab16c7460fde4ff79a527",
+    "exit_status": 1,
+    "expected_exit_status": 1,
+    "log": "docs/receipts/completion-checks/unsigned-broadcast-guard.log",
+    "passed_as_expected": true
+  },
+  {
+    "name": "asset-gate-final-no-run",
+    "command": [
+      "python3",
+      "/Users/dd/.agents/guidance/asset-flow-kit/asset_gate.py",
+      ".",
+      "--no-run"
+    ],
+    "revision": "a66d3cf5e53b33ecc78ab16c7460fde4ff79a527",
+    "exit_status": 2,
+    "expected_exit_status": 2,
+    "log": "docs/receipts/completion-checks/asset-gate-final-no-run.log",
+    "passed_as_expected": true
+  }
+]

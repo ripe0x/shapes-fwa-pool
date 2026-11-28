@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
+import {GasQuotes} from "../utils/GasQuotes.sol";
+
 import {TestVaultOps} from "../utils/TestVaultOps.sol";
 
 import {DeployCore} from "../../script/DeployCore.sol";
 import {ForkBase, ForceSender, IFwaAdmin, IOwnable} from "./ForkBase.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {PackAccount} from "../../src/PackAccount.sol";
-import {KeeperPolicyV1} from "../../src/KeeperPolicy.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {Charges} from "../utils/Charges.sol";
 import {ERC721} from "solady/tokens/ERC721.sol";
@@ -41,11 +44,13 @@ contract ReentrantHolder {
     }
 
     function deposit() external payable {
-        vault.deposit{value: msg.value}();
+        bytes32 _expected0 = vault.configurationHash();
+        vault.deposit{value: msg.value}(_expected0);
     }
 
     function redeemAll() external payable {
-        vault.requestRedeem{value: msg.value}(vault.shareBalance(address(this)));
+        bytes32 _expected1 = vault.configurationHash();
+        vault.requestRedeem{value: msg.value}(vault.shareBalance(address(this)), _expected1);
     }
 
     function claim() external {
@@ -67,12 +72,14 @@ contract ForkVaultAdversarialTest is ForkBase {
     function test_workFeeBounded() public {
         VaultLib.Params memory p = defaultParams();
         p.workFee = uint64(vault.MAX_WORK_FEE() + 1);
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
         vm.expectRevert(VaultLib.OutOfBounds.selector);
-        vault.setParams(p);
+        vault.setParams(p, _expected2);
         p.workFee = uint64(vault.MAX_WORK_FEE());
+        bytes32 _expected3 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected3);
         assertEq(vault.getParams().workFee, vault.MAX_WORK_FEE(), "applied at once (D58)");
         // With the ceiling and fee at 0 no pay remains.
         lowerTo(100 ether, 0, 0);
@@ -86,13 +93,17 @@ contract ForkVaultAdversarialTest is ForkBase {
     function test_buildAboveCeilingPaidAtCeilingPrice() public {
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            bytes32 _expected4 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected4);
         }
         toBlackout();
         checkpoint();
         toOpen();
         lowerTo(100 ether, 0.25 gwei, 0.00002 ether);
+        VaultLib.Params memory affordable = vault.getParams(); affordable.backingRatioBps = 15_000;
+        bytes32 affordableConfig = vault.configurationHash();
+        vm.prank(owner); vault.setParams(affordable, affordableConfig);
         vm.fee(1.9 gwei);
         vm.txGasPrice(2 gwei); // well above the ceiling
         uint256 open0 = TestVaultOps.open(vault).length;
@@ -101,9 +112,8 @@ contract ForkVaultAdversarialTest is ForkBase {
         uint256 pay = TestVaultOps.restock(vault, 1, UNITS, 0);
         assertEq(TestVaultOps.open(vault).length, open0 + 1, "built and listed above the ceiling");
         assertEq(keeper.balance - kb, pay);
-        assertEq(pay,
-            (VaultLib.Q_BUILD + VaultLib.buildGas(2) + VaultLib.Q_LISTED) * 0.25 gwei + 2 * vault.getParams().workFee,
-            "quote at the ceiling price + two work-unit fees");
+        assertEq(pay, MeasuredPay.gross(vault,
+            GasQuotes.Q_BUILD + GasQuotes.buildGas(2) + GasQuotes.Q_LISTED, 2, false, 0.25 gwei));
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
     }
@@ -115,8 +125,9 @@ contract ForkVaultAdversarialTest is ForkBase {
         vm.deal(attacker, 20 ether);
         {
             uint256 gross_ = Charges.grossFor(vault, 0.01 ether);
+            bytes32 _expected5 = TestVaultOps.configurationHash(vault);
             vm.prank(attacker);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected5);
         }
         toBlackout();
         checkpoint();
@@ -125,8 +136,9 @@ contract ForkVaultAdversarialTest is ForkBase {
         new ForceSender{value: 10 ether}(payable(address(vault)));
         {
             uint256 gross_ = Charges.grossFor(vault, 5 ether);
+            bytes32 _expected6 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected6);
         }
         toBlackout();
         checkpoint();
@@ -136,7 +148,7 @@ contract ForkVaultAdversarialTest is ForkBase {
         uint256 nav = vault.lastNav();
         // Alice's claim on NAV equals her escrow less its deployment charge (that charge joins the
         // vault's value, shared by all holders, to pay for building positions with her ETH).
-        uint256 charge = 5 ether * vault.deployCharge() / (VaultLib.POSITION_VALUE + vault.deployCharge());
+        uint256 charge = 5 ether * vault.deployCharge() / (vault.positionValue() + vault.deployCharge());
         assertApproxEqAbs(
             nav * aliceShares / supply, 5 ether - charge + charge * aliceShares / supply, 1e14, "victim keeps her deposit"
         );
@@ -157,7 +169,6 @@ contract ForkVaultAdversarialTest is ForkBase {
 
     function test_reentrantHolderClaimsOnce() public {
         ReentrantHolder r = new ReentrantHolder(vault);
-        vm.deal(address(r), 0);
         r.deposit{value: Charges.grossFor(vault, 1 ether)}(); // escrows exactly 1 ETH
         toBlackout();
         checkpoint();
@@ -181,12 +192,13 @@ contract ForkVaultAdversarialTest is ForkBase {
     function test_distributionPaysGainsOnce() public {
         VaultLib.Params memory p = defaultParams();
         p.distributionBps = 2_000;
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         assertGe(address(vault).balance, 0.01 ether); // deploy addresses can hold mainnet dust
         {
             uint256 gross_ = Charges.grossFor(vault, 4 ether);
+            bytes32 _expected7 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected7);
         }
         toBlackout();
         checkpoint();
@@ -210,9 +222,10 @@ contract ForkVaultAdversarialTest is ForkBase {
         toOpen();
         toBlackout();
         uint256 planned18 = TestVaultOps.witness(vault);
+        bytes32 _expected8 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.checkpoint(planned18, 0);
+        vault.checkpoint(planned18, 0, _expected8);
         assertApproxEqAbs(vault.distributionReserve(), distributed - (alice.balance - before), 1);
         // Nothing strands: after alice claims, only rounding dust remains reserved.
         assertLe(vault.distributionReserve(), 1e6);
@@ -223,11 +236,12 @@ contract ForkVaultAdversarialTest is ForkBase {
     function test_checkpointAfterAllHoldersExitAndGain() public {
         VaultLib.Params memory p = defaultParams();
         p.distributionBps = 2_000;
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            bytes32 _expected9 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected9);
         }
         toBlackout();
         checkpoint();
@@ -235,8 +249,9 @@ contract ForkVaultAdversarialTest is ForkBase {
         uint256 shares = vault.shareBalance(alice);
         {
             uint256 rc_ = Charges.redeemCharge(vault, shares);
+            bytes32 _expected10 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.requestRedeem{value: rc_}(shares);
+            vault.requestRedeem{value: rc_}(shares, _expected10);
         }
         toBlackout();
         checkpoint();
@@ -245,8 +260,9 @@ contract ForkVaultAdversarialTest is ForkBase {
         new ForceSender{value: 0.5 ether}(payable(address(vault)));
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            bytes32 _expected11 = TestVaultOps.configurationHash(vault);
             vm.prank(bob);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected11);
         }
         toBlackout();
         checkpoint(); // must not revert
@@ -264,7 +280,7 @@ contract ForkVaultAdversarialTest is ForkBase {
 
         p.reserve = 0;
         vm.deal(address(this), 100 ether);
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 50 ether);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 50 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
         for (uint256 i; i < n; i += 10) {
             uint256 count = n - i < 10 ? n - i : 10;
             TestVaultOps.restock(vault, count, UNITS, 0); // build mints and lists at once
@@ -275,17 +291,17 @@ contract ForkVaultAdversarialTest is ForkBase {
         assertGt(activeBacking, 10 ether);
         {
             uint256 gross_ = Charges.grossFor(vault, 0.1 ether);
+            bytes32 _expected12 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected12);
         }
         toBlackout();
         uint256 witness = TestVaultOps.witness(vault);
-        bytes memory input = abi.encodeCall(PackVault.checkpoint, (witness, 0));
+        bytes memory input = abi.encodeCall(PackVault.checkpoint, (witness, 0, vault.configurationHash()));
         uint256 intrinsic = 21_000;
         for (uint256 i; i < input.length; ++i) intrinsic += input[i] == 0 ? 4 : 16;
-        address policy = address(vault.keeperPolicy());
-        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); vm.cool(policy);
-        uint256 g = gasleft();
+
+        vm.cool(address(vault)); vm.cool(address(VaultLib)); vm.cool(address(FWA)); uint256 g = gasleft();
         (bool ok, bytes memory result) = address(vault).call{gas: TX_GAS_CAP - intrinsic}(input);
         uint256 used = g - gasleft() + intrinsic;
         if (!ok) assembly ("memory-safe") { revert(add(result, 32), mload(result)) }
@@ -303,22 +319,26 @@ contract ForkVaultAdversarialTest is ForkBase {
         toBlackout();
         for (uint256 i; i < ids.length; ++i) IFwaAdmin(address(FWA)).kickListing(ids[i]);
         uint256 gross = Charges.grossFor(vault, 0.1 ether);
+        bytes32 _expected13 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: gross}();
+        vault.deposit{value: gross}(_expected13);
         assertEq(vault.pendingReceipts(), ids.length);
+        bytes32 _expected14 = TestVaultOps.configurationHash(vault);
         vm.expectRevert();
-        vault.checkpoint(0, 0);
+        vault.checkpoint(0, 0, _expected14);
         TestVaultOps.sync(vault, ids, 0);
         assertEq(vault.pendingReceipts(), 0);
         uint256 start = gasleft();
-        vault.checkpoint(0, 0);
+        bytes32 _expected15 = TestVaultOps.configurationHash(vault);
+        vault.checkpoint(0, 0, _expected15);
         assertLt((start - gasleft()) * 125 / 100, TX_GAS_CAP);
     }
 
     function _listNForAccounting(uint256 n) internal returns (uint256[] memory) {
         uint256 gross = Charges.grossFor(vault, 2 ether);
+        bytes32 _expected16 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: gross}();
+        vault.deposit{value: gross}(_expected16);
         toBlackout();
         checkpoint();
         toOpen();
@@ -328,30 +348,34 @@ contract ForkVaultAdversarialTest is ForkBase {
 
     /// Every keeper batch the reference keeper sends fits the transaction cap. `build` is the
     /// heaviest listing batch (it mints and lists); a `list` of the same count is strictly cheaper
-    /// (no mint), so build(8) fitting subsumes list(8).
+    /// (no mint), so build and relist have separately bounded batch sizes.
     function test_keeperBatchesFitTxCap() public {
         VaultLib.Params memory p = defaultParams();
         p.reserve = 0;
         vm.deal(address(this), 100 ether);
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 20 ether);
-        // Two max build batches (8 each) -> 16 listed.
-        uint256[] memory build8 = TestVaultOps.proposals(vault, vault.MAX_LIST_BATCH(), UNITS);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 20 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
+        // Four max build batches (4 each) -> 16 listed.
+        uint256[] memory build4 = TestVaultOps.proposals(vault, vault.MAX_BUILD_BATCH(), UNITS);
         uint256 g = gasleft();
-        vault.build{gas: TX_GAS_CAP}(UNITS, build8, 0);
-        emit log_named_uint("build 8 packs", g - gasleft());
-        TestVaultOps.restock(vault, 8, UNITS, 0);
+        bytes32 _expected17 = TestVaultOps.configurationHash(vault);
+        vault.build{gas: TX_GAS_CAP}(UNITS, build4, 0, _expected17);
+        emit log_named_uint("build 4 packs", g - gasleft());
+        TestVaultOps.restock(vault, 12, UNITS, 0);
         assertEq(TestVaultOps.open(vault).length, 16);
         vm.prank(owner);
         vault.startWindDown();
         uint256[] memory ids = TestVaultOps.open(vault); // 16, one MAX_BATCH
         g = gasleft();
-        vault.unlist{gas: TX_GAS_CAP}(ids, 0);
+        bytes32 _expected18 = TestVaultOps.configurationHash(vault);
+        vault.unlist{gas: TX_GAS_CAP}(ids, 0, _expected18);
         emit log_named_uint("unlist 16", g - gasleft());
         // Liquidate caps at 60 units = 10 six-unit packs per call; two calls clear 16 idle packs.
         g = gasleft();
-        vault.liquidate{gas: TX_GAS_CAP}(40, 0);
+        bytes32 _expected19 = TestVaultOps.configurationHash(vault);
+        vault.liquidate{gas: TX_GAS_CAP}(40, 0, _expected19);
         emit log_named_uint("liquidate 10 packs", g - gasleft());
-        vault.liquidate{gas: TX_GAS_CAP}(40, 0);
+        bytes32 _expected20 = TestVaultOps.configurationHash(vault);
+        vault.liquidate{gas: TX_GAS_CAP}(40, 0, _expected20);
         assertEq(TestVaultOps.idle(vault).length, 0);
     }
 
@@ -363,8 +387,9 @@ contract ForkVaultAdversarialTest is ForkBase {
         uint256 ck = vault.requestCharge();
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            bytes32 _expected21 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected21);
         }
         toBlackout();
         uint256 kBefore = keeper.balance;
@@ -382,13 +407,15 @@ contract ForkVaultAdversarialTest is ForkBase {
         // can use up the interval's slot ahead of a deposit arriving later in the blackout.
         toBlackout();
         uint256 planned17 = TestVaultOps.witness(vault);
+        bytes32 _expected22 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.checkpoint(planned17, 0);
+        vault.checkpoint(planned17, 0, _expected22);
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            bytes32 _expected23 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected23);
         }
         uint256 kBefore = keeper.balance;
         checkpoint(); // the same blackout still prices the deposit, paid
@@ -401,23 +428,26 @@ contract ForkVaultAdversarialTest is ForkBase {
     function test_restockGated() public {
         {
             uint256 gross_ = Charges.grossFor(vault, 0.3 ether);
+            bytes32 _expected24 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected24);
         }
         toBlackout();
         checkpoint();
         toOpen();
-        uint256[] memory planned16 = TestVaultOps.proposals(vault, 5, UNITS);
+        uint256[] memory planned16 = TestVaultOps.proposals(vault, 4, UNITS);
         vm.startPrank(keeper);
-        // Capital: ~0.25 ETH above the reserve cannot cover five six-unit packs (~0.13 ETH each).
+        // Capital: ~0.25 ETH above the reserve cannot cover four six-unit packs (~0.13 ETH each).
+        bytes32 _expected25 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(VaultLib.InsufficientBacking.selector);
-        vault.build(UNITS, planned16, 0);
+        vault.build(UNITS, planned16, 0, _expected25);
         uint256[] memory planned15 = TestVaultOps.proposals(vault, 1, UNITS);
         // Gas: at 3 gwei (under the 5 gwei ceiling) a pack's build cost exceeds one cycle's net.
         vm.fee(3 gwei);
         vm.txGasPrice(3 gwei);
+        bytes32 _expected26 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(VaultLib.InvalidBacking.selector);
-        vault.build(UNITS, planned15, 0);
+        vault.build(UNITS, planned15, 0, _expected26);
         vm.fee(0.15 gwei);
         vm.txGasPrice(0.2 gwei);
         TestVaultOps.restock(vault, 1, UNITS, 0);
@@ -429,8 +459,9 @@ contract ForkVaultAdversarialTest is ForkBase {
     function test_unlistListLoopClosed() public {
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            bytes32 _expected27 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected27);
         }
         toBlackout();
         checkpoint();
@@ -440,8 +471,9 @@ contract ForkVaultAdversarialTest is ForkBase {
         uint256 shares = vault.shareBalance(alice);
         {
             uint256 rc_ = Charges.redeemCharge(vault, shares);
+            bytes32 _expected28 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.requestRedeem{value: rc_}(shares);
+            vault.requestRedeem{value: rc_}(shares, _expected28);
         }
         uint256[] memory ids = TestVaultOps.open(vault);
         vm.startPrank(keeper);
@@ -449,8 +481,9 @@ contract ForkVaultAdversarialTest is ForkBase {
         // The freed backing and packs are owed to alice: nothing can be listed or built.
         assertEq(vault.idleEth(), 0);
         uint256[] memory planned14 = TestVaultOps.proposals(vault, 6, UNITS);
+        bytes32 _expected29 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.list(planned14, 0);
+        vault.list(planned14, 0, _expected29);
         vm.stopPrank();
     }
 
@@ -460,13 +493,15 @@ contract ForkVaultAdversarialTest is ForkBase {
     function test_settledUnclaimedEthIsNotDeployable() public {
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            bytes32 _expected30 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected30);
         }
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            bytes32 _expected31 = TestVaultOps.configurationHash(vault);
             vm.prank(bob);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected31);
         }
         toBlackout();
         checkpoint();
@@ -474,8 +509,9 @@ contract ForkVaultAdversarialTest is ForkBase {
         uint256 shares = vault.shareBalance(alice);
         {
             uint256 rc_ = Charges.redeemCharge(vault, shares);
+            bytes32 _expected32 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.requestRedeem{value: rc_}(shares);
+            vault.requestRedeem{value: rc_}(shares, _expected32);
         }
         toBlackout();
         checkpoint(); // fills alice in full from free ETH
@@ -486,8 +522,9 @@ contract ForkVaultAdversarialTest is ForkBase {
         // Alice touches the vault without claiming: her entitlement moves to claimableEth.
         {
             uint256 gross_ = Charges.grossFor(vault, 0.01 ether);
+            bytes32 _expected33 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected33);
         }
         assertEq(vault.claimableTotal(), vault.claimableEth(alice));
         assertApproxEqAbs(vault.claimableEth(alice), reserved, 2);
@@ -497,9 +534,10 @@ contract ForkVaultAdversarialTest is ForkBase {
         assertLe(vault.idleEth(), address(vault).balance - liabilities);
         vm.startPrank(keeper);
         TestVaultOps.restock(vault, 5, UNITS, 0); // uses bob's deployable capital
-        uint256[] memory planned13 = TestVaultOps.proposals(vault, 5, UNITS);
+        uint256[] memory planned13 = TestVaultOps.proposals(vault, 4, UNITS);
+        bytes32 _expected34 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(); // nothing more is deployable
-        vault.build(UNITS, planned13, 0);
+        vault.build(UNITS, planned13, 0, _expected34);
         vm.stopPrank();
         assertGe(address(vault).balance, liabilities, "liabilities never spent");
         uint256 before = alice.balance;
@@ -512,40 +550,47 @@ contract ForkVaultAdversarialTest is ForkBase {
     function test_liquidateOnlyWhenNeeded() public {
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            bytes32 _expected35 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected35);
         }
         toBlackout();
         checkpoint();
         toOpen();
         vm.prank(keeper);
         TestVaultOps.restock(vault, 3, UNITS, 0);
+        bytes32 _expected36 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.liquidate(10, 0);
+        vault.liquidate(10, 0, _expected36);
     }
 
     function test_depositAboveTvlCapReverts() public {
         lowerTo(1 ether, 5 gwei, 0.00002 ether);
+        bytes32 _expected37 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
         vm.expectRevert(PackVault.Amount.selector);
-        vault.deposit{value: 1.5 ether}();
+        vault.deposit{value: 1.5 ether}(_expected37);
     }
 
     function test_checkpointWindowRules() public {
         {
             uint256 gross_ = Charges.grossFor(vault, 0.1 ether);
+            bytes32 _expected38 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected38);
         }
         uint256 planned12 = TestVaultOps.witness(vault);
+        bytes32 _expected39 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(PackVault.NotCheckpointWindow.selector);
-        vault.checkpoint(planned12, 0);
+        vault.checkpoint(planned12, 0, _expected39);
         toBlackout();
         uint256 planned11 = TestVaultOps.witness(vault);
-        vault.checkpoint(planned11, 0);
+        bytes32 _expected40 = TestVaultOps.configurationHash(vault);
+        vault.checkpoint(planned11, 0, _expected40);
         uint256 planned10 = TestVaultOps.witness(vault);
+        bytes32 _expected41 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(PackVault.AlreadyCheckpointed.selector);
-        vault.checkpoint(planned10, 0);
+        vault.checkpoint(planned10, 0, _expected41);
     }
 }

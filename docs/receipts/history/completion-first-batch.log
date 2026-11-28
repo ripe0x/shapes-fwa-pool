@@ -1,0 +1,1508 @@
+Compiling 47 files with Solc 0.8.30
+Solc 0.8.30 finished in 122.99s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> src/VaultLib.sol:251:35:
+    |
+251 |     function fill(uint256 locked, uint256 nav, uint256 supply, uint256 liquid)
+    |                                   ^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> src/VaultLib.sol:650:5:
+    |
+650 |     function nav(Book storage b, uint256 freeEth, uint256 credit, uint256 witnessId, uint256 actualPending)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (8760): This declaration has the same name as another declaration.
+   --> src/VaultLib.sol:386:69:
+    |
+386 |     function renewalFundingGas(Params storage p, uint256 feeClaims, bool withdrawCredit)
+    |                                                                     ^^^^^^^^^^^^^^^^^^^
+Note: The other declaration is here:
+   --> src/VaultLib.sol:996:5:
+    |
+996 |     function withdrawCredit(Book storage b, IFWAV2 f) external { _withdrawCredit(b, f); }
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Warning (2519): This declaration shadows an existing declaration.
+   --> test/fork/ForkMeasure.t.sol:198:53:
+    |
+198 |             try this.buyExternal(sizes[i]) returns (uint256 t) {
+    |                                                     ^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> test/fork/ForkMeasure.t.sol:217:9:
+    |
+217 |         uint256 t = this.buyExternal(0.01 ether);
+    |         ^^^^^^^^^
+
+Warning (5159): "selfdestruct" has been deprecated. Note that, starting from the Cancun hard fork, the underlying opcode no longer deletes the code and data associated with an account and only transfers its Ether to the beneficiary, unless executed in the same transaction in which the contract was created (see EIP-6780). Any use in newly deployed contracts is strongly discouraged even if the new behavior is taken into account. Future changes to the EVM might further reduce the functionality of the opcode.
+  --> test/fork/ForkBase.sol:15:9:
+   |
+15 |         selfdestruct(to);
+   |         ^^^^^^^^^^^^
+
+Warning (3149): The result type of the shift operation is equal to the type of the first operand (uint64) ignoring the (larger) type of the second operand (uint256) which might be unexpected. Silence this warning by either converting the first or the second operand to the type of the other.
+  --> test/fork/ForkBase.sol:93:27:
+   |
+93 |         p.packUnitsMask = uint64(1) << UNITS;
+   |                           ^^^^^^^^^^^^^^^^^^
+
+Warning (3149): The result type of the shift operation is equal to the type of the first operand (uint64) ignoring the (larger) type of the second operand (uint256) which might be unexpected. Silence this warning by either converting the first or the second operand to the type of the other.
+   --> test/fork/ForkSelection.t.sol:124:27:
+    |
+124 |         p.packUnitsMask = uint64(1) << UNITS;
+    |                           ^^^^^^^^^^^^^^^^^^
+
+Warning (3149): The result type of the shift operation is equal to the type of the first operand (uint64) ignoring the (larger) type of the second operand (uint256) which might be unexpected. Silence this warning by either converting the first or the second operand to the type of the other.
+  --> test/fork/CompleteForeignJournal.t.sol:87:51:
+   |
+87 |         p.upliftBoundBps = 200; p.packUnitsMask = uint64(1) << UNITS;
+   |                                                   ^^^^^^^^^^^^^^^^^^
+
+Warning (5667): Unused function parameter. Remove or comment out the variable name to silence this warning.
+  --> test/fork/ReviewJournal.t.sol:54:23:
+   |
+54 |     function _measure(uint256 n) private returns (uint256 gross, uint256 pay, int64 refund) {
+   |                       ^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to pure
+   --> src/ScanLib.sol:308:5:
+    |
+308 |     function encodedParams(VaultLib.Params storage p) external view returns (bytes memory) {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to pure
+   --> src/ScanLib.sol:313:5:
+    |
+313 |     function configurationHash(VaultLib.Params storage p, uint256 liveMintFee, bool paused, bool windingDown)
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditActivationGas.t.sol:12:5:
+   |
+12 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditAllocatedValuation.t.sol:29:5:
+   |
+29 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditDistribution.t.sol:10:5:
+   |
+10 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditFreeMismatch.t.sol:10:5:
+   |
+10 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditMaxPackGas.t.sol:13:5:
+   |
+13 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/audit/release/AuditOracleGas.t.sol:11:5:
+   |
+11 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/EfficientJournal.t.sol:20:5:
+   |
+20 |     function assertEnvironment() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkCompletionAccounting.t.sol:35:5:
+   |
+35 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkIncrementalProduction.t.sol:38:5:
+   |
+38 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+   --> test/fork/ForkIncrementalProduction.t.sol:816:5:
+    |
+816 |     function assertStagingGasContext() external {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkJournalGas.t.sol:16:5:
+   |
+16 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkMaxBatchGas.t.sol:27:5:
+   |
+27 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkMeasure.t.sol:44:5:
+   |
+44 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkPartialReconcile.t.sol:39:5:
+   |
+39 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkPartialReconcile.t.sol:48:5:
+   |
+48 |     function _listedIds(uint256 count) private returns (uint256[] memory ids) {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkReconcile.t.sol:26:5:
+   |
+26 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ForkTokens.t.sol:91:5:
+   |
+91 |     function assertTokenGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ReviewBootstrap.t.sol:34:5:
+   |
+34 |     function assertGasContext() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/fork/ReviewJournal.t.sol:31:5:
+   |
+31 |     function assertEnvironment() external {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+Ran 3 tests for test/audit/release-b/AuditB.t.sol:AuditBPinned
+[FAIL: ExplicitFeeAcceptanceRequired()] test_hugeSurchargeDoesNotBlockUnlist() (block: 26424971) (gas: 127193)
+[FAIL: ExplicitFeeAcceptanceRequired()] test_maximumRealOracleAskDoesNotBlockExit() (block: 26424971) (gas: 127237)
+[FAIL: ExplicitFeeAcceptanceRequired()] test_measureOps() (block: 26424971) (gas: 127214)
+Suite result: FAILED. 0 passed; 3 failed; 0 skipped; finished in 1.67s (930.46µs CPU time)
+
+Ran 1 test for test/audit/release/AuditMaxPackGas.t.sol:AuditMaxPackGas
+[PASS] test_maxPackFitsTransactionCap() (gas: 35943)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.67s (1.26ms CPU time)
+
+Ran 9 tests for test/fork/ForkMainConfiguration.t.sol:ForkMainConfigurationTest
+[PASS] test_disabledFreshMintsStillRelistsUnselectedOldInventory() (gas: 4715331)
+[PASS] test_feeIncreaseNeedsExplicitAcceptanceAndDecreasePaysActualFee() (gas: 4881490)
+[PASS] test_gasScheduleBuildCoefficientsReachCostAndPayment() (gas: 2727203)
+[PASS] test_launchManagerPaysThreePrimaryMintFeesAndConsistentMarkup() (gas: 2660072)
+[PASS] test_managerEconomicSettingsRemainOnlyItsOwners() (gas: 842518)
+[PASS] test_oldRateAccrualAndCapacityIncreaseNeverRefillSpentBudget() (gas: 2887948)
+[PASS] test_reuseRejectsLosingInitialBuildButRelistsRealExistingInventory() (gas: 4886281)
+[PASS] test_staleConfigurationFailsBeforeAnyMintOrCapitalCommitment() (gas: 1021209)
+[PASS] test_unrelatedSettingsCannotChangeAcceptedMintFee() (gas: 845078)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 3.03s (1.29s CPU time)
+
+Ran 1 test for test/audit/release/AuditActivationGas.t.sol:AuditActivationGas
+[PASS] test_busyQueueRefusesListing() (gas: 46791241)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 7.61s (7.20s CPU time)
+
+Ran 1 test for test/audit/release/AuditAllocatedValuation.t.sol:AuditAllocatedValuation
+[PASS] test_expiredAllocationMustSyncBeforePricing() (gas: 47576190)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 7.66s (7.24s CPU time)
+
+Ran 2 tests for test/audit/AuditWorkFeeManufacture.t.sol:AuditWorkFeeManufactureTest
+[PASS] test_checkpointFeeIsOnePerIntervalAndNeedsAFlow() (gas: 1827854)
+Logs:
+  manufactured checkpoint pay (wei): 100000000000000
+  work-fee portion drained to keeper (wei): 20000000000000
+  max work-fee drain/yr via checkpoint (wei): 14600000000000000
+
+[FAIL: next call did not revert as expected] test_listUnlistLoopIsGated() (block: 26424971) (gas: 2839512)
+Logs:
+  build pay (1 pack of 6 units): 377000000000000
+
+Suite result: FAILED. 1 passed; 1 failed; 0 skipped; finished in 7.75s (6.08s CPU time)
+
+Ran 1 test for test/fork/ForkIncrementalProduction.t.sol:ForkProductionAdmissionTest
+[PASS] test_quantizedIntervalBothSidesCollisionsAndHardBounds() (gas: 5076109)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 7.76s (5.15s CPU time)
+
+Ran 2 tests for test/audit/release/AuditOracleGas.t.sol:AuditOracleGas
+[FAIL: empty oracle configuration cannot block the exit] test_emptyOracleAddressRejectedBeforeWindDownExit() (block: 26424971) (gas: 6886243)
+[FAIL: wrong oracle ABI cannot block the exit] test_wrongOracleAbiDoesNotBlockRedemption() (block: 26424971) (gas: 4867000)
+Logs:
+  locked shares after first checkpoint: 10759422559369047
+
+Suite result: FAILED. 0 passed; 2 failed; 0 skipped; finished in 7.76s (6.09s CPU time)
+
+Ran 1 test for test/audit/release/AuditOwnerExtraction.t.sol:AuditOwnerExtraction
+[PASS] test_compromisedOwnerRaisesCanaryCapsImmediatelyAndCollectsPay() (gas: 6685724)
+Logs:
+  canary routine remaining before extraction: 28989000000000000
+  owner keeper pay extracted wei: 38989000000000000
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 7.80s (6.06s CPU time)
+
+Ran 1 test for test/fork/ForkReceiptRecovery.t.sol:ForkReceiptRecoveryManagerTest
+[PASS] test_recordedKickRefund_resolvesAndOwnerExits() (gas: 6090284)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 7.88s (5.24s CPU time)
+
+Ran 2 tests for test/audit/release-b/AuditB.t.sol:AuditBBudget
+[FAIL: ExplicitFeeAcceptanceRequired()] test_oneExitEmptiesEssentialBudget() (block: 26424971) (gas: 127229)
+[FAIL: ExplicitFeeAcceptanceRequired()] test_ownerKeyFirstDay() (block: 26424971) (gas: 127343)
+Suite result: FAILED. 0 passed; 2 failed; 0 skipped; finished in 295.83ms (590.50µs CPU time)
+
+Ran 16 tests for test/fork/ForkVaultLifecycle.t.sol:ForkVaultLifecycleTest
+[PASS] test_builtPackCostsAndMints() (gas: 4851834)
+[FAIL: assertion failed: 1000000000000000000 != 1000100000000000000] test_cancelDepositBeforePricing() (block: 26424971) (gas: 525164)
+[PASS] test_depositListRedeem_roundTrip() (gas: 20225788)
+Logs:
+  complete holder round-trip keeper pay wei: 4843000000000000
+
+[FAIL: next call did not revert as expected] test_edgeGateStopsListingWhenCrownShareRaised() (block: 26424971) (gas: 4027716)
+[PASS] test_edgeMatchesLiveFwa() (gas: 165986)
+[PASS] test_kickReturnsFullBackingAndPack() (gas: 4881880)
+[PASS] test_ownerHandoverOnly() (gas: 434815)
+[PASS] test_ownerStopsCannotMoveAssets() (gas: 4039864)
+[PASS] test_paddedSyncPaysOnlyForWorkDone() (gas: 5360758)
+[PASS] test_paramsBoundsAppliedAtOnce() (gas: 487793)
+[PASS] test_proRataRedemptionAcrossCheckpoints() (gas: 27447122)
+[FAIL: next call did not revert as expected] test_staleQuoteDoesNotUnlockUnlisting() (block: 26424971) (gas: 4296683)
+[PASS] test_staleQuoteStopsListing() (gas: 282994)
+[PASS] test_windDownCompletesWithNoAcquisitions() (gas: 15094994)
+[PASS] test_windDownSurvivesBrokenOracle() (gas: 7465919)
+[PASS] test_zeroOwnerRejectedAtDeploy() (gas: 15344)
+Suite result: FAILED. 13 passed; 3 failed; 0 skipped; finished in 7.99s (6.32s CPU time)
+
+Ran 13 tests for test/fork/ForkManager.t.sol:ForkManagerTest
+[PASS] test_coldKickRefundIdentifiedUnderStipend() (gas: 5767818)
+[FAIL: factory holds no ETH: 1 != 0] test_createInitializesAtomically() (block: 26424971) (gas: 681139)
+Logs:
+  gas factory.create (clone + initialize): 648236
+
+[PASS] test_createRejectsBadInputs() (gas: 647992)
+[PASS] test_createRejectsOwnersThatCannotAct() (gas: 331618)
+[PASS] test_deploymentGas() (gas: 10949172)
+Logs:
+  gas PackVault + its policy + postflight: 5881547
+  gas PackManagerFactory + implementation + postflight: 5062577
+
+[PASS] test_initializeOnlyOnceOnlyByFactory() (gas: 791634)
+[PASS] test_isolation_managersAndVault() (gas: 15129861)
+[FAIL: assertion failed: 60000000000000000 < 61559000000000000] test_lifecycle_buildExitWithdrawEverything() (block: 26424971) (gas: 10624925)
+[PASS] test_onlyOwnerControls_andHandover() (gas: 1587836)
+[PASS] test_onlyPackNftsAccepted() (gas: 660980)
+[PASS] test_pauseStopsBuildsNotMaintenance() (gas: 5610702)
+[PASS] test_plainEthIsFreeEth() (gas: 705252)
+[PASS] test_reentrantKeeperGetsNothingExtra() (gas: 3082882)
+Suite result: FAILED. 11 passed; 2 failed; 0 skipped; finished in 8.94s (6.30s CPU time)
+
+Ran 17 tests for test/fork/ForkVaultAdversarial.t.sol:ForkVaultAdversarialTest
+[FAIL: InvalidBacking()] test_buildAboveCeilingPaidAtCeilingPrice() (block: 26424971) (gas: 1304389)
+[PASS] test_checkpointAfterAllHoldersExitAndGain() (gas: 8396566)
+[PASS] test_checkpointWindowRules() (gas: 1037182)
+[PASS] test_depositAboveTvlCapReverts() (gas: 347916)
+[PASS] test_distributionPaysGainsOnce() (gas: 7496836)
+[PASS] test_forcedEthAccruesToHolders_firstDepositorCannotInflate() (gas: 1743630)
+[PASS] test_hostileNftRejected() (gas: 663438)
+[PASS] test_idleCheckpointUnpaid() (gas: 972807)
+[PASS] test_keeperBatchesFitTxCap() (gas: 29985168)
+Logs:
+  build 8 packs: 9848273
+  unlist 16: 4496366
+  liquidate 10 packs: 1570063
+
+[PASS] test_kickedReceiptsBlockPricingUntilReconciled() (gas: 18259013)
+[PASS] test_liquidateOnlyWhenNeeded() (gas: 4773804)
+[PASS] test_noFeeSkimOnHarvest() (gas: 832996)
+[PASS] test_reentrantHolderClaimsOnce() (gas: 2061162)
+[PASS] test_restockGated() (gas: 3268804)
+[PASS] test_settledUnclaimedEthIsNotDeployable() (gas: 8864491)
+[PASS] test_unlistListLoopClosed() (gas: 10400500)
+[PASS] test_workFeeBounded() (gas: 628794)
+Suite result: FAILED. 16 passed; 1 failed; 0 skipped; finished in 1.46s (186.66ms CPU time)
+
+Ran 2 tests for test/fork/ForkIncrementalProduction.t.sol:ForkProductionStagingTest
+[FAIL: next call did not revert as expected] test_foreignAutoactivationRejectedWithBoundedGasEvenWhenOurListingWouldBeActive() (block: 26310897) (gas: 68093024)
+Logs:
+  real FWA one admission with fifteen foreign activations gross gas: 5613320
+
+[PASS] test_stagedAdmissionAfterDrainedPrecheckRevertsAtomically() (gas: 64343792)
+Suite result: FAILED. 1 passed; 1 failed; 0 skipped; finished in 9.24s (8.82s CPU time)
+
+Ran 2 tests for test/audit/release/AuditInvariantHarness.t.sol:AuditInvariantHarness
+[PASS]
+AuditInvariantHarness invariants:
+[PASS] invariant_claimsWithinReserves
+[PASS] invariant_reservesCovered
+[PASS] invariant_sharesConserved
+[PASS] invariant_valueConserved
+ AuditInvariantHarness invariants (runs: 16, calls: 400, reverts: 0)
+
+╭--------------+---------------+-------+---------+----------╮
+| Contract     | Selector      | Calls | Reverts | Discards |
++===========================================================+
+| VaultHandler | build         | 42    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | cancel        | 35    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | checkpoint    | 43    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | claim         | 42    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | deposit       | 49    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | donate        | 36    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | liquidate     | 38    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | relist        | 34    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | requestRedeem | 37    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | unlist        | 44    | 0       | 0        |
+╰--------------+---------------+-------+---------+----------╯
+
+[PASS] test_profitableHolderKeepsValueConserved() (gas: 1731685)
+Logs:
+  bob balance after donated gain: 50497794743882540695
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 9.25s (7.58s CPU time)
+
+Ran 1 test for test/fork/ForkVaultInvariant.t.sol:ForkVaultInvariantTest
+[PASS]
+ForkVaultInvariantTest invariants:
+[PASS] invariant_claimsWithinReserves
+[PASS] invariant_reservesCovered
+[PASS] invariant_sharesConserved
+[PASS] invariant_valueConserved
+ ForkVaultInvariantTest invariants (runs: 16, calls: 400, reverts: 0)
+
+╭--------------+---------------+-------+---------+----------╮
+| Contract     | Selector      | Calls | Reverts | Discards |
++===========================================================+
+| VaultHandler | build         | 42    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | cancel        | 35    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | checkpoint    | 43    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | claim         | 42    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | deposit       | 49    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | donate        | 36    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | liquidate     | 38    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | relist        | 34    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | requestRedeem | 37    | 0       | 0        |
+|--------------+---------------+-------+---------+----------|
+| VaultHandler | unlist        | 44    | 0       | 0        |
+╰--------------+---------------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.63s (488.50ms CPU time)
+
+Ran 1 test for test/fork/ForkJournalGas.t.sol:ForkJournalGasTest
+[PASS] test_realUnexposedForeignHistoryIsOneUnpaidJob() (gas: 1269556)
+Logs:
+  actual fulfilled foreign sample: 16
+  actual refunded foreign sample: 0
+  unpaid rebase caller meter plus intrinsic proxy: 182975
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 2.25s (1.13s CPU time)
+
+Ran 2 tests for test/audit/AuditRoleAndKeeper.t.sol:AuditRoleAndKeeperTest
+[PASS] test_adminMaxParamsSelfKeepExtraction() (gas: 1726614)
+Logs:
+  charge paid (wei): 20050000000000000
+  checkpoint pay (wei): 20050000000000000
+
+[PASS] test_guardianZeroCeilingDoesNotTrapHolderFunds() (gas: 1769690)
+Logs:
+  alice redemption claimed under zero ceiling (wei): 999803526441835588
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 3.69s (6.47ms CPU time)
+
+Ran 2 tests for test/audit/release-b/AuditB.t.sol:AuditBSelection
+[FAIL: ExplicitFeeAcceptanceRequired()] test_harvestRefusesRepeatedIds() (block: 26310897) (gas: 47164071)
+[FAIL: ExplicitFeeAcceptanceRequired()] test_noListingIntoBusyQueue() (block: 26310897) (gas: 47687678)
+Suite result: FAILED. 0 passed; 2 failed; 0 skipped; finished in 10.84s (10.84s CPU time)
+
+Warning: the following cheatcode(s) are deprecated and will be removed in future versions:
+  lastCallGas(): replaced by `lastFrameGas`
+Ran 3 tests for test/fork/CompleteHarvest.t.sol:CompleteCreditTest
+[PASS] test_economicCreditIsSweptOnceWithVerifiedOwnWork() (gas: 46479584)
+[PASS] test_profileCreditIncrementAtDiagnosticPrice() (gas: 46889881)
+Logs:
+  same own journal job with credit retained billed gas: 344165
+  same own journal job with economical credit swept billed gas: 357160
+  attached fee credit sweep incremental billed gas: 12995
+
+[PASS] test_terminalCashPrecedesFeeCollectionAndDustWaitsForCheckpoint() (gas: 46687483)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 12.51s (12.10s CPU time)
+
+Ran 1 test for test/fork/ForkReconcile.t.sol:ForkReconcileTest
+[FAIL: InvalidBacking()] test_reconcileFullCycle() (block: 26310897) (gas: 53114960)
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 3.19s (3.19s CPU time)
+
+Ran 2 tests for test/fork/ForkMeasure.t.sol:ForkMeasureTest
+[PASS] test_measureInventoryAndListing() (gas: 10968686)
+[PASS] test_measureTokenRoute() (gas: 1555632)
+Logs:
+  hook: 0x2C67ebA8A50AF0dB5Fba55F725247a75CbDA6444
+  lp fee: 0
+  size wei: 1000000000000000
+    round trip bps kept: 9800
+    sell gas: 134035
+  size wei: 10000000000000000
+    round trip bps kept: 9800
+    sell gas: 134048
+  size wei: 100000000000000000
+    round trip bps kept: 9800
+    sell gas: 134048
+  size wei: 1000000000000000000
+    round trip bps kept: 9800
+    sell gas: 134050
+  direct transfer succeeded: 0
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.21s (28.58ms CPU time)
+
+Ran 1 test for test/audit/release/AuditDistribution.t.sol:AuditDistribution
+[PASS] test_distributionDueWithoutFlowsNeedsKeeperCheckpoint() (gas: 1424046)
+Logs:
+  distribution reserve wei: 20000000000000000
+  checkpoint pay wei: 100000000000000
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 332.15ms (2.32ms CPU time)
+
+Ran 3 tests for test/fork/ForkTokens.t.sol:ForkTokensTest
+[PASS] test_burnClaimsActiveRewards() (gas: 1183703)
+Logs:
+  burn maximum sixteen real token rewards gross complete gas: 289956
+
+[PASS] test_staleIdDoesNotBlockCredit() (gas: 2323639)
+[PASS] test_zeroRewards() (gas: 52736)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 2.90s (89.67ms CPU time)
+
+Warning: the following cheatcode(s) are deprecated and will be removed in future versions:
+  lastCallGas(): replaced by `lastFrameGas`
+Ran 4 tests for test/fork/ForkMaxBatchGas.t.sol:ForkMaxBatchGasTest
+[FAIL: fixed checkpoint gas component covers this isolated receipt-equivalent sample: 474906 > 400000] test_checkpointFullHolderMixCompleteGas() (block: 26424971) (gas: 36311098)
+[PASS] test_listRebatchBilledGas() (gas: 26617282)
+Logs:
+  list 8 relisted billed gas: 6284869
+  list 8 relisted quoted gas: 6880000
+  list 8 relisted quote margin gas: 595131
+  list 8 relisted keeper pay wei: 1536000000000000
+
+[PASS] test_sixUnitBuildUnlistLiquidateBilledGas() (gas: 61721795)
+Logs:
+  build 1 x 6-unit billed gas: 1769361
+  build 1 x 6-unit quoted gas: 1685000
+  build 1 x 6-unit QUOTE UNDERPAYS billed by gas: 84361
+  build 1 x 6-unit keeper pay wei: 377000000000000
+  build 2 x 6-unit billed gas: 2942114
+  build 2 x 6-unit quoted gas: 3070000
+  build 2 x 6-unit quote margin gas: 127886
+  build 2 x 6-unit keeper pay wei: 694000000000000
+  build 3 x 6-unit billed gas: 4088192
+  build 3 x 6-unit quoted gas: 4455000
+  build 3 x 6-unit quote margin gas: 366808
+  build 3 x 6-unit keeper pay wei: 1011000000000000
+  build 4 x 6-unit billed gas: 5239123
+  build 4 x 6-unit quoted gas: 5840000
+  build 4 x 6-unit quote margin gas: 600877
+  build 4 x 6-unit keeper pay wei: 1328000000000000
+  build 5 x 6-unit billed gas: 6368116
+  build 5 x 6-unit quoted gas: 7225000
+  build 5 x 6-unit quote margin gas: 856884
+  build 5 x 6-unit keeper pay wei: 1645000000000000
+  build 6 x 6-unit billed gas: 7509357
+  build 6 x 6-unit quoted gas: 8610000
+  build 6 x 6-unit quote margin gas: 1100643
+  build 6 x 6-unit keeper pay wei: 1962000000000000
+  build 7 x 6-unit billed gas: 8667768
+  build 7 x 6-unit quoted gas: 9995000
+  build 7 x 6-unit quote margin gas: 1327232
+  build 7 x 6-unit keeper pay wei: 2279000000000000
+  build 8 x 6-unit billed gas: 9801577
+  build 8 x 6-unit quoted gas: 11380000
+  build 8 x 6-unit quote margin gas: 1578423
+  build 8 x 6-unit keeper pay wei: 2596000000000000
+  unlist 8 x 6-unit billed gas: 2432800
+  unlist 8 x 6-unit quoted gas: 2620000
+  unlist 8 x 6-unit quote margin gas: 187200
+  unlist 8 x 6-unit keeper pay wei: 684000000000000
+  liquidate 8 x 6-unit billed gas: 1247588
+  liquidate 8 x 6-unit quoted gas: 1275000
+  liquidate 8 x 6-unit quote margin gas: 27412
+  liquidate 8 x 6-unit keeper pay wei: 415000000000000
+
+[PASS] test_thirtyUnitMaxBatchFitsTransactionCap() (gas: 47972085)
+Logs:
+  build 8 x 30-unit (max build batch) billed gas: 10740413
+  build 8 x 30-unit (max build batch) quoted gas: 12420000
+  build 8 x 30-unit (max build batch) quote margin gas: 1679587
+  build 8 x 30-unit (max build batch) keeper pay wei: 2804000000000000
+  sync 16 kicked receipts billed gas: 2520912
+  sync 16 kicked receipts quoted gas: 85000
+  sync 16 kicked receipts QUOTE UNDERPAYS billed by gas: 2435912
+  sync 16 kicked receipts keeper pay wei: 721000000000000
+  unlist 16 x 30-unit (max unlist batch) billed gas: 4451297
+  unlist 16 x 30-unit (max unlist batch) quoted gas: 4900000
+  unlist 16 x 30-unit (max unlist batch) quote margin gas: 448703
+  unlist 16 x 30-unit (max unlist batch) keeper pay wei: 1300000000000000
+  liquidate 2 x 30-unit (60-unit per-call cap) billed gas: 474174
+  liquidate 2 x 30-unit (60-unit per-call cap) quoted gas: 445000
+  liquidate 2 x 30-unit (60-unit per-call cap) QUOTE UNDERPAYS billed by gas: 29174
+  liquidate 2 x 30-unit (60-unit per-call cap) keeper pay wei: 129000000000000
+
+Suite result: FAILED. 3 passed; 1 failed; 0 skipped; finished in 4.86s (4.58s CPU time)
+
+Ran 1 test for test/fork/ForkPartialReconcile.t.sol:ForkPartialReconcileTest
+[PASS] test_reconcilePartialRedemptionAndWindDown() (gas: 20420022)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.19s (51.21ms CPU time)
+
+Ran 1 test for test/audit/release/AuditFreeMismatch.t.sol:AuditFreeMismatch
+[FAIL: every wei back: 998000000000000000 != 1000000000000000000] test_cancelCyclesRetainNothing() (block: 26424971) (gas: 12279392)
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 1.11s (12.31ms CPU time)
+
+Ran 3 tests for test/fork/ForkBacking.t.sol:ForkBackingTest
+[PASS] test_ceilingDoesNotMoveBacking() (gas: 1477896)
+[PASS] test_exemptListsAtTarget() (gas: 4030138)
+[PASS] test_targetIndependentOfPortfolioRoom() (gas: 1900490)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 1.14s (13.02ms CPU time)
+
+Ran 1 test for test/fork/CompleteHarvest.t.sol:CompleteHarvestTest
+[FAIL: InsufficientBacking()] setUp() (block: 26417086) (gas: 0)
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 3.36s (0.00ns CPU time)
+
+Ran 7 tests for test/fork/ForkCompletionAccounting.t.sol:ForkCompletionAccountingTest
+[PASS] test_cancellableEscrowCannotSuppressPreparatoryLiquidation() (gas: 5929110)
+[PASS] test_constructionIsPricedAtCommitAndIssuanceHasNoOrphanShares() (gas: 1870710)
+[PASS] test_explicitTopupReturnsExcessAndPartialFillFinalizesEra() (gas: 5190593)
+[PASS] test_onlyActuallyCommittingDepositsFundAtomicMatchedRedemptions() (gas: 5146507)
+[PASS] test_reconcileContributionErasEveryWei() (gas: 10586628)
+[PASS] test_stalePreviewCannotCommitEscrowOrCheckpoint() (gas: 934611)
+[PASS] test_zeroQuoteRestoredQuoteCancellationsPreserveActualPayers() (gas: 1844116)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 2.13s (113.72ms CPU time)
+
+Ran 5 tests for test/fork/EfficientJournal.t.sol:EfficientJournalTest
+[PASS] test_distributionFlagCannotPayForTailWithoutDistributableGain() (gas: 1532358)
+[PASS] test_distributionOnlyTailAllowsRealCheckpointAfterItsExpense() (gas: 2269485)
+[PASS] test_fullJournalJobCannotBeShrunkByIrrelevantTerminalIds() (gas: 65570516)
+[PASS] test_lockedSharesKeepSyncRoutineWithZeroEssentialBudget() (gas: 65407040)
+[PASS] test_smallForeignTailIsUnpaidUntilRealCheckpointWindow() (gas: 17726282)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 518.37ms (234.40ms CPU time)
+
+Ran 2 tests for test/fork/ForkDirectMint.t.sol:ForkDirectMintTest
+[PASS] test_directMintRecipes() (gas: 2420718)
+Logs:
+  gas createPack 0.06 (2 Shapes): 534326
+  gas createPack 0.03 (3 Shapes): 626451
+  gas createPack 0.07 (3 Shapes): 639920
+  gas createPack 0.05 (1 Shape): 381195
+  gas redeem 0.06 pack (2 Shapes): 157055
+
+[PASS] test_purchaserRedeemGasWithinQuote() (gas: 3267791)
+Logs:
+  gas redeem, Shapes: 2: 157014
+  gas redeem, Shapes: 5: 245262
+  gas redeem, Shapes: 7: 304165
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 1.13s (13.37ms CPU time)
+
+Ran 3 tests for test/fork/ReviewBootstrap.t.sol:ReviewBootstrapTest
+[FAIL: shared fixed checkpoint charge covers automatic empty-history advance: 431360 > 400000] test_firstCheckpointAdvancesUnexposedHistoryWithoutStandaloneSync() (block: 26434971) (gas: 954492)
+Logs:
+  bootstrap checkpoint call gas, excluding intrinsic: 431360
+
+[PASS] test_realForeignBacklogPreservesMinimumSeedAndFirstDeposit() (gas: 30672092)
+Logs:
+  authentic completed records: 673
+  remaining bootstrap cash before first deposit: 10577021548053172
+  foreign catchup pay: 0
+
+[FAIL: Error != expected error: ConfigurationChanged() != Payment()] test_unexposedAdvanceIsUnpaidAtomicAndIndependentOfReserve() (block: 26434971) (gas: 395704)
+Suite result: FAILED. 1 passed; 2 failed; 0 skipped; finished in 6.94s (3.94s CPU time)
+
+Ran 3 tests for test/fork/ForkIncrementalProduction.t.sol:ForkProductionFeeWitnessTest
+[PASS] test_duplicateHarvestRejectedWithoutDebtChangeOrPay() (gas: 46787923)
+[PASS] test_liveDebtWitnessAndHarvestMatchIndividualFeeSum() (gas: 47776878)
+[PASS] test_realFailedHarvestPreservesDebtAndPaysNothing() (gas: 47035630)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 12.14s (11.01s CPU time)
+
+Ran 3 tests for test/fork/ForkIncrementalProduction.t.sol:ForkProductionInventoryTest
+[PASS] test_directMintBuildListingWithdrawalAndRedemptionMatchFullReference() (gas: 8624431)
+[FAIL: InvalidBacking()] test_gasCeilingAndBasefeeDoNotMoveBackingProposal() (block: 26424971) (gas: 1914100)
+[PASS] test_pendingEscrowProcessingClaimsAndCancellationExcludedFromNAV() (gas: 2407596)
+Suite result: FAILED. 2 passed; 1 failed; 0 skipped; finished in 1.16s (27.57ms CPU time)
+
+Warning: the following cheatcode(s) are deprecated and will be removed in future versions:
+  lastCallGas(): replaced by `lastFrameGas`
+Ran 2 tests for test/fork/ReviewJournal.t.sol:ReviewJournalTest
+[PASS] test_cashOnlyHistoryRebasesWithoutMaintenanceExpense() (gas: 1085795)
+Logs:
+  cash-only real historical records skipped unpaid: 269
+  unpaid rebase caller meter plus intrinsic proxy: 163088
+
+[PASS] test_realMixedHistoryCashOnlyExitWithZeroEssentialBudget() (gas: 21630285)
+Logs:
+  actual successful foreign backlog: 269
+  actual refunded backlog: 16
+  cash-only backlog rebase caller meter plus intrinsic proxy: 162960
+  rebase caller meter cost proxy wei at 0.2gwei: 32592000000000
+  request rebase checkpoint claim caller meter plus intrinsic proxy: 881443
+  full holder-call gas proxy wei at 0.2gwei: 176288600000000
+  actual claimed wei: 1999813194848657374
+
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 2.60s (1.50s CPU time)
+
+Ran 5 tests for test/fork/ScanGas.t.sol:ScanGasTest
+[PASS] test_full128ForeignJournalReceiptGasFitsCap() (gas: 192207888)
+Logs:
+  full 128-record foreign journal receipt-equivalent gas (94 own): 2311501
+
+[PASS] test_journalBilledGasBacklog1() (gas: 2739518)
+Logs:
+  journal billed gas backlog=1 (1 own): 166891
+
+[PASS] test_scanBilledGasN1() (gas: 26192861)
+Logs:
+  scan billed gas N=1: 177326
+  scan pay N=1: 0
+
+[PASS] test_scanBilledGasN30() (gas: 60801973)
+Logs:
+  scan billed gas N=30: 1029910
+  scan pay N=30: 0
+
+[PASS] test_scanBilledGasN8() (gas: 33683547)
+Logs:
+  scan billed gas N=8: 382976
+  scan pay N=8: 0
+
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 1.70s (543.55ms CPU time)
+
+Ran 1 test for test/fork/ScanGas.t.sol:ScanPaidGasTest
+[FAIL: fixed quote covers the keeper's billed gas: scan stays profitable: 335000 < 366799] test_paidScanProfitableN1() (block: 26310897) (gas: 49323993)
+Logs:
+  paid scan billed gas: 366799
+  paid scan quoted gasQ: 335000
+  paid scan pay wei (0.5 gwei): 167500000000000
+
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 764.82ms (763.93ms CPU time)
+
+Ran 4 tests for test/fork/ScanSync.t.sol:ScanSyncForeignTest
+[PASS] test_b_foreignOnlyScanPaysNothingAndRepeatIsNothing() (gas: 15868340)
+[PASS] test_c_unrelatedForeignAcquisitionsChargeNothing() (gas: 24326904)
+[PASS] test_g_oneScanClearsAnyBacklogAtBacklogIndependentCost() (gas: 65480605)
+Logs:
+  scan billed gas backlog 41: 179326
+  scan billed gas backlog 94: 179326
+
+[PASS] test_h_noManufacturedRepeatOrPaddedScan() (gas: 24302188)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 1.38s (197.33ms CPU time)
+
+Ran 3 tests for test/fork/ForkReceiptRecovery.t.sol:ForkReceiptRecoveryVaultTest
+[PASS] test_defaultFinalizationUsesRealReceiverAndResolves() (gas: 46427119)
+[PASS] test_lowGasKeepNeverForcesAnUnrecordedPayment() (gas: 62164450)
+Logs:
+  keep gas limits that reverted: 65
+  keep gas limits that completed and recorded: 26
+
+[PASS] test_recordedKeepResolvesExactlyOnceAndStrangerCannotFabricateReceipt() (gas: 46633551)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 22.37s (22.37s CPU time)
+
+Ran 1 test for test/fork/ForkScanReconcile.t.sol:ForkScanReconcileTest
+[PASS] test_reconcileScanPath() (gas: 69608491)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 17.74s (17.74s CPU time)
+
+Ran 6 tests for test/research/IncrementalLedgerModel.t.sol:IncrementalLedgerModelTest
+[PASS] testFuzz_randomizedLifecycleMatchesFullReference(uint256) (runs: 256, μ: 35916654, ~: 35892859)
+[PASS] test_backingFloorCoversMaximumFeeAtRoundingBoundary() (gas: 15543283)
+[PASS] test_duplicateTransitionsCannotDoubleCountPrincipalOrFees() (gas: 1847879)
+[PASS] test_feeRoundingAndWitnessCompleteness() (gas: 1740962)
+[PASS] test_fifoOnlyNeedsBoundedTombstoneCleanup() (gas: 2448224)
+[PASS] test_owedReturnsKeepPrincipalAndCannotBeSpentEarly() (gas: 1517935)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 8.51s (8.51s CPU time)
+
+Ran 1 test for test/audit/release/IndependentChallenge.t.sol:IndependentChallenge
+[PASS] test_emptyCheckpointRevertsAndLeavesSlotFree() (gas: 2542354)
+Logs:
+  request charge wei: 100000000000000
+  unwind charge wei: 3166481758624063
+  exact redemption charge wei: 3266481758624063
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.97s (4.48ms CPU time)
+
+Ran 11 tests for test/scenario/VaultFlow.t.sol:VaultFlowPinnedTest
+[PASS] test_flow_distributions() (gas: 10160072)
+Logs:
+  
+  FLOW BREAKDOWN  distributions   gas 200000000 / basefee 150000000 wei, fork block 26424971
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           1.0001    50.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    1.0000    49.99%
+    paid to keepers (gas + premium)                                               0.0002     0.00%
+    Shapes mint fees                                                              0.0000     0.00%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.1999     9.99%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.0000     0.00%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              1.7999    89.99%
+    held in backing held by FWA (active listings) (change)                        0.0000     0.00%
+    held in pack value in FWA custody (listed) (change)                           0.0000     0.00%
+    held in inventory held by vault (idle packs) (change)                         0.0000     0.00%
+    held in FWA fees uncollected (pending + credit) (change)                      0.0000     0.00%
+    held in request charges held for the next checkpoint (change)                 0.0000     0.00%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         1.8104    90.51%
+      stated need                                                                 0.0050     0.24%
+      ABOVE its need                                                              1.8054    90.26%
+    backing held by FWA (active listings): held                                   0.0000     0.00%
+      counters imply                                                              0.0000     0.00%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.0000     0.00%
+    pack value in FWA custody (listed): held                                      0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    inventory held by vault (idle packs): held                                    0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               1.0001    50.00%  | returned 0.1999
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.0000     0.00%  | returned 0.0000
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.0000     0.00%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0002     0.00%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[FAIL: BadBatch()] test_flow_gas_spike() (block: 26424971) (gas: 7374072)
+[FAIL: BadBatch()] test_flow_inactive_long() (block: 26424971) (gas: 7901766)
+[FAIL: BadBatch()] test_flow_inactive_short() (block: 26424971) (gas: 7901678)
+[PASS] test_flow_init() (gas: 9434040)
+Logs:
+  
+  FLOW BREAKDOWN  init   gas 200000000 / basefee 150000000 wei, fork block 26424971
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           1.0001   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0001     0.00%
+    Shapes mint fees                                                              0.0000     0.00%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.0000     0.00%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              1.0000    99.99%
+    held in backing held by FWA (active listings) (change)                        0.0000     0.00%
+    held in pack value in FWA custody (listed) (change)                           0.0000     0.00%
+    held in inventory held by vault (idle packs) (change)                         0.0000     0.00%
+    held in FWA fees uncollected (pending + credit) (change)                      0.0000     0.00%
+    held in request charges held for the next checkpoint (change)                 0.0000     0.00%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         1.0105   101.04%
+      stated need                                                                 0.0050     0.49%
+      ABOVE its need                                                              1.0055   100.54%
+    backing held by FWA (active listings): held                                   0.0000     0.00%
+      counters imply                                                              0.0000     0.00%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.0000     0.00%
+    pack value in FWA custody (listed): held                                      0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    inventory held by vault (idle packs): held                                    0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               1.0001   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.0000     0.00%  | returned 0.0000
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.0000     0.00%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0001     0.00%  | returned 0.0000
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[FAIL: BadBatch()] test_flow_keeper_delay() (block: 26424971) (gas: 7868139)
+[FAIL: max-load reaches real pack admission: 0 <= 0] test_flow_max_load() (block: 26424971) (gas: 11721978)
+[FAIL: BadBatch()] test_flow_oracle_change() (block: 26424971) (gas: 8042419)
+[FAIL: BadBatch()] test_flow_settled_unclaimed() (block: 26424971) (gas: 9451854)
+[FAIL: BadBatch()] test_flow_wind_down() (block: 26424971) (gas: 8271836)
+[FAIL: BadBatch()] test_flow_withdrawals() (block: 26424971) (gas: 8271865)
+Suite result: FAILED. 2 passed; 9 failed; 0 skipped; finished in 12.54s (10.80s CPU time)
+
+Ran 16 tests for test/research/IncrementalAdversarial.t.sol:IncrementalAdversarialTest
+[PASS] test_adversarialBuyerBurnsKeptPackBeforeReconciliation() (gas: 42928591)
+[PASS] test_adversarialBuyerExtendsKeptPackAndGiftsItBack() (gas: 43397486)
+[PASS] test_adversarialLaterFeeChangeDoesNotRedecodeRecordedReceipt() (gas: 42833790)
+[PASS] test_adversarialRetiredBurnedBidTagCannotPoisonLaterKickAndCanBeReused() (gas: 47038303)
+[PASS] test_controlledFeeCreditHarvestDoesNotCreateAsyncReceipt() (gas: 41947927)
+[PASS] test_controlledWithdrawalDoesNotCreateAsyncReceipt() (gas: 5122491)
+[PASS] test_lowGasKeepNeverCommitsAnUnrecordedPayment() (gas: 49213169)
+Logs:
+  failed gas limits: 22
+  successful gas limits: 18
+  first successful gas limit: 460000
+
+[PASS] test_lowGasKickNeverCommitsAnUnrecordedPayment() (gas: 61494781)
+Logs:
+  failed kick gas limits: 40
+  successful kick gas limits: 19
+  successful kicks with stuck NFT: 0
+  first successful kick gas limit: 420000
+
+[PASS] test_protocolAndStrangerGiftsDoNotDuplicateTerminalReceipt() (gas: 42326435)
+[PASS] test_realCashBidDoesNotInventETHReceipt() (gas: 42104791)
+[PASS] test_realKeepAtDefaultFee() (gas: 42132387)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_realKeepAtMaximumFee() (gas: 42135331)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_realKeepAtZeroFee() (gas: 42117856)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_realKickChecksSettledBidDecoyAndRecordsCorrectID() (gas: 44156817)
+Logs:
+  receiver logic gas: 67992
+  receiver gas bound including instrumentation: 70992
+
+[PASS] test_realRelistIdentifiesReceiptWithoutNFTTransfer() (gas: 42369316)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_realSilentPurchaserReclaimIdentifiesReceipt() (gas: 42101610)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+Suite result: ok. 16 passed; 0 failed; 0 skipped; finished in 38.75s (38.75s CPU time)
+
+Ran 4 tests for test/fork/ForkAllocationProof.t.sol:ForkAllocationProofTest
+[PASS] test_activeCheckOnlyWhileKickableAndBounded() (gas: 274590915)
+Logs:
+  proof gas at 33 open, exemption lifted: 32884
+  proof gas at 1,000 open, exemption lifted: 32884
+
+[PASS] test_boundaryReadsTheQueue() (gas: 58198281)
+Logs:
+  proof gas, 32 entries, 1 FWA read: 190702
+
+[PASS] test_longHistoryRefusesAtConstantCost() (gas: 834868008)
+Logs:
+  refusal gas at 33 entries: 36824
+  refusal gas at 2,001 entries: 36824
+
+[PASS] test_manyUnresolvedReadAtMostTheBound() (gas: 56553146)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 44.11s (46.59s CPU time)
+
+Ran 6 tests for test/fork/ScanSync.t.sol:ScanSyncSelectionTest
+[PASS] test_a_routinePayCappedByBudget() (gas: 68146388)
+[PASS] test_d_delayedMaintenanceLosesNoFees() (gas: 68500006)
+[PASS] test_e_delayedSyncCannotMispriceSharesCatchUpFirst() (gas: 68546824)
+[PASS] test_f_budgetExhaustionRecoverable() (gas: 68726519)
+[PASS] test_i_scanPaysSingleConfiguredQuote() (gas: 67927229)
+[PASS] test_j_fullRedemptionSettlesWithoutFundingPayFromLiabilities() (gas: 70099876)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 30.47s (15.03s CPU time)
+
+Ran 7 tests for test/fork/ProductionLedgerModel.t.sol:ProductionLedgerModelTest
+[PASS] testFuzz_randomizedLifecycleMatchesFullReference(uint256) (runs: 256, μ: 40495945, ~: 40435026)
+[PASS] test_backingFloorCoversMaximumFeeAtRoundingBoundary() (gas: 23748178)
+[PASS] test_duplicateTransitionsCannotDoubleCountPrincipalOrFees() (gas: 2717923)
+[PASS] test_feeRoundingAndWitnessCompleteness() (gas: 2645039)
+[PASS] test_fifoOnlyNeedsBoundedTombstoneCleanup() (gas: 3759207)
+[PASS] test_maximumPruneBatchHasBoundedProductionKernelGas() (gas: 12908641)
+Logs:
+  production kernel prune sixteen gas excluding financial payment: 156618
+
+[PASS] test_owedReturnsKeepPrincipalAndCannotBeSpentEarly() (gas: 2289210)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 19.01s (19.01s CPU time)
+
+Ran 12 tests for test/research/ReceiptIdentity.t.sol:ReceiptIdentityTest
+[PASS] test_controlledFeeCreditHarvestDoesNotCreateAsyncReceipt() (gas: 39665814)
+[PASS] test_controlledWithdrawalDoesNotCreateAsyncReceipt() (gas: 2798553)
+[PASS] test_lowGasKeepNeverCommitsAnUnrecordedPayment() (gas: 46902713)
+Logs:
+  failed gas limits: 22
+  successful gas limits: 18
+  first successful gas limit: 460000
+
+[PASS] test_lowGasKickNeverCommitsAnUnrecordedPayment() (gas: 59033664)
+Logs:
+  failed kick gas limits: 40
+  successful kick gas limits: 19
+  successful kicks with stuck NFT: 0
+  first successful kick gas limit: 420000
+
+[PASS] test_protocolAndStrangerGiftsDoNotDuplicateTerminalReceipt() (gas: 40036475)
+[PASS] test_realCashBidDoesNotInventETHReceipt() (gas: 39815515)
+[PASS] test_realKeepAtDefaultFee() (gas: 39842950)
+Logs:
+  receiver logic gas: 44740
+  receiver gas bound including instrumentation: 47740
+
+[PASS] test_realKeepAtMaximumFee() (gas: 39845894)
+Logs:
+  receiver logic gas: 44740
+  receiver gas bound including instrumentation: 47740
+
+[PASS] test_realKeepAtZeroFee() (gas: 39828441)
+Logs:
+  receiver logic gas: 44740
+  receiver gas bound including instrumentation: 47740
+
+[PASS] test_realKickChecksSettledBidDecoyAndRecordsCorrectID() (gas: 41722324)
+Logs:
+  receiver logic gas: 67737
+  receiver gas bound including instrumentation: 70737
+
+[PASS] test_realRelistIdentifiesReceiptWithoutNFTTransfer() (gas: 40080207)
+Logs:
+  receiver logic gas: 44740
+  receiver gas bound including instrumentation: 47740
+
+[PASS] test_realSilentPurchaserReclaimIdentifiesReceipt() (gas: 39812656)
+Logs:
+  receiver logic gas: 44740
+  receiver gas bound including instrumentation: 47740
+
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 13.24s (28.13s CPU time)
+
+Ran 16 tests for test/fork/ForkIncrementalProduction.t.sol:ForkProductionReceiptsTest
+[FAIL: InvalidBacking()] test_bidReturnPreservesFloorBeforeInventorySyncAndReusesIdentifierAfterRetirement() (block: 26310897) (gas: 48553743)
+[PASS] test_burnedKeptPackCanStillConsumeReceipt() (gas: 46855462)
+Logs:
+  production vault runtime bytes: 23570
+
+[PASS] test_extendedKeptGiftAdoptsActualBackingOnce() (gas: 47485306)
+Logs:
+  production vault runtime bytes: 23570
+
+[PASS] test_feeChangeDoesNotReinterpretReceipt() (gas: 46800174)
+Logs:
+  production vault runtime bytes: 23570
+
+[PASS] test_mutatingCheckpointCannotSkipUnseenOwnSelectionAndReceipt() (gas: 47888434)
+Logs:
+  production vault runtime bytes: 23570
+
+[PASS] test_oversizedKeptGiftRecoversInBoundedChunksWithoutBlockingNormalInventory() (gas: 53401754)
+Logs:
+  production vault runtime bytes: 23570
+  recovery thirty Shapes complete gas: 1166930
+  recovery thirty Shapes pay wei: 259000000000000
+
+[PASS] test_productionColdKeepFee0() (gas: 46010248)
+Logs:
+  production vault runtime bytes: 23570
+
+[PASS] test_productionColdKeepFee100() (gas: 46024897)
+Logs:
+  production vault runtime bytes: 23570
+
+[PASS] test_productionColdKeepFee500() (gas: 46030636)
+Logs:
+  production vault runtime bytes: 23570
+
+[PASS] test_productionColdKickAfterFalseSettledBidCandidate() (gas: 49648858)
+[PASS] test_productionLowGasKeepRecordsOrFailsAtomically() (gas: 53494644)
+Logs:
+  keep atomic failures: 22
+  keep recorded successes: 18
+
+[PASS] test_productionLowGasKickRecordsOrFailsAtomically() (gas: 64386681)
+Logs:
+  kick atomic failures: 36
+  kick recorded successes: 23
+
+[PASS] test_realRefundedForeignTailDoesNotEarnImmediateCompensation() (gas: 47273888)
+Logs:
+  refunded foreign prefix complete gas: 216681
+  refunded foreign prefix pay wei: 0
+
+[PASS] test_realTokenBidReturnsPackPreservesPrincipalAndCreatesNoEthReceipt() (gas: 47159318)
+Logs:
+  token bid actual ETH input wei: 59292000000000000
+  token bid actual FWA tokens out raw: 26295514902208398229682
+
+[PASS] test_receiptBeforeJournalBlocksPricingAndSyncOrdersReconciliation() (gas: 47313473)
+Logs:
+  production vault runtime bytes: 23570
+
+[PASS] test_terminalReconciliationPrunesItsHeadWithoutAnotherPaidCall() (gas: 48238461)
+Suite result: FAILED. 15 passed; 1 failed; 0 skipped; finished in 56.45s (83.98s CPU time)
+
+Ran 4 tests for test/fork/ForkSelection.t.sol:ForkSelectionTest
+[PASS] test_bidOutcome_packReturnsIdle() (gas: 46370671)
+[PASS] test_keepOutcome_backingBackLessFee() (gas: 46327909)
+[PASS] test_secondCandidate_bidOutcome() (gas: 45775668)
+[FAIL: next call did not revert as expected] test_silentPurchaser_vaultReclaimsBacking() (block: 26310897) (gas: 47480279)
+Suite result: FAILED. 3 passed; 1 failed; 0 skipped; finished in 242.73s (245.18s CPU time)
+
+Ran 21 tests for test/research/IncrementalFWAFork.t.sol:IncrementalFWAForkTest
+[PASS] test_bidReturnNeedsNoValueRefreshThenCanRedeemAndReuseBacking() (gas: 45322339)
+[PASS] test_checkpointReadsNoPortfolioArray() (gas: 5134604)
+Logs:
+  real FWA cold checkpoint valuation gas: 82918
+
+[PASS] test_checkpointWindowAndExpiredAllocationRemainEnforced() (gas: 42960958)
+[PASS] test_controlledFeeCreditHarvestDoesNotCreateAsyncReceipt() (gas: 41948107)
+[PASS] test_controlledWithdrawalAndSamePackRelistKeepExactValue() (gas: 7492373)
+[PASS] test_controlledWithdrawalDoesNotCreateAsyncReceipt() (gas: 5122565)
+[PASS] test_cursorProgressSurvivesNewFWAActivityBetweenBatches() (gas: 42833310)
+[PASS] test_directKickUpdatesLedgerWithoutAnAcquisitionEntry() (gas: 45398306)
+[PASS] test_journalBeforeReceiptAndOmittedReceiptBlocksPricing() (gas: 42898473)
+[PASS] test_lowGasKeepNeverCommitsAnUnrecordedPayment() (gas: 49213019)
+Logs:
+  failed gas limits: 22
+  successful gas limits: 18
+  first successful gas limit: 460000
+
+[PASS] test_lowGasKickNeverCommitsAnUnrecordedPayment() (gas: 61493829)
+Logs:
+  failed kick gas limits: 40
+  successful kick gas limits: 19
+  successful kicks with stuck NFT: 0
+  first successful kick gas limit: 420000
+
+[PASS] test_protocolAndStrangerGiftsDoNotDuplicateTerminalReceipt() (gas: 42326593)
+[PASS] test_realCashBidDoesNotInventETHReceipt() (gas: 42105103)
+[PASS] test_realFeeIndexAndHarvestMatchFullReference() (gas: 44415928)
+[PASS] test_realKeepAtDefaultFee() (gas: 42132575)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_realKeepAtMaximumFee() (gas: 42135651)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_realKeepAtZeroFee() (gas: 42118022)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_realKickChecksSettledBidDecoyAndRecordsCorrectID() (gas: 44156891)
+Logs:
+  receiver logic gas: 67992
+  receiver gas bound including instrumentation: 70992
+
+[PASS] test_realRelistIdentifiesReceiptWithoutNFTTransfer() (gas: 42369474)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_realSilentPurchaserReclaimIdentifiesReceipt() (gas: 42101944)
+Logs:
+  receiver logic gas: 44905
+  receiver gas bound including instrumentation: 47905
+
+[PASS] test_receiptBeforeJournalCannotPriceOrRetireEarly() (gas: 42954787)
+Suite result: ok. 21 passed; 0 failed; 0 skipped; finished in 220.21s (44.79s CPU time)
+
+Ran 5 tests for test/scenario/VaultFlow.t.sol:VaultFlowSelectionTest
+[PASS] test_flow_acquire_bid() (gas: 49801797)
+Logs:
+  
+  FLOW BREAKDOWN  acquire_bid   gas 450000000 / basefee 400000000 wei, fork block 26310897
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           0.2001   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0002     0.11%
+    Shapes mint fees                                                              0.0000     0.00%
+    backing to purchaser and FWA on a bid                                         0.0648    32.37%
+    FWA settlement fee (keep/silent)                                              0.0000     0.00%
+    pack value delivered to purchasers                                            0.0000     0.00%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.2000    99.91%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.0000     0.00%
+    held in backing held by FWA (active listings) (change)                       -0.0648   -32.37%
+    held in pack value in FWA custody (listed) (change)                          -0.0600   -29.97%
+    held in inventory held by vault (idle packs) (change)                         0.0600    29.97%
+    held in FWA fees uncollected (pending + credit) (change)                     -0.0002    -0.11%
+    held in request charges held for the next checkpoint (change)                 0.0001     0.08%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.2000    99.91%
+      stated need                                                                 0.2000    99.91%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         2.8735  1435.47%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              2.8735  1435.47%
+    backing held by FWA (active listings): held                                   0.0000     0.00%
+      counters imply                                                              0.0000     0.00%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.0000     0.00%
+    pack value in FWA custody (listed): held                                      0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    inventory held by vault (idle packs): held                                    0.0600    29.97%
+      ABOVE (states no need)                                                      0.0600    29.97%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0001     0.08%
+      stated need                                                                 0.0001     0.08%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               0.2001   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.0000     0.00%  | returned 0.0000
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.0000     0.00%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0002     0.11%  | returned 0.0002
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_acquire_keep() (gas: 49767837)
+Logs:
+  
+  FLOW BREAKDOWN  acquire_keep   gas 450000000 / basefee 400000000 wei, fork block 26310897
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           0.2001   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0002     0.11%
+    Shapes mint fees                                                              0.0000     0.00%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0006     0.32%
+    pack value delivered to purchasers                                            0.0600    29.97%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.2000    99.91%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.0641    32.05%
+    held in backing held by FWA (active listings) (change)                       -0.0648   -32.37%
+    held in pack value in FWA custody (listed) (change)                          -0.0600   -29.97%
+    held in inventory held by vault (idle packs) (change)                         0.0000     0.00%
+    held in FWA fees uncollected (pending + credit) (change)                     -0.0002    -0.11%
+    held in request charges held for the next checkpoint (change)                 0.0001     0.08%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.2000    99.91%
+      stated need                                                                 0.2000    99.91%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         2.9376  1467.52%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              2.9376  1467.52%
+    backing held by FWA (active listings): held                                   0.0000     0.00%
+      counters imply                                                              0.0000     0.00%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.0000     0.00%
+    pack value in FWA custody (listed): held                                      0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    inventory held by vault (idle packs): held                                    0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0001     0.08%
+      stated need                                                                 0.0001     0.08%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               0.2001   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.0000     0.00%  | returned 0.0641
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.0000     0.00%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0002     0.11%  | returned 0.0002
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[PASS] test_flow_acquire_silent() (gas: 49545533)
+Logs:
+  
+  FLOW BREAKDOWN  acquire_silent   gas 450000000 / basefee 400000000 wei, fork block 26310897
+  TABLE 1  Where the inflows went
+    in: holder deposits and deploy seed                                           0.2001   100.00%
+    in: FWA acquisition fees earned                                               0.0000     0.00%
+    in: forced ETH (donations)                                                    0.0000     0.00%
+    paid to keepers (gas + premium)                                               0.0002     0.11%
+    Shapes mint fees                                                              0.0000     0.00%
+    backing to purchaser and FWA on a bid                                         0.0000     0.00%
+    FWA settlement fee (keep/silent)                                              0.0006     0.32%
+    pack value delivered to purchasers                                            0.0600    29.97%
+    redemptions and distributions claimed                                         0.0000     0.00%
+    deposits cancelled                                                            0.0000     0.00%
+    held in depositor escrow (pending deposits) (change)                          0.2000    99.91%
+    held in redemption reserve (change)                                           0.0000     0.00%
+    held in distribution reserve (change)                                         0.0000     0.00%
+    held in claimable to holders (settled, unpaid) (change)                       0.0000     0.00%
+    held in vault free ETH (reserve + idle) (change)                              0.0641    32.05%
+    held in backing held by FWA (active listings) (change)                       -0.0648   -32.37%
+    held in pack value in FWA custody (listed) (change)                          -0.0600   -29.97%
+    held in inventory held by vault (idle packs) (change)                         0.0000     0.00%
+    held in FWA fees uncollected (pending + credit) (change)                     -0.0002    -0.11%
+    held in request charges held for the next checkpoint (change)                 0.0001     0.08%
+    inflows - destinations                                                                       0 wei
+  TABLE 2  Where assets sit at the end (held, what counters imply, own stated need)
+    depositor escrow (pending deposits): held                                     0.2000    99.91%
+      stated need                                                                 0.2000    99.91%
+      ABOVE its need                                                              0.0000     0.00%
+    redemption reserve: held                                                      0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    distribution reserve: held                                                    0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    claimable to holders (settled, unpaid): held                                  0.0000     0.00%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              0.0000     0.00%
+    vault free ETH (reserve + idle): held                                         2.9376  1467.52%
+      stated need                                                                 0.0000     0.00%
+      ABOVE its need                                                              2.9376  1467.52%
+    backing held by FWA (active listings): held                                   0.0000     0.00%
+      counters imply                                                              0.0000     0.00%
+    backing held by FWA (active listings): held - counters                                       0 wei
+      ABOVE (states no need)                                                      0.0000     0.00%
+    pack value in FWA custody (listed): held                                      0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    inventory held by vault (idle packs): held                                    0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    FWA fees uncollected (pending + credit): held                                 0.0000     0.00%
+      ABOVE (states no need)                                                      0.0000     0.00%
+    request charges held for the next checkpoint: held                            0.0001     0.08%
+      stated need                                                                 0.0001     0.08%
+      ABOVE its need                                                              0.0000     0.00%
+  TABLE 3  One-way flows (amount | return)
+    holders -> vault: deposits | claimed back                               0.2001   100.00%  | returned 0.0000
+    vault -> FWA: backing posted | returned (kick/keep/silent/unlist)        0.0000     0.00%  | returned 0.0641
+    vault -> Shapes/Packs: value minted | redeemed (liquidate)              0.0000     0.00%  | returned 0.0000
+    vault -> keepers: pay | fees harvested back                             0.0002     0.11%  | returned 0.0002
+    FWA token rewards: claimed | burned (token units, zero ETH)             0.0000     0.00%  | returned 0.0000
+
+[FAIL: InvalidBacking()] test_flow_staged_activation() (block: 26310897) (gas: 50395263)
+[FAIL: BadBatch()] test_flow_tokens() (block: 26423454) (gas: 6626112)
+Suite result: FAILED. 3 passed; 2 failed; 0 skipped; finished in 228.39s (13.34s CPU time)
+
+Ran 3 tests for test/fork/ForkManager.t.sol:ForkManagerSelectionTest
+[PASS] test_bid_returnedPackRelistedWithoutMint() (gas: 47205242)
+[PASS] test_keep_replacementMintsFreshShapes() (gas: 47747652)
+[PASS] test_silentPurchaser_reclaimsBacking() (gas: 46160722)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 245.72s (26.28s CPU time)
+
+Ran 17 tests for test/fork/ForkKeeperPay.t.sol:ForkKeeperPayTest
+[PASS] test_budgetsBoundSpendingOverTime() (gas: 8514811)
+[PASS] test_cancelKeepsPoolForOtherFlows() (gas: 805148)
+[FAIL: deposit and charge refunded in full: 10100000000000000 != 10200000000000000] test_dustDepositCannotManufacturePay() (block: 26424971) (gas: 1353070)
+[FAIL: InvalidBacking()] test_essentialCeilingPaysExitsInSpikes() (block: 26424971) (gas: 1294258)
+[FAIL: InvalidBacking()] test_manufacturedCycleLosesAtMaxima() (block: 26424971) (gas: 19485618)
+[PASS] test_minPayIsAllOrNothing() (gas: 4682577)
+[PASS] test_newRoutineRateCeilingOnlyRefillsPermission() (gas: 633413)
+[PASS] test_payIgnoresCallerGasAndTip() (gas: 8528913)
+[PASS] test_payNeverUsesLiabilities() (gas: 3971468)
+[FAIL: next call did not revert as expected] test_repeatedWorkPaysNothing() (block: 26424971) (gas: 4916201)
+[PASS] test_requestChargeTopsUpOnce() (gas: 1147826)
+[PASS] test_routineCannotDrainEssential() (gas: 8289494)
+[PASS] test_selfServeExitWithoutEssentialBudget() (gas: 7164211)
+[PASS] test_splittingDoesNotPay() (gas: 9525233)
+Logs:
+  batch three complete gross gas: 4098772
+  three singleton complete gross gas: 5024166
+  batch three pay wei: 1011000000000000
+  three singleton pay wei: 1131000000000000
+
+[FAIL: InvalidBacking()] test_splittingDoesNotPayAtMaximumMarkup() (block: 26424971) (gas: 1340356)
+[PASS] test_tinyRedemptionCannotManufacturePay() (gas: 1693865)
+[PASS] test_unpaidWorkWhenBudgetsAreEmpty() (gas: 9301654)
+Suite result: FAILED. 12 passed; 5 failed; 0 skipped; finished in 256.97s (11.66s CPU time)
+
+Ran 7 tests for test/fork/CompleteForeignJournal.t.sol:CompleteForeignJournalTest
+[PASS] test_125SuccessfulForeignRecordsAndThreeRefundsFill128Batch() (gas: 199026446)
+[PASS] test_125SuccessfulForeignRequiredTail() (gas: 198194854)
+[SKIP] test_exportSuccessfulForeignReceiptFixture() (gas: 0)
+[PASS] test_full128ForeignScanReceiptGasFitsCap() (gas: 198850049)
+Logs:
+  full 128-record foreign backlog scan receipt-equivalent gas: 184971
+  full 128-record foreign backlog scan pay wei: 0
+
+[PASS] test_successfulForeignEarlyTailCannotCollectPayment() (gas: 1444181)
+[PASS] test_successfulForeignSingletonRequiredTail() (gas: 2504170)
+[PASS] test_successfulForeignTwoRecordRequiredTail() (gas: 2303235)
+Suite result: ok. 6 passed; 0 failed; 1 skipped; finished in 250.89s (717.52s CPU time)
+
+Ran 2 tests for test/fork/ForkMainCheckpointFairness.t.sol:ForkMainCheckpointFairnessTest
+[PASS] test_lateAllocationCannotUseMissedWindowAndRecoversThroughRealSettlement() (gas: 46746391)
+[FAIL: actual allocation lies near the configured 25bps bound: 1800000000000000000000 <= 1818892719835623877392] test_liveIncumbentAndEntrantKeepOrderingAt25bpsCompleteBothExits() (block: 26438035) (gas: 24274844)
+Suite result: FAILED. 1 passed; 1 failed; 0 skipped; finished in 411.02s (648.36s CPU time)
+
+Ran 4 tests for test/fork/ForkMainRenewal.t.sol:ForkMainRenewalTest
+[PASS] test_exitInventoryNeverCreatesFreshReplacement() (gas: 40648135)
+[PASS] test_launchVaultBidRetiresAndMintsThreePaidReplacementsExactlyOnce() (gas: 47355646)
+[PASS] test_managerKeepCreatesOnlyOnePaidReplacementPermission() (gas: 42077397)
+[PASS] test_managerReuseModeRelistsReturnedPackWithoutPaidFreshMints() (gas: 41574953)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 424.85s (1642.78s CPU time)
+
+Ran 59 test suites in 425.38s (2724.37s CPU time): 236 tests passed, 44 failed, 1 skipped (281 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/audit/AuditWorkFeeManufacture.t.sol:AuditWorkFeeManufactureTest
+[FAIL: next call did not revert as expected] test_listUnlistLoopIsGated() (block: 26424971) (gas: 2839512)
+
+Encountered 2 failing tests in test/audit/release-b/AuditB.t.sol:AuditBBudget
+[FAIL: ExplicitFeeAcceptanceRequired()] test_oneExitEmptiesEssentialBudget() (block: 26424971) (gas: 127229)
+[FAIL: ExplicitFeeAcceptanceRequired()] test_ownerKeyFirstDay() (block: 26424971) (gas: 127343)
+
+Encountered 3 failing tests in test/audit/release-b/AuditB.t.sol:AuditBPinned
+[FAIL: ExplicitFeeAcceptanceRequired()] test_hugeSurchargeDoesNotBlockUnlist() (block: 26424971) (gas: 127193)
+[FAIL: ExplicitFeeAcceptanceRequired()] test_maximumRealOracleAskDoesNotBlockExit() (block: 26424971) (gas: 127237)
+[FAIL: ExplicitFeeAcceptanceRequired()] test_measureOps() (block: 26424971) (gas: 127214)
+
+Encountered 2 failing tests in test/audit/release-b/AuditB.t.sol:AuditBSelection
+[FAIL: ExplicitFeeAcceptanceRequired()] test_harvestRefusesRepeatedIds() (block: 26310897) (gas: 47164071)
+[FAIL: ExplicitFeeAcceptanceRequired()] test_noListingIntoBusyQueue() (block: 26310897) (gas: 47687678)
+
+Encountered 1 failing test in test/audit/release/AuditFreeMismatch.t.sol:AuditFreeMismatch
+[FAIL: every wei back: 998000000000000000 != 1000000000000000000] test_cancelCyclesRetainNothing() (block: 26424971) (gas: 12279392)
+
+Encountered 2 failing tests in test/audit/release/AuditOracleGas.t.sol:AuditOracleGas
+[FAIL: empty oracle configuration cannot block the exit] test_emptyOracleAddressRejectedBeforeWindDownExit() (block: 26424971) (gas: 6886243)
+[FAIL: wrong oracle ABI cannot block the exit] test_wrongOracleAbiDoesNotBlockRedemption() (block: 26424971) (gas: 4867000)
+
+Encountered 1 failing test in test/fork/CompleteHarvest.t.sol:CompleteHarvestTest
+[FAIL: InsufficientBacking()] setUp() (block: 26417086) (gas: 0)
+
+Encountered 1 failing test in test/fork/ForkIncrementalProduction.t.sol:ForkProductionInventoryTest
+[FAIL: InvalidBacking()] test_gasCeilingAndBasefeeDoNotMoveBackingProposal() (block: 26424971) (gas: 1914100)
+
+Encountered 1 failing test in test/fork/ForkIncrementalProduction.t.sol:ForkProductionReceiptsTest
+[FAIL: InvalidBacking()] test_bidReturnPreservesFloorBeforeInventorySyncAndReusesIdentifierAfterRetirement() (block: 26310897) (gas: 48553743)
+
+Encountered 1 failing test in test/fork/ForkIncrementalProduction.t.sol:ForkProductionStagingTest
+[FAIL: next call did not revert as expected] test_foreignAutoactivationRejectedWithBoundedGasEvenWhenOurListingWouldBeActive() (block: 26310897) (gas: 68093024)
+
+Encountered 5 failing tests in test/fork/ForkKeeperPay.t.sol:ForkKeeperPayTest
+[FAIL: deposit and charge refunded in full: 10100000000000000 != 10200000000000000] test_dustDepositCannotManufacturePay() (block: 26424971) (gas: 1353070)
+[FAIL: InvalidBacking()] test_essentialCeilingPaysExitsInSpikes() (block: 26424971) (gas: 1294258)
+[FAIL: InvalidBacking()] test_manufacturedCycleLosesAtMaxima() (block: 26424971) (gas: 19485618)
+[FAIL: next call did not revert as expected] test_repeatedWorkPaysNothing() (block: 26424971) (gas: 4916201)
+[FAIL: InvalidBacking()] test_splittingDoesNotPayAtMaximumMarkup() (block: 26424971) (gas: 1340356)
+
+Encountered 1 failing test in test/fork/ForkMainCheckpointFairness.t.sol:ForkMainCheckpointFairnessTest
+[FAIL: actual allocation lies near the configured 25bps bound: 1800000000000000000000 <= 1818892719835623877392] test_liveIncumbentAndEntrantKeepOrderingAt25bpsCompleteBothExits() (block: 26438035) (gas: 24274844)
+
+Encountered 2 failing tests in test/fork/ForkManager.t.sol:ForkManagerTest
+[FAIL: factory holds no ETH: 1 != 0] test_createInitializesAtomically() (block: 26424971) (gas: 681139)
+[FAIL: assertion failed: 60000000000000000 < 61559000000000000] test_lifecycle_buildExitWithdrawEverything() (block: 26424971) (gas: 10624925)
+
+Encountered 1 failing test in test/fork/ForkMaxBatchGas.t.sol:ForkMaxBatchGasTest
+[FAIL: fixed checkpoint gas component covers this isolated receipt-equivalent sample: 474906 > 400000] test_checkpointFullHolderMixCompleteGas() (block: 26424971) (gas: 36311098)
+
+Encountered 1 failing test in test/fork/ForkReconcile.t.sol:ForkReconcileTest
+[FAIL: InvalidBacking()] test_reconcileFullCycle() (block: 26310897) (gas: 53114960)
+
+Encountered 1 failing test in test/fork/ForkSelection.t.sol:ForkSelectionTest
+[FAIL: next call did not revert as expected] test_silentPurchaser_vaultReclaimsBacking() (block: 26310897) (gas: 47480279)
+
+Encountered 1 failing test in test/fork/ForkVaultAdversarial.t.sol:ForkVaultAdversarialTest
+[FAIL: InvalidBacking()] test_buildAboveCeilingPaidAtCeilingPrice() (block: 26424971) (gas: 1304389)
+
+Encountered 3 failing tests in test/fork/ForkVaultLifecycle.t.sol:ForkVaultLifecycleTest
+[FAIL: assertion failed: 1000000000000000000 != 1000100000000000000] test_cancelDepositBeforePricing() (block: 26424971) (gas: 525164)
+[FAIL: next call did not revert as expected] test_edgeGateStopsListingWhenCrownShareRaised() (block: 26424971) (gas: 4027716)
+[FAIL: next call did not revert as expected] test_staleQuoteDoesNotUnlockUnlisting() (block: 26424971) (gas: 4296683)
+
+Encountered 2 failing tests in test/fork/ReviewBootstrap.t.sol:ReviewBootstrapTest
+[FAIL: shared fixed checkpoint charge covers automatic empty-history advance: 431360 > 400000] test_firstCheckpointAdvancesUnexposedHistoryWithoutStandaloneSync() (block: 26434971) (gas: 954492)
+[FAIL: Error != expected error: ConfigurationChanged() != Payment()] test_unexposedAdvanceIsUnpaidAtomicAndIndependentOfReserve() (block: 26434971) (gas: 395704)
+
+Encountered 1 failing test in test/fork/ScanGas.t.sol:ScanPaidGasTest
+[FAIL: fixed quote covers the keeper's billed gas: scan stays profitable: 335000 < 366799] test_paidScanProfitableN1() (block: 26310897) (gas: 49323993)
+
+Encountered 9 failing tests in test/scenario/VaultFlow.t.sol:VaultFlowPinnedTest
+[FAIL: BadBatch()] test_flow_gas_spike() (block: 26424971) (gas: 7374072)
+[FAIL: BadBatch()] test_flow_inactive_long() (block: 26424971) (gas: 7901766)
+[FAIL: BadBatch()] test_flow_inactive_short() (block: 26424971) (gas: 7901678)
+[FAIL: BadBatch()] test_flow_keeper_delay() (block: 26424971) (gas: 7868139)
+[FAIL: max-load reaches real pack admission: 0 <= 0] test_flow_max_load() (block: 26424971) (gas: 11721978)
+[FAIL: BadBatch()] test_flow_oracle_change() (block: 26424971) (gas: 8042419)
+[FAIL: BadBatch()] test_flow_settled_unclaimed() (block: 26424971) (gas: 9451854)
+[FAIL: BadBatch()] test_flow_wind_down() (block: 26424971) (gas: 8271836)
+[FAIL: BadBatch()] test_flow_withdrawals() (block: 26424971) (gas: 8271865)
+
+Encountered 2 failing tests in test/scenario/VaultFlow.t.sol:VaultFlowSelectionTest
+[FAIL: InvalidBacking()] test_flow_staged_activation() (block: 26310897) (gas: 50395263)
+[FAIL: BadBatch()] test_flow_tokens() (block: 26423454) (gas: 6626112)
+
+Encountered a total of 44 failing tests, 236 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 44 failed tests
+Tip: Run `forge test --debug --match-test <TEST_NAME>` to inspect one failing test in the debugger

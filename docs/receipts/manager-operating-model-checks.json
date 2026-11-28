@@ -1,0 +1,97 @@
+[
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "sim/test_manager.py"
+    ],
+    "exitStatus": 0,
+    "elapsedSeconds": 2.211,
+    "log": "docs/receipts/manager-operating-model-check-0.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "sim/test_manager_operating_assessment.py"
+    ],
+    "exitStatus": 0,
+    "elapsedSeconds": 0.819,
+    "log": "docs/receipts/manager-operating-model-check-1.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "sim/test_forward.py"
+    ],
+    "exitStatus": 0,
+    "elapsedSeconds": 0.203,
+    "log": "docs/receipts/manager-operating-model-check-2.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "sim/test_forward_randomness.py"
+    ],
+    "exitStatus": 0,
+    "elapsedSeconds": 6.78,
+    "log": "docs/receipts/manager-operating-model-check-3.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "sim/test_funding_holds.py"
+    ],
+    "exitStatus": 0,
+    "elapsedSeconds": 0.031,
+    "log": "docs/receipts/manager-operating-model-check-4.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "sim/test_manager_monte_carlo.py"
+    ],
+    "exitStatus": 0,
+    "elapsedSeconds": 3.801,
+    "log": "docs/receipts/manager-operating-model-check-5.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "sim/test_manager_standard_backing.py"
+    ],
+    "exitStatus": 0,
+    "elapsedSeconds": 0.583,
+    "log": "docs/receipts/manager-operating-model-check-6.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "sim/manager_reconcile.py",
+      "--funded",
+      "--output",
+      "docs/receipts/manager-operating-reconciliation.json"
+    ],
+    "exitStatus": 0,
+    "elapsedSeconds": 0.188,
+    "log": "docs/receipts/manager-operating-model-reconciliation.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "sim/test_manager_closeout.py"
+    ],
+    "exitStatus": 0,
+    "elapsedSeconds": 0.198,
+    "log": "docs/receipts/manager-operating-closeout-binding-0.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "sim/manager_closeout.py",
+      "--out",
+      "docs/receipts/manager-closeout-economics"
+    ],
+    "exitStatus": 0,
+    "elapsedSeconds": 0.191,
+    "log": "docs/receipts/manager-operating-closeout-binding-1.log"
+  }
+]

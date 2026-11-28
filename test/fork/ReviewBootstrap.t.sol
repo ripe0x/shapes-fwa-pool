@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {MeasuredPay} from "../utils/MeasuredPay.sol";
+
+import {TestVaultOps} from "../utils/TestVaultOps.sol";
+
+import {GasQuotes} from "../utils/GasQuotes.sol";
+
 import {ForkBase} from "./ForkBase.sol";
 import {DeployCore} from "../../script/DeployCore.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 import {StrategyLib} from "../../src/StrategyLib.sol";
+import {ScanLib} from "../../src/ScanLib.sol";
 import {IFWAV2} from "../../src/interfaces/External.sol";
 
 interface ReviewFwaQueue {
@@ -24,7 +31,7 @@ contract ReviewBootstrapTest is ForkBase {
         p.reserve = 0.005 ether; p.tvlCap = 2 ether;
         p.routineCap = 0.03 ether; p.routineRate = 0.0008 ether;
         p.essentialCap = 0; p.essentialRate = 0;
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
     }
 
     function assertGasContext() external {
@@ -55,8 +62,8 @@ contract ReviewBootstrapTest is ForkBase {
 
     function _historicalBacklog() private returns (uint64 begin) {
         begin = vault.acquisitionCursor();
-        vm.makePersistent(address(vault)); vm.makePersistent(address(vault.keeperPolicy()));
-        vm.makePersistent(address(VaultLib));
+        vm.makePersistent(address(vault)); vm.makePersistent(address(VaultLib));
+        vm.makePersistent(address(ScanLib)); vm.makePersistent(address(StrategyLib));
         vm.rollFork(BLOCK + 10_000);
         assertEq(keeper.code.length, 0); assertEq(keeper.balance, 0);
         assertEq(alice.code.length, 0); assertEq(alice.balance, 0);
@@ -80,7 +87,8 @@ contract ReviewBootstrapTest is ForkBase {
         }
         uint256 totalPay;
         while (vault.acquisitionCursor() < FWA.nextSequenceToProcess()) {
-            vm.prank(keeper); totalPay += vault.sync(new uint256[](0), 0, 0);
+            bytes32 _expected0 = TestVaultOps.configurationHash(vault);
+            vm.prank(keeper); totalPay += vault.sync(new uint256[](0), 0, 0, _expected0);
         }
         emit log_named_uint("authentic completed records", vault.acquisitionCursor() - begin);
         emit log_named_uint("remaining bootstrap cash before first deposit", address(vault).balance);
@@ -88,14 +96,17 @@ contract ReviewBootstrapTest is ForkBase {
         toBlackout(); _drainActualRequests();
         vm.fee(0.45 gwei); vm.txGasPrice(0.5 gwei); this.assertGasContext();
         while (vault.acquisitionCursor() < FWA.nextSequenceToProcess()) {
-            vm.prank(keeper); totalPay += vault.sync(new uint256[](0), 0, 0);
+            bytes32 _expected1 = TestVaultOps.configurationHash(vault);
+            vm.prank(keeper); totalPay += vault.sync(new uint256[](0), 0, 0, _expected1);
         }
         uint256 escrow = 0.1 ether;
         uint256 ck = vault.requestCharge();
-        vm.prank(alice); vault.deposit{value: escrow + ck}();
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: escrow + ck}(_expected2);
         assertEq(vault.pendingDepositTotal(), escrow);
         assertEq(vault.processingPool(), ck);
-        vm.prank(keeper); vault.checkpoint(0, 0);
+        bytes32 _expected3 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); vault.checkpoint(0, 0, _expected3);
         assertEq(totalPay, 0, "unexposed history cannot consume bootstrap capital");
         assertGe(vault.lastNav(), seed + escrow, "seed and deposit value remain priced");
         assertGt(vault.shareBalance(alice), 0);
@@ -111,15 +122,20 @@ contract ReviewBootstrapTest is ForkBase {
         vm.expectRevert(VaultLib.CatchUpFirst.selector);
         vault.accountedNav(0);
         uint256 ck = vault.requestCharge();
-        vm.prank(alice); vault.deposit{value: 0.1 ether + ck}();
+        bytes32 _expected4 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: 0.1 ether + ck}(_expected4);
         assertEq(vault.acquisitionCursor(), beforeCursor, "deposit does not pretend exposure history is current");
         uint256 beforeGas = gasleft();
-        vm.prank(keeper); uint256 pay = vault.checkpoint(0, 0);
+        bytes32 _expected5 = TestVaultOps.configurationHash(vault);
+        vm.recordLogs();
+        vm.prank(keeper); uint256 pay = vault.checkpoint(0, 0, _expected5);
         uint256 used = beforeGas - gasleft();
         emit log_named_uint("bootstrap checkpoint call gas, excluding intrinsic", used);
-        assertLe(used, VaultLib.Q_CHECKPOINT, "shared fixed checkpoint charge covers automatic empty-history advance");
-        assertEq(pay, ck, "only the existing shared request charge funds checkpoint");
-        assertEq(address(vault).balance, seed + 0.1 ether);
+        assertLe(used, GasQuotes.Q_CHECKPOINT, "shared fixed checkpoint charge covers automatic empty-history advance");
+        uint256 gross = MeasuredPay.gross(vault, GasQuotes.Q_CHECKPOINT, 1, true, 0.5 gwei);
+        assertEq(pay, gross < ck ? gross : ck, "only the request source funds measured checkpoint pay");
+        assertEq(vault.chargeRefundReserve(), ck - pay, "unused contribution remains owed to its payer");
+        assertEq(address(vault).balance, seed + 0.1 ether + ck - pay);
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
         assertGt(vault.shareBalance(alice), 0);
         assertEq(vault.pendingDepositTotal(), 0);
@@ -132,17 +148,21 @@ contract ReviewBootstrapTest is ForkBase {
         assertEq(owner.code.length, 0); assertEq(owner.balance, 0);
         vm.deal(owner, 1 ether);
         VaultLib.Params memory p = vault.getParams(); p.reserve = 0;
-        vm.prank(owner); vault.setParams(p);
+        bytes32 _expected6 = TestVaultOps.configurationHash(vault);
+        vm.prank(owner); vault.setParams(p, _expected6);
+        bytes32 _expected7 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Payment.selector);
-        vm.prank(keeper); vault.sync(new uint256[](0), 0, 1);
+        vm.prank(keeper); vault.sync(new uint256[](0), 0, 1, _expected7);
         assertEq(vault.acquisitionCursor(), beforeCursor, "minPay refusal reverts the cursor advance");
         uint256 beforeKeeper = keeper.balance;
-        vm.prank(keeper); assertEq(vault.sync(new uint256[](0), 0, 0), 0);
+        bytes32 _expected8 = TestVaultOps.configurationHash(vault);
+        vm.prank(keeper); assertEq(vault.sync(new uint256[](0), 0, 0, _expected8), 0);
         assertEq(keeper.balance, beforeKeeper);
         assertEq(address(vault).balance, seed, "zero reserve does not allow bootstrap depletion");
         assertEq(vault.acquisitionCursor(), FWA.nextSequenceToProcess());
+        bytes32 _expected9 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.Nothing.selector);
-        vm.prank(keeper); vault.sync(new uint256[](0), 0, 0);
+        vm.prank(keeper); vault.sync(new uint256[](0), 0, 0, _expected9);
     }
 
 }

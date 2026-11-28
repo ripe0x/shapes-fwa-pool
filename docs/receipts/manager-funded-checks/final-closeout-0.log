@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/sim/test_manager_closeout.py", line 6, in <module>
+    from manager_closeout import ROOT, PINS, build_report, checked_json, verify_sources, markdown
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/sim/manager_closeout.py", line 8, in <module>
+    from manager_standard_backing import diagnostic
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/sim/manager_standard_backing.py", line 12, in <module>
+    import forward as F
+  File "/Users/dd/CascadeProjects/shapes-fwa-pool-completion/sim/forward.py", line 31, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'

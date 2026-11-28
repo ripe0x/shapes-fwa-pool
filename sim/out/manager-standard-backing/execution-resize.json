@@ -1,0 +1,8 @@
+{
+  "reason": "Increase local baseline parallelism from4 to8workers at lower OS priority. No return values inspected; every durable path retained; fixed IDs/inputs unchanged.",
+  "atUtc": "2026-11-24T21:43:05.871322+00:00",
+  "fromWorkers": 4,
+  "toWorkers": 8,
+  "processExitStatus": 130,
+  "savedRows": 1296
+}

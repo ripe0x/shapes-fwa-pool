@@ -1,0 +1,21 @@
+{
+ "name": "Main pool individual manager closeout",
+ "deployment_target": "manager",
+ "status": "A8_ENGINEERING_PREPARED_ECONOMICS_INCOMPLETE_UNSIGNED",
+ "manifest_sha256": "b0b7c9a29731d4e8a672024c374df9a1e46c9d6357860d0541bf64ea2b67223b",
+ "signature": null,
+ "release_ready": false,
+ "authorization": "Manager closeout implementation, isolated validation and draft PR updates only. No public transactions, production mint-fee changes, live cutover or merges.",
+ "shared_vault_open": false,
+ "pooled_vault_return_gate_applied_to_manager": false,
+ "manager_values": "deploy/manager.json",
+ "economic_inputs_approved_for_production": false,
+ "note": "A8 measured-pay/reuse-only engineering passed focused checks and an unsigned local manager postflight. Actual opening, keeper and owner-exit cash flows are reconciled. A bounded final economic run stopped before any financial row on unmeasured sync context 780000:1, so operating return and production economics remain unaccepted. No public action authority is granted.",
+ "implementation_revision": null,
+ "app_revision": null,
+ "engineering_acceptance": false,
+ "manager_return_hurdle": null,
+ "production_recommendation": false,
+ "engineering_status": "A8_REUSE_ONLY_MEASURED_PAY_AND_INTACT_MIGRATION",
+ "economic_assessment": "CURRENT_RECEIPTS_RECONCILED_OPERATING_RETURN_UNMEASURED"
+}

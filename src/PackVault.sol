@@ -6,7 +6,6 @@ import {FixedPointMathLib as M} from "solady/utils/FixedPointMathLib.sol";
 import {PackAccount} from "./PackAccount.sol";
 import {VaultLib} from "./VaultLib.sol";
 import {StrategyLib} from "./StrategyLib.sol";
-import {IKeeperPolicy} from "./KeeperPolicy.sol";
 import {IShapes, IShapePacks, IFWAV2} from "./interfaces/External.sol";
 
 /// @title PackVault
@@ -17,9 +16,8 @@ import {IShapes, IShapePacks, IFWAV2} from "./interfaces/External.sol";
 /// @dev Economics, from FWAV2 source and validated against every historical EarningsAccrued event:
 ///      a listing with backing B earns expected fees k B before selection, where
 ///      k = (1 + surcharge)(1 - protocolCut)(1 - crownShare). On selection the purchaser either keeps
-///      the pack (the vault gets B (1 - s) back: net B (k - s) - P, and builds a replacement) or takes
-///      the bid (the vault keeps the pack, loses B: net B (k - 1)). Backing is set so keeping wins
-///      for the purchaser (VaultLib.edge).
+///      the pack (the vault gets B (1 - s) back) or takes the bid (the vault gets the pack back).
+///      Account-owned backing settings price both outcomes without assuming a choice.
 ///
 ///      Keepers are paid from vault ETH (a holder expense, NAV-visible), never from a fee skim, by
 ///      quote (D56). Checkpoints are funded by charges on the deposit and redemption requests that
@@ -28,7 +26,7 @@ import {IShapes, IShapePacks, IFWAV2} from "./interfaces/External.sol";
 ///      Trust: FWA, its rewards module, Shapes, ShapePacks and the FWA token are immutable
 ///      addresses fixed here. FWA's owner can change fees, the floor quote and admission; every
 ///      such change is read live, never cached. One owner (D59; transferable, never renounced,
-///      D76) sets parameters and the keeper policy at once, inside bytecode bounds (D58), pauses
+///      D76) sets economic parameters at once, inside bytecode bounds (D58), pauses
 ///      and starts wind-down. The owner cannot take assets directly; a compromised owner can raise
 ///      keeper pay to the bytecode maxima and keep for itself, bounded by the budgets.
 contract PackVault is PackAccount {
@@ -38,8 +36,7 @@ contract PackVault is PackAccount {
     uint256 internal constant INTERVAL = 12 hours; // FWA purchase interval
     uint256 internal constant SCALE = 1e36;
     uint256 internal constant OP_CHECKPOINT = 8;
-    uint256 internal constant MIN_DEPOSIT = 0.01 ether;
-    uint256 internal constant MIN_DISTRIBUTION = VaultLib.MIN_DISTRIBUTION;
+    uint256 internal constant MIN_SEED = 0.01 ether;
     uint256 public constant DEAD_SHARES = VaultLib.DEAD_SHARES;
 
     bool public depositsPaused;
@@ -49,24 +46,25 @@ contract PackVault is PackAccount {
     uint256 public totalShares;
     mapping(address => uint256) public sharesOf;
 
-    uint256 public epoch; // checkpoints completed
+    uint256 public epoch; // deposit pricing epochs completed
     uint256 public lastCheckpointInterval;
     uint256 public highWaterMark; // NAV per share, 1e18 scale
     uint256 public lastNav;
 
     struct PendingDeposit {
-        // uint96 holds 7.9e10 ETH, more than exists, so neither field can truncate.
-        uint96 amount; // escrowed, deployment charge included
-        uint32 epoch; // priced at the checkpoint that ends this epoch
-        uint96 charge; // deployment charge: escrowed with the deposit, earns no shares
-        uint32 checkpointGwei; // checkpoint charge paid, in gwei (at most ~0.51 ETH at the maxima)
+        uint128 amount; // gross cancellable escrow; construction is priced only at commitment
+        uint128 epoch;
     }
 
     mapping(address => PendingDeposit) public pendingDeposits;
     uint256 public pendingDepositTotal; // ETH escrowed, excluded from NAV
-    uint256 internal pendingChargeTotal; // deployment charges inside pendingDepositTotal
-    mapping(uint256 epoch => uint256) internal epochNav; // post-flow NAV used to price deposits
-    mapping(uint256 epoch => uint256) internal epochSupply;
+    struct Issuance {
+        uint256 gross;
+        uint256 issued;
+        uint256 remainingGross;
+        uint256 remainingShares;
+    }
+    mapping(uint256 epoch => Issuance) public issuances;
     mapping(uint256 epoch => uint256) internal epochDistPerShare; // accumulator when deposits were priced
 
     // Pro-rata redemption index. Each checkpoint fills fraction f of all locked shares at the
@@ -95,6 +93,24 @@ contract PackVault is PackAccount {
 
     // Request charges held for the next checkpoint.
     uint256 public processingPool; // excluded from NAV until the checkpoint it funds
+    uint256 public chargeRefundReserve;
+    uint256 public chargeEra;
+    uint256 public contributionCount;
+
+    struct ChargeEra {
+        uint256 total;
+        uint256 refundable;
+        bool closed;
+    }
+    struct Contribution {
+        address payer;
+        uint256 era;
+        uint256 start;
+        uint256 amount;
+        bool claimed;
+    }
+    mapping(uint256 => ChargeEra) public chargeEras;
+    mapping(uint256 => Contribution) public contributions;
 
     // ------------------------------------------------------------------ events and errors
 
@@ -104,6 +120,9 @@ contract PackVault is PackAccount {
     event Checkpoint(uint256 indexed epoch, uint256 nav, uint256 supply, uint256 filledShares, uint256 paid, uint256 distributed);
     event Claimed(address indexed holder, uint256 amount);
     event WindDownStarted();
+    event ContributionFunded(uint256 indexed id, address indexed payer, uint256 indexed era, uint256 amount);
+    event ContributionEraClosed(uint256 indexed era, uint256 total, uint256 refundable);
+    event ContributionRefunded(uint256 indexed id, address indexed payer, uint256 amount);
 
     error Paused();
     error WindingDown();
@@ -113,6 +132,7 @@ contract PackVault is PackAccount {
     error Amount();
     error Nothing();
     error SyncFirst();
+    error MintFeeNotAccepted();
 
     // ------------------------------------------------------------------ construction
 
@@ -122,12 +142,13 @@ contract PackVault is PackAccount {
         IShapePacks packs_,
         address owner_,
         VaultLib.Params memory initial,
-        IKeeperPolicy policy_
+        bytes32 expected
     ) payable PackAccount(fwa_, shapes_, packs_) {
-        _initStrategy(owner_, initial, address(policy_));
+        _initStrategy(owner_, initial);
+        _checkConfiguration(expected);
         // First issuance: the deployer's seed buys dead shares so the share price cannot be
         // inflated against a later first depositor.
-        if (msg.value < MIN_DEPOSIT) revert Amount();
+        if (msg.value < MIN_SEED) revert Amount();
         totalShares = DEAD_SHARES;
         sharesOf[address(0xdead)] = DEAD_SHARES;
         highWaterMark = msg.value * 1e18 / DEAD_SHARES;
@@ -147,10 +168,10 @@ contract PackVault is PackAccount {
         return owed > inventory ? owed - inventory : 0;
     }
 
-    /// @dev ETH locked redemptions need beyond free ETH and new deposits.
+    /// @dev Cancellable deposits are not liquidation liquidity. Only a checkpoint may commit them.
     function _need() internal view override returns (uint256) {
         uint256 owed = _owedEstimate();
-        uint256 liquid = _free() + pendingDepositTotal;
+        uint256 liquid = _free();
         return owed > liquid ? owed - liquid : 0;
     }
 
@@ -159,7 +180,8 @@ contract PackVault is PackAccount {
     ///      Request charges held for the next checkpoint are excluded too. Forced ETH lands here,
     ///      so it is attributed by balance, never by callback.
     function _free() internal view override returns (uint256) {
-        uint256 owed = pendingDepositTotal + redemptionReserve + distributionReserve + claimableTotal + processingPool;
+        uint256 owed = pendingDepositTotal + redemptionReserve + distributionReserve + claimableTotal
+            + processingPool + chargeRefundReserve;
         uint256 bal = address(this).balance;
         return bal > owed ? bal - owed : 0;
     }
@@ -172,6 +194,8 @@ contract PackVault is PackAccount {
         return free > keep ? free - keep : 0;
     }
 
+
+
     /// @dev ETH locked shares will need at the last checkpoint's price, rounded up.
     function _owedEstimate() internal view returns (uint256) {
         if (lockedShares == 0) return 0;
@@ -180,29 +204,23 @@ contract PackVault is PackAccount {
 
     // ------------------------------------------------------------------ holders
 
-    /// @notice Escrow ETH to buy shares at the next checkpoint. Cancellable until then. The
-    ///         request charge (`requestCharge()`) is kept from `msg.value` to fund that checkpoint.
-    function deposit() external payable nonReentrant {
+    /// @notice Gross escrow is cancellable until commitment. Construction quotes are estimates:
+    ///         the committing checkpoint uses its effective configuration and live mint fee.
+    function deposit(bytes32 expected) external payable nonReentrant {
+        _checkConfiguration(expected);
         if (depositsPaused) revert Paused();
         if (s.windingDown) revert WindingDown();
-        // Charges: the checkpoint (to the pool, kept on cancel) and building and listing positions
-        // with this ETH (escrowed with the deposit and refunded on cancel; at pricing it joins the
-        // vault's value, which pays for that work, and earns the depositor no shares).
         uint256 ck = requestCharge();
-        if (msg.value < MIN_DEPOSIT + ck) revert Amount();
+        if (msg.value <= ck || msg.value - ck < s.params.minDeposit) revert Amount();
         uint256 amount = msg.value - ck;
-        uint256 deploy = deployCharge();
-        uint256 charge = amount * deploy / (VaultLib.POSITION_VALUE + deploy);
         if (lastNav + pendingDepositTotal + amount > s.params.tvlCap) revert Amount();
         _settleHolder(msg.sender);
-        processingPool += ck;
+        _contribute(msg.sender, ck);
         PendingDeposit storage d = pendingDeposits[msg.sender];
-        d.amount += uint96(amount);
-        d.charge += uint96(charge);
-        d.epoch = uint32(epoch);
-        d.checkpointGwei += uint32(ck / 1 gwei);
+        if (amount > type(uint128).max - d.amount || epoch > type(uint128).max) revert Amount();
+        d.amount += uint128(amount);
+        d.epoch = uint128(epoch);
         pendingDepositTotal += amount;
-        pendingChargeTotal += charge;
         emit Deposited(msg.sender, amount, epoch);
     }
 
@@ -213,35 +231,105 @@ contract PackVault is PackAccount {
         if (amount == 0) revert Nothing();
         delete pendingDeposits[msg.sender];
         pendingDepositTotal -= amount;
-        pendingChargeTotal -= d.charge;
-        // Refund the checkpoint charge, keeping the pool funded for any flows still waiting.
-        uint256 keep = pendingDepositTotal != 0 || lockedShares != 0 ? VaultLib.requestCharge(s.params) : 0;
-        uint256 back = M.min(uint256(d.checkpointGwei) * 1 gwei, processingPool > keep ? processingPool - keep : 0);
-        processingPool -= back;
-        msg.sender.forceSafeTransferETH(amount + back);
-        emit DepositCancelled(msg.sender, amount + back);
+        _closeIdleEra();
+        msg.sender.forceSafeTransferETH(amount);
+        emit DepositCancelled(msg.sender, amount);
     }
 
     /// @notice Lock shares for redemption. Filled pro rata at checkpoints as ETH frees up; the
     ///         unfilled part stays exposed to the vault until filled. Send at least
     ///         `requestCharge()`: it funds the checkpoint; any excess is returned.
-    function requestRedeem(uint256 amount) external payable nonReentrant {
+    function requestRedeem(uint256 amount, bytes32 expected) external payable nonReentrant {
+        _checkConfiguration(expected);
         _settleHolder(msg.sender);
         if (amount == 0 || amount > sharesOf[msg.sender]) revert Amount();
         // Charges: the checkpoint (to the pool) and unwinding positions worth the shares' value
         // (to the vault, which pays for that work).
         uint256 ck = requestCharge();
-        uint256 charge = ck + M.mulDiv(M.mulDiv(amount, lastNav, totalShares), unwindCharge(), VaultLib.POSITION_VALUE);
+        uint256 charge = ck + M.mulDiv(M.mulDiv(amount, lastNav, totalShares), unwindCharge(), positionValue());
         if (msg.value < charge) revert Amount();
-        processingPool += ck;
+        _contribute(msg.sender, ck);
         if (msg.value > charge) msg.sender.forceSafeTransferETH(msg.value - charge);
         _settleDist(msg.sender);
         sharesOf[msg.sender] -= amount;
         distDebt[msg.sender] = sharesOf[msg.sender] * distPerShare / 1e18;
         Redemption storage r = redemptions[msg.sender];
+        if (amount > type(uint128).max - r.shares) revert Amount();
         r.shares += uint128(amount);
         lockedShares += amount;
         emit RedeemRequested(msg.sender, amount);
+    }
+
+    function _contribute(address payer, uint256 amount) internal {
+        if (amount == 0) return;
+        ChargeEra storage e = chargeEras[chargeEra];
+        uint256 id = contributionCount++;
+        contributions[id] = Contribution(payer, chargeEra, e.total, amount, false);
+        e.total += amount;
+        processingPool += amount;
+        emit ContributionFunded(id, payer, chargeEra, amount);
+    }
+
+    function _closeIdleEra() internal {
+        if (pendingDepositTotal == 0 && lockedShares == 0) _closeChargeEra();
+    }
+
+    function _closeChargeEra() internal {
+        ChargeEra storage e = chargeEras[chargeEra];
+        if (e.total == 0) return;
+        e.closed = true;
+        e.refundable = processingPool;
+        chargeRefundReserve += processingPool;
+        processingPool = 0;
+        emit ContributionEraClosed(chargeEra, e.total, e.refundable);
+        ++chargeEra;
+    }
+
+    /// @notice Refunds partition the era's remaining wei by contribution interval. Adjacent
+    ///         floor differences telescope, attributing every wei regardless of claim order.
+    function checkpointRefund(uint256 id) public view returns (uint256) {
+        Contribution storage c = contributions[id];
+        ChargeEra storage e = chargeEras[c.era];
+        if (c.claimed || !e.closed || c.amount == 0) return 0;
+        return M.mulDiv(c.start + c.amount, e.refundable, e.total) - M.mulDiv(c.start, e.refundable, e.total);
+    }
+
+    function claimCheckpointRefund(uint256[] calldata ids) external nonReentrant {
+        if (ids.length == 0 || ids.length > MAX_BATCH) revert Amount();
+        uint256 amount;
+        for (uint256 i; i < ids.length; ++i) {
+            Contribution storage c = contributions[ids[i]];
+            if (c.payer != msg.sender) revert Amount();
+            uint256 refund = checkpointRefund(ids[i]);
+            if (c.claimed || !chargeEras[c.era].closed) continue;
+            c.claimed = true;
+            amount += refund;
+            emit ContributionRefunded(ids[i], msg.sender, refund);
+        }
+        if (amount == 0) revert Nothing();
+        chargeRefundReserve -= amount;
+        msg.sender.forceSafeTransferETH(amount);
+    }
+
+    /// @notice Explicit checkpoint sponsorship while holder work exists; overpayment is returned.
+    function fundCheckpoint(bytes32 expected) external payable nonReentrant returns (uint256 accepted) {
+        _checkConfiguration(expected);
+        if (pendingDepositTotal == 0 && lockedShares == 0) revert Nothing();
+        accepted = M.min(msg.value, requestCharge());
+        _contribute(msg.sender, accepted);
+        if (msg.value > accepted) msg.sender.forceSafeTransferETH(msg.value - accepted);
+    }
+
+    /// @notice Required pricing work uses its explicit contribution source, never routine cash.
+    function syncCheckpoint(uint256[] calldata ids, uint256 witnessId, uint256 minPay, bytes32 expected) external returns (uint256) {
+        return _syncCheckpoint(ids, witnessId, minPay, expected, gasleft());
+    }
+
+    function _syncCheckpoint(uint256[] calldata ids, uint256 witnessId, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256 paid) {
+        _checkConfiguration(expected);
+        if (pendingDepositTotal == 0 && lockedShares == 0) revert Nothing();
+        paid = StrategyLib.syncFunded(s, fwa, packs, ids, witnessId, 1, minPay, processingPool, gasStart);
+        processingPool -= paid;
     }
 
     /// @notice Withdraw redeemed ETH and distributions.
@@ -261,7 +349,13 @@ contract PackVault is PackAccount {
         PendingDeposit memory d = pendingDeposits[h];
         if (d.amount != 0 && d.epoch < epoch) {
             _settleDist(h);
-            uint256 minted = uint256(d.amount - d.charge) * epochSupply[d.epoch] / epochNav[d.epoch];
+            Issuance storage issuance = issuances[d.epoch];
+            // The final settlement receives the aggregate floor residue. Total assigned shares
+            // therefore equals checkpoint issuance without enumerating depositors.
+            uint256 minted = d.amount == issuance.remainingGross ? issuance.remainingShares
+                : M.mulDiv(d.amount, issuance.issued, issuance.gross);
+            issuance.remainingGross -= d.amount;
+            issuance.remainingShares -= minted;
             sharesOf[h] += minted;
             // New shares earn every distribution after their pricing, even if converted later.
             distDebt[h] += minted * epochDistPerShare[d.epoch] / 1e18;
@@ -310,24 +404,33 @@ contract PackVault is PackAccount {
     ///         every Active position is worth exactly what a withdrawal would return.
     ///         Paid at cost plus one work unit, from the request charges of the flows it settles
     ///         (`processingPool`); with no flows, from the routine budget for a distribution.
-    function checkpoint(uint256 witnessId, uint256 minPay) external nonReentrant returns (uint256) {
+    function checkpoint(uint256 witnessId, uint256 minPay, bytes32 expected) external returns (uint256) {
+        return _checkpoint(witnessId, minPay, expected, gasleft());
+    }
+
+    function _checkpoint(uint256 witnessId, uint256 minPay, bytes32 expected, uint256 gasStart) private nonReentrant returns (uint256) {
+        // Zero expectation selects the unpaid redemption-only recovery path. It cannot commit
+        // pending deposits, distribute gains or earn compensation.
+        bool recoveryOnly = expected == bytes32(0);
+        if (!recoveryOnly) _checkConfiguration(expected);
+        if (recoveryOnly && minPay != 0) revert Amount();
         IFWAV2 f = fwa;
         if (!f.isPurchaseBlackout() || f.unsettledAcquisitionCount() != 0) revert NotCheckpointWindow();
         uint256 interval = block.timestamp / INTERVAL;
-        if (interval == lastCheckpointInterval) revert AlreadyCheckpointed();
+        if (!recoveryOnly && interval == lastCheckpointInterval) revert AlreadyCheckpointed();
         // Only with holder flows to settle, or with distributions on: a no-op checkpoint would
         // use up the interval's one slot and delay flows that arrive later in the blackout.
-        bool work = pendingDepositTotal != 0 || lockedShares != 0;
+        if (recoveryOnly && lockedShares == 0) revert Nothing();
+        bool work = (!recoveryOnly && pendingDepositTotal != 0) || lockedShares != 0;
         if (!work && s.params.distributionBps == 0) revert Nothing();
-        bool essential = lockedShares != 0 || s.windingDown;
-        if (!work) StrategyLib.precheck(s, minPay, essential); // with flows, the charge pool pays (no budget)
-        lastCheckpointInterval = interval;
+        if (!work) StrategyLib.precheck(s, minPay, false); // distribution pays routine; holder flows use their pool
+        if (!recoveryOnly) lastCheckpointInterval = interval;
 
         (uint256 oldest, uint64 allocatedAt) = VaultLib.oldestAllocation(s.book);
         if (oldest != 0 && block.timestamp >= uint256(allocatedAt) + f.settlementWindow()) revert SyncFirst();
         VaultLib.harvestCredit(s.book, f);
-        (uint256 nav, uint256 gasQ) = VaultLib.checkpointNav(s.book, f, packs, _free(), witnessId);
-        if (s.book.allocatedValue * BPS > nav * s.params.allocatedBoundBps) revert AllocatedExposure();
+        (uint256 nav, uint256 gasQ) = VaultLib.checkpointNav(s.params, s.book, f, packs, _free(), witnessId);
+        if (s.book.unresolvedKeepUplift * BPS > nav * s.params.upliftBoundBps) revert AllocatedExposure();
 
         uint256 supply = totalShares;
         // 1. Redemptions at the pre-flow price, funded by free ETH and new deposits. Inventory is
@@ -337,7 +440,7 @@ contract PackVault is PackAccount {
         if (lockedShares != 0) {
             uint256 frac;
             uint256 unit;
-            (frac, filled, unit, paid) = VaultLib.fill(lockedShares, nav, supply, _free() + pendingDepositTotal);
+            (frac, filled, unit, paid) = VaultLib.fill(lockedShares, nav, supply, _free() + (recoveryOnly ? 0 : pendingDepositTotal));
             redeemQ += M.mulDiv(redeemG, unit, SCALE);
             if (frac == SCALE) {
                 eraFinalQ[redeemEra] = redeemQ;
@@ -358,10 +461,10 @@ contract PackVault is PackAccount {
         // 2. Distribution of new gains, only when no shares are waiting to exit.
         uint256 distributed;
         uint256 perShare = nav * 1e18 / supply;
-        if (lockedShares == 0 && supply > DEAD_SHARES && perShare > highWaterMark && s.params.distributionBps != 0) {
+        if (!recoveryOnly && lockedShares == 0 && supply > DEAD_SHARES && perShare > highWaterMark && s.params.distributionBps != 0) {
             uint256 gain = M.mulDiv(perShare - highWaterMark, supply, 1e18);
             distributed = M.min(gain * s.params.distributionBps / BPS, _idle());
-            if (distributed >= MIN_DISTRIBUTION) {
+            if (distributed != 0 && distributed >= s.params.minDistribution) {
                 // Live shares only: the dead seed shares never claim, so their slice would strand.
                 distPerShare += distributed * 1e18 / (supply - DEAD_SHARES);
                 distributionReserve += distributed;
@@ -371,58 +474,102 @@ contract PackVault is PackAccount {
             }
         }
         perShare = nav * 1e18 / supply;
-        if (perShare > highWaterMark) highWaterMark = perShare;
+        if (!recoveryOnly && perShare > highWaterMark) highWaterMark = perShare;
 
         // 3. Deposits at the post-flow price.
-        epochNav[epoch] = nav;
-        epochSupply[epoch] = supply;
-        epochDistPerShare[epoch] = distPerShare;
-        if (pendingDepositTotal != 0) {
-            totalShares += (pendingDepositTotal - pendingChargeTotal) * supply / nav;
-            nav += pendingDepositTotal;
+        if (!recoveryOnly) epochDistPerShare[epoch] = distPerShare;
+        bool committed = !recoveryOnly && pendingDepositTotal != 0;
+        if (committed) {
+            if (s.params.packUnitsMask != 0 && shapes.mintFee() > s.params.acceptedMintFee) revert MintFeeNotAccepted();
+            uint256 gross = pendingDepositTotal;
+            uint256 charge = constructionCharge(gross);
+            uint256 issued = M.mulDiv(gross - charge, supply, nav);
+            if (issued == 0) revert Amount();
+            issuances[epoch] = Issuance(gross, issued, gross, issued);
+            totalShares += issued;
+            nav += gross;
             pendingDepositTotal = 0;
-            pendingChargeTotal = 0;
             // Deployment charges lift NAV per share; that is not a gain to distribute.
             perShare = nav * 1e18 / totalShares;
             if (perShare > highWaterMark) highWaterMark = perShare;
         }
+        if (!committed && filled == 0 && distributed == 0) revert Nothing();
         lastNav = nav;
         emit Checkpoint(epoch, nav, totalShares, filled, paid, distributed);
-        ++epoch;
+        if (!recoveryOnly) ++epoch;
+        if (recoveryOnly) {
+            // Unpriced deposits still need their funded normal checkpoint. An incumbent cannot
+            // refund that sponsorship by front-running it with a tiny unpaid redemption.
+            if (pendingDepositTotal == 0) _closeChargeEra();
+            return 0;
+        }
         if (work) {
-            // Pay comes out of the request charges; what is left over joins the vault's ETH.
-            uint256 pool = processingPool;
-            processingPool = 0;
-            return StrategyLib.pay(s, OP_CHECKPOINT, gasQ, 1, essential, minPay, pool);
+            // Source classification survives the final redemption. Contributions never become
+            // general free cash; unused wei move directly to their payers' protected reserve.
+            uint256 paidKeeper = StrategyLib.payFunded(s, OP_CHECKPOINT, gasQ, 1, true, minPay, processingPool, gasStart);
+            processingPool -= paidKeeper;
+            _closeChargeEra();
+            return paidKeeper;
         }
         if (distributed != 0) {
-            return StrategyLib.pay(s, OP_CHECKPOINT, gasQ, 1, false, minPay, type(uint256).max);
+            return StrategyLib.pay(s, OP_CHECKPOINT, gasQ, 1, false, minPay, type(uint256).max, gasStart);
         }
         // No flows and nothing distributed: revert, so the interval's one slot stays free (audit E3).
         revert Nothing();
     }
 
+    /// @notice Caller-funded redemption only. Pending deposits stay cancellable and mint fee
+    ///         changes cannot veto recovery. The caller pays wallet gas and earns no compensation.
+    function recoverCheckpoint(uint256 witnessId) external {
+        // Reuse the guarded entry point so the large bounded pricing path has one implementation.
+        this.checkpoint(witnessId, 0, bytes32(0));
+    }
+
     // ------------------------------------------------------------------ charges
 
     /// @notice What a deposit or redemption request is charged now: what tops `processingPool` up
-    ///         to one checkpoint at its quote (cost plus one work unit), rounded up to whole gwei;
+    ///         to one checkpoint at its quote (cost plus one work unit), in canonical wei;
     ///         0 when the pool already holds it. Requests in one interval share one checkpoint.
     function requestCharge() public view returns (uint256) {
-        uint256 full = VaultLib.requestCharge(s.params);
+        uint256 entries = s.book.allocationQueue.length - s.book.allocationHead;
+        if (entries > VaultLib.MAX_ALLOCATION_SCAN) entries = VaultLib.MAX_ALLOCATION_SCAN;
+        uint256 open = s.book.open.length;
+        if (s.book.activeCount != 0 && open <= VaultLib.MAX_ALLOCATION_SCAN
+            && !fwa.oracleExemptCollections(address(packs))) entries += open;
+        uint256 full = VaultLib.quote(s.params, s.params.gasSchedule.checkpoint
+            + entries * (uint256(s.params.gasSchedule.allocationEntry) + s.params.gasSchedule.allocationRead), 1, true);
         uint256 topUp = full > processingPool ? full - processingPool : 0;
-        return (topUp + 1 gwei - 1) / 1 gwei * 1 gwei;
+        return topUp;
     }
 
-    /// @notice Deployment charge per VaultLib.POSITION_VALUE deposited: building and listing one
+    /// @notice Deployment allowance per reference position: building and listing one
     ///         reference position at its quote now plus its mint fees, and never less than the
     ///         keeper margin that building it can pay out at any gas price.
     function deployCharge() public view returns (uint256) {
         return VaultLib.deployCharge(s.params, shapes.mintFee());
     }
 
-    /// @notice Unwind charge per VaultLib.POSITION_VALUE redeemed: unlisting and liquidating one position.
+    /// @notice Unwind allowance per reference position.
     function unwindCharge() public view returns (uint256) {
-        return VaultLib.unwindCharge(s.params);
+        return VaultLib.unwindCharge(s.params, s.book);
+    }
+
+    function positionValue() public view returns (uint256) {
+        return VaultLib.positionValue(s.params);
+    }
+
+    function constructionCharge(uint256 gross) public view returns (uint256) {
+        uint256 cost = deployCharge();
+        return M.mulDiv(gross, cost, positionValue() + cost);
+    }
+
+    /// @param escrowGross Cancellable principal, excluding the separately quoted checkpoint topup.
+    function previewDeposit(uint256 escrowGross) external view returns (
+        uint256 checkpointTopup, uint256 estimatedConstruction, uint256 estimatedNetPrincipal
+    ) {
+        checkpointTopup = requestCharge();
+        estimatedConstruction = constructionCharge(escrowGross);
+        estimatedNetPrincipal = escrowGross - estimatedConstruction;
     }
 
     // ------------------------------------------------------------------ owner
@@ -445,6 +592,31 @@ contract PackVault is PackAccount {
     function shareBalance(address h) external view returns (uint256 shares) {
         shares = sharesOf[h];
         PendingDeposit memory d = pendingDeposits[h];
-        if (d.amount != 0 && d.epoch < epoch) shares += uint256(d.amount - d.charge) * epochSupply[d.epoch] / epochNav[d.epoch];
+        if (d.amount != 0 && d.epoch < epoch) {
+            Issuance storage issuance = issuances[d.epoch];
+            shares += d.amount == issuance.remainingGross ? issuance.remainingShares
+                : M.mulDiv(d.amount, issuance.issued, issuance.gross);
+        }
+    }
+
+    /// @notice Lazy claim and surviving redemption preview without RPC transaction simulation.
+    function holderState(address h) external view returns (uint256 shares, uint256 locked, uint256 claimable) {
+        shares = sharesOf[h];
+        uint256 debt = distDebt[h];
+        PendingDeposit memory d = pendingDeposits[h];
+        if (d.amount != 0 && d.epoch < epoch) {
+            Issuance storage issuance = issuances[d.epoch];
+            uint256 minted = d.amount == issuance.remainingGross ? issuance.remainingShares
+                : M.mulDiv(d.amount, issuance.issued, issuance.gross);
+            shares += minted;
+            debt += minted * epochDistPerShare[d.epoch] / 1e18;
+        }
+        claimable = claimableEth[h] + shares * distPerShare / 1e18 - debt;
+        Redemption storage r = redemptions[h];
+        if (r.shares != 0) {
+            uint256 q = r.era < redeemEra ? eraFinalQ[r.era] : redeemQ;
+            claimable += M.mulDiv(r.shares, q - r.q0, r.g0);
+            if (r.era == redeemEra) locked = M.mulDiv(r.shares, redeemG, r.g0);
+        }
     }
 }

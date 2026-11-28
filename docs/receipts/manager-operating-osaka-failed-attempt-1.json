@@ -1,0 +1,102 @@
+{
+ "status": "FAIL",
+ "phase": "load-allocated-chunk-9-of-9",
+ "command": [
+  "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+  "keeper/calibrate_manager_operations.py",
+  "--execute",
+  "--attach",
+  "--port",
+  "18783"
+ ],
+ "scriptSha256": "494fa5078599a2fb4cc3bb36ed52baf8f5edd05f337ed8846524d49f8680a2c2",
+ "contractSourceSha256": {
+  "src/PackAccount.sol": "18effdf4eeddc1cde3eab969fe7cab29080985c1d4e35b0717cf1b26b15b0af2",
+  "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+  "src/PackVault.sol": "a2c1d7c4d0826722cc5658943a15bf5c5cafd119ff7ff56d35b7b876ce4d2aee",
+  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+  "src/StrategyLib.sol": "9552d8c0b2581287e041a17a6fe9399775f3e37576a25051dff9af1f2f83c7ab",
+  "src/VaultLib.sol": "0b341caa2b97f279d3107963e15e30e35ce0e87e4cc54342a9fd39904f64f75f",
+  "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+ },
+ "input_sha256": {
+  "sim/out/manager-operating-native-checkpoint.json": "901c621ef350f0902a946dc90c3d50186f7e770f2bbc740fb9d8f6c6891ed114",
+  "sim/out/manager-operating-native-checkpoint.hex": "8d8d391e8a61d01ff3a2489cf7632d009ec2a7ddd1a38a18fd016cc63caacb62",
+  "sim/out/manager-operating-returned-native.json": "0df9ac947e8b5ca6696cac43ddfb4746e468b3c8980bf659c70a12825cc7f8f1",
+  "sim/out/manager-operating-returned-native.hex": "856cc7f008413b8741ac112a98e5fc9936080908637b30a0d7e206589973d70d",
+  "docs/receipts/manager-operating-cancun-receipts.json": "233f0135c60b0ab8fa7deb11ebf8d4bd6ae2b31fbdd857f74fe7aabcc707a48b",
+  "sim/out/manager-operating-checkpoint-alloc.json": "d484414fab94cd6be815288d99f602428b914c56ec13add1a1901741edfcbf71",
+  "sim/out/manager-operating-checkpoint-metadata.json": "20c2011a60f467a7d8bbcf37ef6b0b906a7f49828202cf50334ba2d4ce0a8a54",
+  "sim/out/manager-operating-checkpoint-diff.json": "4f99cafd2d07d28402c4f04081f8aa79fc6a6e78cb7646c0a248673f4fd47981"
+ },
+ "executionHardfork": "Osaka",
+ "compilerTarget": "Cancun",
+ "rpc": "http://127.0.0.1:18783",
+ "chainId": 31337,
+ "publicTransactions": 0,
+ "ownedNodePid": 63188,
+ "nodeCommand": [
+  "anvil",
+  "--host",
+  "127.0.0.1",
+  "--port",
+  "18783",
+  "--accounts",
+  "0",
+  "--chain-id",
+  "31337",
+  "--hardfork",
+  "osaka",
+  "--enable-tx-gas-limit",
+  "--gas-limit",
+  "60000000",
+  "--fork-url",
+  "https://mainnet.gateway.tenderly.co",
+  "--fork-block-number",
+  "26385000",
+  "--retries",
+  "30",
+  "--fork-retry-backoff",
+  "5000",
+  "--silent"
+ ],
+ "workDirectory": "/var/folders/ql/fxv4cbz95kz22crsmldp06sm0000gn/T/manager-operating-osaka-xpe928q4",
+ "transactions": [],
+ "submissions": [],
+ "checkpointLoads": [],
+ "externalEOAs": {},
+ "actors": {
+  "owner": "0x5b01599a32C3b99826bca57E97FEBe76986dF14D",
+  "keeper": "0xFDeFC387cF9E5dBfc09Ea54bA8490501A16a2E9c",
+  "purchaser": "0x4dE365ea3b8e94f30b4D5BFd9D89FaE323bEE55d"
+ },
+ "limitations": [
+  "Authenticated request/proof setup is execution-derived and not billed as a production deployment.",
+  "Historical Cancun samples are preserved and excluded from this gas calibration.",
+  "Independent restored branches are samples, not one cash lifecycle or full-period return.",
+  ".00025 ETH is an agent-selected fork sensitivity, not an approved public mint fee.",
+  "Multi-pack fresh renewal and operating work beyond the measured sizes remain unmeasured."
+ ],
+ "nodeInfo": {
+  "currentBlockNumber": "0x1929a68",
+  "currentBlockTimestamp": 1794319583,
+  "currentBlockHash": "0xcee4ad361ef948dd4f5167373cf8d97c77ae8d8fc5294398bc727cb1d94ff405",
+  "hardFork": "Osaka",
+  "transactionOrder": "fees",
+  "environment": {
+   "baseFee": "0xe6af760",
+   "chainId": 31337,
+   "gasLimit": "0x3938700",
+   "gasPrice": "0x4a05c160"
+  },
+  "forkConfig": {
+   "forkUrl": "https://mainnet.gateway.tenderly.co",
+   "forkBlockNumber": 26385000,
+   "forkRetryBackoff": 5000
+  },
+  "network": "ethereum"
+ },
+ "bareSnapshot": "0x1",
+ "error": "URLError(ConnectionResetError(54, 'Connection reset by peer'))"
+}

@@ -1,0 +1,14 @@
+test_credit_sweep_can_be_economic_without_filling_float (test_funding_holds.FundingHoldTest.test_credit_sweep_can_be_economic_without_filling_float) ... ok
+test_first_cash_covering_prefix_share_or_permission_failure_stops_sync (test_funding_holds.FundingHoldTest.test_first_cash_covering_prefix_share_or_permission_failure_stops_sync) ... ok
+test_keeper_cash_clamps_after_proceeds_below_equal_and_above_float (test_funding_holds.FundingHoldTest.test_keeper_cash_clamps_after_proceeds_below_equal_and_above_float) ... ok
+test_legacy_return_cannot_bypass_reserve_before_fresh_replacement (test_funding_holds.FundingHoldTest.test_legacy_return_cannot_bypass_reserve_before_fresh_replacement) ... ok
+test_multiple_claims_reach_first_true_cash_covering_prefix (test_funding_holds.FundingHoldTest.test_multiple_claims_reach_first_true_cash_covering_prefix) ... ok
+test_primary_liabilities_stay_outside_both_sources (test_funding_holds.FundingHoldTest.test_primary_liabilities_stay_outside_both_sources) ... ok
+test_renewal_cash_preserves_reserve_and_owed_after_incoming_principal (test_funding_holds.FundingHoldTest.test_renewal_cash_preserves_reserve_and_owed_after_incoming_principal) ... ok
+test_renewal_prefix_clamps_retirement_credit_and_fees_after_reserve (test_funding_holds.FundingHoldTest.test_renewal_prefix_clamps_retirement_credit_and_fees_after_reserve) ... ok
+test_terminal_cash_and_credit_jointly_fill_full_hold_before_compensation (test_funding_holds.FundingHoldTest.test_terminal_cash_and_credit_jointly_fill_full_hold_before_compensation) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.001s
+
+OK

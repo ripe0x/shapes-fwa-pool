@@ -1,0 +1,17 @@
+{
+  "capturedAt": "2026-11-24T15:36:14.928090+00:00",
+  "forge": "forge Version: 1.8.1\nCommit SHA: 982849d3140c01fd3b72905759581a132df7aa98\nBuild Timestamp: 2026-08-28T17:50:40.383510000Z (1787939440)\nBuild Profile: dist",
+  "pythonEnvironment": {
+    "python": "3.14.5 (main, May 10 2026, 10:21:34) [Clang 17.0.0 (clang-1700.6.4.2)]",
+    "numpy": "2.5.5",
+    "eth_abi": "5.2.0",
+    "eth_utils": "6.0.0"
+  },
+  "mainBase": "e94fd99c072448bbbbb090c60d4f1e9b51df56ed",
+  "contractEngineeringCommit": "d0436bd46729dc73f1c378f93f7979d6cadc3677",
+  "mainPullRequest": "https://github.com/ripe0x/shapes-fwa-pool/pull/8",
+  "appPullRequest": "https://github.com/ripe0x/shapes-pool-balancer/pull/37",
+  "appRevision": "c83cf8f6397010a6bc0e6db5a34956636c0a9131",
+  "currentImageInputRevision": "49da8105ab50e45ca27957eb2604acd15737978c",
+  "contractSourceSetSha256": "d85c926518a689c73c6575937fd7d3dcde0d1a484d5abfe6de6faa22a4ca8e39"
+}

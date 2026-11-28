@@ -1,0 +1,38 @@
+[
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "script/release.py",
+      "manifest",
+      "--target",
+      "manager"
+    ],
+    "exit_status": 0,
+    "elapsed_seconds": 0.161,
+    "output": "wrote deploy/manager-release-manifest.json sha256 c83b9b093f2dcca3c73f572f7a695e09c12c1d165c7e45a9a6ba9aaa841cdbda\n"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "script/release.py",
+      "manager-package",
+      "broadcast/Deploy.s.sol/1/dry-run/run-latest.json"
+    ],
+    "exit_status": 0,
+    "elapsed_seconds": 0.569,
+    "output": "wrote unsigned manager-only deployment and keeper address data; no vault or seed\n"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "script/release.py",
+      "manager-create",
+      "0xbb19536496e016ff33f15e8fae56bf17ccac9786",
+      "0xCB43078C32423F5348Cab5885911C3B5faE217F9",
+      "500000000000000000"
+    ],
+    "exit_status": 0,
+    "elapsed_seconds": 0.938,
+    "output": ""
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "status": "INVALID_PAYMENT_MODEL",
+  "sourceCommit": "8e8d5e062914dbd584a95932d70a93d734862ae2",
+  "exitStatus": 130,
+  "stoppedAtUtc": "2026-11-25T00:02:18.196420+00:00",
+  "savedRows": 20020,
+  "outcomesInspected": false,
+  "reason": "Simulator clamped cash before incoming receipts, could commit routine work with zero/partial unaccepted keeper compensation, omitted zero-paid keeper gas and manager unpaid-call counter. Contract final payment protects minPay. These partial rows are preserved and excluded from conclusions.",
+  "manifestSha256": "bafa22a1e23e71efb276eae9be0fc68ebd8d30420a24dab560a23d34f5d715c9",
+  "rawRowsSha256": "69fbfaf65b63165e88b09824e09d3b4bbc4ff1918e257f148be5d355d19e83ca",
+  "compressedRowsSha256": "3a1bf09580f70e86e6f481b021c5fdf86628fd510f11554ddc8f0a865e61df56",
+  "compressedBytes": 2538058
+}

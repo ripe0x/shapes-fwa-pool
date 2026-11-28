@@ -1,0 +1,153 @@
+{
+  "status": "FOCUSED_FUNDING_AND_LOCAL_EXIT_PASS_ECONOMIC_CAMPAIGN_PENDING",
+  "baseCommit": "8e8d5e062914dbd584a95932d70a93d734862ae2",
+  "sources": {
+    "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+    "src/PackAccount.sol": "18effdf4eeddc1cde3eab969fe7cab29080985c1d4e35b0717cf1b26b15b0af2",
+    "src/PackVault.sol": "a2c1d7c4d0826722cc5658943a15bf5c5cafd119ff7ff56d35b7b876ce4d2aee",
+    "src/VaultLib.sol": "0b341caa2b97f279d3107963e15e30e35ce0e87e4cc54342a9fd39904f64f75f",
+    "src/StrategyLib.sol": "9552d8c0b2581287e041a17a6fe9399775f3e37576a25051dff9af1f2f83c7ab",
+    "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+    "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+    "sim/vault.py": "4f22da5672c1d078c837c27252f068a7761541077616bafced1495830ffb1390",
+    "sim/forward.py": "a3b419869eaa016401fbc1b18ab536fc6f076c2bb526d897a544c874a4cbd379",
+    "sim/manager_reconcile.py": "608cc8680c39ae885920d314944daa08b1d6bc0d4ce4bb3dbc04c3f266b6740a",
+    "keeper/policy.py": "42a40400cee6acd7ad1b3342548bd5f0754d11636a9b890118caa346bd4f219a",
+    "keeper/rehearse_manager_r2.py": "b74f24d169ef0e10f0b8731a0f2879fa3fb9fa889c65fad9efcb4c72800f41a1",
+    "test/fork/ForkManagerFundingDeficit.t.sol": "c40367824d37d4bfcc43ddebf0adf1f22650c5b4e0710f05cb061cb2cb1f0fa2",
+    "script/release.py": "945b208b3bdbad79650bebbf9aef78b60e56d2e91478696b0128c32235f67464"
+  },
+  "files": [
+    {
+      "path": "docs/receipts/manager-funded-checks/pure-6.log",
+      "sha256": "27f750e3cd1b81cd0f6b54e75defdcd72eca37476d2670ad98d947af48264003"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/pure-5.log",
+      "sha256": "a94d58c5e250c902d37c740ba389ad15d027fe564c13e7fa8fdfa88dca9d41c1"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/pure-4.log",
+      "sha256": "0e6d048a702c52c655e2866f725d18712938bffe0c618fc4fe131efc626a261d"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/pure-0.log",
+      "sha256": "e6022ee252622355326c376e5c6bd7be6c4974144382c8c867b1adca9f38a61a"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/packaging-0.log",
+      "sha256": "21b18ddafafb76eb215073cf3c58a3049c86f819cb6f68b4d638b8389bafd3f7"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/packaging-1.log",
+      "sha256": "10bda9ccce3f8317be2bb0f271959b66341d21e0c55b6113176da4f75896fcd8"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/pure-1.log",
+      "sha256": "4d3628b8cec720814c528a437f40d6cd892a556dbb8121e3df6e5e7ed03455cd"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/pure-3.log",
+      "sha256": "c41b86173347c333f8e5228abee307dc9404b776be327c4c6416f042d90c9709"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/pure-2.log",
+      "sha256": "dd23875c235c17bc6c0de701e9b098d8ec0685039db32dcdb913511c0ca2b92a"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/funding-holds-repair.log",
+      "sha256": "49bb2452cbfba39beaf7df0608cc250e544449f242b5583be3dd0c4561c95b62"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/reconciliation.log",
+      "sha256": "87ac0f0940c22edc2c7d9867fcd34ed8f61473f88c521ef643599e65035c1b27"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/packaging-batch.json",
+      "sha256": "4a2e8aa8745e8313f62ea48626a73b6d5a5fe0bcf63d4bccf874269dc64311a5"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/standard-final.log",
+      "sha256": "3ed19b32ccf95005ef94832c466efe12b581e82273220bc695d7a6e322e8c9f4"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/pure-batch.json",
+      "sha256": "eff6a3e571b3b0a5578afff02887bfb4f07e9e916a4004da5ef713c298923074"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/shapes-manager-funded-fork-batch.log",
+      "sha256": "1094114a4ba5e196b4961c3dcb9aa9599b65926fed956fa626cdfe833ca300d1"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/shapes-manager-funded-funding-trace-repair.log",
+      "sha256": "4cf9786ff7c0cbc29e9597564f9937445227daa4ee3862ec034b44e73c78a4bb"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/shapes-manager-funded-funding-fixture-final.log",
+      "sha256": "5e6da01350706dbd7d2e3bd3f8ea1d245c7a9d634de8512cedb91adc3439ba06"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/shapes-manager-funded-rehearsal.log",
+      "sha256": "0995c9a806488e9555498fa844001902108cb04aefa9029afc73f586a1df7806"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/shapes-manager-funded-rehearsal-resume.log",
+      "sha256": "9ae6b1a524b686429e7ebce4596a275701f99722dfa5f893b4d3e9970c0a45a8"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/shapes-manager-funded-rehearsal-resume2.log",
+      "sha256": "f3c8505f1b9219a4e05208919503c4943e13fefab3f11e471b8e198ec5148502"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/shapes-manager-funded-app-typecheck.log",
+      "sha256": "09c7269c33779698d260100c549c83ea1dc274a192c6e6fbc12c3f4542abdc7c"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/shapes-manager-funded-app-tests.log",
+      "sha256": "4e32b3be922bf42a85e63d589e54b85809de55b68953a1fb60fbc17510adc326"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/shapes-manager-funded-unsigned-prepare.log",
+      "sha256": "3e657e61afe9f9e2eca24ecf7c321b60946756216596e84ba98927b0dc1677c1"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/callback.log",
+      "sha256": "3440e94ad4247afdf6cb46cc8aca28a9c80beda768163eabfcf917b189872484"
+    },
+    {
+      "path": "docs/receipts/manager-funded-checks/release-final.log",
+      "sha256": "0b9e2191320d214fc7e632dabe328e2220ff02d77c7e4b48bdf676846cc73d26"
+    }
+  ],
+  "checks": {
+    "existingForkTests": 18,
+    "newFundingForkTests": 3,
+    "pureFundingTests": 9,
+    "randomnessTests": 7,
+    "managerTests": 13,
+    "completionTests": 12,
+    "vaultTests": 18,
+    "forwardTests": 2,
+    "releaseTests": 22,
+    "statisticsTests": 18,
+    "standardBackingTests": 5,
+    "appTests": 14,
+    "appTypecheckExitStatus": 0,
+    "realFundedReconciliationSteps": 43,
+    "localRehearsalReceipts": 23,
+    "coldCloneCallbackTests": 1
+  },
+  "failuresPreserved": [
+    "Initial legacy recipe assertion mistakenly counted two instead of four Shapes; repaired expected total fees .0035ETH.",
+    "Initial funding fixture changed weights and missed real selection; second attempt exceeded legitimate backing-offset admission; repaired using exact archived tree/words and seven uniquely backed positions.",
+    "First local rehearsal allowed only three bounded index passes; resumed existing fork and receipts.",
+    "First resumed acquisition quote and estimation differed in fee envelope; exact fixed0.2gwei legacy quote/estimate/send repaired without additional account funding."
+  ],
+  "limits": [
+    "No public broadcast or shared-vault opening.",
+    "Simulation return results pending; old two-draw and partial campaigns invalid.",
+    "No new authenticated-VRF billed renewal, standalone harvest or variable routine sync/list receipt curves.",
+    "Cheap-calibration fee-prefix regression is not keeper-profit evidence.",
+    "Owner hardware/encrypted-keystore transport and current-source browser rerun not performed; additive ABI/typecheck/tests preserve earlier unchanged UI-flow evidence."
+  ]
+}

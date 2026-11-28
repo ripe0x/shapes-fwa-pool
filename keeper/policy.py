@@ -6,7 +6,7 @@ A call is planned only when the vault pays for it (necessary work, or value well
 or when holders need it (redemption liquidity, wind-down). Everything is recomputed each pass, so
 an interrupted keeper resumes from chain state alone.
 
-Gas classes (D45). Fixed quotes can underpay a planned candidate; the executor checks the
+Gas classes (D45). Bounded measured compensation can underpay a planned candidate; the executor checks the
 actual offer and signed-call estimate before accepting it. Above the ceiling only
 liability work is planned: redemption liquidity, the checkpoint that prices a redemption, and
 wind-down. Everything else (new packs, relists, fee harvests, deposit pricing, token
@@ -17,6 +17,7 @@ import functools
 import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
+from config import GAS_DEFAULTS, GAS_KEYS
 
 SOURCE_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
@@ -28,26 +29,12 @@ ACTIVE, ALLOCATED, WITHDRAWN, SETTLED = 1, 2, 3, 4
 # probability (its weight)/(total weight), each listing's weight being 1e36/backing.
 EXPOSURE_SHARE_HIGH_BPS = 1_000  # 10%
 
-# The vault's quoted-gas schedule, line for line (VaultLib Q_* constants, D56). Pay is a quote
-# fixed by the operation and its completed work, never the caller's gas. build-and-list replaced
-# restock/mint/split (direct-mint recipe): each pack mints its Shapes straight into ShapePacks and
-# lists at once, so a pack of `units` costs Q_BUILD_PACK + shapeCount x Q_BUILD_SHAPE to build.
-Q = dict(checkpoint=360_000, build=300_000, build_pack=300_000, build_shape=130_000,
-         list=280_000, listed=825_000, sync=85_000, journal_tail=120_000, distribution_proof=80_000,
-         synced=120_000, journal=22_000, scan=30_000, selected=180_000,
-         pruned=45_000, unlist=340_000, unlisted=285_000, liquidate=75_000, liq_pack=80_000,
-         redeem_shape=35_000, recovery_base=100_000, recovery_shape=35_000,
-         recovery_unseal=70_000, harvest=125_000, harvested=80_000,
-         sync_credit=40_000, sync_funding=40_000)
-POSITION_VALUE = 1248 * 10**14  # 0.1248 ETH: what deploy/unwind charges are scaled by
-REF_UNITS = 6  # the reference recipe: one 0.05 and one 0.01 Shape, two paid primary mints
+# Default calibration only. Every observed account carries its own schedule.
+Q = {GAS_KEYS[k]: v for k, v in GAS_DEFAULTS.items()}
+REF_UNITS = 3
 MIN_PACK_UNITS, MAX_PACK_UNITS = 3, 30
-MIN_KEEP_ADVANTAGE = 3 * 10**14  # 0.0003 ETH: a keep must beat the best bid by this after redeem gas
-Q_PURCHASER_REDEEM_PACK, Q_PURCHASER_REDEEM_SHAPE = 100_000, 30_000  # ShapePacks.redeem gas: pack + per Shape
-PURCHASER_GAS_PRICE = 2 * 10**9  # the purchaser's redeem gas price bound, independent of the keeper ceiling
-Q_POSITION_SYNC = Q["journal"] + Q["selected"] + Q["synced"] + Q["pruned"]
-CYCLE_GAS = Q_POSITION_SYNC + Q["listed"] + Q["harvested"]  # a bid cycle's quoted gas (gates)
-MAX_BATCH = dict(sync=16, journal=128, selected=16, prune=16, harvest=16, list=8, build=8, unlist=16, liquidate=16, tokens=16)
+MAX_SCAN = 96  # hard work bound, independent of mutable quote coefficients
+MAX_BATCH = dict(sync=16, journal=128, selected=16, prune=16, harvest=16, list=8, build=4, unlist=16, liquidate=16, tokens=16)
 
 
 def shape_count(units):
@@ -87,6 +74,7 @@ class State:
     queue_drained: bool
     checkpoint_done_this_interval: bool
     listings: list = field(default_factory=list)
+    relistable_idle: int = None
     idle_packs: int = 0
     recovery_packs: int = 0
     free: int = 0  # balance less escrow and holder reserves
@@ -133,10 +121,26 @@ class State:
     pack_units_mask: int = 1 << REF_UNITS  # account packUnitsMask: the pack sizes it admits
     build_units: int = REF_UNITS  # pack size the keeper builds; must be enabled in pack_units_mask
     essential_ceiling: int = None  # redemption and wind-down work; None = same as gas_ceiling
+    book_pack_count: int = 0
+    book_shape_count: int = 0
+    book_capital: int = 0
+    book_max_units: int = 0
+    book_recovery_count: int = 0
+    book_recovery_value: int = 0
+    checkpoint_proof_entries: int = 0
     processing_pool: int = 0  # request charges already held for the next checkpoint (pool only)
     essential_cap: int = None  # essentialCap; 0 = exit work unpaid (withdrawers run it)
     pooled: bool = True  # a PackVault (shares, checkpoints); False for a personal PackManager
-    settlement_fee_bps: int = 100  # FWA ownerSettlementFeeBps: fee on a keep (B(1-s) is returned)
+    settlement_fee_bps: int = 100
+    gas_schedule: dict = field(default_factory=lambda: Q.copy())
+    backing_ratio_bps: int = 70_000
+    keeper_cash: int = None
+    operating_reserve: int = 0
+    accepted_mint_fee: int = 10**15
+    configuration_hash: str = ""
+    caller_funded_exit: bool = False
+    request_funding_needed: int = 0
+
 
 
 def price(s, essential=False):
@@ -147,44 +151,66 @@ def price(s, essential=False):
 
 
 def quote(s, gas, units=0, essential=False):
-    """VaultLib.quote, the vault's envelope: quoted gas at the price, markup on routine work, plus
-    work fees. Gates and charges use it; pay never exceeds it."""
-    q = gas * price(s, essential)
+    """Conservative payment envelope; work allowances cap measured gas."""
+    if gas == 0 and units == 0:
+        return 0
+    q = (gas + s.gas_schedule['overhead']) * price(s, essential)
     if not essential:
         q = q * (BPS + s.markup_bps) // BPS
     return q + units * s.work_fee
 
 
+def payment(s, gas, units=0, essential=False, *, measured_gas, tx_gas_price=None):
+    """Measured compensation, before cash/permission limits; never infer a bill from a cap."""
+    if gas == 0 and units == 0:
+        return 0
+    if measured_gas < 0:
+        raise ValueError('measured gas must be nonnegative')
+    paid_price = min(s.gas_price if tx_gas_price is None else tx_gas_price, price(s, essential))
+    amount = (min(measured_gas, gas) + s.gas_schedule['overhead']) * paid_price
+    if not essential:
+        amount = amount * (BPS + s.markup_bps) // BPS
+    return amount + units * s.work_fee
 
-def pay_v1(s, gas, units=0, essential=False):
-    """What KeeperPolicyV1 offers, capped by the envelope: quoted gas at min(basefee + maxTip,
-    ceiling) plus the work fee per unit, no markup. The live keeper reads pay by simulating the
-    call instead, so it follows whatever policy is active."""
-    return min(gas * price(s, essential) + units * s.work_fee, quote(s, gas, units, essential))
+
+def cycle_gas(s, retirement_shapes=None):
+    q = s.gas_schedule
+    return sum(q[k] for k in ('sync', 'journal', 'selected', 'synced', 'pruned', 'sync_funding', 'harvested', 'sync_credit', 'list', 'listed'))
+
+
+def position_value(s, units=None):
+    units = s.build_units if units is None else units
+    # Zero-mask fallback is only a quote denominator; authorization remains the actual mask.
+    value = (units or REF_UNITS) * UNIT
+    return value + value * s.backing_ratio_bps // BPS
+
 
 def edge_backing(k, cap, s_bps, units, gas_ceiling, markup_bps, work_fee, buffer_bps=0, min_edge_bps=100,
-                 discount_bps=9_150, price=None, mint_fee=10**15):
-    """Mirror of VaultLib.edge / _backingTerms (D62): the backing a new listing posts, 0 when it must
-    not list. Purchasers are expected to keep, so backing is the largest amount at which keeping the
-    pack (the account gets B(1-s) back) still beats taking FWA's best bid (max(ETH, token) x B) by
-    MIN_KEEP_ADVANTAGE after the gas to redeem the pack. `cap` is FWA's oracle cap (None when FWA
-    exempts the collection, 0 when no quote); `discount_bps` is max(settlementDiscountBps,
-    tokenSettlementDiscountBps); `price` the quoted price now (default: the ceiling)."""
+                 discount_bps=9_150, price=None, mint_fee=10**15, backing_ratio_bps=70_000,
+                 gas_schedule=None, newly_built=True, reference_units=None, retirement_shapes=None):
+    """Adjustable ratio backing, with actual FWA admission and no buyer-choice preference."""
+    q = Q if gas_schedule is None else gas_schedule
     value = units * UNIT
-    floor = value + value // 19 + (0 if value % 19 == 0 else 1)  # ceil(value / 0.95)
-    redeem_gas = Q_PURCHASER_REDEEM_PACK + shape_count(units) * Q_PURCHASER_REDEEM_SHAPE
-    margin = MIN_KEEP_ADVANTAGE + redeem_gas * PURCHASER_GAS_PRICE
-    desired = 0
-    if discount_bps != 0 and value > margin:
-        desired = (value - margin) * BPS // discount_bps // BPS * BPS  # quantized to 10,000 wei
+    floor = -(-value * BPS // 9500)  # Conservative NAV coverage at the protocol maximum 5% keep settlement fee.
+    desired = value * backing_ratio_bps // BPS // BPS * BPS
     if cap is not None:
-        desired = min(desired, cap * (BPS - buffer_bps) // BPS)
+        desired = min(desired, cap * (BPS - buffer_bps) // BPS // BPS * BPS)
     pr = gas_ceiling if price is None else price
-    cycle_cost = CYCLE_GAS * pr * (BPS + markup_bps) // BPS + 2 * work_fee  # quote(CYCLE_GAS, 2)
-    s = s_bps * 10**14  # settlement fee, 1e18 scale
+    gas = sum(q[x] for x in ('sync', 'journal', 'selected', 'synced', 'pruned', 'sync_funding', 'harvested', 'sync_credit'))
+    recipe = units if newly_built or reference_units is None else reference_units
+    construction = (q['build'] + q['build_pack'] + shape_count(recipe)*q['build_shape'] + q['listed']) * pr*(BPS+markup_bps)//BPS + 2*work_fee + shape_count(recipe)*mint_fee
+    service_units = 1 if newly_built else 2
+    if not newly_built:
+        gas += q['list'] + q['listed']
+        construction = 0
+    # A construction and a synchronization are distinct transactions; a returned
+    # pack instead requires synchronization and relisting.
+    overhead_calls = 1 if newly_built else 2
+    construction += (q['overhead'] * pr * (BPS + markup_bps) // BPS) if newly_built else 0
+    cycle = (gas + overhead_calls*q['overhead'])*pr*(BPS+markup_bps)//BPS + service_units*work_fee
     ok = (cap != 0 and k >= 10**18 + min_edge_bps * 10**14 and desired >= floor
-          and desired * (k - 10**18) // 10**18 > cycle_cost
-          and desired * (k - s) // 10**18 >= value + cycle_cost)
+          and desired * (k - 10**18) // 10**18 > cycle + construction
+          and desired * (k - s_bps * 10**14) // 10**18 >= value + cycle + construction)
     return desired if ok else 0
 
 
@@ -231,56 +257,83 @@ def cycle_net(s):
     if s.k <= 10**18 or s.backing == 0:
         return 0
     gross = s.backing * (s.k - 10**18) // 10**18
-    c = quote(s, CYCLE_GAS, 2)
+    q = s.gas_schedule
+    sync_gas = cycle_gas(s) - q['list'] - q['listed']
+    c = quote(s, sync_gas, 1) + quote(s, q['list'] + q['listed'], 1)
     return gross - c if gross > c else 0
 
 
 def build_net(s):
-    """Headroom a new build must fit (VaultLib._profitable, newlyBuilt): the keep outcome returns
-    B(1-s) and the vault keeps the pack's value, so over one selection the backing repays
-    B(k-s) - value - cycle. A build is worth planning only when that clears its build cost. Richer
-    than cycle_net (the bid outcome B(k-1) - cycle), because a keep also returns B(1-s) - value."""
-    if s.k <= 10**18 or s.backing == 0:
+    """Worst purchaser outcome after the complete initial cost, including all paid primary mints."""
+    if s.k <= 10**18 or not s.backing:
         return 0
-    value = s.build_units * UNIT
-    gross = s.backing * (s.k - s.settlement_fee_bps * 10**14) // 10**18
-    headroom = gross - value - quote(s, CYCLE_GAS, 2)
-    return headroom if headroom > 0 else 0
+    q = s.gas_schedule
+    common = sum(q[k] for k in ('sync','journal','selected','synced','pruned','sync_funding','harvested','sync_credit'))
+    maintenance = quote(s, common, 1)
+    cost=maintenance+build_cost(s)
+    bid=s.backing*(s.k-10**18)//10**18
+    keep=s.backing*(s.k-s.settlement_fee_bps*10**14)//10**18-s.build_units*UNIT
+    return max(0,min(bid,keep)-cost)
 
 
-def build_cost(s, units=REF_UNITS):
+def build_cost(s, units=None):
     """VaultLib.buildCost: building one pack of `units` and listing it at the envelope now, plus its
     paid primary mint fees (one per Shape)."""
+    q = s.gas_schedule
+    units = s.build_units if units is None else units
     n = shape_count(units)
-    return quote(s, Q["build_pack"] + n * Q["build_shape"] + Q["listed"], 2) + n * s.mint_fee
+    return quote(s, q["build"] + q["build_pack"] + n * q["build_shape"] + q["listed"], 2) + n * s.mint_fee
 
 
 def checkpoint_cost(s):
     """VaultLib.requestCharge: one checkpoint at cost plus one work unit."""
-    return quote(s, Q["checkpoint"], 1, True)
+    q = s.gas_schedule
+    return quote(s, q["checkpoint"] + s.checkpoint_proof_entries * (q["allocation_entry"] + q["allocation_read"]), 1, True)
 
 
 def request_charge(s):
-    """PackVault.requestCharge: what tops the processing pool up to one checkpoint, whole gwei."""
+    """PackVault.requestCharge: what tops the processing pool up to its current bounded checkpoint quote, in wei."""
     top = max(0, checkpoint_cost(s) - s.processing_pool)
-    return -(-top // 10**9) * 10**9
+    return top
 
 
 def deploy_charge(s):
-    """VaultLib.deployCharge, per POSITION_VALUE deposited: build and list one REF_UNITS position at
-    the envelope now plus mint fees, never less than the most a builder nets over its own gas."""
-    n = shape_count(REF_UNITS)
-    g = Q["build_pack"] + n * Q["build_shape"] + Q["listed"]
-    floor = g * (s.gas_ceiling * s.markup_bps + s.max_tip * (BPS + s.markup_bps)) // BPS + 2 * s.work_fee
-    return max(build_cost(s, REF_UNITS), floor)
+    """Conservative allowed-recipe build cost per current reference capital."""
+    q = s.gas_schedule
+    if not s.pack_units_mask:
+        return 0
+    reference = position_value(s)
+    return max((-(-build_cost(s, u) * reference // position_value(s, u))
+                for u in range(MIN_PACK_UNITS, MAX_PACK_UNITS + 1) if (s.pack_units_mask >> u) & 1), default=0)
 
 
 def unwind_charge(s):
-    """VaultLib.unwindCharge, per POSITION_VALUE redeemed; 0 without an essential budget."""
+    """Actual maintained book exposure, or bounded allowed-recipe comparison before first build."""
     if s.essential_cap == 0:
         return 0
-    n = shape_count(REF_UNITS)
-    return quote(s, Q["unlisted"] + Q["liq_pack"] + n * Q["redeem_shape"], 2, True)
+    q, reference = s.gas_schedule, position_value(s)
+    if (s.book_pack_count or s.book_recovery_count) and s.book_capital:
+        count = s.book_pack_count
+        gas = s.active_count*q['unlisted'] + count*q['liq_pack'] + s.book_shape_count*q['redeem_shape']
+        per_call=min(MAX_BATCH['liquidate'],60//(s.book_max_units or MAX_PACK_UNITS)) if count else MAX_BATCH['liquidate']
+        calls = -(-s.active_count//MAX_BATCH['unlist']) + -(-count//per_call)
+        gas += -(-s.active_count//MAX_BATCH['unlist'])*q['unlist'] + -(-count//per_call)*q['liquidate']
+        units=s.active_count+count
+        if s.book_recovery_count:
+            shapes=s.book_recovery_value//UNIT
+            chunks=-(-shapes//30)+s.book_recovery_count-1
+            gas+=shapes*q['recovery_shape']+s.book_recovery_count*q['recovery_unseal']+chunks*(q['liquidate']+q['recovery_base'])
+            units+=chunks
+            calls+=chunks
+        if calls == 0:
+            return 0
+        return -(-quote(s, gas + (calls-1)*q['overhead'], units, True)*reference//s.book_capital)
+    costs = []
+    for u in range(MIN_PACK_UNITS, MAX_PACK_UNITS+1):
+        if s.pack_units_mask >> u & 1:
+            gas = q['unlist']+q['unlisted']+q['liquidate']+q['liq_pack']+shape_count(u)*q['redeem_shape']
+            costs.append(-(-quote(s, gas + q['overhead'], 2, True)*reference//position_value(s,u)))
+    return max(costs, default=0)
 
 
 def sync_funding_candidates(s, terminal_ids, active, checkpoint_due):
@@ -290,11 +343,12 @@ def sync_funding_candidates(s, terminal_ids, active, checkpoint_due):
     in increasing length, so the executor can find the smallest useful call without guessing
     the number of own journal transitions, terminal inflows or pruned heads.
     """
+    q = s.gas_schedule
     records = min(MAX_BATCH["journal"], s.completed_prefix - s.journal_cursor)
-    base = Q["journal_tail"] + Q["distribution_proof"] if checkpoint_due else Q["sync"]
-    upper = quote(s, base + records * Q["journal"] + MAX_BATCH["selected"] * Q["selected"]
-                  + len(terminal_ids) * Q["synced"] + MAX_BATCH["prune"] * Q["pruned"], len(terminal_ids))
-    if s.free >= upper or s.routine_budget < quote(s, Q["sync"]):
+    base = q["journal_tail"] + q["distribution_proof"] if checkpoint_due else q["sync"]
+    upper = quote(s, base + records * q["journal"] + MAX_BATCH["selected"] * q["selected"]
+                  + len(terminal_ids) * q["synced"] + MAX_BATCH["prune"] * q["pruned"], len(terminal_ids))
+    if (s.free if s.keeper_cash is None else s.keeper_cash) >= upper or s.routine_budget < quote(s, q["sync"]):
         return []
     candidates = sorted((l for l in active if l.pending_fees and l.id not in terminal_ids),
                         key=lambda l: (-l.pending_fees, l.id))
@@ -304,20 +358,23 @@ def sync_funding_candidates(s, terminal_ids, active, checkpoint_due):
 def scan_proof(s):
     """ScanLib.rebase's choice: the vault reads its open positions instead of FWA's journal when
     that costs no more than the next journal batch."""
+    q = s.gas_schedule
     backlog = s.completed_prefix - s.journal_cursor
-    return backlog > 0 and s.open_positions * Q["scan"] <= min(backlog, MAX_BATCH["journal"]) * Q["journal"]
+    return backlog > 0 and s.open_positions <= MAX_SCAN and s.open_positions * q["scan"] <= min(backlog, MAX_BATCH["journal"]) * q["journal"]
 
 
 def scan_vault(s):
     """Small enough that any full journal batch is replaced by one scan (at most 93 open)."""
-    return s.open_positions * Q["scan"] <= MAX_BATCH["journal"] * Q["journal"]
+    q = s.gas_schedule
+    return s.open_positions <= MAX_SCAN and s.open_positions * q["scan"] <= MAX_BATCH["journal"] * q["journal"]
 
 
 def plan(s):
     """Ordered list of calls for this pass. Each is a tuple: (function, args...)."""
+    q = s.gas_schedule
     out = []
     spike = s.gas_price > s.gas_ceiling
-    if spike and not (s.winding_down or s.locked_shares):
+    if spike and not (s.winding_down or s.locked_shares or s.caller_funded_exit):
         return out  # nothing owed to anyone waits on this pass: wait for gas to fall
 
     # 1. Resolve what FWA moved on: settled, withdrawn (kicked), or allocated past the window,
@@ -326,10 +383,10 @@ def plan(s):
                if l.status in (SETTLED, WITHDRAWN)
                or (l.status == ALLOCATED and s.now >= l.allocated_at + s.settlement_window)))
     active = [l for l in s.listings if l.status == ACTIVE]
-    shortfall = max(0, s.owed_estimate - s.free - s.pending_deposits)
+    shortfall = max(0, s.owed_estimate - s.free)
     catchup = s.journal_cursor < s.completed_prefix
     unexposed = not s.open_positions and not s.active_count and not s.pending_receipts and not s.listings
-    checkpoint_due = (s.blackout and s.queue_drained and not s.checkpoint_done_this_interval
+    checkpoint_due = (s.blackout and s.queue_drained and (not s.checkpoint_done_this_interval or (s.caller_funded_exit and s.locked_shares))
                       and (s.pending_deposits or s.locked_shares or s.distribution_bps))
     scanning = scan_vault(s) and not unexposed
     selected_due = [i for i in due if any(l.id == i and l.unapplied for l in s.listings)]
@@ -344,22 +401,22 @@ def plan(s):
     else:
         journal_due = catchup and not unexposed and (
             s.completed_prefix - s.journal_cursor >= MAX_BATCH["journal"]
-            or s.own_journal_pending or checkpoint_due)
+            or s.own_journal_pending or checkpoint_due or s.caller_funded_exit)
     # All sync work uses routine funding, including while holders are withdrawing.
-    if (due or journal_due or s.allocation_stale) and not spike and not defer:
+    if (due or journal_due or s.allocation_stale) and (not spike or s.caller_funded_exit) and not defer:
         ids = due[:MAX_BATCH["sync"]]
         if scanning and checkpoint_due and scan_proof(s) and not selected_due:
             ids = []  # the paid checkpoint scan first; terminals follow without a scan
         # Ordinary preflight tries the no-claim job first, then the shortest funded prefix.
         # The executor replans after one successful call; these are alternatives, not a batch.
-        out.append(("sync", ids, s.witness_id))
+        out.append(("syncCheckpoint" if checkpoint_due and (s.pending_deposits or s.locked_shares) else "sync", ids, s.witness_id))
         fees = []
         for candidate in sync_funding_candidates(s, ids, active, checkpoint_due):
             fees.append(candidate)
             terminals = ids[:MAX_BATCH["sync"] - len(fees)]
             if not terminals and not journal_due and not s.allocation_stale:
                 break  # Active candidates alone cannot create a paid job.
-            out.append(("sync", terminals + fees, s.witness_id))
+            out.append(("syncCheckpoint" if checkpoint_due and (s.pending_deposits or s.locked_shares) else "sync", terminals + fees, s.witness_id))
 
     redeeming = shortfall > 0  # deploy nothing this pass while redeemers wait for ETH
     # FWA's live fees leave no edge: every further cycle loses, so unwind (the vault allows it).
@@ -380,9 +437,9 @@ def plan(s):
                 break
             earning.append(listing)
             amount += listing.pending_fees
-        hgas = Q["harvest"] + Q["harvested"] * len(earning)
+        hgas = q["harvest"] + q["harvested"] * len(earning)
         # A due checkpoint already sweeps fee credit without a separate transaction.
-        if amount >= shortfall and hgas < Q["unlist"] + Q["unlisted"] and not (not earning and credit_checkpoint):
+        if amount >= shortfall and hgas < q["unlist"] + q["unlisted"] and not (not earning and credit_checkpoint):
             out.append(("harvest", sorted(l.id for l in earning)))
             shortfall = 0
 
@@ -411,8 +468,8 @@ def plan(s):
     #    Personal managers have no shares, deposits or checkpoints (s.pooled is False), so the pool
     #    flow fields stay zero and this never fires for them.
     if (s.pooled and s.blackout and s.queue_drained and (not catchup or unexposed) and not s.pending_receipts
-            and not s.allocation_stale and not due and not s.checkpoint_done_this_interval
-            and (s.locked_shares or (s.pending_deposits and not spike) or (s.distribution_due and not spike))):
+            and not s.allocation_stale and not due and (not s.checkpoint_done_this_interval or (s.caller_funded_exit and s.locked_shares))
+            and (s.locked_shares or (s.pending_deposits and not spike and not s.caller_funded_exit) or (s.distribution_due and not spike and not s.caller_funded_exit))):
         out.append(("checkpoint", s.witness_id))
 
     # 5. Tokens (zero in NAV, never sold): claim and burn when the operator opts in.
@@ -425,25 +482,25 @@ def plan(s):
 
     # 6. Deploy: relist idle packs, then build new ones only when one cycle repays the build.
     #    Wait for FWA's queue to drain; production admission also rejects staged results atomically.
-    if spike or s.winding_down or broken or s.listing_paused or redeeming or not s.backing \
+    if spike or s.winding_down or broken or s.listing_paused or redeeming or not (s.backing or s.backing_proposals) \
             or not s.queue_drained:
         return out
-    if journal_backlog_floor(s) > min(s.free, s.routine_budget):
-        return out
-    net = cycle_net(s)
-    if not net:
+    if journal_backlog_floor(s) > min(s.free if s.keeper_cash is None else s.keeper_cash, s.routine_budget):
         return out
     idle = s.idle_eth
     proposals = s.backing_proposals[:MAX_BATCH["list"]]
-    if s.idle_packs:
-        n = min(s.idle_packs, len(proposals))
-        while n and sum(proposals[:n]) > idle:
+    relistable = s.idle_packs if s.relistable_idle is None else s.relistable_idle
+    if relistable:
+        n = min(relistable, len(proposals))
+        while n and sum(proposals[:n]) + quote(s, q['list'] + n*q['listed'], n) > idle:
             n -= 1
         if n:
             out.append(("list", proposals[:n]))
             return out
         if proposals:
             return out  # viable inventory keeps priority when only cash is missing
+    if s.mint_fee > s.accepted_mint_fee:
+        return out
     if s.recent_volume >= s.slowdown_volume and (s.pack_units_mask >> s.build_units) & 1:
         units = s.build_units
         price = units * UNIT + shape_count(units) * s.mint_fee  # mint cost of one pack (direct mint)
@@ -451,11 +508,11 @@ def plan(s):
         build = build_cost(s, units)
         n = 0  # largest batch the vault's capital check accepts: per-pack mint cost plus backing
         for c in range(min(len(proposals), MAX_BATCH["build"]), 0, -1):
-            if s.idle_funding + c * price + sum(proposals[:c]) <= idle:
+            if c * price + sum(proposals[:c]) + quote(s,q['build']+c*(q['build_pack']+shape_count(units)*q['build_shape']+q['listed']),2*c) <= idle:
                 n = c
                 break
         # The build repays from the keep outcome (build_net), not the bid-only cycle_net.
-        if build <= build_net(s) and n:
+        if s.backing and build_net(s) and n:
             out.append(("build", units, proposals[:n]))
     return out
 
@@ -466,21 +523,23 @@ def reserve_need(s):
     Checkpoint request charges remain separate. Foreign/refunded entries earn their gas quote
     only, with no per-entry work fee. Essential catchup is priced at its own ceiling.
     """
-    listing = (Q["list"] + Q["listed"] * MAX_BATCH["list"]) * s.gas_ceiling * (BPS + s.markup_bps) // BPS
-    catchup = (Q["sync"] + MAX_BATCH["journal"] * Q["journal"] + MAX_BATCH["prune"] * Q["pruned"])
-    routine = catchup * s.gas_ceiling * (BPS + s.markup_bps) // BPS
+    q = s.gas_schedule
+    listing = (q["list"] + q["listed"] * MAX_BATCH["list"] + q["overhead"]) * s.gas_ceiling * (BPS + s.markup_bps) // BPS
+    catchup = (q["sync"] + MAX_BATCH["journal"] * q["journal"] + MAX_BATCH["prune"] * q["pruned"])
+    routine = (catchup + q["overhead"]) * s.gas_ceiling * (BPS + s.markup_bps) // BPS
     return listing + MAX_BATCH["list"] * s.work_fee + routine
 
 
 def journal_backlog_floor(s):
     """Packed journal floor; own transitions, terminal work and distribution proof can add cost."""
+    q = s.gas_schedule
     if not s.open_positions and not s.active_count and not s.pending_receipts and not s.listings:
         return 0
     records = s.completed_prefix - s.journal_cursor
     if records and scan_vault(s):
-        return quote(s, Q["journal_tail"] + s.open_positions * Q["scan"])
+        return quote(s, q["journal_tail"] + s.open_positions * q["scan"])
     full, tail = divmod(records, MAX_BATCH["journal"])
-    return quote(s, full * Q["sync"] + (Q["journal_tail"] if tail else 0) + records * Q["journal"])
+    return full * quote(s, q["sync"] + MAX_BATCH["journal"] * q["journal"]) + (quote(s, q["journal_tail"] + tail*q["journal"]) if tail else 0)
 
 
 def exposure_share_bps(backings, total_weight):
@@ -510,7 +569,7 @@ def status(s, planned=None):
     planned = plan(s) if planned is None else planned
     out = []
     spike = s.gas_price > s.gas_ceiling
-    shortfall = max(0, s.owed_estimate - s.free - s.pending_deposits)
+    shortfall = max(0, s.owed_estimate - s.free)
     if s.winding_down:
         out.append(("WINDING_DOWN", "info", f"{s.open_positions} positions, {s.idle_packs} idle packs left to unwind"))
     if spike:
@@ -552,6 +611,8 @@ def status(s, planned=None):
         out.append(("RECOVERY_REQUIRED", "action", f"FWA holds packs owed to the vault for listings {owed[:5]}"))
     if s.listing_paused and not s.winding_down:
         out.append(("LISTING_PAUSED", "action", "owner paused listing"))
+    if s.mint_fee > s.accepted_mint_fee:
+        out.append(("MINT_FEE_NOT_ACCEPTED", "action", f"live mint fee {s.mint_fee} wei exceeds accepted {s.accepted_mint_fee} wei"))
     if s.routine_budget == 0:
         out.append(("ROUTINE_BUDGET_EMPTY", "wait", "strategy work is unpaid until the routine budget refills"))
     if s.essential_budget == 0 and (s.locked_shares or s.winding_down):

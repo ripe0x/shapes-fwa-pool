@@ -1,0 +1,20 @@
+[
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "script/test_release.py"
+    ],
+    "exitStatus": 0,
+    "seconds": 0.26369476318359375,
+    "log": "/tmp/shapes-manager-funded-checks/packaging-0.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "sim/test_manager_monte_carlo.py"
+    ],
+    "exitStatus": 0,
+    "seconds": 3.369354009628296,
+    "log": "/tmp/shapes-manager-funded-checks/packaging-1.log"
+  }
+]

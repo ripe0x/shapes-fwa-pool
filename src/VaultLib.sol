@@ -2,7 +2,7 @@
 pragma solidity 0.8.30;
 
 import {FixedPointMathLib as M} from "solady/utils/FixedPointMathLib.sol";
-import {IKeeperPolicy} from "./KeeperPolicy.sol";
+import {LibBit} from "solady/utils/LibBit.sol";
 import {ScanLib} from "./ScanLib.sol";
 import {
     IFWAV2,
@@ -22,6 +22,7 @@ import {
 interface IAccount {
     function freeEth() external view returns (uint256);
     function idleEth() external view returns (uint256);
+    function keeperCash() external view returns (uint256);
 }
 
 /// @notice PackVault's share-price reads, used only for its distribution checkpoint tail.
@@ -38,17 +39,48 @@ interface ISyncVault is IAccount {
 library VaultLib {
     uint256 internal constant BPS = 10_000;
     uint256 internal constant DEAD_SHARES = 1e15;
-    uint256 internal constant MIN_DISTRIBUTION = 0.01 ether;
 
     /// @notice PackVault's governed parameters (moved here so library code can read them by
     ///         storage pointer; EIP-170 size).
+    struct GasSchedule {
+        uint32 checkpoint;
+        uint32 allocationEntry;
+        uint32 allocationRead;
+        uint32 build;
+        uint32 buildPack;
+        uint32 buildShape;
+        uint32 list;
+        uint32 listed;
+        uint32 sync;
+        uint32 requiredTail;
+        uint32 distributionProof;
+        uint32 journal;
+        uint32 scan;
+        uint32 selected;
+        uint32 synced;
+        uint32 pruned;
+        uint32 unlist;
+        uint32 unlisted;
+        uint32 liquidate;
+        uint32 liquidatePack;
+        uint32 redeemShape;
+        uint32 recoveryBase;
+        uint32 recoveryShape;
+        uint32 recoveryUnseal;
+        uint32 harvest;
+        uint32 harvested;
+        uint32 credit;
+        uint32 fund;
+        uint32 overhead; // transaction and payment-tail allowance, separate from measured work
+    }
+
     struct Params {
         uint16 minEdgeBps; // require k >= 1 + minEdge
         uint16 bufferBps; // list at cap x (1 - buffer), so a small ask cut does not trigger kicks
         uint16 distributionBps; // share of new gains above the high-water mark paid out
-        uint16 payMarkupBps; // envelope markup on the quoted gas of routine work (V1 pays none)
+        uint16 payMarkupBps; // markup on bounded measured routine gas compensation
         uint16 keeperShareBps; // optional calls are paid only if pay <= this share of value realized
-        uint16 allocatedBoundBps; // checkpoint skips when Allocated value exceeds this share of NAV
+        uint16 upliftBoundBps; // checkpoint skips when Allocated value exceeds this share of NAV
         uint64 packUnitsMask; // bit u set: packs of u x 0.01 ETH may be built and listed
         uint64 gasCeiling; // wei per gas, routine work
         uint64 essentialCeiling; // wei per gas, redemption and wind-down work (essential budget)
@@ -61,20 +93,25 @@ library VaultLib {
         uint64 essentialRate;
         uint128 reserve; // ETH kept idle
         uint128 tvlCap; // deposits refused above this NAV
+        uint32 backingRatioBps; // backing as a ratio of pack face value
+        uint64 acceptedMintFee; // changed only by explicit owner acceptance
+        uint64 minDeposit;
+        uint64 minDistribution;
+        GasSchedule gasSchedule;
     }
 
 
     uint256 internal constant UNIT = 0.01 ether;
 
     /// @notice Everything the shared strategy owns in an account: governed parameters, keeper
-    ///         budgets, the position book, the keeper payment policy and the two operating flags.
+    ///         budgets, the position book and the two operating flags.
     struct Strategy {
         Params params;
         Budget budget;
         Book book;
-        address policy;
         bool listingPaused;
         bool windingDown;
+        bool callerFunded;
     }
 
     // ---------------------------------------------------------------- bounds and quotes
@@ -86,66 +123,17 @@ library VaultLib {
     uint256 internal constant MAX_DISTRIBUTION_BPS = 5_000;
     uint256 internal constant MAX_PAY_MARKUP_BPS = 1_000; // routine work only (D56, D57)
     uint256 internal constant MAX_KEEPER_SHARE_BPS = 5_000;
-    uint256 internal constant MAX_ALLOCATED_BOUND_BPS = 1_000;
+    uint256 internal constant MAX_UPLIFT_BOUND_BPS = 1_000;
     uint256 internal constant MAX_ROUTINE_CAP = 0.3 ether;
     uint256 internal constant MAX_ROUTINE_RATE = 0.02 ether;
     uint256 internal constant MAX_ESSENTIAL_CAP = 0.1 ether;
     uint256 internal constant MAX_ESSENTIAL_RATE = 0.005 ether;
     uint256 internal constant MAX_PACK_UNITS = 30; // at most 30 x 0.01 ETH: bounded redemption work
     uint256 internal constant MIN_PACK_UNITS = 3; // ShapePacks' minimum pack value, 0.03 ETH
-    uint256 internal constant REF_UNITS = 6; // the reference recipe: one 0.05 and one 0.01 Shape
-
-    /// Purchaser keep incentive. A selected purchaser keeps the pack when it is worth more than the
-    /// best bid FWA offers (ETH or token bid), after the gas to redeem it, by at least this much.
-    uint256 internal constant MIN_KEEP_ADVANTAGE = 0.0003 ether;
-    /// ShapePacks.redeem gas: a pack plus each Shape it holds. Measured on a fork (execution gas):
-    /// 2 Shapes 157,023, 5 Shapes 245,212, 7 Shapes (the most any allowed size holds) 304,115.
-    uint256 internal constant Q_PURCHASER_REDEEM_PACK = 100_000;
-    uint256 internal constant Q_PURCHASER_REDEEM_SHAPE = 30_000;
-    /// The purchaser's redeem gas is priced at this fixed bound, independent of the keeper's gas
-    /// ceiling: keeping stays the better choice for any purchaser paying up to 2 gwei.
-    uint256 internal constant PURCHASER_GAS_PRICE = 2 gwei;
-
-    /// Fixed gas quotes from billed receipts (keeper/measure_gas.py, docs/GAS.md). The journal
-    /// always consumes its full bounded job; only a required checkpoint can pay for a foreign
-    /// tail. Fee collection has no independently paid entry point. These eligibility rules keep
-    /// callers from splitting work merely to collect additional bases.
-    // One checkpoint per interval cannot be split, so it is quoted at measured billed gas.
-    uint256 internal constant Q_CHECKPOINT = 360_000;
-    /// Checkpoint proof that booked allocations are still Allocated at FWA (ScanLib), per queue
-    /// entry examined and per FWA listing read.
-    uint256 internal constant Q_ALLOCATION_ENTRY = 6_000;
-    uint256 internal constant Q_ALLOCATION_READ = 30_000;
-    uint256 internal constant Q_BUILD = 300_000; // call base for build-and-list (one 0.06 pack billed 1,667,619 in all)
-    // createPack minting straight into the pack (ForkDirectMint: 381k / 534k / 627k gas for 1 / 2 / 3 Shapes)
-    uint256 internal constant Q_BUILD_PACK = 300_000;
-    uint256 internal constant Q_BUILD_SHAPE = 130_000;
-    uint256 internal constant Q_LIST = 280_000;
-    uint256 internal constant Q_LISTED = 825_000;
-    uint256 internal constant Q_SYNC = 85_000;
-    uint256 internal constant Q_REQUIRED_TAIL = 120_000;
-    uint256 internal constant Q_DISTRIBUTION_PROOF = 80_000;
-    uint256 internal constant Q_JOURNAL = 22_000; // each completed global acquisition
-    uint256 internal constant Q_SCAN = 30_000; // each Active position's FWA listing read (scan proof)
-    uint256 internal constant Q_SELECTED = 180_000; // own selection bookkeeping
-    uint256 internal constant Q_SYNCED = 120_000; // terminal or recovered return
-    uint256 internal constant Q_PRUNED = 45_000; // resolved allocation head
-    uint256 internal constant Q_POSITION_SYNC = Q_JOURNAL + Q_SELECTED + Q_SYNCED + Q_PRUNED;
-    uint256 internal constant Q_UNLIST = 340_000;
-    uint256 internal constant Q_UNLISTED = 285_000;
-    uint256 internal constant Q_LIQUIDATE = 75_000;
-    uint256 internal constant Q_LIQ_PACK = 80_000; // fixed work per ordinary pack
-    uint256 internal constant Q_REDEEM_SHAPE = 35_000;
-    uint256 internal constant Q_RECOVERY_BASE = 100_000;
-    uint256 internal constant Q_RECOVERY_SHAPE = 35_000;
-    uint256 internal constant Q_RECOVERY_UNSEAL = 70_000;
-    uint256 internal constant Q_HARVESTED = 80_000; // per listing with fees claimed
-    uint256 internal constant Q_CREDIT = 40_000;
-    uint256 internal constant Q_FUND = 40_000;
-    /// A bid cycle's quoted gas: select and resolve, relist, and the fee claim that funds it.
-    uint256 internal constant CYCLE_GAS = Q_POSITION_SYNC + Q_LISTED + Q_HARVESTED;
-    /// A reference position (0.06 ETH pack + ~0.0648 backing): what request charges are scaled by.
-    uint256 internal constant POSITION_VALUE = 0.1248 ether;
+    uint256 internal constant REF_UNITS = 3; // charge fallback; launch recipe remains owner adjustable
+    uint256 internal constant MAX_BACKING_RATIO_BPS = 1_000_000;
+    uint256 internal constant MAX_GAS_QUOTE = 16_777_216;
+    uint256 internal constant MAX_REBASE_SCAN = 96; // independent of every economic setting
 
     uint256 internal constant MAX_BATCH = 16;
     uint256 internal constant MAX_JOURNAL = 128;
@@ -157,7 +145,9 @@ library VaultLib {
     uint256 internal constant MAX_TERMINALS = 16;
     uint256 internal constant MAX_PRUNES = 16;
     uint256 internal constant MAX_LIST_BATCH = 8;
+    uint256 internal constant MAX_BUILD_BATCH = 4; // paid mint work fits the transaction cap with keeper padding
     uint256 internal constant LIST_CALL_GAS = 1_200_000;
+    uint256 internal constant MAX_LIQUIDATE_UNITS = 60;
     uint256 internal constant MAX_REDEEM_SHAPES = 30; // Shapes burned per liquidation call
     uint8 internal constant NONE = 0;
     uint8 internal constant ACTIVE = 1;
@@ -171,9 +161,10 @@ library VaultLib {
         uint256 feeDebt;
         uint64 allocatedAt;
         uint8 state;
+        uint256 keepUplift;
     }
 
-    struct Work { uint256 processed; uint256 own; uint256 resolved; uint256 pruned; uint256 scanned; }
+    struct Work { uint256 processed; uint256 own; uint256 resolved; uint256 pruned; uint256 scanned; uint256 used; }
 
     struct BackingTerms {
         uint256 k;
@@ -183,7 +174,7 @@ library VaultLib {
         uint256 value;
         uint256 floor;
         uint256 cycleCost;
-        uint256 build;
+        uint256 initialCost;
         bool ok;
     }
 
@@ -201,6 +192,11 @@ library VaultLib {
         uint256 feeDebtSum;
         mapping(uint256 => uint256) countByDebt;
         uint256 allocatedValue;
+        uint256 unresolvedKeepUplift;
+        uint256[31] recipeCounts;
+        mapping(uint256 => uint256) packShapeCount;
+        uint256 ordinaryShapeCount;
+        mapping(uint256 => uint256) idleIndex;
         uint256[] allocationQueue;
         uint256 allocationHead;
         uint64 lastAllocatedAt;
@@ -219,8 +215,10 @@ library VaultLib {
         bool controlled;
     }
 
+    event KeeperWorkMeasured(uint256 measuredGas, uint256 gasAllowance, uint256 gasPrice, uint256 workUnits, bool essential);
     event PositionUpdated(uint256 indexed listingId, uint256 packId, uint256 value, uint256 backing, uint256 feeDebt, uint64 allocatedAt, uint8 state);
     event InventoryUpdated(uint256 indexed packId, uint256 value);
+    event PrimaryMinted(uint256 packs, uint256 shapes, uint256 principal, uint256 mintFees);
     event RecoveryUpdated(uint256 indexed packId, uint256 value, bool unsealed);
     event CashReceipt(uint256 indexed listingId, uint8 outcome, uint256 amount);
     event ReceiptConsumed(uint256 indexed listingId);
@@ -239,6 +237,7 @@ library VaultLib {
     error PendingReceipts();
     error InvalidBacking();
     error BadBatch();
+    error UnusedPaidInput();
     error Nothing();
 
     /// @notice One checkpoint's redemption fill. Owed rounds up and a partial fill leaves 2 wei of
@@ -250,49 +249,12 @@ library VaultLib {
         pure
         returns (uint256 frac, uint256 filled, uint256 unit, uint256 paid)
     {
-        uint256 owed = M.mulDivUp(locked, nav, supply);
-        frac = owed <= liquid ? 1e36 : M.mulDiv(liquid > 2 ? liquid - 2 : 0, 1e36, owed);
-        filled = M.mulDiv(locked, frac, 1e36);
-        unit = M.mulDiv(frac, nav, supply);
-        paid = M.mulDivUp(locked, unit, 1e36);
+        return ScanLib.fill(locked, nav, supply, liquid);
     }
 
     error OutOfBounds();
 
-    /// Gas a keeper policy's quote may use: enough for arithmetic and reads, not for griefing.
-    uint256 internal constant POLICY_GAS = 50_000;
-    uint256 internal constant ORACLE_GAS = 100_000; // floor oracle read; FWA's own oracle uses far less
-
-    /// @notice The active keeper policy's proposed pay for verified work, from a bounded-gas
-    ///         staticcall. A revert, out-of-gas or short answer is zero; only the first word of
-    ///         the answer is read, so a policy cannot grief with huge return data.
-    function offer(
-        address policy,
-        uint256 op,
-        uint256 units,
-        uint256 gasQ,
-        bool essential,
-        uint256 gasCeiling,
-        uint256 maxTip,
-        uint256 workFee
-    ) public view returns (uint256 o) {
-        bytes memory c = abi.encodeCall(IKeeperPolicy.quote, (op, units, gasQ, essential, gasCeiling, maxTip, workFee));
-        assembly ("memory-safe") {
-            // Yul evaluates arguments right to left: check returndatasize only after the call.
-            let ok := staticcall(POLICY_GAS, policy, add(c, 32), mload(c), 0, 32)
-            if and(ok, gt(returndatasize(), 31)) { o := mload(0) }
-        }
-    }
-
-    /// @notice A keeper policy must be a contract answering `policyVersion()` with a nonzero value.
-    function checkPolicy(address policy) external view {
-        if (policy.code.length == 0) revert OutOfBounds();
-        try IKeeperPolicy(policy).policyVersion() returns (uint256 v) {
-            if (v == 0) revert OutOfBounds();
-        } catch {
-            revert OutOfBounds();
-        }
-    }
+    uint256 internal constant ORACLE_GAS = 100_000;
 
     // ---------------------------------------------------------------- keeper pay (D56, D57)
 
@@ -306,16 +268,45 @@ library VaultLib {
     event KeeperPaid(address indexed keeper, uint256 amount);
 
     error Payment();
+    error MintFeeNotAccepted();
+    error ExplicitFeeAcceptanceRequired();
 
-    /// @notice The vault's envelope for work: quoted gas at basefee + maxTip, capped at the
-    ///         ceiling, markup on routine work, plus work fees. The most this work may ever pay.
-    function quote(Params storage p, uint256 gasQ, uint256 units, bool essential) public view returns (uint256 q) {
-        q = gasQ * M.min(block.basefee + p.maxTip, essential ? p.essentialCeiling : p.gasCeiling);
-        if (!essential) q = q * (BPS + p.payMarkupBps) / BPS;
-        q += units * p.workFee;
+    /// @notice Upper payment envelope: verified work cap plus the separately named overhead.
+    function quote(Params storage p, uint256 gasAllowance, uint256 units, bool essential) internal view returns (uint256) {
+        return quoteCalls(p, gasAllowance, units, essential, 1);
     }
 
-    function budgetNow(Params storage p, Budget storage b) public view returns (uint256 r, uint256 e) {
+    /// @dev Aggregated lifecycle charges include overhead for each distinct paid transaction.
+    function quoteCalls(Params storage p, uint256 gasAllowance, uint256 units, bool essential,
+        uint256 calls) internal view returns (uint256)
+    {
+        if (gasAllowance == 0 && units == 0) return 0;
+        return calculatePayment(gasAllowance + calls * p.gasSchedule.overhead, units,
+            M.min(block.basefee + p.maxTip, essential ? p.essentialCeiling : p.gasCeiling),
+            essential ? 0 : p.payMarkupBps, p.workFee);
+    }
+
+    function calculatePayment(uint256 gasUnits, uint256 units, uint256 price, uint256 markupBps,
+        uint256 workFee) internal pure returns (uint256)
+    {
+        return gasUnits * price * (BPS + markupBps) / BPS + units * workFee;
+    }
+
+    /// @dev The account supplies gasStart from before its guard and checks. No caller-selected
+    ///      gas limit or unused allowance is reimbursed. Only verified eligible work earns pay.
+    function measuredPayment(Params storage p, uint256 gasStart, uint256 gasAllowance, uint256 units,
+        bool essential) private returns (uint256)
+    {
+        if (gasAllowance == 0 && units == 0) return 0;
+        uint256 price = M.min(tx.gasprice,
+            M.min(block.basefee + p.maxTip, essential ? p.essentialCeiling : p.gasCeiling));
+        uint256 measured = gasStart - gasleft();
+        emit KeeperWorkMeasured(measured, gasAllowance, price, units, essential);
+        return calculatePayment(M.min(measured, gasAllowance) + p.gasSchedule.overhead,
+            units, price, essential ? 0 : p.payMarkupBps, p.workFee);
+    }
+
+    function budgetNow(Params storage p, Budget storage b) internal view returns (uint256 r, uint256 e) {
         uint256 dt = block.timestamp - b.at;
         r = M.min(p.routineCap, b.routine + dt * p.routineRate / 1 days);
         e = M.min(p.essentialCap, b.essential + dt * p.essentialRate / 1 days);
@@ -327,53 +318,64 @@ library VaultLib {
         (b.routine, b.essential, b.at) = (uint128(r), uint128(e), block.timestamp);
     }
 
-    /// @notice Pay the caller for verified work: the least of the policy's offer, the vault's
+    /// @notice Pay the caller for verified work: the least of the account's
     ///         envelope for that work, `cap` (a funding source), free ETH and the budget. Below
     ///         `minPay` the whole call reverts; with 0 the work is done for whatever is paid.
     function pay(
         Params storage p,
         Budget storage b,
-        address policy,
-        uint256 op,
         uint256 gasQ,
         uint256 units,
         bool essential,
         uint256 minPay,
         uint256 cap,
-        uint256 free
+        uint256 free,
+        uint256 gasStart
     ) external returns (uint256 amount) {
         (uint256 r, uint256 e) = budgetNow(p, b);
-        // A finite `cap` is the request-charge pool: requesters already paid for this work, so it
-        // is bounded by the pool, not by the holders' budgets.
-        bool charged = cap != type(uint256).max;
-        if (charged) (r, e) = (type(uint256).max, type(uint256).max);
-        uint256 o =
-            offer(policy, op, units, gasQ, essential, essential ? p.essentialCeiling : p.gasCeiling, p.maxTip, p.workFee);
-        amount = M.min(M.min(o, M.min(quote(p, gasQ, units, essential), cap)), M.min(free, essential ? e : r));
+        amount = M.min(M.min(measuredPayment(p, gasStart, gasQ, units, essential), cap), M.min(free, essential ? e : r));
         if (amount < minPay) revert Payment();
-        if (!charged) {
-            (b.routine, b.essential, b.at) =
-                (uint128(essential ? r : r - amount), uint128(essential ? e - amount : e), block.timestamp);
-        }
+        (b.routine, b.essential, b.at) =
+            (uint128(essential ? r : r - amount), uint128(essential ? e - amount : e), block.timestamp);
         if (amount == 0) return 0;
         (bool ok,) = msg.sender.call{value: amount}("");
         if (!ok) revert Payment();
         emit KeeperPaid(msg.sender, amount);
     }
 
+    function payFunded(Params storage p, uint256 gasQ, uint256 units, bool essential, uint256 minPay,
+        uint256 fundingCap, uint256 gasStart) external returns (uint256 amount)
+    {
+        amount = M.min(measuredPayment(p, gasStart, gasQ, units, essential), fundingCap);
+        if (amount < minPay) revert Payment();
+        if (amount != 0) {
+            (bool ok,) = msg.sender.call{value: amount}("");
+            if (!ok) revert Payment();
+            emit KeeperPaid(msg.sender, amount);
+        }
+    }
+
+    function defaultGasSchedule() internal pure returns (GasSchedule memory g) {
+        g = GasSchedule(500_000, 6_000, 30_000, 360_000, 300_000, 130_000, 280_000, 825_000,
+            125_000, 120_000, 80_000, 22_000, 30_000, 180_000, 120_000, 45_000, 340_000, 285_000,
+            75_000, 80_000, 35_000, 100_000, 35_000, 70_000, 125_000, 80_000, 40_000, 40_000, 100_000);
+    }
+
+    function preview(Params memory p, uint256 mintFee) external view returns (uint256 units, uint256 principal,
+        uint256 backing, uint256 mintCost, uint256 openingCash, bytes32 expectedConfigHash)
+    {
+        return ScanLib.preview(p, mintFee);
+    }
+
+    function cycleGas(GasSchedule storage g) internal view returns (uint256) {
+        return uint256(g.journal) + g.selected + g.synced + g.pruned + g.listed + g.harvested;
+    }
+
     // ---------------------------------------------------------------- parameters and charges
 
     /// @notice Bytecode bounds on every parameter.
     function checkBounds(Params storage p) external view {
-        if (
-            p.minEdgeBps > MAX_MIN_EDGE_BPS || p.bufferBps > MAX_BUFFER_BPS || p.distributionBps > MAX_DISTRIBUTION_BPS
-                || p.payMarkupBps > MAX_PAY_MARKUP_BPS || p.workFee > MAX_WORK_FEE || p.keeperShareBps > MAX_KEEPER_SHARE_BPS
-                || p.allocatedBoundBps > MAX_ALLOCATED_BOUND_BPS
-                || p.gasCeiling > MAX_GAS_CEILING || p.essentialCeiling > MAX_GAS_CEILING || p.maxTip > p.gasCeiling
-                || p.routineCap > MAX_ROUTINE_CAP || p.routineRate > MAX_ROUTINE_RATE || p.essentialCap > MAX_ESSENTIAL_CAP
-                || p.essentialRate > MAX_ESSENTIAL_RATE
-                || p.packUnitsMask >> (MAX_PACK_UNITS + 1) != 0 || p.packUnitsMask & ((1 << MIN_PACK_UNITS) - 1) != 0
-        ) revert OutOfBounds();
+        ScanLib.checkBounds(p);
     }
 
     /// @notice ShapePacks makeup for a pack of `units` x 0.01 ETH, minted straight into the pack:
@@ -387,85 +389,71 @@ library VaultLib {
         shapeCount = uint256(counts[0]) + counts[1] + counts[2];
     }
 
-    function buildGas(uint256 shapeCount) internal pure returns (uint256) {
-        return Q_BUILD_PACK + shapeCount * Q_BUILD_SHAPE;
+    function buildGas(Params storage p, uint256 shapeCount) internal view returns (uint256) {
+        return p.gasSchedule.buildPack + shapeCount * p.gasSchedule.buildShape;
     }
+
+
+
+
 
     /// @notice Building one pack of `units` and listing it, at the envelope now, plus its paid
     ///         primary mint fees (one per Shape).
     function buildCost(Params storage p, uint256 units, uint256 mintFee) public view returns (uint256) {
-        (, uint256 n) = makeup(units);
-        return quote(p, buildGas(n) + Q_LISTED, 2, false) + n * mintFee;
+        return ScanLib.buildCost(p, units, mintFee);
     }
 
     /// @notice A request's checkpoint charge: one checkpoint at its envelope, at cost plus one unit.
     function requestCharge(Params storage p) external view returns (uint256) {
-        return quote(p, Q_CHECKPOINT, 1, true);
+        return quote(p, p.gasSchedule.checkpoint, 1, true);
     }
 
-    /// @notice Deployment charge per POSITION_VALUE deposited: building and listing one reference
-    ///         position at its envelope now plus its mint fees, and never less than the most a
-    ///         builder can net over its own gas (markup at the ceiling, the tip it is repaid but
-    ///         need not pay, and the two work fees).
-    function deployCharge(Params storage p, uint256 mintFee) external view returns (uint256) {
-        (, uint256 n) = makeup(REF_UNITS);
-        uint256 g = buildGas(n) + Q_LISTED;
-        return M.max(quote(p, g, 2, false) + mintFee * n,
-            g * (p.gasCeiling * p.payMarkupBps + p.maxTip * (BPS + p.payMarkupBps)) / BPS + 2 * p.workFee);
+    function refUnits(Params storage p) internal view returns (uint256) {
+        return p.packUnitsMask == 0 ? REF_UNITS : LibBit.ffs(p.packUnitsMask);
     }
 
-    /// @notice Unwind charge per POSITION_VALUE redeemed: unlisting and liquidating one position.
-    function unwindCharge(Params storage p) external view returns (uint256) {
-        // No essential budget means exit work is unpaid (withdrawers run it): nothing to charge.
-        if (p.essentialCap == 0) return 0;
-        (, uint256 n) = makeup(REF_UNITS);
-        return quote(p, Q_UNLISTED + Q_LIQ_PACK + n * Q_REDEEM_SHAPE, 2, true);
+    function positionValue(Params storage p) external view returns (uint256) {
+        return ScanLib.positionValue(p);
     }
 
-    /// @notice Backing for a new listing of a pack of `units` x 0.01 ETH, and whether to list.
-    ///         FWA splits each acquisition fee evenly over active listings and selects by 1/B, so a
-    ///         listing expects fees k B before selection. A selected purchaser then keeps the pack
-    ///         (the account gets B (1 - s) back) or takes FWA's best bid, max(ETH, token) x B (the
-    ///         account keeps the pack and loses B). Backing is the largest amount at which keeping
-    ///         still beats the best bid by MIN_KEEP_ADVANTAGE after the gas to redeem the pack, so
-    ///         purchasers keep packs and each keep pays for fresh primary mints. It lists only when
-    ///         both outcomes are profitable after the keeper pay of the cycle (`_profitable`), it
-    ///         is at least P / 0.95 (a keep never loses at FWA's immutable 5% settlement-fee cap),
-    ///         and FWA's oracle cap less the buffer allows it (FWA exempts ShapePacks today).
-    function edge(Params storage p, IFWAV2 f, address packs, uint256 units, uint256 build)
+
+
+    function operatingReserve(Params storage p) external view returns (uint256) {
+        return ScanLib.operatingReserve(p);
+    }
+
+    function deployCharge(Params storage p, uint256 mintFee) external view returns (uint256 cost) {
+        return ScanLib.deployCharge(p, mintFee);
+    }
+
+    function unwindCharge(Params storage p, Book storage b) external view returns (uint256) {
+        return ScanLib.unwindCharge(p, b);
+    }
+
+    /// @notice Owner-selected backing ratio, bounded by actual FWA admission and profitable
+    ///         operating costs. Buyer choice is modeled, never enforced by the backing recipe.
+    function edge(Params storage p, IFWAV2 f, address packs, uint256 units, uint256 mintFee, bool newlyBuilt, uint256 retiredShapes)
         public
         view
         returns (uint256 k1e18, uint256 backing, bool ok)
     {
-        BackingTerms memory t = _backingTerms(p, f, packs, units, build);
-        return (t.k, t.desired, t.ok);
+        BackingTerms memory t = _backingTerms(p, f, packs, units, mintFee, retiredShapes);
+        ok = t.ok && _profitable(t, t.desired, newlyBuilt);
+        return (t.k, ok ? t.desired : 0, ok);
     }
 
-    function _backingTerms(Params storage p, IFWAV2 f, address packs, uint256 units, uint256 build)
+    function _backingTerms(Params storage p, IFWAV2 f, address packs, uint256 units, uint256 mintFee, uint256 retiredShapes)
         private view returns (BackingTerms memory t)
     {
-        (t.k, t.cap, t.settlementFee) = economics(f, packs);
-        t.value = units * UNIT;
-        t.build = build;
-        t.floor = t.value + t.value / 19 + (t.value % 19 == 0 ? 0 : 1);
-        uint256 bid = M.max(f.settlementDiscountBps(), f.tokenSettlementDiscountBps());
-        (, uint256 shapes) = makeup(units);
-        uint256 margin =
-            MIN_KEEP_ADVANTAGE + (Q_PURCHASER_REDEEM_PACK + shapes * Q_PURCHASER_REDEEM_SHAPE) * PURCHASER_GAS_PRICE;
-        if (bid != 0 && t.value > margin) t.desired = (t.value - margin) * BPS / bid / BPS * BPS;
-        if (t.cap != type(uint256).max) t.desired = M.min(t.desired, t.cap * (BPS - p.bufferBps) / BPS);
-        t.cycleCost = quote(p, CYCLE_GAS, 2, false);
-        t.ok = t.cap != 0 && t.k >= 1e18 + uint256(p.minEdgeBps) * 1e14 && t.desired >= t.floor
-            && _profitable(t, t.desired, false);
-        if (!t.ok) t.desired = 0;
+        return ScanLib.backingTerms(p, f, packs, units, mintFee, retiredShapes);
     }
 
-    /// @dev Both outcomes of one selection clear the keeper pay of the cycle: the bid outcome
-    ///      B (k - 1), and the keep outcome B (k - s) - P, which also repays the replacement build
-    ///      when the pack is newly built. Requires k >= 1 (checked before).
-    function _profitable(BackingTerms memory t, uint256 backing, bool newlyBuilt) private pure returns (bool) {
-        return backing * (t.k - 1e18) / 1e18 > t.cycleCost
-            && backing * (t.k - t.settlementFee * 1e14) / 1e18 >= t.value + t.cycleCost + (newlyBuilt ? t.build : 0);
+    /// @dev Initial reuse pays construction once plus maintenance, without charging a second
+    ///      relisting. A continuing reuse cycle pays no fresh mint.
+    function _profitable(BackingTerms memory t, uint256 backing, bool newlyBuilt) internal pure returns (bool) {
+        uint256 cost = newlyBuilt ? t.initialCost : t.cycleCost;
+        return backing * (t.k - 1e18) / 1e18 > cost
+            && backing * (t.k - t.settlementFee * 1e14) / 1e18 >= t.value + cost;
     }
 
 
@@ -489,43 +477,7 @@ library VaultLib {
     /// @notice Live k (1e18 scale) and FWA's backing cap for `packs` (zero when FWA would refuse
     ///         a listing). k = (1 + surcharge)(1 - protocolCut)(1 - crownShare).
     function economics(IFWAV2 f, address packs) internal view returns (uint256 k1e18, uint256 cap, uint256 s) {
-        s = f.ownerSettlementFeeBps();
-        uint256 w = f.totalWeight();
-        if (w == 0) return (0, 0, s);
-        // FWA exposes no getter for its surcharge: acquisitionFee = (wbt / w) (1 + surcharge).
-        uint256 ev = f.weightedBackingTotal() / w;
-        uint256 oneSur = f.acquisitionFee() * 1e18 / ev; // 1e18 x (1 + surcharge), floors
-        k1e18 = oneSur * (BPS - f.ownerAcquisitionFeeBps()) / BPS * (BPS - f.topListingShareBps()) / BPS;
-        if (!f.canDeposit(packs)) return (k1e18, 0, s);
-        // FWA exempts the collection from its floor cap: no cap applies (D62).
-        if (f.oracleExemptCollections(packs)) return (k1e18, type(uint256).max, s);
-        // The oracle ask plus premium when the quote passes FWA's own validity rules.
-        // A failing or malformed oracle means no cap (nothing new lists); it must not block
-        // unlisting, wind-down or redemptions. FWA's owner can repoint the oracle to any contract,
-        // so the read is a raw staticcall: a revert or short return data both mean "no cap".
-        // Bounded gas and a manual four-word read: a gas-burning oracle or one returning words that
-        // do not fit their types (which would make abi.decode revert) also means "no cap" (audit S1).
-        address o = f.floorOracle();
-        bytes memory c = abi.encodeCall(IFloorOracle.getFloorRange, (packs));
-        bool ok;
-        uint256 bid;
-        uint256 ask;
-        uint256 observedAt;
-        uint256 periodUsed;
-        assembly ("memory-safe") {
-            let m := mload(0x40) // scratch past the free pointer; not kept
-            ok := staticcall(ORACLE_GAS, o, add(c, 32), mload(c), m, 128)
-            if lt(returndatasize(), 128) { ok := 0 }
-            bid := mload(m)
-            ask := mload(add(m, 32))
-            observedAt := mload(add(m, 64))
-            periodUsed := mload(add(m, 96))
-        }
-        if (!ok || observedAt > type(uint48).max || periodUsed > type(uint48).max) return (k1e18, 0, s);
-        if (bid == 0 || bid >= ask || observedAt == 0 || observedAt > block.timestamp) return (k1e18, 0, s);
-        if (block.timestamp - observedAt > f.maxOracleAge()) return (k1e18, 0, s);
-        if (periodUsed < f.minOracleChallengePeriod()) return (k1e18, 0, s);
-        cap = ask * (BPS + f.oracleCeilingPremiumBps()) / BPS;
+        return ScanLib.economics(f, packs);
     }
 
     function _emitPosition(Book storage b, uint256 id) internal {
@@ -536,6 +488,11 @@ library VaultLib {
     function addInventory(Book storage b, uint256 packId, uint256 value) internal {
         if (value == 0 || b.idleValueOf[packId] != 0 || b.packToListing[packId] != 0) revert Duplicate();
         b.trackedValue += value;
+        if (value <= MAX_PACK_UNITS * UNIT) {
+            ++b.recipeCounts[value / UNIT];
+            b.packShapeCount[packId] = value / UNIT;
+            b.ordinaryShapeCount += value / UNIT;
+        }
         b.idleValue += value;
         _toIdle(b, packId, value, 0);
     }
@@ -548,6 +505,7 @@ library VaultLib {
             emit RecoveryUpdated(packId, value, false);
         } else {
             b.idlePacks.push(packId);
+            b.idleIndex[packId] = b.idlePacks.length;
             emit InventoryUpdated(packId, value);
         }
         b.idleQuote[packId] = backingQuote;
@@ -558,15 +516,15 @@ library VaultLib {
         if (id == 0 || b.positions[id].value != 0 || b.packToListing[packId] != 0) revert Duplicate();
         uint256 value = b.idleValueOf[packId];
         if (value == 0) revert MissingInventory();
+        // Preserve the face-value floor of an unresolved allocation at the 5% protocol fee cap.
         if (backing < value + value / 19 + (value % 19 == 0 ? 0 : 1)) revert InsufficientBacking();
         delete b.idleValueOf[packId];
         b.idleValue -= value;
         b.idleFunding -= b.idleQuote[packId];
         delete b.idleQuote[packId];
-        if (b.idlePacks[b.idlePacks.length - 1] != packId) revert MissingInventory();
-        b.idlePacks.pop();
+        _removeIdle(b, packId);
         emit InventoryUpdated(packId, 0);
-        b.positions[id] = Position(packId, value, backing, debt, 0, ACTIVE);
+        b.positions[id] = Position(packId, value, backing, debt, 0, ACTIVE, 0);
         b.packToListing[packId] = id;
         b.open.push(id);
         b.openIndex[id] = b.open.length;
@@ -588,6 +546,8 @@ library VaultLib {
         p.allocatedAt = at;
         b.lastAllocatedAt = at;
         b.allocatedValue += p.value;
+        p.keepUplift = p.backing > p.value ? p.backing - p.value : 0;
+        b.unresolvedKeepUplift += p.keepUplift;
         b.allocationQueue.push(id);
         _emitPosition(b, id);
     }
@@ -596,7 +556,11 @@ library VaultLib {
         p = b.positions[id];
         if (p.state != ALLOCATED) revert WrongState();
         b.allocatedValue -= p.value;
+        b.unresolvedKeepUplift -= p.keepUplift;
         b.trackedValue -= p.value;
+        --b.recipeCounts[p.value / UNIT];
+        b.ordinaryShapeCount -= b.packShapeCount[p.packId];
+        delete b.packShapeCount[p.packId];
         _retire(b, id, p.packId);
     }
 
@@ -604,7 +568,11 @@ library VaultLib {
         Position storage live = b.positions[id];
         p = live;
         if (p.state == ACTIVE) _removeActive(b, live);
-        else if (p.state == ALLOCATED) b.allocatedValue -= p.value;
+        else if (p.state == ALLOCATED) {
+            b.allocatedValue -= p.value;
+            b.unresolvedKeepUplift -= p.keepUplift;
+            live.keepUplift = 0;
+        }
         else revert WrongState();
         if (owned) {
             _retire(b, id, p.packId);
@@ -626,15 +594,48 @@ library VaultLib {
 
     function redeemInventory(Book storage b, uint256 packId) internal returns (uint256 value) {
         value = b.idleValueOf[packId];
-        if (value == 0 || b.idlePacks[b.idlePacks.length - 1] != packId) revert MissingInventory();
+        if (value == 0 || b.idleIndex[packId] == 0) revert MissingInventory();
         delete b.idleValueOf[packId];
+        b.idleValue -= value;
+        b.trackedValue -= value;
+        --b.recipeCounts[value / UNIT];
+        b.ordinaryShapeCount -= b.packShapeCount[packId];
+        delete b.packShapeCount[packId];
+        b.idleFunding -= b.idleQuote[packId];
+        delete b.idleQuote[packId];
+        _removeIdle(b, packId);
+        emit InventoryUpdated(packId, 0);
+    }
+
+    /// @notice Remove one sealed oversized pack for an in-kind owner withdrawal.
+    function withdrawRecoveryInventory(Book storage b, uint256 index) internal returns (uint256 packId, uint256 value) {
+        uint256 n = b.recoveryPacks.length;
+        if (index >= n) revert MissingInventory();
+        packId = b.recoveryPacks[index];
+        value = b.idleValueOf[packId];
+        if (value == 0 || b.recoveryUnsealed[packId]) revert MissingInventory();
+        b.recoveryPacks[index] = b.recoveryPacks[n - 1];
+        b.recoveryPacks.pop();
         b.idleValue -= value;
         b.trackedValue -= value;
         b.idleFunding -= b.idleQuote[packId];
         delete b.idleQuote[packId];
-        b.idlePacks.pop();
-        emit InventoryUpdated(packId, 0);
+        delete b.idleValueOf[packId];
+        delete b.packShapeCount[packId];
+        emit RecoveryUpdated(packId, 0, false);
     }
+
+    function _removeIdle(Book storage b, uint256 packId) private {
+        uint256 index = b.idleIndex[packId];
+        if (index == 0) revert MissingInventory();
+        uint256 last = b.idlePacks[b.idlePacks.length - 1];
+        b.idlePacks[index - 1] = last;
+        b.idleIndex[last] = index;
+        b.idlePacks.pop();
+        delete b.idleIndex[packId];
+    }
+
+
 
     function updateFeeDebt(Book storage b, uint256 id, uint256 debt) internal {
         Position storage p = b.positions[id];
@@ -755,13 +756,33 @@ library VaultLib {
         external returns (uint256 gasQ, uint256 units)
     {
         bool distributionTail;
-        (gasQ, units, distributionTail) = _syncChanges(p, b, f, packs, ids, checkpointMode, witnessId);
-        if (gasQ != 0) gasQ = _fundSync(p, budget, b, f, ids, gasQ, units, distributionTail, witnessId);
+        uint256 used;
+        (gasQ, units, distributionTail, used) = _syncChanges(p, b, f, packs, ids, checkpointMode, witnessId);
+        if (gasQ != 0 || units != 0) {
+            uint256 claimed;
+            (gasQ, claimed) = _fundSync(p, budget, b, f, ids, gasQ, units, distributionTail, witnessId);
+            _requireUsedInputs(ids, used | claimed);
+        }
+    }
+
+    function syncUnfunded(Params storage p, Book storage b, IFWAV2 f, IShapePacks packs,
+        uint256[] calldata ids, uint256 checkpointMode, uint256 witnessId, bool paid)
+        external returns (uint256 gasQ, uint256 units)
+    {
+        uint256 used;
+        (gasQ, units,, used) = _syncChanges(p, b, f, packs, ids, checkpointMode, witnessId);
+        if (paid && (gasQ != 0 || units != 0)) _requireUsedInputs(ids, used);
+    }
+
+    /// @dev Measured reimbursement cannot pay for padded or duplicated terminal/fee hints.
+    ///      Unpaid recovery remains tolerant of stale inputs and state races.
+    function _requireUsedInputs(uint256[] calldata ids, uint256 used) private pure {
+        if (used != (uint256(1) << ids.length) - 1) revert UnusedPaidInput();
     }
 
     function _syncChanges(Params storage p, Book storage b, IFWAV2 f, IShapePacks packs,
         uint256[] calldata ids, uint256 checkpointMode, uint256 witnessId)
-        private returns (uint256 gasQ, uint256 units, bool distributionTail)
+        private returns (uint256 gasQ, uint256 units, bool distributionTail, uint256)
     {
         if (ids.length > MAX_TERMINALS) revert BadBatch();
         Work memory work;
@@ -773,60 +794,67 @@ library VaultLib {
         } else {
             // A scan of the vault's own positions replaces the global journal whenever it costs no
             // more than the next journal batch (ScanLib.rebase).
-            (rebased, work.scanned, work.own) = ScanLib.rebase(b, f);
+            (rebased, work.scanned, work.own) = ScanLib.rebase(b, f, p.gasSchedule);
             if (!rebased) (work.processed, work.own) = _syncJournal(b, f, packs);
         }
-        for (uint256 i; i < ids.length; ++i) if (_syncTerminal(b, f, packs, ids[i])) ++work.resolved;
+        for (uint256 i; i < ids.length; ++i) {
+            if (_syncTerminal(b, f, packs, ids[i])) {
+                ++work.resolved;
+                work.used |= uint256(1) << i;
+            }
+        }
         work.pruned = prune(b, MAX_PRUNES);
         if (work.processed + work.resolved + work.pruned == 0 && !rebased) revert Nothing();
         // Rebase is unpaid. Empty-vault head cleanup also cannot consume its bootstrap cash.
         if ((unexposed && b.trackedValue == 0) || work.processed + work.scanned + work.resolved + work.pruned == 0) {
-            return (0, 0, false);
+            return (0, 0, false, work.used);
         }
         bool journalPaid = work.processed == MAX_JOURNAL || work.own + work.resolved != 0;
         bool requiredTail;
-        uint256 tailBase = Q_REQUIRED_TAIL;
+        uint256 tailBase = p.gasSchedule.requiredTail;
         if (!journalPaid && work.processed + work.scanned != 0 && checkpointMode != 0) {
             journalPaid = f.isPurchaseBlackout() && f.unsettledAcquisitionCount() == 0;
             if (journalPaid && checkpointMode == 2) {
-                tailBase += Q_DISTRIBUTION_PROOF;
+                tailBase += p.gasSchedule.distributionProof;
                 journalPaid = _distributionTail(p, b, f, witnessId,
-                    tailBase + work.processed * Q_JOURNAL + work.scanned * Q_SCAN + work.pruned * Q_PRUNED);
+                    tailBase + work.processed * p.gasSchedule.journal + work.scanned * p.gasSchedule.scan + work.pruned * p.gasSchedule.pruned);
             }
             requiredTail = journalPaid;
         }
-        if (!journalPaid && work.own + work.resolved + work.pruned == 0) return (0, 0, false);
+        if (!journalPaid && work.own + work.resolved + work.pruned == 0) return (0, 0, false, work.used);
         // A scan is paid only when it applied an own selection or is the required checkpoint proof:
         // splitting a cycle's terminal work into later calls cannot earn a second scan.
-        gasQ = (requiredTail ? tailBase : Q_SYNC) + (journalPaid ? work.processed * Q_JOURNAL : 0)
-            + (work.own != 0 || requiredTail ? work.scanned * Q_SCAN : 0) + work.own * Q_SELECTED
-            + work.resolved * Q_SYNCED + work.pruned * Q_PRUNED;
+        gasQ = (requiredTail ? tailBase : p.gasSchedule.sync) + (journalPaid ? work.processed * p.gasSchedule.journal : 0)
+            + (work.own != 0 || requiredTail ? work.scanned * p.gasSchedule.scan : 0) + work.own * p.gasSchedule.selected
+            + work.resolved * p.gasSchedule.synced + work.pruned * p.gasSchedule.pruned;
         units = work.resolved;
         distributionTail = requiredTail && checkpointMode == 2;
+        return (gasQ, units, distributionTail, work.used);
     }
 
     /// @dev Terminal proceeds arrive first. Only real paid work may sweep economical credit or
     ///      claim the first bounded fee prefix needed to fund its complete payment envelope.
     function _fundSync(Params storage p, Budget storage budget, Book storage b, IFWAV2 f,
         uint256[] calldata ids, uint256 gasQ, uint256 units, bool distributionTail, uint256 witnessId)
-        private returns (uint256)
+        private returns (uint256, uint256)
     {
         (uint256 routine,) = budgetNow(p, budget);
         uint256 cost = quote(p, gasQ, units, false);
-        if (routine < cost) return gasQ;
+        if (routine < cost) return (gasQ, 0);
         uint256 credit = f.feeCredit(address(this));
-        uint256 combined = quote(p, gasQ + Q_CREDIT, units, false);
+        uint256 combined = quote(p, gasQ + p.gasSchedule.credit, units, false);
         if (credit != 0 && combined <= routine && (combined - cost) * BPS <= credit * p.keeperShareBps
-            && (!distributionTail || _distributionTail(p, b, f, witnessId, gasQ + Q_CREDIT))) {
+            && (!distributionTail || _distributionTail(p, b, f, witnessId, gasQ + p.gasSchedule.credit))) {
             _withdrawCredit(b, f);
-            gasQ += Q_CREDIT;
+            gasQ += p.gasSchedule.credit;
             cost = combined;
             credit = 0;
         }
-        uint256 free = ISyncVault(address(this)).freeEth();
-        if (free >= cost) return gasQ;
+        uint256 free = ISyncVault(address(this)).keeperCash();
+        if (free >= cost) return (gasQ, 0);
         uint256[] memory claims = new uint256[](ids.length);
         uint256 count;
+        uint256 claimed;
         uint256 fees = credit;
         for (uint256 i; i < ids.length; ++i) {
             uint256 id = ids[i];
@@ -837,49 +865,29 @@ library VaultLib {
             uint256 pending = f.pendingFees(id);
             if (pending == 0) continue;
             claims[count++] = id;
+            claimed |= uint256(1) << i;
             fees += pending;
-            uint256 fundedGas = gasQ + Q_FUND + count * Q_HARVESTED + (credit != 0 ? Q_CREDIT : 0);
+            uint256 fundedGas = gasQ + p.gasSchedule.fund + count * p.gasSchedule.harvested + (credit != 0 ? p.gasSchedule.credit : 0);
             combined = quote(p, fundedGas, units, false);
             if (free + fees < combined) continue;
             // Once enough cash was found, extra IDs cannot increase the claim or its payment.
             if (combined > routine || (combined - cost) * BPS > fees * p.keeperShareBps
-                || (distributionTail && !_distributionTail(p, b, f, witnessId, fundedGas))) return gasQ;
+                || (distributionTail && !_distributionTail(p, b, f, witnessId, fundedGas))) return (gasQ, 0);
             assembly ("memory-safe") { mstore(claims, count) }
             uint256 before = address(this).balance;
-            if (!_claimFees(b, f, claims)) return gasQ;
+            if (!_claimFees(b, f, claims)) return (gasQ, 0);
             if (credit != 0) _withdrawCredit(b, f);
             uint256 received = address(this).balance - before;
-            if (free + received < combined || (combined - cost) * BPS > received * p.keeperShareBps) revert Payment();
-            return fundedGas;
+            if (ISyncVault(address(this)).keeperCash() < combined || (combined - cost) * BPS > received * p.keeperShareBps) revert Payment();
+            return (fundedGas, claimed);
         }
-        return gasQ;
+        return (gasQ, 0);
     }
 
     function _distributionTail(Params storage p, Book storage b, IFWAV2 f, uint256 witnessId, uint256 gasQ)
         private view returns (bool)
     {
-        if (b.allocationHead < b.allocationQueue.length) {
-            Position storage oldest = b.positions[b.allocationQueue[b.allocationHead]];
-            if (oldest.state != ALLOCATED || block.timestamp >= uint256(oldest.allocatedAt) + f.settlementWindow()) return false;
-        }
-        ISyncVault v = ISyncVault(address(this));
-        uint256 nav_;
-        try v.accountedNav(witnessId) returns (uint256 n) { nav_ = n; } catch { return false; }
-        // Prove a real distribution remains possible even after the largest sync payment.
-        uint256 cost = quote(p, gasQ, 0, false);
-        if (nav_ <= cost) return false;
-        nav_ -= cost;
-        if (b.allocatedValue * BPS > nav_ * p.allocatedBoundBps) return false;
-        uint256 supply = v.totalShares();
-        uint256 perShare = nav_ * 1e18 / supply;
-        uint256 high = v.highWaterMark();
-        if (supply <= DEAD_SHARES || perShare <= high) return false;
-        uint256 liquid = v.freeEth() + f.feeCredit(address(this));
-        if (liquid <= p.reserve) return false;
-        liquid -= p.reserve;
-        if (liquid <= cost) return false;
-        uint256 gain = M.mulDiv(perShare - high, supply, 1e18);
-        return M.min(gain * p.distributionBps / BPS, liquid - cost) >= MIN_DISTRIBUTION;
+        return ScanLib.distributionTail(p, b, f, witnessId, gasQ);
     }
 
     function _unexposed(Book storage b) private view returns (bool) {
@@ -996,6 +1004,10 @@ library VaultLib {
         if (f.feeCredit(address(this)) != 0) _withdrawCredit(b, f);
     }
 
+    function claimFundingFees(Book storage b, IFWAV2 f, uint256[] memory ids) external returns (bool) {
+        return _claimFees(b, f, ids);
+    }
+
     function _claimFees(Book storage b, IFWAV2 f, uint256[] memory ids) private returns (bool claimed) {
         b.controlled = true;
         if (ids.length != 0) {
@@ -1014,48 +1026,50 @@ library VaultLib {
         if (f.feeCredit(address(this)) != 0) _withdrawCredit(b, f);
     }
 
+    function withdrawCredit(Book storage b, IFWAV2 f) external { _withdrawCredit(b, f); }
+
     function _withdrawCredit(Book storage b, IFWAV2 f) private {
         b.controlled = true;
         f.withdrawEarnings();
         b.controlled = false;
     }
 
-    function accountedNav(Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
+    function accountedNav(Params storage p, Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
         external view returns (uint256 value)
     {
-        (value,) = _accountedNav(b, f, packs, freeEth, witnessId);
+        (value,) = _accountedNav(p, b, f, packs, freeEth, witnessId);
     }
 
     /// @return value NAV; gasQ the checkpoint's quoted gas, including the allocation proof it read.
-    function checkpointNav(Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
+    function checkpointNav(Params storage p, Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
         external returns (uint256 value, uint256 gasQ)
     {
         _rebaseUnexposed(b, f);
-        return _accountedNav(b, f, packs, freeEth, witnessId);
+        return _accountedNav(p, b, f, packs, freeEth, witnessId);
     }
 
-    function _accountedNav(Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
+    function _accountedNav(Params storage p, Book storage b, IFWAV2 f, IShapePacks packs, uint256 freeEth, uint256 witnessId)
         private view returns (uint256, uint256 gasQ)
     {
         if (b.acquisitionCursor != f.nextSequenceToProcess()) revert CatchUpFirst();
         if (b.pendingPlusOne != 1) revert PendingReceipts();
         (uint256 entries, uint256 reads) = ScanLib.requireAllocatedCurrent(b, f, packs);
-        gasQ = Q_CHECKPOINT + entries * Q_ALLOCATION_ENTRY + reads * Q_ALLOCATION_READ;
+        gasQ = p.gasSchedule.checkpoint + entries * p.gasSchedule.allocationEntry + reads * p.gasSchedule.allocationRead;
         uint256 pending;
         if (b.activeCount != 0) {
-            Position memory p = b.positions[witnessId];
+            Position memory pos = b.positions[witnessId];
             IFWAView.Listing memory l = listing(f, witnessId);
-            if (p.state != ACTIVE || l.status != LISTING_ACTIVE || p.feeDebt != l.feeDebt) revert BadWitness();
-            _validate(l, packs, p.packId, p.backing);
+            if (pos.state != ACTIVE || l.status != LISTING_ACTIVE || pos.feeDebt != l.feeDebt) revert BadWitness();
+            _validate(l, packs, pos.packId, pos.backing);
             pending = f.pendingFees(witnessId);
         }
         return (nav(b, freeEth, f.feeCredit(address(this)), witnessId, pending), gasQ);
     }
 
     function validateBacking(Params storage p, Book storage b, IFWAV2 f, address packs,
-        uint256 units, uint256 backing, uint256 build, bool newlyBuilt) public view
+        uint256 units, uint256 backing, uint256 mintFee, bool newlyBuilt, uint256 retiredShapes) public view
     {
-        _validateBacking(p, b, _backingTerms(p, f, packs, units, build), backing, newlyBuilt);
+        _validateBacking(p, b, _backingTerms(p, f, packs, units, mintFee, retiredShapes), backing, newlyBuilt);
     }
 
     function _validateBacking(Params storage p, Book storage b, BackingTerms memory t,
@@ -1076,15 +1090,17 @@ library VaultLib {
         uint256 units, uint256[] calldata backingProposals, uint256 available) external
     {
         uint256 count = backingProposals.length;
-        if (count == 0 || count > MAX_LIST_BATCH || units < MIN_PACK_UNITS || units > MAX_PACK_UNITS
+        if (shapes.mintFee() > p.acceptedMintFee) revert MintFeeNotAccepted();
+        if (count == 0 || count > MAX_BUILD_BATCH || units < MIN_PACK_UNITS || units > MAX_PACK_UNITS
             || (p.packUnitsMask >> units) & 1 == 0) revert BadBatch();
         (uint32[] memory counts, uint256 n) = makeup(units);
         uint256 fee = shapes.mintFee();
         uint256 price = units * UNIT + n * fee;
-        BackingTerms memory terms = _backingTerms(p, f, address(packs), units, buildCost(p, units, fee));
-        uint256 need = b.idleFunding + count * price;
+        BackingTerms memory terms = _backingTerms(p, f, address(packs), units, fee, n);
+        uint256 need = count * price;
         for (uint256 i; i < count; ++i) need += backingProposals[i];
-        if (available < need) revert InsufficientBacking();
+        uint256 compensation = quote(p, uint256(p.gasSchedule.build) + count * (buildGas(p, n) + p.gasSchedule.listed), 2 * count, false);
+        if (available < need + compensation) revert InsufficientBacking();
         uint256[] memory none = new uint256[](0);
         for (uint256 i; i < count; ++i) {
             // Validated one at a time, as in `list`: each admission widens the identifier interval.
@@ -1092,42 +1108,16 @@ library VaultLib {
             uint256 packId = packs.createPack{value: price}(none, counts);
             // ShapePacks records exactly the minted backing; a different value is not our pack.
             if (packs.valueOf(packId) != units * UNIT) revert MissingInventory();
+            emit PrimaryMinted(1, n, units * UNIT, n * fee);
             addInventory(b, packId, units * UNIT);
+            b.ordinaryShapeCount = b.ordinaryShapeCount - b.packShapeCount[packId] + n;
+            b.packShapeCount[packId] = n;
             admit(b, f, packs, packId, backingProposals[i]);
         }
     }
 
     /// @dev An extended gift may contain arbitrarily many Shapes. Never enumerate its contents.
-    function recoverInventory(Book storage b, IShapePacks packs, IShapes shapes) external returns (uint256 gasQ) {
-        uint256 id = b.recoveryPacks[b.recoveryPacks.length - 1];
-        gasQ = Q_RECOVERY_BASE;
-        if (!b.recoveryUnsealed[id]) {
-            packs.unseal(id, address(this));
-            b.recoveryUnsealed[id] = true;
-            gasQ += Q_RECOVERY_UNSEAL;
-        }
-        uint256 before = address(this).balance;
-        uint256 supply = shapes.totalSupply();
-        packs.claimEth(id, MAX_REDEEM_SHAPES, payable(address(this)));
-        uint256 out = address(this).balance - before;
-        // The immutable Shapes path burns exactly the claimed IDs before its sole ETH callback.
-        // No other supply mutation can interleave while this guarded vault receives that ETH.
-        uint256 burned = supply - shapes.totalSupply();
-        if (out == 0 || burned == 0 || burned > MAX_REDEEM_SHAPES) revert MissingInventory();
-        gasQ += burned * Q_RECOVERY_SHAPE;
-        b.trackedValue -= out;
-        b.idleValue -= out;
-        b.idleValueOf[id] -= out;
-        bool unsealed = true;
-        if (packs.claimantOf(id) == address(0)) {
-            if (b.idleValueOf[id] != 0) revert MissingInventory();
-            delete b.idleValueOf[id];
-            delete b.recoveryUnsealed[id];
-            b.idleFunding -= b.idleQuote[id];
-            delete b.idleQuote[id];
-            b.recoveryPacks.pop();
-            unsealed = false;
-        }
-        emit RecoveryUpdated(id, b.idleValueOf[id], unsealed);
+    function recoverInventory(Params storage p, Book storage b, IShapePacks packs, IShapes shapes) external returns (uint256 gasQ) {
+        return ScanLib.recoverInventory(p, b, packs, shapes);
     }
 }

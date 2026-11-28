@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
+import {RefundClaims} from "../../utils/RefundClaims.sol";
 
 import {TestVaultOps} from "../../utils/TestVaultOps.sol";
 import {ForkBase} from "../../fork/ForkBase.sol";
@@ -20,11 +21,13 @@ contract AuditFreeMismatch is ForkBase {
         p.essentialCeiling = 0.5 gwei;
         p.payMarkupBps = 0;
         p.reserve = 0.005 ether;
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
         vm.prank(owner);
-        vault.setParams(p);
+        vault.setParams(p, _expected0);
         uint256 ck = vault.requestCharge();
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: 1 ether + ck}();
+        vault.deposit{value: 1 ether + ck}(_expected1);
         toBlackout();
         checkpoint();
         toOpen();
@@ -40,10 +43,12 @@ contract AuditFreeMismatch is ForkBase {
         uint256 b0 = bob.balance;
         for (uint256 i; i < 20; ++i) {
             uint256 charge = vault.requestCharge();
+            bytes32 _expected2 = TestVaultOps.configurationHash(vault);
             vm.prank(bob);
-            vault.deposit{value: 0.01 ether + charge}();
+            vault.deposit{value: 0.01 ether + charge}(_expected2);
             vm.prank(bob);
             vault.cancelDeposit();
+        RefundClaims.claim(vault, bob);
         }
         assertEq(vault.processingPool(), pool0, "nothing retained");
         assertEq(bob.balance, b0, "every wei back");

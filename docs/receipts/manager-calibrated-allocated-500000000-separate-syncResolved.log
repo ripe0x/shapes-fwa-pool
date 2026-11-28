@@ -1,0 +1,8 @@
+client {"__main__": {"loaded_code_sha256": "cf61e57c5d33a9a4385b642f5e55c39bfc79725751187fcbf24873cbce977ebe", "source_sha256_at_import": "5bfe7f9b9965dcab42eeb92e7707e2a791132c5880b03fa2b3b929e2426816a1"}, "index": {"loaded_code_sha256": "d62be2e9d0dafba4d321d2737f03d22236689dfacf2b3f04f344ce0aeab3369e", "source_sha256_at_import": "321946551c971b6374cb37c37de93c6a79895e87492e08421956472376d3d96a"}, "policy": {"loaded_code_sha256": "6b3aaca794c8f2962d9a321ce9229f90eceebd30836832ce6f5fecc4dc18d4b6", "source_sha256_at_import": "42a40400cee6acd7ad1b3342548bd5f0754d11636a9b890118caa346bd4f219a"}, "tx": {"loaded_code_sha256": "f5fc4655be2cb92f33d5a648f85ec1dfabec8cc561a186b9bd62a1adfc96d7b9", "source_sha256_at_import": "23ef4eeb579994c28343ec58612afdaf1972317e5c43110fcdd60fcf139ede3e"}}
+account 0x037eDa3aDB1198021A9b2e88C22B464fD38db3f3 (manager) configuration 0x1659f02e7d449602ff72da170ffb8ae4cd64e9dfc2613ace347c488271c5bd42
+gas 0.500 gwei, 1 open, 0 idle packs, idle 2.5373 ETH, cycle net 7.476 mETH, 7d volume 0/day
+status RESERVE_BELOW_NEED [info] reserve 0.0050 ETH; maximum listing and sync batches quote 0.0055 ETH
+sent sync nonce 1 hash 0x25c33154124549eba8714fc1dabcc54335314ddeef639f2f0caab21ef0e1b073
+mined sync gas 431800 (est 501944) cost 215900000000000 pay 247500000000000 net 31600000000000 wei
+exposure EXPOSURE_UNAVAILABLE [info] aggregate share is not calculated in bounded routine passes
+Error: server returned an error response: error code 3: execution reverted, data: "0x"

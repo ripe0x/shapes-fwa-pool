@@ -25,7 +25,7 @@ contract ReviewJournalTest is ForkBase {
         p.gasCeiling = 0.5 gwei; p.essentialCeiling = 2 gwei; p.payMarkupBps = 0;
         p.reserve = 0.005 ether; p.routineCap = 0.1 ether; p.routineRate = 0.005 ether;
         p.essentialCap = 0; p.essentialRate = 0;
-        (vault,) = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether);
+        vault = DeployCore.deploy(FWA, SHAPES, PACKS, owner, p, 0.01 ether, keccak256(abi.encode(p, SHAPES.mintFee(), false, false)));
     }
 
     function assertEnvironment() external {
@@ -34,8 +34,7 @@ contract ReviewJournalTest is ForkBase {
 
     function _advance() private returns (uint64 begin, uint64 end) {
         begin = vault.acquisitionCursor();
-        vm.makePersistent(address(vault)); vm.makePersistent(address(vault.keeperPolicy()));
-        vm.makePersistent(address(VaultLib));
+        vm.makePersistent(address(vault)); vm.makePersistent(address(VaultLib));
         vm.rollFork(BLOCK + 10_000);
         address[4] memory actors = [owner, keeper, alice, bob];
         for (uint256 i; i < actors.length; ++i) {
@@ -53,11 +52,10 @@ contract ReviewJournalTest is ForkBase {
     }
 
     function _measure(uint256 n) private returns (uint256 gross, uint256 pay, int64 refund) {
-        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), 0, 0));
+        bytes memory input = abi.encodeCall(PackAccount.sync, (new uint256[](0), 0, 0, vault.configurationHash()));
         uint256 intrinsic = _intrinsic(input);
         uint256 before = keeper.balance;
-        vm.cool(address(vault)); vm.cool(address(FWA)); vm.cool(address(vault.keeperPolicy()));
-        vm.cool(address(VaultLib));
+        vm.cool(address(vault)); vm.cool(address(FWA)); vm.cool(address(VaultLib));
         vm.prank(keeper);
         uint256 start = gasleft();
         (bool ok, bytes memory result) = address(vault).call(input);
@@ -82,7 +80,8 @@ contract ReviewJournalTest is ForkBase {
 
     function test_cashOnlyHistoryRebasesWithoutMaintenanceExpense() public {
         uint256 gross = vault.requestCharge() + 2 ether;
-        vm.prank(alice); vault.deposit{value: gross}();
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: gross}(_expected0);
         toBlackout(); checkpoint();
         (uint64 begin, uint64 end) = _advance();
         assertGt(end, begin);
@@ -96,7 +95,8 @@ contract ReviewJournalTest is ForkBase {
 
     function test_realMixedHistoryCashOnlyExitWithZeroEssentialBudget() public {
         uint256 gross = vault.requestCharge() + 2 ether;
-        vm.prank(alice); vault.deposit{value: gross}();
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
+        vm.prank(alice); vault.deposit{value: gross}(_expected1);
         toBlackout(); checkpoint();
         (uint64 begin,) = _advance();
         toOpen();
@@ -126,7 +126,7 @@ contract ReviewJournalTest is ForkBase {
         uint256 shares = vault.shareBalance(alice);
         uint256 charge = vault.requestCharge();
         uint256 expectedPrincipal = vault.lastNav() * shares / vault.totalShares();
-        uint256 holderGross = _holderCall(abi.encodeCall(PackVault.requestRedeem, (shares)), charge);
+        uint256 holderGross = _holderCall(abi.encodeCall(PackVault.requestRedeem, (shares, vault.configurationHash())), charge);
         assertGt(vault.lockedShares(), 0);
         (uint256 routineBefore, uint256 essential) = vault.budget();
         assertGt(routineBefore, 0); assertEq(essential, 0);
@@ -136,7 +136,7 @@ contract ReviewJournalTest is ForkBase {
         assertEq(vault.acquisitionCursor(), end);
         toBlackout();
         holderGross += used;
-        holderGross += _holderCall(abi.encodeCall(PackVault.checkpoint, (0, 0)), 0);
+        holderGross += _holderCall(abi.encodeCall(PackVault.checkpoint, (0, 0, vault.configurationHash())), 0);
         uint256 before = alice.balance;
         holderGross += _holderCall(abi.encodeCall(PackVault.claim, ()), 0);
         uint256 claimed = alice.balance - before;

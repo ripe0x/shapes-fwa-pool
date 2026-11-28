@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/tmp/shapes-manager-closeout-run/collect.py", line 31, in <module>
+    abi=json.loads((ROOT/'out/PackManager.sol/PackManager.json').read_text())['abi'];paid_event=next(a for a in abi if a['type']=='event'and a['name']=='KeeperPaid');paid_sig='KeeperPaid('+','.join(typ(v)for v in paid_event['inputs'])+')';paid_topic='0x'+keccak(text=paid_sig).hex();pay=0
+                                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+StopIteration

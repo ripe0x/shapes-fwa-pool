@@ -20,9 +20,11 @@ import json
 import copy
 import functools
 import heapq
+import hashlib
 from itertools import islice
 from fractions import Fraction
 from collections import deque
+from types import SimpleNamespace
 import sqlite3
 import sys
 from pathlib import Path
@@ -33,6 +35,7 @@ ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent / "keeper"))
 import policy  # noqa: E402
+from config import gas_schedule
 import bisect  # noqa: E402
 from vault import ACTIVE, ALLOCATED, SETTLED, WITHDRAWN, OWED, Vault  # noqa: E402
 
@@ -40,15 +43,14 @@ DB = ROOT / "data/fwa.sqlite"
 OUT = ROOT / "out"
 E = 10**18
 GWEI = 10**9
-P = 6 * 10**16  # the REF_UNITS (6) reference recipe: 0.06 ETH, one 0.05 and one 0.01 Shape (two mints)
-BUILD_UNITS = 6
+P = 3 * 10**16  # three paid 0.01 ETH primary mints
+BUILD_UNITS = 3
 SUR, CUT, S_FEE, BID_RATE = 0.05, 0.01, 0.01, 0.90
 ASK, PREMIUM = 0.033, 0.10
 MINT_FEE = 10**15
-# The backing rule (VaultLib.edge) sets each listing's backing so that keeping the pack beats taking
-# FWA's best bid by MIN_KEEP_ADVANTAGE after redeem gas, so a value-aware purchaser keeps and each keep
-# pays for a fresh replacement build. Scenarios override this via sc["keep"] or a response sampler.
-KEEP_DEFAULT = 1.0
+# Backing follows the account ratio. Purchaser choices are separate explicit scenarios.
+KEEP_DEFAULT = 0.0  # no favorable purchaser behavior assumed
+POOL = None
 MARK_DAYS = 30  # operating marks interval (diagnostics may lower it)
 DAY = 86_400
 WORK_FEE = 2 * 10**13  # wei per unit of work, canary value (D55)
@@ -59,10 +61,15 @@ ESSENTIAL_CEILING = 2.0  # gwei: canary essentialCeiling (redemption and wind-do
 # ---------------------------------------------------------------- history
 
 
+def archive_revision():
+    with sqlite3.connect(f'file:{DB}?mode=ro', uri=True) as db:
+        return int(db.execute('SELECT max(block) FROM logs').fetchone()[0])
+
+
 def history():
     """Per-acquisition arrays from the event log: time, fee, total weight (sum of 1/B in 1/ETH),
     active listing count, protocol cut and crown share in force."""
-    cache = OUT / "acq_history.npz"
+    cache = OUT / f"acq_history-{archive_revision()}.npz"
     if cache.exists():
         return dict(np.load(cache))
     db = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
@@ -94,7 +101,7 @@ def staging_delays(days_back=30, poll=600):
     """Seconds a relist waits staged (FWA queue busy) before it can be activated, measured at
     every historical relist moment in the last `days_back` days: a bid outcome's resolution plus
     one keeper poll. 0 when FWA's queue was empty then (audit E7)."""
-    cache = OUT / f"staging_delays_{days_back}.npy"
+    cache = OUT / f"staging_delays_{days_back}-{archive_revision()}.npy"
     if cache.exists():
         return np.load(cache)
     db = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
@@ -165,13 +172,15 @@ def k_of(crown=0.001, cut=CUT, sur=SUR):
     return (1 + sur) * (1 - cut) * (1 - crown)
 
 
-def expectation(n, volume, gwei, B=0.0363, crown=0.001, premium=0.0):
-    pool = POOL
+def expectation(n, volume, gwei, B=None, crown=0.001, premium=0.0):
+    st = configured_state(int(gwei * GWEI))
+    B = policy.position_value(st) / E - st.build_units * policy.UNIT / E if B is None else B
+    pool = POOL if POOL is not None else pool_snapshot()
     W = np.sum(1 / pool) + n / B
     cycles = 365 * volume * (1 / B) / W
     # A bid cycle's keeper pay as the vault quotes it (D56): quoted gas at basefee + 0.05 gwei tip,
-    # capped at the ceiling (V1: no premium), plus two work units (resolve and relist).
-    gas = policy.CYCLE_GAS * min(gwei + 0.05, CEILING) * 1e-9 * (1 + premium) + 2 * WORK_FEE / E
+    # capped at the ceiling, with the configured routine markup and verified service fees.
+    gas = policy.quote(st, policy.cycle_gas(st), 2) / E
     net = B * (k_of(crown) - 1) - gas
     capital = n * (B + P / E)
     return dict(cycle_days=365 / cycles, net_meth=net * 1e3, apr=cycles * net / (B + P / E),
@@ -181,9 +190,11 @@ def expectation(n, volume, gwei, B=0.0363, crown=0.001, premium=0.0):
 # ---------------------------------------------------------------- 2. backtest
 
 
-def backtest(h, n, gwei, t0, t1, B=0.0363, runs=400, seed=1, premium=0.0):
+def backtest(h, n, gwei, t0, t1, B=None, runs=400, seed=1, premium=0.0):
     """Vault of n listings at backing B inside the real history between t0 and t1 (unix s).
     Positions are relisted the same day after a bid outcome (cycle gas charged per selection)."""
+    st = configured_state(int(gwei * GWEI))
+    B = policy.position_value(st) / E - st.build_units * policy.UNIT / E if B is None else B
     m = (h["ts"] >= t0) & (h["ts"] < t1)
     fee, w, N, cut, crown = h["fee"][m], h["w"][m], h["n"][m], h["cut"][m] / 1e4, h["crown"][m] / 1e4
     if len(fee) == 0:
@@ -193,7 +204,7 @@ def backtest(h, n, gwei, t0, t1, B=0.0363, runs=400, seed=1, premium=0.0):
     fee2 = fee * H2 / H  # the vault's listings move the harmonic backing, so the fee
     vault_fees = fee2 * (1 - cut) * (1 - crown) * n / (N + n)
     p_sel = (n / B) / (w + n / B)
-    cycle_cost = B + policy.CYCLE_GAS * min(gwei + 0.05, CEILING) * 1e-9 * (1 + premium) + 2 * WORK_FEE / E
+    cycle_cost = B + policy.quote(st, policy.cycle_gas(st), 2) / E
     days = (t1 - t0) / DAY
     capital = n * (B + P / E)
     exp_pnl = vault_fees.sum() - p_sel.sum() * cycle_cost
@@ -223,11 +234,27 @@ def charge_state(gas, open_positions, pool=0):
                         essential_ceiling=int(ESSENTIAL_CEILING * GWEI), processing_pool=pool)
 
 
+def configured_state(base_fee, values=None):
+    values = values or json.loads((ROOT.parent / 'deploy/mainnet.json').read_text())
+    s = charge_state(base_fee, 0)
+    s.gas_schedule = gas_schedule(values)
+    if 'renewalMode' in values or 'renewalFloatCount' in values:
+        raise ValueError('historical Fresh settings require their pinned revision; active strategy is reuse-only')
+    s.backing_ratio_bps = values['backingRatioBps']
+    s.gas_ceiling, s.essential_ceiling = values['gasCeilingWei'], values['essentialCeilingWei']
+    s.max_tip, s.work_fee, s.markup_bps = values['maxTipWei'], values['workFeeWei'], values['payMarkupBps']
+    s.pack_units_mask, s.accepted_mint_fee = values['packUnitsMask'], values['acceptedMintFeeWei']
+    s.build_units = next((u for u in range(3,31) if s.pack_units_mask >> u & 1), 3)
+    s.routine_budget, s.essential_budget, s.essential_cap = values['routineCapWei'], values['essentialCapWei'], values['essentialCapWei']
+    s.share_bps = values['keeperShareBps']
+    return s
+
+
 def backing_proposals(target, positions, minimum=0, maximum=2**256 - 1, count=policy.MAX_BATCH["list"]):
     """Bounded offchain identifier proposals, using current outstanding identifiers."""
     if not target:
         return []
-    return list(_proposals(target, frozenset(p.backing for p in positions.values()), minimum, maximum, count))
+    return list(_proposals(target, frozenset(p.backing for p in positions.values() if p.state != OWED), minimum, maximum, count))
 
 
 @functools.lru_cache(maxsize=65_536)
@@ -295,6 +322,13 @@ class OperatingClock:
         self.push(days * DAY, "cutoff")
         for day, fraction in sc.get("redeem", []):
             self.push(day * DAY, "redemption", fraction)
+        self.request_draws = None
+        if sc.get('request_randomness'):
+            acquisitions = [(at, payload) for at, _, serial, kind, payload in sorted(self.events) if kind == 'acquisition']
+            self.request_events_sha256 = hashlib.sha256(json.dumps(acquisitions,separators=(',',':')).encode()).hexdigest()
+            # Independent pre-generated domains keep conditional account choices out of later requests.
+            self.request_draws = np.column_stack([np.random.default_rng(np.random.SeedSequence([seed,domain])).random(len(acquisitions))
+                                                  for domain in (0x53454C,0x525350,0x4B4545)])
 
     def push(self, at, kind, payload=None):
         if at > self.end:
@@ -317,6 +351,8 @@ def bounded_policy_positions(v, now, settlement_window, returned_order, selected
     obtains the identical bounded classes from indexed SQL queries, then hydrates their IDs.
     Text ID ordering matches keeper/index.py's TEXT primary keys.
     """
+    if not v.positions and not v.receipts:
+        return [], owed_after
     limit = policy.MAX_BATCH["sync"]  # keeper.keeper.MAX_CANDIDATES
     positions = v.positions
     returned = sorted((i for i, p in positions.items()
@@ -346,6 +382,56 @@ def bounded_policy_positions(v, now, settlement_window, returned_order, selected
     return list(dict.fromkeys(due + active)), owed_after
 
 
+RECEIPT_WORK_LIMITS = dict(create=1,setExiting=1,withdraw=1,processAcquisitions=16,
+    build=4,list=8,sync=16,recover_sync=16,unlist=16,liquidate=16,harvest=16)
+
+
+def receipt_gas(curves, operation, work_count, work_gas=0, *, estimate=False, legacy_floor=0):
+    if not curves:
+        return max(work_gas, legacy_floor)
+    if operation not in curves or type(work_count) is not int or not 1<=work_count<=RECEIPT_WORK_LIMITS.get(operation,0):
+        raise ValueError(('unsupported receipt work count/operation',operation,work_count))
+    curve=curves[operation]
+    base='single_estimate_gas' if estimate else 'single_billed_gas'
+    slope='estimate_per_extra_work' if estimate else 'billed_per_extra_work'
+    if type(curve.get(base)) is not int or curve[base]<=0 or type(curve.get(slope)) is not int or curve[slope]<0:
+        raise ValueError(('invalid receipt gas curve',operation))
+    return curve[base]+curve[slope]*(work_count-1)
+
+
+
+
+def metered_work_gas(curves, meters, operation, work_count=1, max_work=None):
+    if max_work is not None and (operation not in max_work or work_count>max_work[operation]):
+        raise ValueError('metered batch exceeds actual receipt support: '+operation)
+    curve=curves.get(operation,{})
+    if 'single_meter_gas' in curve and 'meter_per_extra_work' in curve:
+        receipt_gas(curves,operation,work_count)  # enforce verified operation/count bounds
+        base,slope=curve['single_meter_gas'],curve['meter_per_extra_work']
+        if type(base) is not int or base<0 or type(slope) is not int or slope<0:
+            raise ValueError('invalid measured work-span curve: '+operation)
+        return base+slope*(work_count-1)
+    if work_count!=1 or type(meters.get(operation)) is not int or meters[operation]<0:
+        raise ValueError('missing independently measured work span: '+operation)
+    return meters[operation]
+
+
+def sync_context_gas(contexts, allowance, units, work_count=1):
+    key=f'{allowance}:{units}:{work_count}'
+    if key not in contexts:
+        raise ValueError('unmeasured sync context: '+key+f' count={work_count}')
+    context=contexts[key]
+    if any(type(context.get(name)) is not int or context[name]<=0
+           for name in ('billed_gas','estimate_gas')):
+        raise ValueError('invalid sync receipt context: '+key)
+    return context
+
+
+def receipt_acceptance_gas(curves, operation, work_count, work_gas=0, legacy_floor=0):
+    return max(receipt_gas(curves,operation,work_count,work_gas,estimate=True,legacy_floor=legacy_floor),
+               receipt_gas(curves,operation,work_count,work_gas,legacy_floor=legacy_floor))
+
+
 def run(sc, n_target, seed, days=365, values=None):
     rng = np.random.default_rng(seed)
     if "foreign_pool_weight" in sc:
@@ -357,20 +443,53 @@ def run(sc, n_target, seed, days=365, values=None):
         if W_o <= 0 or not np.isfinite(W_o):
             raise ValueError("foreign pool weight must be positive and finite")
     else:
-        others = POOL
+        others = POOL if POOL is not None else pool_snapshot()
         if sc.get("pool_scale", 1.0) != 1.0:
             others = rng.choice(POOL, int(len(POOL) * sc["pool_scale"]))
         W_o = float(np.sum(1 / others))
     g_of = sc.get("gwei", 0.15)  # scenario basefee; the actual bid also includes maxTip
-    deposit = sc.get("deposit_wei", int((n_target * (0.0363 + 0.03) + 0.06 + 0.11) * E))
-    values = values or json.loads((ROOT.parent / "deploy/mainnet.json").read_text())
+    manager = bool(sc.get('manager', False))
+    values = values or json.loads((ROOT.parent / ('deploy/manager.json' if manager else 'deploy/mainnet.json')).read_text())
     ceiling, tip = values["gasCeilingWei"], values["maxTipWei"]
     essential_ceiling = values["essentialCeilingWei"]
-    work_fee, mint_fee = values["workFeeWei"], MINT_FEE
-    if deposit > values["tvlCapWei"]:
+    work_fee, mint_fee = values["workFeeWei"], int(sc.get("mint_fee_wei", MINT_FEE))
+    schedule = gas_schedule(values)
+    cached_economics = sc.get('cache_economics', True)
+    from keeper import proposal_limits as canonical_proposal_limits
+    limits_cache, edge_cache, construction_cache = {}, {}, {}
+    def proposal_limits(state,value,settlement,discount,cap,build=False,units=policy.REF_UNITS,retirement_shapes=None):
+        key=(state.k,state.base_fee,value,settlement,discount,cap,build,units,retirement_shapes)
+        if not cached_economics or key not in limits_cache:
+            result=canonical_proposal_limits(state,value,settlement,discount,cap,build,units,retirement_shapes)
+            if not cached_economics:return result
+            limits_cache[key]=result
+        return limits_cache[key]
+    def edge_for(units,newly_built=True,retirement_shapes=None):
+        limit=None if sc.get('exempt',True) else cap
+        key=(k,gas,limit,units,newly_built,retirement_shapes)
+        if not cached_economics or key not in edge_cache:
+            result=policy.edge_backing(k,limit,int(S_FEE*10_000),units,ceiling,values['payMarkupBps'],work_fee,
+                price=min(gas+tip,ceiling),mint_fee=mint_fee,buffer_bps=values['bufferBps'],min_edge_bps=values['minEdgeBps'],
+                backing_ratio_bps=values['backingRatioBps'],gas_schedule=schedule,
+                newly_built=newly_built,reference_units=build_units,retirement_shapes=retirement_shapes)
+            if not cached_economics:return result
+            edge_cache[key]=result
+        return edge_cache[key]
+    build_units = next((u for u in range(policy.MIN_PACK_UNITS, policy.MAX_PACK_UNITS + 1) if (values['packUnitsMask'] >> u) & 1), policy.REF_UNITS)
+    face_value = build_units * policy.UNIT
+    opening = configured_state(int((g_of(0) if callable(g_of) else g_of) * GWEI), values)
+    opening.mint_fee = mint_fee
+    deposit = sc.get('deposit_wei', n_target * (policy.position_value(opening) + policy.shape_count(build_units) * mint_fee) + values['reserveWei'] + policy.build_cost(opening))
+    if not manager and deposit > values["tvlCapWei"]:
         raise ValueError("model deposit exceeds configured TVL cap")
-    v = Vault(seed=10**16, balance=10**16, reserve=values["reserveWei"],
-              distribution_bps=values["distributionBps"], allocated_bound_bps=values["allocatedBoundBps"])
+    account_type = Vault
+    if manager:
+        from manager import Manager
+        account_type = Manager
+    v = account_type(seed=0 if manager else 10**16, balance=deposit if manager else 10**16, reserve=values["reserveWei"],
+              distribution_bps=values["distributionBps"], uplift_bound_bps=values["upliftBoundBps"], pack_units_mask=values["packUnitsMask"],
+              accepted_mint_fee=values["acceptedMintFeeWei"],
+              live_mint_fee=mint_fee, min_distribution=values["minDistributionWei"])
     v.routine_budget = v.routine_cap = values["routineCapWei"]
     v.essential_budget = v.essential_cap = values["essentialCapWei"]
     v.routine_rate, v.essential_rate = values["routineRatePerDayWei"], values["essentialRatePerDayWei"]
@@ -385,14 +504,62 @@ def run(sc, n_target, seed, days=365, values=None):
     st0 = charge_state(int(g0 * GWEI), 0)
     st0.gas_ceiling, st0.essential_ceiling, st0.max_tip = ceiling, essential_ceiling, tip
     st0.work_fee, st0.essential_cap = work_fee, values["essentialCapWei"]
+    st0.mint_fee = mint_fee
+    st0.gas_schedule = schedule
+    st0.build_units, st0.pack_units_mask = build_units, values["packUnitsMask"]
+    st0.backing_ratio_bps = values['backingRatioBps']
+    st0.accepted_mint_fee = values['acceptedMintFeeWei']
     ck0, d0 = policy.request_charge(st0), policy.deploy_charge(st0)
-    v.deposit("h", deposit, ck0, deposit * d0 // (policy.POSITION_VALUE + d0))
-    paid_in = deposit + ck0
+    v.construction_cost, v.reference_capital = d0, policy.position_value(st0)
+    if not manager:
+        v.deposit("h", deposit, ck0)
+    paid_in = deposit if manager else deposit + ck0
     exit_all = sc.get("exit_all", False)
     exit_days = sc.get("exit_days", 30) if exit_all else 0
     user_gas = sc.get("user_gas_proxy", {})
-    holder_gas = (int(g0 * GWEI) + tip) * user_gas.get("deposit", 0)
-    unknown_user_gas = int(exit_all and "deposit" not in user_gas)
+    gas_curves = sc.get("gas_curves", {}) if manager else {}
+    owner_gas_curves = gas_curves | sc.get("owner_gas_curves", {})
+    owner_gas_max_work = sc.get("owner_gas_max_work")
+    gas_meter_proxy = sc.get("gas_meter_proxy", {})
+    gas_meter_max_work = sc.get("gas_meter_max_work")
+    def sync_context(allowance, units, count=1, owner=False):
+        if sc.get('full_gas_schedule')!=values['gasSchedule']:
+            raise ValueError('sync context calibration gas schedule differs from current settings')
+        return sync_context_gas(sc.get('owner_sync_contexts' if owner else 'sync_contexts',{}),allowance,units,count)
+    def work_meter(operation,count=1,allowance=None,units=0):
+        if operation=='sync':
+            context=sync_context(allowance,units,count)
+            meter=context.get('measured_gas')
+            if type(meter) is not int or meter<0:raise ValueError('sync context lacks measured span')
+            return meter
+        return metered_work_gas(gas_curves,gas_meter_proxy,operation,count,gas_meter_max_work)
+    def operation_gas(operation,count,allowance,units=0,estimate=False):
+        if operation=='sync':
+            return sync_context(allowance,units,count)['estimate_gas' if estimate else 'billed_gas']
+        return receipt_gas(gas_curves,operation,count,allowance,estimate=estimate,legacy_floor=user_gas.get(operation,0))
+    meter_censored_calls = 0
+    user_estimates = sc.get("user_gas_estimate_proxy", {})
+    owner_estimate_fallback = set()
+    entry_method = 'create' if manager else 'deposit'
+    holder_gas = (int(g0 * GWEI) + tip) * receipt_gas(owner_gas_curves,entry_method,1,legacy_floor=user_gas.get(entry_method,0))
+    unknown_user_gas = int(exit_all and entry_method not in user_gas)
+    keeper_gas_proxy_cost = 0
+    keeper_unmeasured = set()
+    manager_waits = {}
+    manager_wait_examples = {}
+    owner_processing_calls = owner_processing_cost = owner_processing_pending = 0
+    owner_harvest_calls = owner_withdraw_calls = owner_set_exiting_calls = 0
+    owner_exit_limit = sc.get('owner_exit_spend_limit_wei') if manager else None
+    if owner_exit_limit is not None and (not isinstance(owner_exit_limit, int) or owner_exit_limit < 0):
+        raise ValueError('owner exit signed spending limit must be a nonnegative integer')
+    owner_exit_reserved = owner_exit_spent = 0
+    owner_processing_blocked = False
+    keeper_zero_loss = manager and bool(sc.get('manager_keeper_zero_loss', False))
+    from keeper import profitability_gate, wallet_debit_bound, billed_ratio
+    keeper_receipt_history_enabled = manager and bool(sc.get('manager_keeper_receipt_history',False))
+    if keeper_receipt_history_enabled and (not keeper_zero_loss or not gas_curves):
+        raise ValueError('keeper receipt history requires calibrated curves and zero-loss admission')
+    keeper_receipt_history=SimpleNamespace(state={'counted':[]})
     holder_claimed = holder_cancelled = holder_keeper_pay = holder_maintenance_gas = 0
     exit_requested = False
     operation_end_backlog = 0
@@ -404,6 +571,11 @@ def run(sc, n_target, seed, days=365, values=None):
     trace = sc.get("trace_sink")
     timed = sc.get("timed", False)
     clock = OperatingClock(sc, seed, days, exit_days) if timed else None
+    keyed_randomness = bool(sc.get('request_randomness'))
+    if keyed_randomness and (not timed or ('response_sampler' in sc and 'request_response_sampler' not in sc)):
+        raise ValueError('request_randomness requires timed mode and request_response_sampler(U) in place of response_sampler(rng)')
+    request_ordinal = 0
+    response_draws = {}
     now = absolute_now = 0
     event_kind = "day"
     market_pending = last_checkpoint_interval = 0
@@ -418,7 +590,7 @@ def run(sc, n_target, seed, days=365, values=None):
     routine_unfunded = unpaid_routine_calls = zero_quote_sync_calls = 0
     sync_credit_sweeps = sync_active_fee_claims = sync_fee_receipts = sync_collection_quote = 0
     last_unfunded_offer = last_cash_shortfall = last_permission_shortfall = 0
-    op_names = ("sync", "harvest", "unlist", "liquidate", "checkpoint", "build", "list")
+    op_names = ("syncCheckpoint", "sync", "harvest", "unlist", "liquidate", "checkpoint", "build", "list")
     op_paid = dict.fromkeys(op_names, 0)
     op_calls = dict.fromkeys(op_names, 0)
     holder_calls = dict.fromkeys(op_names, 0)
@@ -432,13 +604,83 @@ def run(sc, n_target, seed, days=365, values=None):
     def trace_state(action, day):
         if trace is not None:
             trace.append(dict(day=day, action=action, **(dict(timestamp=absolute_now, event=event_kind) if timed else {}), cash=v.balance, free=v.free(), routine_budget=v.routine_budget,
-                              protected=v.redemption_reserve + v.distribution_reserve + v.claimable_total + v.processing_pool,
+                              protected=v.redemption_reserve + v.distribution_reserve + v.claimable_total + v.processing_pool + v.charge_refund_reserve,
                               locked=locked_holder(), global_locked=v.locked_shares, positions=len(v.positions),
                               returned_value=sum(p.value for p in v.positions.values() if p.status == SETTLED and p.pack_owned),
-                              journal=len(journal), claimed=holder_claimed))
+                              journal=len(journal), claimed=holder_claimed,market_pending=market_pending))
+
+    def owner_gas(estimate):
+        return max(21_000, estimate) if owner_exit_limit is not None else estimate
+
+    def owner_supported(operation, work_count):
+        if owner_gas_max_work is not None and work_count > owner_gas_max_work.get(operation,0):
+            raise ValueError("owner batch exceeds actual receipt support: " + operation)
+
+    def owner_billed(operation, work_gas=0, work_count=1, units=0):
+        owner_supported(operation,work_count)
+        if operation=='recover_sync':
+            return sync_context(work_gas,units,work_count,owner=True)['billed_gas']
+        return owner_gas(receipt_gas(owner_gas_curves,operation,work_count,work_gas,legacy_floor=user_gas.get(operation,0)))
+
+    def owner_estimate(operation, work_gas, work_count=1, units=0):
+        owner_supported(operation,work_count)
+        if operation=='recover_sync':
+            context=sync_context(work_gas,units,work_count,owner=True)
+            return max(context['billed_gas'],context['estimate_gas'])
+        if owner_gas_curves:
+            return max(21_000,receipt_acceptance_gas(owner_gas_curves,operation,work_count,work_gas))
+        if operation not in user_estimates:
+            owner_estimate_fallback.add(operation)
+        return max(21_000, work_gas, user_estimates.get(operation, user_gas.get(operation, 0)))
+
+    def owner_preflight(estimates, base_fee, operation):
+        nonlocal owner_exit_reserved
+        bound = sum(wallet_debit_bound(max(21_000, estimate), base_fee, tip) for estimate in estimates)
+        if owner_exit_limit is not None and owner_exit_reserved + bound > owner_exit_limit:
+            manager_waits['EXIT_SPEND_LIMIT'] = manager_waits.get('EXIT_SPEND_LIMIT', 0) + 1
+            manager_wait_examples.setdefault('EXIT_SPEND_LIMIT', dict(time=now,operation=operation,
+                reserved_wei=owner_exit_reserved,next_signed_bound_wei=bound,limit_wei=owner_exit_limit))
+            return False
+        owner_exit_reserved += bound
+        return True
+
+    def owner_charge(cost):
+        nonlocal owner_exit_spent, holder_gas
+        owner_exit_spent += cost
+        holder_gas += cost
 
     def claim_available(gas_price, day):
         nonlocal holder_claimed, holder_gas, unknown_user_gas
+        nonlocal credit,owner_harvest_calls,owner_withdraw_calls
+        if manager:
+            if not exit_requested or owner_processing_blocked:
+                return
+            if credit and not (v.positions or v.idle_packs or v.recovery_packs or v.receipts):
+                # Collect once after retirement; no needless intermediate exit sweeps.
+                gas = owner_billed('harvest',st0.gas_schedule['harvest'])
+                if not owner_preflight([owner_estimate('harvest', gas)], max(0, gas_price-tip), 'harvest'):
+                    return
+                v.receive_fees(credit)
+                credit = 0
+                owner_charge(gas * gas_price)
+                unknown_user_gas += int('harvest' not in user_gas or 'harvest' in sc.get('unmeasured_gas_operations',[]))
+                owner_harvest_calls+=1
+                trace_state('owner-harvest-credit', day)
+            if not (v.positions or v.idle_packs or v.recovery_packs or v.receipts) and v.balance:
+                withdraw_gas = owner_billed('withdraw')
+                if not owner_preflight([owner_estimate('withdraw', withdraw_gas)], max(0, gas_price-tip), 'withdraw'):
+                    return
+                holder_claimed += v.withdraw(v.balance)
+                owner_charge(withdraw_gas * gas_price)
+                unknown_user_gas += int('withdraw' not in user_gas)
+                owner_withdraw_calls+=1
+                trace_state('owner-withdraw', day)
+            return
+        refund_ids = [i for i, c in enumerate(v.contributions) if c[0] == 'h' and v.checkpoint_refund(i)]
+        for start in range(0, len(refund_ids), 16):
+            holder_claimed += v.claim_checkpoint_refund('h', refund_ids[start:start+16])
+            holder_gas += user_gas.get('claim_refund', 0) * gas_price
+            unknown_user_gas += int('claim_refund' not in user_gas)
         r = v.redemptions.get("h")
         redemption_pay = 0
         if r and r.shares:
@@ -474,10 +716,12 @@ def run(sc, n_target, seed, days=365, values=None):
         d = now // DAY
         absolute_now = (clock.start if timed else 0) + now
         v.sync_budget(now)
-        if d <= days and d % MARK_DAYS == 0 and str(d) not in operating_budget_marks:
+        if d <= days and (d % MARK_DAYS == 0 or d in (1,2,3,7,14)) and str(d) not in operating_budget_marks:
             operating_budget_marks[str(d)] = dict(elapsed_seconds=now, routine_budget_wei=v.routine_budget,
                 routine_paid_wei=routine_paid, free_wei=v.free(), positions=len(v.positions),
-                fees_wei=v.fees_received, lost_wei=v.backing_lost, selections=selected)
+                fees_wei=v.fees_received, lost_wei=v.backing_lost, selections=selected, cash_wei=v.balance,
+                keeper_cash_wei=v.keeper_cash_after(),
+                mint_fees_wei=v.mint_fees,fee_credit_wei=credit,protected_refund_wei=v.charge_refund_reserve)
         gas = int((g_of(d) if callable(g_of) else g_of) * GWEI)
         for day, key, val in sc.get("changes", []):
             if day != d or (timed and (day, key) in applied_changes):
@@ -494,16 +738,18 @@ def run(sc, n_target, seed, days=365, values=None):
                         v.kicked(i)
         cap = int(ask * (1 + PREMIUM) * E)
         k = int(k_of(crown) * E)
-        backing = policy.edge_backing(k, None if sc.get("exempt", True) else cap, int(S_FEE * 1e4), BUILD_UNITS,
-                                      ceiling, values["payMarkupBps"], work_fee,
-                                      price=min(gas + tip, ceiling), mint_fee=mint_fee,
-                                      buffer_bps=values["bufferBps"], min_edge_bps=values["minEdgeBps"])
+        backing = edge_for(build_units)
+        relist_backing = edge_for(build_units,False)
 
         if timed:
             A = 0
             if event_kind == "request":
                 market_pending += 1
             elif event_kind == "acquisition":
+                draws=clock.request_draws[request_ordinal] if keyed_randomness else None
+                if keyed_randomness and sc.get('randomness_sink') is not None:
+                    sc['randomness_sink'].append((request_ordinal,*map(float,draws)))
+                request_ordinal+=1
                 market_pending -= 1
                 assert market_pending >= 0
                 # A replayed acquisition carries its recorded foreign totalWeight (1/ETH).
@@ -516,7 +762,7 @@ def run(sc, n_target, seed, days=365, values=None):
                     W = foreign_weight + sum(weights)
                     expected_selections += sum(weights) / W
                     # Conditional counterfactual selection, not replay of a real VRF word.
-                    draw = rng.random() * W
+                    draw = (draws[0] if keyed_randomness else rng.random()) * W
                     for i, weight in zip(act, weights):
                         draw -= weight
                         if draw < 0:
@@ -537,8 +783,14 @@ def run(sc, n_target, seed, days=365, values=None):
                         trace_state("selection", d)
                         if trace is not None:
                             trace[-1]["listing_id"] = chosen
+                            if keyed_randomness:trace[-1]['request_ordinal']=request_ordinal-1
                         delay, kept = clock.response_delay, None
-                        if "response_sampler" in sc:
+                        if keyed_randomness:
+                            response_draws[chosen]=draws[2]
+                            if 'request_response_sampler' in sc:
+                                delay,kept=sc['request_response_sampler'](float(draws[1]))
+                                response_keep[chosen]=kept
+                        elif "response_sampler" in sc:
                             # Empirical purchaser behaviour: (seconds or None for silence, kept).
                             delay, kept = sc["response_sampler"](rng)
                             response_keep[chosen] = kept
@@ -552,7 +804,8 @@ def run(sc, n_target, seed, days=365, values=None):
                 if p and p.status == ALLOCATED:
                     late_purchaser_returns += int(absolute_now >= selected_times[payload] + clock.SETTLEMENT)
                     kept = response_keep.pop(payload, None)
-                    if kept if kept is not None else rng.random() < sc.get("keep", KEEP_DEFAULT):
+                    keep_draw=response_draws.pop(payload,None) if keyed_randomness else None
+                    if kept if kept is not None else (keep_draw if keyed_randomness else rng.random()) < sc.get("keep", KEEP_DEFAULT):
                         v.record_keep(payload, v.settlement_fee_bps)
                     else:
                         v.bid_settled(payload)
@@ -625,6 +878,10 @@ def run(sc, n_target, seed, days=365, values=None):
         checkpoint_done = timed and last_checkpoint_interval == absolute_now // OperatingClock.INTERVAL
         holder_finished = False
         phases = ([absolute_now % clock.INTERVAL >= clock.BLACKOUT_START] if event_kind == "keeper" else []) if timed else (False, True)
+        if manager and owner_processing_blocked and market_pending == 0:
+            owner_processing_blocked = False  # Actual archived callbacks removed the global queue lock.
+        if manager and owner_processing_blocked:
+            phases = []
         for blackout in phases:
             while not congested and not holder_finished and calls < (1 if timed else max_calls):
                 hydrated = list(v.positions)
@@ -635,53 +892,86 @@ def run(sc, n_target, seed, days=365, values=None):
                                            value=p.value, backing=p.backing,
                                            unapplied=p.state == ACTIVE and p.status in (ALLOCATED, SETTLED))
                             for i in hydrated for p in [v.positions[i]]]
+                recent = vol_hist[max(0, d - 6):d + 1] if timed else vol_hist[-7:]
+                recent_total = sum(map(int, recent))
+                recent_volume = recent_total / len(recent) if len(recent) and 0 <= recent_total <= 2**53 else float(np.mean(recent))
                 st = policy.State(
                     now=absolute_now, gas_price=gas + tip, base_fee=gas, gas_ceiling=ceiling, max_tip=tip,
                     markup_bps=values["payMarkupBps"], share_bps=values["keeperShareBps"], k=k, backing=backing,
+                    pooled=not manager, winding_down=bool(manager and v.exiting), listing_paused=bool(manager and v.listing_paused),
                     min_edge_bps=values["minEdgeBps"], settlement_fee_bps=int(S_FEE * 10_000), mint_fee=mint_fee,
                     settlement_window=clock.SETTLEMENT if timed else 10**12,
                     blackout=blackout, queue_drained=(market_pending == 0 if timed else (blackout_ok or not blackout) and d >= listing_ready_day),
-                    checkpoint_done_this_interval=checkpoint_done, listings=listings, idle_packs=len(v.idle_packs),
+                    checkpoint_done_this_interval=checkpoint_done, caller_funded_exit=self_serve and exit_all and exit_requested, listings=listings, idle_packs=len(v.idle_packs),
+                    relistable_idle=len(v.idle_packs),
                     recovery_packs=len(v.recovery_packs),
-                    free=v.free(), idle_eth=v.idle(), owed_estimate=v.owed_estimate(),
+                    free=v.free(), keeper_cash=v.keeper_cash_after(), idle_eth=v.idle(), owed_estimate=v.owed_estimate(),
                     pending_deposits=v.pending_total, locked_shares=v.locked_shares,
                     total_shares=v.total_shares, fee_credit=credit,
                     open_positions=len(v.positions), active_count=v.active_count, idle_value=v.idle_value,
+                    book_pack_count=len(v.positions)+len(v.idle_packs),
+                    book_shape_count=sum(p.shapes or policy.shape_count(p.units) for p in v.positions.values())+sum(v.idle_shapes),
+                    book_capital=v.tracked_value+v.active_backing,
+                    book_recovery_count=len(v.recovery_packs),book_recovery_value=sum(v.recovery_packs),
+                    book_max_units=max([p.units for p in v.positions.values()]+[value//policy.UNIT for value in v.idle_packs],default=0),
                     idle_funding=v.idle_funding,
                     journal_cursor=v.acquisition_cursor, completed_prefix=v.completed_prefix,
                     pending_receipts=len(v.receipts), routine_budget=v.routine_budget,
                     essential_budget=v.essential_budget, essential_cap=values["essentialCapWei"],
-                    recent_volume=float(np.mean(vol_hist[max(0, d - 6):d + 1] if timed else vol_hist[-7:])), work_fee=work_fee,
+                    recent_volume=recent_volume, work_fee=work_fee,
                     slowdown_volume=sc.get("slowdown", 0.0), essential_ceiling=essential_ceiling,
-                    pack_units_mask=values["packUnitsMask"] | (1 << BUILD_UNITS), build_units=BUILD_UNITS,
+                    pack_units_mask=values["packUnitsMask"], build_units=build_units,
+                    gas_schedule=schedule, backing_ratio_bps=values['backingRatioBps'],
+                    accepted_mint_fee=values['acceptedMintFeeWei'], operating_reserve=v.reserve,
                     reserve=values["reserveWei"],
-                    processing_pool=v.processing_pool, distribution_bps=v.distribution_bps,
+                    processing_pool=v.processing_pool, distribution_bps=0 if manager else v.distribution_bps,
+                    checkpoint_proof_entries=min(32,len(v.allocation_queue)-v.allocation_head) + (len(v.positions) if not sc.get("exempt",True) and len(v.positions)<=32 and v.active_count else 0),
                     allocation_stale=(v.allocation_head < len(v.allocation_queue) and
                                       (v.allocation_queue[v.allocation_head] not in v.positions or
                                        v.positions[v.allocation_queue[v.allocation_head]].state != ALLOCATED)),
                     own_journal_pending=any(v.positions[i].state == ACTIVE and v.positions[i].status in (ALLOCATED, SETTLED)
                                             for i in hydrated))
-                if backing:
-                    up = lambda a, b: -(-a // b)
-                    keep_bps = int(S_FEE * 10_000)
-                    cycle = policy.quote(st, policy.CYCLE_GAS, 2)
-                    # VaultLib floors for a valid listing near the edge's desired backing: the keep
-                    # never loses at FWA's 5% settlement-fee cap (P/0.95), the bid outcome clears the
-                    # cycle (B(k-1) > cycle), and the keep outcome clears value plus cycle (B(k-s) >= P + cycle).
-                    minimum = max(up(P * 10_000, 9500), cycle * E // (k - E) + 1,
-                                  up((P + cycle) * E, k - keep_bps * 10**14))
-                    maximum = 2**256 - 1 if sc.get("exempt", True) else cap * (10_000 - values["bufferBps"]) // 10_000
+                if backing or relist_backing:
+                    maximum = 2**256-1 if sc.get('exempt',True) else cap*(10_000-values['bufferBps'])//10_000
+                    minimum, maximum = proposal_limits(st,face_value,int(S_FEE*10_000),int(BID_RATE*10_000),maximum,units=build_units)
                     # Speed only: with no idle pack and idle ETH below one backing, the planner can
                     # use neither list nor build proposals, so skipping them changes no decision.
                     if v.idle_packs or st.idle_eth >= minimum:
-                        st.backing_proposals = backing_proposals(backing, v.positions, minimum, maximum)
+                        chosen = []
+                        for value, old_shapes in zip(reversed(v.idle_packs), reversed(v.idle_shapes)):
+                            if len(chosen) == policy.MAX_BATCH['list']:
+                                break
+                            old_units = value // policy.UNIT
+                            target = edge_for(old_units,False,old_shapes)
+                            lo, hi = proposal_limits(st,value,int(S_FEE*10_000),int(BID_RATE*10_000),maximum,
+                                                     units=old_units,retirement_shapes=old_shapes)
+                            proposal = list(_proposals(target, frozenset(p.backing for p in v.positions.values() if p.state != OWED) | frozenset(chosen), lo, hi, 1))
+                            if not proposal:
+                                break
+                            chosen += proposal
+                        st.backing_proposals = chosen
                         # A newly built pack repays its build from the keep outcome B(k-s), not the bid
                         # outcome B(k-1): backing >= (value + cycle + build) / (k - s) (VaultLib._profitable).
-                        build_minimum = max(minimum, up((P + cycle + policy.build_cost(st, BUILD_UNITS)) * E,
-                                                        k - keep_bps * 10**14))
-                        build_quote = backing_proposals(backing, v.positions, build_minimum, maximum, 1)
-                        st.build_proposals = build_quote * policy.MAX_BATCH["build"]
+                        build_minimum, _ = proposal_limits(st,face_value,int(S_FEE*10_000),int(BID_RATE*10_000),maximum,build=True,units=build_units)
+                        build_quote = backing_proposals(backing, v.positions, build_minimum, maximum, policy.MAX_BATCH["build"])
+                        st.build_proposals = build_quote
+                # Other quote inputs are fixed for this run; price changes still get a fresh quote.
+                construction_key = st.base_fee, st.gas_price
+                if not cached_economics or construction_key not in construction_cache:
+                    construction = policy.deploy_charge(st)
+                    if cached_economics:
+                        construction_cache[construction_key] = construction
+                else:
+                    construction = construction_cache[construction_key]
+                v.construction_cost, v.reference_capital = construction, policy.position_value(st)
                 planned = policy.plan(st)
+                if manager and not v.exiting:
+                    for code,kind,detail in policy.status(st,planned):
+                        if code not in ('ROUTINE_BUDGET_EMPTY','MAINTENANCE_UNFUNDED'):
+                            continue
+                        manager_waits[code]=manager_waits.get(code,0)+1
+                        manager_wait_examples.setdefault(code,dict(time=now,free=v.free(),keeper_cash=v.keeper_cash_after(),
+                            fee_credit=credit,routine_budget=v.routine_budget,reserve=v.reserve,detail=detail))
                 if timed and calls == 0 and d < days:
                     waiting = v.idle_packs or any(l.status in (SETTLED, WITHDRAWN) or (l.status == ALLOCATED and
                                                   absolute_now >= l.allocated_at + clock.SETTLEMENT) for l in listings)
@@ -689,24 +979,48 @@ def run(sc, n_target, seed, days=365, values=None):
                         gas_wait_seconds += clock.poll
                     elif any(l.status in (SETTLED, WITHDRAWN) for l in listings) and not any(a[0] == "sync" for a in planned):
                         deferred_seconds += clock.poll
-                Q = policy.Q
-                essential = v.locked_shares != 0
+                Q = st.gas_schedule
+                essential = bool(manager and v.exiting) or v.locked_shares != 0
                 executed = False
 
-                def affordable(gas_q, units=0, ess=False, funding_cap=None, cash_delta=0, liability=False, final_candidate=True):
+                def affordable(gas_q, units=0, ess=False, funding_cap=None, cash_delta=0, liability=False, final_candidate=True, work_count=1, physical_gas=None):
                     nonlocal skipped_funding, routine_unfunded
                     nonlocal last_unfunded_offer, last_cash_shortfall, last_permission_shortfall
-                    offer = policy.pay_v1(st, gas_q, units, ess)
+                    if fn == 'syncCheckpoint':
+                        ess, funding_cap = True, v.processing_pool
+                    cost_basis = physical_gas if gas_curves and physical_gas is not None else gas_q
+                    recovery = self_serve and exit_all and exit_requested and liability and fn in ('sync','syncCheckpoint','unlist','liquidate','checkpoint')
+                    offer = 0 if recovery or fn=='harvest' else policy.payment(st,gas_q,units,ess,measured_gas=0 if gas_q==0 and units==0 else work_meter(fn,work_count,gas_q,units))
                     funds = funding_cap if funding_cap is not None else (v.essential_budget if ess else v.routine_budget)
-                    paid = min(offer, funds, max(0, v.free() + cash_delta))
+                    cash = max(0, v.free() + cash_delta) if ess else v.keeper_cash_after(cash_delta)
+                    paid = min(offer, funds) if fn == 'syncCheckpoint' else min(offer, funds, cash)
                     holder_fallback = self_serve and liability and (not exit_all or fn != "sync"
-                        or (rescue_sync and exit_requested and v.locked_shares))
+                        or (rescue_sync and exit_requested and (v.locked_shares or manager)))
+                    if manager and recovery:
+                        gas_key = 'recover_checkpoint' if fn=='checkpoint' else 'recover_sync' if fn in ('sync','syncCheckpoint') else fn
+                        estimate = owner_estimate(gas_key, cost_basis, work_count, units)
+                        # An owner recovery pays no keeper; acceptance is the final pre-mutation check.
+                        return owner_preflight([estimate], st.base_fee, fn)
+                    if keeper_zero_loss:
+                        estimate_gas=operation_gas(fn,work_count,gas_q,units,estimate=True)
+                        billed_gas=operation_gas(fn,work_count,gas_q,units)
+                        ratio=billed_ratio(keeper_receipt_history,fn) if keeper_receipt_history_enabled else 1.
+                        cost,need,accepted=profitability_gate(estimate_gas,st.gas_price,paid,
+                            sc.get('keeper_fail_rate_bps',0),sc.get('keeper_min_return_bps',0),0,ratio=ratio)
+                        billed_cost,billed_need,billed_accepted=profitability_gate(billed_gas,st.gas_price,paid,
+                            sc.get('keeper_fail_rate_bps',0),sc.get('keeper_min_return_bps',0),0,ratio=1.)
+                        cost,need,accepted=max(cost,billed_cost),max(need,billed_need),accepted and billed_accepted
+                        if not accepted:
+                            if final_candidate:
+                                manager_waits['KEEPER_LOSS'] = manager_waits.get('KEEPER_LOSS', 0) + 1
+                                manager_wait_examples.setdefault('KEEPER_LOSS', dict(time=now,operation=fn,cost_wei=cost,need_wei=need,pay_wei=paid))
+                            return False
                     if paid < offer and not holder_fallback:
                         if not final_candidate:
                             return False  # A shorter preflight prefix is not an operating stall.
                         skipped_funding += 1
                         last_unfunded_offer = offer
-                        last_cash_shortfall = max(0, offer - max(0, v.free() + cash_delta))
+                        last_cash_shortfall = max(0, offer - cash)
                         last_permission_shortfall = max(0, offer - funds)
                         if not ess and fn != "checkpoint":
                             routine_unfunded += 1
@@ -715,38 +1029,59 @@ def run(sc, n_target, seed, days=365, values=None):
                         return False
                     return True
 
-                def pay(gas_q, units=0, ess=False, funding_cap=None, liability=False):
-                    nonlocal self_serve_cost, holder_gas, holder_keeper_pay, holder_maintenance_gas
-                    nonlocal routine_paid, essential_paid, request_paid, unpaid_routine_calls
-                    offer = policy.pay_v1(st, gas_q, units, ess)
-                    paid = v.pay_keeper(offer, essential=ess, cap=funding_cap)
+                def pay(gas_q, units=0, ess=False, funding_cap=None, liability=False, work_count=1, physical_gas=None):
+                    nonlocal self_serve_cost, holder_gas, holder_keeper_pay, holder_maintenance_gas, keeper_gas_proxy_cost
+                    nonlocal routine_paid, essential_paid, request_paid, unpaid_routine_calls, unknown_user_gas, zero_quote_sync_calls, meter_censored_calls
+                    if fn == 'syncCheckpoint':
+                        ess, funding_cap = True, v.processing_pool
+                    cost_basis = physical_gas if gas_curves and physical_gas is not None else gas_q
+                    recovery = self_serve and exit_all and exit_requested and liability and fn in ('sync','syncCheckpoint','unlist','liquidate','checkpoint')
+                    offer = 0 if recovery or fn=='harvest' else policy.payment(st,gas_q,units,ess,measured_gas=0 if gas_q==0 and units==0 else work_meter(fn,work_count,gas_q,units))
+                    paid = 0 if recovery or fn=='harvest' else v.pay_keeper(offer, essential=ess, cap=funding_cap, source='processing' if fn == 'syncCheckpoint' else None)
+                    if manager and not recovery and fn!='harvest':
+                        meter_censored_calls += int(work_meter(fn,work_count,gas_q,units)>gas_q)
+                        keeper_gas_proxy_cost += operation_gas(fn,work_count,gas_q,units) * st.gas_price
+                        if fn not in user_gas or fn in sc.get('unmeasured_gas_operations',[]):
+                            keeper_unmeasured.add(fn)
+                        if paid < offer or paid == 0:
+                            raise RuntimeError(('ordinary keeper payment fell below its reviewed envelope', fn, paid, offer))
+                        if keeper_receipt_history_enabled:
+                            keeper_receipt_history.state['counted'].append(dict(label=fn,
+                                est=operation_gas(fn,work_count,gas_q,units,estimate=True),
+                                gas_used=operation_gas(fn,work_count,gas_q,units)))
                     op_paid[fn] += paid
                     op_calls[fn] += 1
-                    if fn == "checkpoint" and funding_cap is not None:
+                    if fn in ("checkpoint", "syncCheckpoint") and funding_cap is not None:
                         request_paid += paid
                     elif ess:
                         essential_paid += paid
                     else:
                         routine_paid += paid
-                        unpaid_routine_calls += int(paid < offer and fn != "harvest")
+                        unpaid_routine_calls += int(paid < offer and fn != "harvest" and not recovery)
                     if self_serve and liability:
-                        # Proxy from the operation quote, not a measured gas claim. Kept outside
-                        # vault NAV because the withdrawing holder pays this gas personally.
-                        self_serve_cost += max(0, gas_q * st.gas_price - paid)
-                        if exit_all and paid < offer:
-                            # Variable-size unpaid maintenance retains the explicitly labeled
-                            # operation-quote gas proxy until matching receipt curves exist.
-                            cost = user_gas.get(fn, gas_q) * st.gas_price
-                            holder_gas += cost
+                        if not manager:
+                            self_serve_cost += max(0, gas_q * st.gas_price - paid)
+                        if exit_all and (recovery or fn=='harvest' or paid < offer):
+                            # Owner recovery uses its own receipts, with no keeper meter or pay.
+                            gas_key = 'recover_checkpoint' if recovery and fn=='checkpoint' else 'recover_sync' if recovery and fn in ('sync','syncCheckpoint') else fn
+                            measured=user_gas.get(gas_key,0)
+                            cost=owner_billed(gas_key,cost_basis,work_count,units)*st.gas_price if manager else owner_gas(max(gas_q,measured))*st.gas_price
+                            if manager:
+                                owner_charge(cost)
+                                self_serve_cost += cost
+                            else:
+                                holder_gas += cost
                             holder_maintenance_gas += cost
                             holder_keeper_pay += paid
                             holder_calls[fn] += 1
+                            unknown_user_gas += int(gas_key not in user_gas)
+                            zero_quote_sync_calls += int(gas_q == 0)
                     return paid
 
                 for action_index, action in enumerate(planned):
                     fn = action[0]
                     action_meta = {}
-                    if fn == "sync":
+                    if fn in ("sync", "syncCheckpoint"):
                         unexposed = not v.positions and not v.receipts and not v.active_count and not v.active_backing and not v.allocated_value
                         rebase_count = len(journal) if unexposed else 0
                         entries = []
@@ -764,7 +1099,7 @@ def run(sc, n_target, seed, days=365, values=None):
                         # ScanLib.rebase: read the open positions instead of the journal when cheaper.
                         found = [(at, i) for i, at in journal if i is not None]
                         scanned, scan_now = 0, False
-                        if (not unexposed and journal and len(v.positions) * Q["scan"] <= min(len(journal), policy.MAX_BATCH["journal"]) * Q["journal"]
+                        if (not unexposed and journal and len(v.positions) <= policy.MAX_SCAN and len(v.positions) * Q["scan"] <= min(len(journal), policy.MAX_BATCH["journal"]) * Q["journal"]
                                 and len(found) <= policy.MAX_BATCH["selected"]):
                             entries, scan_now = [], True
                             own_ids = [i for _, i in sorted(found)]
@@ -807,39 +1142,39 @@ def run(sc, n_target, seed, days=365, values=None):
                         gas_q = base_q + (len(entries) * Q["journal"] if journal_paid_work else 0) \
                             + (scanned * Q["scan"] if own_ids or required_tail else 0) + len(own_ids) * Q["selected"] \
                             + len(resolved) * Q["synced"] + pruned * Q["pruned"]
+                        physical_gas = (base_q + len(entries)*Q['journal'] + scanned*Q['scan']
+                            + len(own_ids)*Q['selected'] + len(resolved)*Q['synced'] + pruned*Q['pruned'])
                         if ((unexposed and not v.tracked_value) or (rebase_count and not pruned)
                                 or (not journal_paid_work and not own_ids and not resolved and not pruned)):
                             gas_q = 0
                         base_gas_q = gas_q
                         funding_probe = distribution_probe if required_tail and st.distribution_bps \
                             and not (st.pending_deposits or st.locked_shares) else v
-                        gas_q, take_credit, fee_ids = funding_probe.sync_fee_plan(
-                            action[1], credit, gas_q, len(resolved),
-                            lambda g, u: policy.quote(st, g, u), st.share_bps,
-                            Q["sync_credit"], Q["sync_funding"], Q["harvested"],
-                            cash_delta=reclaim_cash,
-                            distribution_tail=bool(required_tail and st.distribution_bps
-                                                   and not (st.pending_deposits or st.locked_shares)))
+                        take_credit, fee_ids = 0, []
+                        if fn == 'sync' and not (self_serve and exit_all and exit_requested and essential):
+                            gas_q, take_credit, fee_ids = funding_probe.sync_fee_plan(
+                                action[1], credit, gas_q, len(resolved),
+                                lambda g, u: policy.quote(st, g, u), st.share_bps,
+                                Q["sync_credit"], Q["sync_funding"], Q["harvested"],
+                                cash_delta=reclaim_cash,
+                                distribution_tail=bool(required_tail and st.distribution_bps
+                                                       and not (st.pending_deposits or st.locked_shares)))
+                        physical_gas += (Q['sync_credit'] if take_credit else 0) + (
+                            Q['sync_funding'] + len(fee_ids)*Q['harvested'] if fee_ids else 0)
                         fee_receipts = take_credit + sum(v.positions[i].pending_fees for i in fee_ids)
-                        if exit_all and gas_q == 0:
-                            if not (exit_requested and v.locked_shares):
-                                continue  # No operator gratuity is invented for an unpaid job.
-                            cost = user_gas.get("unexposed_sync", 0) * st.gas_price
-                            holder_gas += cost
-                            holder_maintenance_gas += cost
-                            unknown_user_gas += int("unexposed_sync" not in user_gas)
-                            holder_calls["sync"] += 1
-                            zero_quote_sync_calls += 1
+                        if (exit_all or manager) and gas_q == 0 and not (exit_requested and (v.locked_shares or manager)):
+                            continue
                         if not affordable(gas_q, len(resolved), False,
                                           cash_delta=reclaim_cash + fee_receipts, liability=essential,
-                                          final_candidate=not any(a[0] == "sync" for a in planned[action_index + 1:])):
+                                          final_candidate=not any(a[0] == "sync" for a in planned[action_index + 1:]),
+                                          work_count=max(1,len(own_ids),len(resolved)),physical_gas=physical_gas):
                             continue
                         if rebase_count:
                             assert v.advance_unexposed()
                             journal.clear()
                             journal_rebased += rebase_count
                         if scan_now:
-                            assert v.scan_rebase(found) == scanned
+                            assert v.scan_rebase(found,Q["scan"],Q["journal"]) == scanned
                             journal_scans += 1
                             journal_scanned += scanned
                             journal_skipped += len(journal) - len(found)
@@ -877,8 +1212,9 @@ def run(sc, n_target, seed, days=365, values=None):
                         if timed:
                             action_meta = dict(sync_credit=take_credit, sync_fee_ids=fee_ids,
                                                sync_fee_receipts=fee_receipts,
-                                               sync_collection_gas=gas_q - base_gas_q)
-                        journal_paid += pay(gas_q, len(resolved), False, liability=essential)
+                                               sync_collection_gas=gas_q - base_gas_q,sync_payment_gas=gas_q,
+                                               sync_physical_work_gas=physical_gas)
+                        journal_paid += pay(gas_q, len(resolved), False, liability=essential,work_count=max(1,len(own_ids),len(resolved)),physical_gas=physical_gas)
                         journal_own += len(own_ids)
                         journal_foreign += 0 if scan_now else len(entries) - len(own_ids)
                         journal_pruned += pruned
@@ -891,7 +1227,7 @@ def run(sc, n_target, seed, days=365, values=None):
                                                harvested_pending={i: v.positions[i].pending_fees for i in ids})
                         gas_q = Q["harvest"] + Q["harvested"] * len(ids)
                         funding_cap = 0  # Standalone fee collection never earns keeper compensation.
-                        liability = essential and v.owed_estimate() > v.free() + v.pending_total
+                        liability = essential and v.owed_estimate() > v.free()
                         if not affordable(gas_q, funding_cap=funding_cap, cash_delta=amt, liability=liability):
                             continue
                         for i in ids:
@@ -903,12 +1239,12 @@ def run(sc, n_target, seed, days=365, values=None):
                         ids = action[1]
                         cash = sum(v.positions[i].backing for i in ids)
                         gas_q = Q["unlist"] + Q["unlisted"] * len(ids)
-                        if not affordable(gas_q, len(ids), essential, cash_delta=cash, liability=essential):
+                        if not affordable(gas_q, len(ids), essential, cash_delta=cash, liability=essential,work_count=len(ids)):
                             continue
                         for i in ids:
                             credit += v.positions[i].pending_fees
                             v.unlist(i)
-                        pay(gas_q, len(ids), essential, liability=essential)
+                        pay(gas_q, len(ids), essential, liability=essential,work_count=len(ids))
                     elif fn == "liquidate":
                         # Redeem idle packs to ETH at exact backing; burn each pack's Shapes (no loose
                         # Shapes exist). At most MAX_LIQUIDATE_UNITS (60) 0.01-units of packs per call.
@@ -916,7 +1252,7 @@ def run(sc, n_target, seed, days=365, values=None):
                         inventory = reversed(v.idle_packs)
                         cash = 0
                         while packs < action[1] and units < 60 and \
-                                v.owed_estimate() > v.free() + v.pending_total + cash:
+                                ((manager and v.exiting) or v.owed_estimate() > v.free() + cash):
                             value = next(inventory, None)
                             if value is None:
                                 break
@@ -925,37 +1261,54 @@ def run(sc, n_target, seed, days=365, values=None):
                                 break
                             packs += 1
                             units += u
-                            burned += policy.shape_count(u)
+                            burned += v.idle_shapes[-packs]
                             cash += value
                         if not packs:
                             continue
                         gas_q = Q["liquidate"] + Q["liq_pack"] * packs + Q["redeem_shape"] * burned
-                        if not affordable(gas_q, packs, True, cash_delta=cash, liability=True):
+                        if not affordable(gas_q, packs, True, cash_delta=cash, liability=True,work_count=packs):
                             continue
                         for _ in range(packs):
                             v.liquidate_one()
-                        pay(gas_q, packs, True, liability=True)
+                        pay(gas_q, packs, True, liability=True,work_count=packs)
                     elif fn == "checkpoint":
                         pool = v.processing_pool
                         flows = v.pending_total != 0 or v.locked_shares != 0
-                        gas_q = Q["checkpoint"]
+                        try:
+                            proof_entries,proof_reads=v.checkpoint_proof_counts(sc.get("exempt",True))
+                        except RuntimeError:
+                            missed_alloc += 1
+                            continue
+                        gas_q = Q["checkpoint"] + proof_entries*Q["allocation_entry"] + proof_reads*Q["allocation_read"]
                         funding_cap = pool if flows else None
                         if not affordable(gas_q, 1, essential, funding_cap, cash_delta=pool, liability=essential):
                             continue
                         snap = copy.deepcopy(v.__dict__)
                         try:
-                            v.checkpoint(credit)
+                            if self_serve and exit_all and exit_requested and v.locked_shares:
+                                v.recover_checkpoint(credit)
+                            else:
+                                v.checkpoint(credit, keeper_payment=min(policy.payment(st,gas_q,1,True,measured_gas=work_meter(fn,1)), pool) if flows else 0)
                         except RuntimeError:
                             v.__dict__.update(snap)
                             missed_alloc += 1
                             continue
                         credit = 0
                         checkpoints += 1
-                        checkpoint_done = True
-                        if timed:
+                        recovering = self_serve and exit_all and exit_requested and snap["locked_shares"]
+                        checkpoint_done = not recovering
+                        if timed and not recovering:
                             last_checkpoint_interval = absolute_now // clock.INTERVAL
                             timed_checkpoint_times.append(absolute_now)
-                        pay(gas_q, 1, essential, funding_cap, liability=essential)
+                        if self_serve and exit_all and exit_requested and snap['locked_shares']:
+                            pay(gas_q,1,True,liability=True)
+                        elif flows:
+                            paid = v.keeper_paid - snap['keeper_paid']
+                            request_paid += paid
+                            op_paid[fn] += paid
+                            op_calls[fn] += 1
+                        else:
+                            pay(gas_q, 1, False, liability=essential)
                     elif fn == "build":
                         # Build-and-list: each pack mints its Shapes straight into ShapePacks (no loose
                         # Shapes) and lists at once. Capital must cover pending idle funding, every
@@ -966,12 +1319,12 @@ def run(sc, n_target, seed, days=365, values=None):
                         count = len(proposals)
                         cash = count * price
                         gas_q = Q["build"] + count * (Q["build_pack"] + n * Q["build_shape"] + Q["listed"])
-                        if v.idle() < v.idle_funding + cash + sum(proposals) \
-                                or not affordable(gas_q, 2 * count, cash_delta=-(cash + sum(proposals))):
+                        if v.idle() < cash + sum(proposals) \
+                                or not affordable(gas_q, 2 * count, cash_delta=-(cash + sum(proposals)),work_count=count):
                             continue
                         v.build(list(range(next_id, next_id + count)), units, mint_fee, proposals)
                         next_id += count
-                        pay(gas_q, 2 * count)
+                        pay(gas_q, 2 * count,work_count=count)
                     elif fn == "list":
                         if not timed:
                             if d < listing_ready_day:
@@ -989,12 +1342,12 @@ def run(sc, n_target, seed, days=365, values=None):
                             proposals.append(proposal)
                             cash += proposal
                         gas_q = Q["list"] + Q["listed"] * len(proposals)
-                        if not proposals or not affordable(gas_q, len(proposals), cash_delta=-cash):
+                        if not proposals or not affordable(gas_q, len(proposals), cash_delta=-cash,work_count=len(proposals)):
                             continue
                         for proposal in proposals:
                             v.list(next_id, proposal)
                             next_id += 1
-                        pay(gas_q, len(proposals))
+                        pay(gas_q, len(proposals),work_count=len(proposals))
                     else:
                         continue
                     rebased_now = v.acquisition_cursor - journal_own - journal_foreign - journal_rebased - journal_skipped
@@ -1027,11 +1380,34 @@ def run(sc, n_target, seed, days=365, values=None):
             operation_end_cash, operation_end_keeper_paid, operation_end_fees = v.balance, v.keeper_paid, v.fees_received
             operation_end_routine_paid, operation_end_routine_budget = routine_paid, v.routine_budget
             operation_end_idle, operation_end_funding, operation_end_loose = v.idle_value, v.idle_funding, 0
+        if manager and ((event_kind == 'cutoff') if timed else d == days - 1):
+            set_exit_gas = owner_billed('setExiting')
+            if owner_preflight([owner_estimate('setExiting', set_exit_gas)], gas, 'setExiting'):
+                exit_requested = True
+                v.set_exiting(True)
+                owner_set_exiting_calls += 1
+                owner_charge(set_exit_gas * (gas + tip))
+                unknown_user_gas += int('setExiting' not in user_gas)
+                trace_state('set-exiting', d)
+                if market_pending and (v.positions or v.receipts):
+                    from manager import owner_processing_reserve
+                    owner_processing_pending=market_pending
+                    single_gas=owner_billed('processAcquisitions')
+                    single_estimate=owner_estimate('processAcquisitions', single_gas)
+                    estimates=[min(16,market_pending-start)*single_estimate for start in range(0,market_pending,16)]
+                    if owner_preflight(estimates, gas, 'processAcquisitions'):
+                        owner_processing_calls,owner_processing_cost=owner_processing_reserve(market_pending,single_gas,gas+tip)
+                        owner_charge(owner_processing_cost)
+                        unknown_user_gas+=int('processAcquisitions' not in user_gas)
+                        # Archived ready times remain; the owner pays the pending prefix reserve.
+                        trace_state('owner-processing-reserve',d)
+                    else:
+                        owner_processing_blocked=True
         if timed:
             redemptions = [(d, 1.0)] if event_kind == "cutoff" and exit_all else ([(d, payload)] if event_kind == "redemption" else [])
         elif exit_all:
             redemptions.append((days - 1, 1.0))
-        for day, frac in redemptions:
+        for day, frac in ([] if manager else redemptions):
             if day == d:
                 fraction = Fraction(str(frac))
                 sh = v.share_balance("h") * fraction.numerator // fraction.denominator
@@ -1043,11 +1419,20 @@ def run(sc, n_target, seed, days=365, values=None):
                         holder_gas += user_gas.get("cancel", 0) * (gas + tip)
                         unknown_user_gas += int("cancel" not in user_gas)
                     continue
-                st1 = charge_state(gas, len(v.positions), v.processing_pool)
+                st1 = configured_state(gas, values)
+                st1.processing_pool = v.processing_pool
+                st1.mint_fee = mint_fee
+                st1.active_count = v.active_count
+                st1.book_pack_count = len(v.positions)+len(v.idle_packs)
+                st1.book_shape_count = sum(p.shapes or policy.shape_count(p.units) for p in v.positions.values()) + sum(v.idle_shapes)
+                st1.book_capital = v.tracked_value + v.active_backing
+                st1.book_recovery_count,st1.book_recovery_value = len(v.recovery_packs),sum(v.recovery_packs)
+                st1.book_max_units = max([p.units for p in v.positions.values()]+[value//policy.UNIT for value in v.idle_packs],default=0)
+                st1.checkpoint_proof_entries = min(32, len(v.allocation_queue)-v.allocation_head) + (len(v.positions) if not sc.get('exempt',True) and len(v.positions)<=32 and v.active_count else 0)
                 st1.gas_ceiling, st1.essential_ceiling, st1.max_tip = ceiling, essential_ceiling, tip
                 st1.work_fee, st1.essential_cap = work_fee, values["essentialCapWei"]
                 ck = policy.request_charge(st1)
-                unwind = (sh * v.last_nav // v.total_shares) * policy.unwind_charge(st1) // policy.POSITION_VALUE
+                unwind = (sh * v.last_nav // v.total_shares) * policy.unwind_charge(st1) // policy.position_value(st1)
                 v.request_redeem("h", sh, ck, unwind)
                 trace_state("request-redeem", d)
                 paid_in += ck + unwind
@@ -1055,17 +1440,76 @@ def run(sc, n_target, seed, days=365, values=None):
                 unknown_user_gas += int(exit_all and "request_redeem" not in user_gas)
         if exit_all and exit_requested:
             claim_available(gas + tip, d)
-            if (not v.share_balance("h") and not locked_holder()
+            if manager and not (v.positions or v.idle_packs or v.recovery_packs or v.receipts or credit or v.balance):
+                break
+            if not manager and (not v.share_balance("h") and not locked_holder()
                     and not v.claimable.get("h", 0) and not v.pending_total and not journal and not v.receipts
                     and not v.locked_shares):
                 break
+
+    if manager:
+        physical = (v.balance + sum(v.idle_packs) + sum(v.recovery_packs)
+            + sum(p.value for p in v.positions.values() if p.status in (ACTIVE, ALLOCATED) or p.pack_owned)
+            + sum(p.backing for p in v.positions.values() if p.status in (ACTIVE, ALLOCATED)))
+        unreconciled_keep = sum(p.value for p in v.positions.values() if p.status == SETTLED and not p.pack_owned)
+        gap = paid_in + v.fees_received - v.keeper_paid - v.mint_fees - v.backing_lost - v.settlement_fees - unreconciled_keep - holder_claimed - physical
+        assert gap == 0, ('manager cash/assets ledger', gap)
+        assert accrued == v.fees_received + credit + sum(p.pending_fees for p in v.positions.values()), 'manager external fee ledger'
+        complete = exit_requested and not (v.positions or v.idle_packs or v.recovery_packs or v.receipts or credit or v.balance)
+        result = dict(account_kind='manager', initial_funding_wei=deposit, owner_funded_wei=paid_in,
+            owner_withdrawn_wei=holder_claimed, owner_wallet_gas_proxy_wei=holder_gas,
+            owner_net_wei=holder_claimed-holder_gas-paid_in if complete else None,
+            owner_total_value_before_gas_wei=physical+credit+sum(p.pending_fees for p in v.positions.values())+holder_claimed,
+            keeper_compensation_wei=v.keeper_paid, keeper_gas_proxy_cost_wei=keeper_gas_proxy_cost,
+            keeper_net_proxy_wei=v.keeper_paid-keeper_gas_proxy_cost, keeper_unmeasured_operations=sorted(keeper_unmeasured),
+            unpaid_routine_calls=unpaid_routine_calls,
+            creator_primary_fees_accrued_wei=v.mint_fees, fees_received_wei=v.fees_received,
+            backing_lost_wei=v.backing_lost, settlement_fees_wei=v.settlement_fees,
+            ledger_gap_wei=gap, physical_assets_wei=physical, external_fee_credit_wei=credit,
+            unharvested_listing_fees_wei=sum(p.pending_fees for p in v.positions.values()),
+            exit_complete=complete, elapsed_days=now/DAY if timed else d+1,
+            exit_days_elapsed=max(0,now/DAY-days) if timed else max(0,d+1-days),
+            selections=selected, mean_positions=float(np.mean(open_days)), maximum_positions=max(open_days,default=0),
+            routine_keeper_paid_wei=routine_paid, essential_keeper_paid_wei=essential_paid,
+            operation_end_cash_wei=operation_end_cash, operation_end_routine_budget_wei=operation_end_routine_budget,
+            operation_end_backlog=operation_end_backlog, operating_budget_marks=operating_budget_marks,
+            unknown_owner_gas_calls=unknown_user_gas, owner_exit_work=self_serve,
+            routine_unfunded_attempts=routine_unfunded, routine_budget_wei=v.routine_budget,
+            routine_period_permission_upper_wei=values['routineCapWei']+now*values['routineRatePerDayWei']//DAY,
+            pending_receipts=len(v.receipts), journal_backlog=len(journal),
+            end_open_positions=len(v.positions),end_idle_packs=len(v.idle_packs),end_recovery_packs=len(v.recovery_packs),end_cash_wei=v.balance,
+            waiting_observations=manager_waits, first_wait_observation=manager_wait_examples,
+            owner_processing_calls=owner_processing_calls,owner_processing_proxy_cost_wei=owner_processing_cost,
+            owner_processing_pending_at_exit=owner_processing_pending,
+            owner_exit_spend_limit_wei=owner_exit_limit,owner_exit_reserved_wei=owner_exit_reserved,
+            owner_exit_spent_wei=owner_exit_spent,owner_exit_spend_limit_waits=manager_waits.get('EXIT_SPEND_LIMIT',0),
+            owner_exit_estimate_fallback_operations=sorted(owner_estimate_fallback),
+            count_aware_gas_curves_enabled=bool(gas_curves),physical_sync_cost_basis_enabled=bool(sc.get("sync_contexts")),sync_contexts_enabled=bool(sc.get("sync_contexts")),
+            owner_zero_quote_sync_calls=zero_quote_sync_calls,
+            compensation_mode='bounded-measured-v1',meter_censored_calls=meter_censored_calls,
+            keeper_estimate_acceptance_enabled=bool(gas_curves and keeper_zero_loss),
+            keeper_receipt_history_enabled=keeper_receipt_history_enabled,
+            keeper_receipt_history_counts={name:sum(e['label']==name for e in keeper_receipt_history.state['counted']) for name in op_names},
+            keeper_receipt_history_ratios={name:billed_ratio(keeper_receipt_history,name) for name in op_names} if keeper_receipt_history_enabled else {},
+            keeper_zero_loss_enabled=keeper_zero_loss,keeper_loss_waits=manager_waits.get('KEEPER_LOSS',0),
+            ordinary_completion_actor='Recorded external VRF/processor; historical requesters fund it',
+            exit_processing_assumption='Owner reserve for pending prefix, <=16 records per call, full measured single-request call gas charged per pending record; archived ready times retained')
+        for name in op_names:
+            result['keeper_calls_'+name]=op_calls[name]-holder_calls[name]
+            result['keeper_paid_'+name+'_wei']=op_paid[name]
+            result['owner_calls_'+name]=holder_calls[name]
+        result['owner_calls_harvest']+=owner_harvest_calls
+        result['owner_calls_withdraw']=owner_withdraw_calls
+        result['owner_calls_setExiting']=owner_set_exiting_calls
+        if keyed_randomness:result.update(randomness_mode='request-keyed-v1',request_events_sha256=clock.request_events_sha256,requests_seen=request_ordinal)
+        return result
 
     end_nav = economic_nav(v, credit)
     unexposed = not v.positions and not v.receipts and not v.active_count and not v.active_backing and not v.allocated_value
     end_blocked = bool((journal and not unexposed) or v.receipts or (v.allocation_head < len(v.allocation_queue) and
                        (v.allocation_queue[v.allocation_head] not in v.positions or
                         v.positions[v.allocation_queue[v.allocation_head]].state != ALLOCATED))
-                       or v.allocated_value * 10_000 > end_nav * v.allocated_bound_bps)
+                       or v.unresolved_keep_uplift * 10_000 > end_nav * v.uplift_bound_bps)
     assert len(journal) == v.completed_prefix - v.acquisition_cursor
     assert journal_own + journal_foreign + journal_rebased + journal_skipped == v.acquisition_cursor
     supply = v.total_shares
@@ -1074,7 +1518,7 @@ def run(sc, n_target, seed, days=365, values=None):
     # With only this holder and no locked exit, cancelling the unpriced deposit also refunds
     # its checkpoint charge. No work was performed, so do not invent an entry loss.
     unpriced_refund = unpriced + (v.processing_pool if unpriced and not v.locked_shares else 0)
-    claimed = v.claimable.get("h", 0) + v.redemption_reserve + unpriced_refund
+    claimed = v.claimable.get("h", 0) + v.redemption_reserve + unpriced_refund + sum(v.checkpoint_refund(i) for i, c in enumerate(v.contributions) if c[0] == "h")
     holder = v.share_balance("h") * end_nav // supply + claimed
     locked_val = v.locked_shares * end_nav // supply
     value_end = (holder + locked_val + holder_claimed + holder_cancelled + holder_keeper_pay - holder_gas
@@ -1152,7 +1596,7 @@ def run(sc, n_target, seed, days=365, values=None):
                 end_unreconciled_returned_value_wei=sum(p.value for p in v.positions.values() if p.status == SETTLED and p.pack_owned),
                 end_allocated_book_value_wei=v.allocated_value,
                 creator_mint_fees_wei=v.mint_fees, settlement_fees_wei=v.settlement_fees,
-                physical_assets_wei=physical, vault_cash_wei=v.balance, holder_liability_wei=v.redemption_reserve + v.distribution_reserve + v.claimable_total,
+                physical_assets_wei=physical, vault_cash_wei=v.balance, holder_liability_wei=v.redemption_reserve + v.distribution_reserve + v.claimable_total + v.charge_refund_reserve,
                 ledger_gap_wei=ledger_gap, routine_initial_cap_wei=values["routineCapWei"],
                 routine_refill_per_day_wei=values["routineRatePerDayWei"],
                 routine_period_permission_upper_wei=values["routineCapWei"] + now * values["routineRatePerDayWei"] // DAY,
@@ -1173,255 +1617,18 @@ def run(sc, n_target, seed, days=365, values=None):
         result[f"keeper_paid_{name}_wei"] = op_paid[name]
         result[f"keeper_calls_{name}"] = op_calls[name]
         result[f"holder_calls_{name}"] = holder_calls[name]
+    if keyed_randomness:result.update(randomness_mode='request-keyed-v1',request_events_sha256=clock.request_events_sha256,requests_seen=request_ordinal)
     return result
 
 
-def self_check():
-    """Focused model regressions using the caller's recorded pool and wait inputs."""
-    rows = {}
-    rows["zero"] = run(Scenario(volume=const(0), gwei=0.15), 10, 8, days=20)
-    assert rows["zero"]["mint"] > 0 and rows["zero"]["fees"] == 0
-    rows["keeps"] = run(Scenario(volume=const(609), gwei=0.15, keep=1.0), 30, 8, days=20)
-    assert rows["keeps"]["journal_own"] > 0 and rows["keeps"]["terminal_work"] > 0
-    assert rows["keeps"]["pending_receipts"] == 0
-    rows["at_bid_ceiling"] = run(Scenario(volume=const(100), gwei=0.45), 10, 8, days=20)
-    assert rows["at_bid_ceiling"]["positions"] > 0
-    rows["above_bid_ceiling"] = run(Scenario(volume=const(100), gwei=0.5), 10, 8, days=20)
-    assert rows["above_bid_ceiling"]["positions"] == 0
-    assert rows["above_bid_ceiling"]["checkpoints"] == 0
-    assert rows["above_bid_ceiling"]["ret"] == 0  # unpriced deposit and charge remain refundable
-    values = json.loads((ROOT.parent / "deploy/mainnet.json").read_text())
-    values.update(routineCapWei=0, routineRatePerDayWei=0)
-    rows["empty_budget"] = run(Scenario(volume=const(609), gwei=0.15), 10, 8, days=10, values=values)
-    assert rows["empty_budget"]["keeper_paid_wei"] == policy.checkpoint_cost(charge_state(150_000_000, 0))
-    assert rows["empty_budget"]["checkpoints"] == 1
-    # Later foreign history can wait until the next real checkpoint/admission without
-    # requiring standalone unpaid calls or blocking a cash-only vault's pricing.
-    assert rows["empty_budget"]["journal_rebased"] > 0
-    assert not rows["empty_budget"]["end_pricing_blocked"]
-    assert rows["empty_budget"]["positions"] == 0
-    values.update(routineCapWei=5 * 10**15)
-    rows["depleted_budget"] = run(Scenario(volume=const(100), gwei=0.15), 10, 8, days=20, values=values)
-    assert rows["depleted_budget"]["checkpoints"] == 1
-    assert rows["depleted_budget"]["journal_backlog"] > 0
-    assert rows["depleted_budget"]["keeper_paid_wei"] <= 5 * 10**15 + policy.checkpoint_cost(charge_state(150_000_000, 0))
-    rows["partial_redemption"] = run(Scenario(volume=const(15), gwei=0.15, redeem=[(10, 0.5)]),
-                                     30, 8, days=20)
-    assert rows["partial_redemption"]["checkpoints"] == 2
-    assert rows["partial_redemption"]["external_exit_gas_proxy_wei"] > 0
-    for row in rows.values():
-        assert row["processed_entries"] == row["journal_own"] + row["journal_foreign"] + row["journal_rebased"]
-        assert row["issued_entries"] == row["processed_entries"] + row["journal_backlog"]
-    return rows
-
-
-def wilson(k, n, z=1.96):
-    """95% interval for a proportion k / n."""
-    if n == 0:
-        return (0.0, 1.0)
-    p = k / n
-    c = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
-    m = (p + z * z / (2 * n)) / (1 + z * z / n)
-    return (max(0.0, m - c), min(1.0, m + c))
-
-
-def summarize(sc, n, runs, days=365):
-    rs = [run(sc, n, seed, days=days) for seed in range(runs)]
-    r = np.array([x["ret"] for x in rs])
-    mean = {k: float(np.mean([x[k] for x in rs])) for k in rs[0]}
-    k = int(np.sum(r < 0))
-    lo, hi = wilson(k, len(r))
-    return dict(mean=float(r.mean()), se=float(r.std() / np.sqrt(len(r))), p5=float(np.percentile(r, 5)),
-                p50=float(np.median(r)), p95=float(np.percentile(r, 95)), ploss=k / len(r), ploss_lo=lo, ploss_hi=hi,
-                runs=len(r), worst=float(r.min()), **{f"m_{k_}": v for k_, v in mean.items()})
-
-
-# ---------------------------------------------------------------- scenarios
-
-
-def boot(series):
-    s = np.asarray(series, float)
-    return lambda d, rng: float(rng.choice(s))
-
-
-def const(x):
-    return lambda d, rng: x
-
-
-def decline(start, end, days=365):
-    return lambda d, rng: start * (end / start) ** (d / days)
-
-
-def stop_after(series, day):
-    b = boot(series)
-    return lambda d, rng: b(d, rng) if d < day else 0.0
-
-
-def pct(x):
-    return f"{100 * x:+.1f}%"
-
-
-def successful_daily():
-    """Acquisitions per UTC day that reached a selection (fees were distributed). Requests that
-    were refunded or expired distributed nothing (sim/backtest_audit.py)."""
-    import backtest_audit
-    sel = backtest_audit.load()["sel"]
-    days = (sel[:, 0] // DAY).astype(int)
-    return np.bincount(days - days.min()).astype(float), int(days.min())
-
-
-def ci(s):
-    return f"{100 * s['ploss']:.0f}% [{100 * s['ploss_lo']:.0f}-{100 * s['ploss_hi']:.0f}]"
+def const(value):
+    return lambda day, rng: value
 
 
 def main():
-    global POOL, STAGING, REFUNDS_PER_SELECTION
-    OUT.mkdir(exist_ok=True)
-    POOL = pool_snapshot()
-    STAGING = staging_delays(30)
-    db = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
-    end, end_block = db.execute("SELECT max(ts),max(block) FROM logs").fetchone()
-    statuses = [json.loads(a)["status"] for (a,) in db.execute(
-        "SELECT args FROM logs WHERE event='AcquisitionProcessed' AND ts>=?", (end - 30 * DAY,))]
-    successes = sum(int(status) == 2 for status in statuses)
-    REFUNDS_PER_SELECTION = (len(statuses) - successes) / successes if successes else 0.0
-    db.close()
-    if len(sys.argv) > 1 and sys.argv[1] == "--self-check":
-        results = self_check()
-        print(json.dumps(dict(block=end_block, end_timestamp=end, pool_listings=len(POOL),
-                              completed30d=len(statuses), successful30d=successes,
-                              context="model scenarios; gwei is basefee, bid includes maxTip; no return gate claim",
-                              results=results), indent=1))
-        print(f"PASS: {len(results)} focused forward model scenarios")
-        return
-    vol, first = successful_daily()
-    last30, last14, last7 = vol[-30:], vol[-14:], vol[-7:]
-    spike = int(np.argmax(last30))
-    last30_ex = np.delete(last30, spike)
-    runs = int(sys.argv[1]) if len(sys.argv) > 1 else 400
-    md = ["# PackVault economics: gate, expectation, forward simulation\n",
-          "Generated by `python3 sim/forward.py " + str(runs) + "`. Data: `sim/data/fwa.sqlite`, FWA, rewards and oracle "
-          f"events through block {end_block:,}, timestamp {end} (`python3 sim/ingest.py`); pool snapshot at the end of that history; "
-          "volume = acquisitions per UTC day that reached a selection (refunded requests distributed no fees). "
-          "The historical replay and its reconciliation with these numbers are in `sim/out/backtest_audit.md`.\n",
-          f"Pool: {len(POOL):,} listings, harmonic backing {len(POOL) / np.sum(1 / POOL):.4f} ETH. Successful acquisitions "
-          f"per day: last 7 d {last7.mean():.0f}, last 14 d {last14.mean():.0f}, last 30 d {last30.mean():.0f} "
-          f"({last30_ex.mean():.0f} without the {last30.max():.0f} of Oct 31), 30-day median {np.median(last30):.0f}.",
-          "Forward fixture: 3-unit packs (P = 0.03 ETH), with backing proposed from the current policy; the research pack size does not change production sizing rules. The closed form uses fixed B = 0.0363 ETH as a theoretical comparison. Keeper pay V1 uses quoted gas + work fee, no premium; maxTip 0.05 gwei; "
-          f"gas ceiling {CEILING} gwei; scenario gwei is basefee and actual bid is basefee + maxTip. FWA tokens have zero value; purchasers take the bid unless stated. Gas quotes require candidate calibration; this report alone does not validate the return or launch gate.\n",
-          f"FWA staging (audit E7): the keeper lists only when FWA's queue is drained, so a relist never stages; each "
-          f"listing first waits the queue's historical drain time, sampled from {len(STAGING)} relist moments in the last "
-          f"30 days ({100 * np.mean(STAGING > 0):.1f}% found the queue busy; waits up to {STAGING.max() / 3600:.1f} h). "
-          f"The forward simulation assumes this; the closed form does not.\n"]
-
-    # 1. The formal gate, as approved: trailing 30-day volume, tokens at zero.
-    md += ["## 1. Formal economic gate (owner's definition)\n",
-           f"Gate: 10%/yr net of gas at trailing-30-day volume, tokens at zero, at the {CEILING} gwei gas ceiling (D42); "
-           "bid outcome positive at the ceiling; a usable exit window each day. The ceiling row uses 0.45 gwei basefee plus the 0.05 gwei tip. The closed form omits global journal overhead and is a theoretical comparison. 0.15 gwei is basefee at the pinned block. "
-           "Above the ceiling the keeper waits; calls are still accepted, paid at the ceiling price (D51).\n",
-           "| basefee / bid | net per bid cycle (mETH) | closed form, 100 positions | forward sim mean, 100 positions | 10% comparison |",
-           "|---|---|---|---|---|"]
-    gate = {}
-    for g in (0.15, max(0, CEILING - 0.05)):
-        x = expectation(100, last30.mean(), g)
-        sm = summarize(Scenario(volume=boot(last30), gwei=g), 100, runs)
-        gate[min(g + 0.05, CEILING)] = (x, sm)
-        comparison = (f"not established: {100 * sm['m_end_pricing_blocked']:.0f}% end with pricing blocked"
-                      if sm["m_end_pricing_blocked"] else "above threshold" if sm["mean"] >= 0.10 else "below threshold")
-        md.append(f"| {g:.2f} / {g + 0.05:.2f} gwei | {x['net_meth']:+.3f} | {pct(x['apr'])} | {pct(sm['mean'])} (p5 {pct(sm['p5'])}) | "
-                  f"{comparison}; candidate validation separate |")
-        print(md[-1], flush=True)
-    md.append(f"\nBid outcome at the {CEILING} gwei ceiling: {gate[CEILING][0]['net_meth']:+.3f} mETH per cycle. New packs "
-              "must repay their build from one bid cycle under the current policy; the closed form assumes positions already "
-              "exist. Exit windows: 59 of the last 60 blackouts had a drained queue (Phase 0.2).\n")
-
-    md += ["## 2. Expectation (closed form, per position, no variance)\n",
-           "| volume/day | gas gwei | positions | cycle days | net per cycle mETH | APR | selection share |",
-           "|---|---|---|---|---|---|---|"]
-    for v_ in (15, last7.mean(), last30_ex.mean(), last30.mean()):
-        for g in (0.15, CEILING, 1.0):
-            for n in (30, 300):
-                x = expectation(n, v_, g)
-                md.append(f"| {v_:.0f} | {g} | {n} | {x['cycle_days']:.1f} | {x['net_meth']:+.3f} | {pct(x['apr'])} | "
-                          f"{100 * x['share']:.1f}% |")
-    gross = 0.0363 * (k_of() - 1)
-    fee = WORK_FEE / E
-    build_g = policy.Q["build_pack"] + policy.shape_count(BUILD_UNITS) * policy.Q["build_shape"] + policy.Q["listed"]
-    mint_share = policy.shape_count(BUILD_UNITS) * MINT_FEE / E  # mints for one REF_UNITS pack
-    md.append(f"\nBreak-even quoted price for a bid cycle (D56: quoted gas {policy.CYCLE_GAS:,}, including own journal, selection, terminal, cleanup, relist and harvest components, plus 2 work fees; V1 pays no markup): {(gross - 2 * fee) / policy.CYCLE_GAS * 1e9:.2f} gwei. "
-              f"New packs (build {build_g:,} quoted gas, mint fee share {mint_share} ETH and two additional work fees): "
-              f"below {(gross - mint_share - 4 * fee) / (policy.CYCLE_GAS + build_g) * 1e9:.2f} gwei quoted price "
-              "(basefee + 0.05 gwei tip).\n")
-
-    def g_path(base, high, start, stop=10**9):
-        return lambda d: high if start <= d < stop else base
-
-    def cheap_windows(base, cheap, every):
-        return lambda d: cheap if d % every == 0 else base
-
-    scen = [
-        ("trailing 30 d (gate window)", dict(volume=boot(last30), gwei=0.15), (30, 100, 300)),
-        ("trailing 30 d without Oct 31", dict(volume=boot(last30_ex), gwei=0.15), (100,)),
-        ("last 14 d", dict(volume=boot(last14), gwei=0.15), (30, 100, 300)),
-        ("last 7 d", dict(volume=boot(last7), gwei=0.15), (100,)),
-        ("15/day", dict(volume=const(15), gwei=0.15), (100,)),
-        ("decline 97 -> 10/day over the year", dict(volume=decline(97, 10), gwei=0.15), (100,)),
-        ("inactive after 60 days", dict(volume=stop_after(last14, 60), gwei=0.15), (100,)),
-        ("last 14 d at 0.5 gwei bid ceiling (0.45 basefee)", dict(volume=boot(last14), gwei=0.45), (100,)),
-        ("enter at 0.15 gwei, 0.4 gwei from day 30 on", dict(volume=boot(last14), gwei=g_path(0.15, 0.4, 30)), (100,)),
-        ("enter at 0.15 gwei, 1.0 gwei (above ceiling) from day 30 on", dict(volume=boot(last14), gwei=g_path(0.15, 1.0, 30)), (100,)),
-        ("enter at 0.15 gwei, 2.0 gwei (above ceiling) days 30-120", dict(volume=boot(last14), gwei=g_path(0.15, 2.0, 30, 120)), (100,)),
-        ("1.2 gwei with a 0.1 gwei day every 7", dict(volume=boot(last14), gwei=cheap_windows(1.2, 0.1, 7)), (100,)),
-        ("50% redemption at day 120 during 7 congested days", dict(volume=boot(last14), gwei=0.15, redeem=[(120, 0.5)],
-                                                                    congested=lambda d: 120 <= d < 127), (100,)),
-        ("50% redemption at day 120", dict(volume=boot(last14), gwei=0.15, redeem=[(120, 0.5)]), (100,)),
-        ("crown share to 5% at day 90", dict(volume=boot(last14), gwei=0.15, changes=[(90, "crown", 0.05)]), (100,)),
-        ("ask cut 0.033 -> 0.0275 at day 90", dict(volume=boot(last14), gwei=0.15, changes=[(90, "ask", 0.0275)]), (100,)),
-        ("11% of purchasers keep", dict(volume=boot(last14), gwei=0.15, keep=0.11), (100,)),
-        ("demand elasticity 1", dict(volume=boot(last14), gwei=0.15, elasticity=1.0), (100,)),
-        ("pool shrinks to half", dict(volume=boot(last14), gwei=0.15, pool_scale=0.5), (100,)),
-        ("half of checkpoints missed", dict(volume=boot(last14), gwei=0.15, checkpoint_miss=0.5), (100,)),
-    ]
-    md += ["## 3. Forward simulation (one year, daily integer vault model + live keeper policy)\n",
-           f"{runs} runs per row. One year, so the raw return is the annual return. Every expense is included: keeper gas "
-           "pay, mint fees, FWA settlement fees, backing lost to purchasers. The simulation holds real cash: a relist "
-           "needs backing the vault has, a pack waits for its purchaser's settlement, and redemptions are paid before "
-           "anything is redeployed. Positions: the initial target / mean held / most held; capital and transaction "
-           "work limits bound deployment, with no total position cap. Global journal processing includes foreign "
-           "and refunded records, at the historical completed/refunded ratio. Routine calls wait when budget or free cash cannot fund their full quote. "
-           "Self-serve exits use a separate quoted-gas cost proxy paid by the withdrawing holder, outside vault NAV. "
-           "Selection timing is a daily approximation. End values use an independent mark when pricing is blocked; "
-           "the reported blocked flag must not be treated as a completed redemption. Calls are capped at512 per modeled day, "
-           "with any remaining journal retained. P(loss) with a 95% interval.\n",
-           "| scenario | positions (target/mean/max) | mean (± s.e.) | p5 | median | p95 | worst run | P(loss) | fees/dep | "
-           "lost/dep | keeper/dep | mint/dep | pricing blocked | journal backlog |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
-    results = {}
-    for name, sc, sizes in scen:
-        for n in sizes:
-            sm = summarize(Scenario(sc), n, runs)
-            results[f"{name}|{n}"] = sm
-            md.append(f"| {name} | {n}/{sm['m_pos_mean']:.0f}/{sm['m_pos_max']:.0f} | {pct(sm['mean'])} ± {100 * sm['se']:.1f} | "
-                      f"{pct(sm['p5'])} | {pct(sm['p50'])} | {pct(sm['p95'])} | {pct(sm['worst'])} | {ci(sm)} | "
-                      f"{100 * sm['m_fees']:.0f}% | {100 * sm['m_lost']:.0f}% | {100 * sm['m_keeper']:.2f}% | "
-                      f"{100 * sm['m_mint']:.2f}% | {100 * sm['m_end_pricing_blocked']:.0f}% | {sm['m_journal_backlog']:.0f} |")
-            print(md[-1], flush=True)
-
-    md += ["\n## 4. Deployment slowdown (keeper stops building new packs while 7-day volume is low)\n",
-           "| scenario | slowdown below | mean | p5 | P(loss) | mint/dep | keeper/dep |", "|---|---|---|---|---|---|---|"]
-    for name, sc in (("decline 97 -> 10/day", dict(volume=decline(97, 10), gwei=0.15)),
-                     ("inactive after 60 days", dict(volume=stop_after(last14, 60), gwei=0.15))):
-        for sl in (0, 30, 60):
-            sm = summarize(Scenario({**sc, "slowdown": sl}), 100, runs)
-            md.append(f"| {name} | {sl}/day | {pct(sm['mean'])} | {pct(sm['p5'])} | {ci(sm)} | "
-                      f"{100 * sm['m_mint']:.2f}% | {100 * sm['m_keeper']:.2f}% |")
-            print(md[-1], flush=True)
-
-    md += ["\n## 5. FWA tokens (burned, never sold; D43)\n",
-           "Holders get no token value by design: the vault claims FWA token rewards and burns them, at the operator's gas cost (`burnTokens`, unpaid). Measured in `keeper/rehearse_canary.py`: one real buyback paid the canary's 28 listings 4.87 FWA tokens (a pool sale would have realized about 8.2e12 wei), all claimed and burned.\n"]
-    (OUT / "forward.md").write_text("\n".join(md) + "\n")
-    json.dump(results, open(OUT / "forward.json", "w"), indent=1)
-    print("wrote sim/out/forward.md")
+    from formal import main as assess
+    assess()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

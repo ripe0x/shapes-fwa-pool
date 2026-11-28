@@ -1,0 +1,22 @@
+{
+ "status": "COMPLETE_CONDITIONAL_ASSESSMENT_NOT_PRODUCTION_ACCEPTANCE",
+ "sourceRevision": "5701f84",
+ "inputSha256": {
+  "sim/out/manager-calibrated-assessment/manifest.json": "650176c293d951d85966667b8734b57ef0ca8c0a145ccdb6384b3f92da2f28e1",
+  "sim/out/manager-calibrated-assessment/paths.jsonl": "67431bfa1ef671cfe03f1c5d826800987392b5c15f585c8033bbf75fde27d81d",
+  "sim/out/manager-calibrated-assessment/summary.json": "f188a421c92f6823215ef420bac551b5a1b578bc7e35fedaa95e0ce804bdee11",
+  "docs/receipts/manager-calibrated-cost-calibration.json": "3a1aa82707e1ef9e6116ad32b7bcdfb5ac6ae44c801a3b383cb3c169a3229137"
+ },
+ "scenarioCount": 960,
+ "qualifiedExits": 957,
+ "spendingLimitedExits": 3,
+ "deployableBackingCases": 480,
+ "deployableBackingQualifiedExits": 480,
+ "maximumSignedExitReservationWei": 8646148550000000,
+ "cashPartitionChecks": "Every complete path exact integer equality; all paths source qualifier and independent reviewer partition",
+ "productionEconomicValuesApproved": false,
+ "productionRecommendation": false,
+ "publicTransactions": 0,
+ "sharedVaultDeployed": false,
+ "runtimeSeconds": 1236.4313034580555
+}

@@ -1,0 +1,18 @@
+No files changed, compilation skipped
+
+Ran 1 test for test/fork/ForkManagerCloseout.t.sol:ForkManagerCloseoutReuseTest
+[PASS] test_managerReuseOwnerPaidExitReconcilesEveryWei() (gas: 51133016)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 3.95s (3.51s CPU time)
+
+Ran 1 test for test/fork/ForkManagerCloseout.t.sol:ForkManagerCloseoutFreshTest
+[PASS] test_managerFreshOwnerPaidExitReconcilesEveryWei() (gas: 52019666)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 4.21s (3.77s CPU time)
+
+Ran 4 tests for test/fork/ForkManager.t.sol:ForkManagerTest
+[PASS] test_coldKickRefundIdentifiedUnderStipend() (gas: 5762845)
+[PASS] test_createInitializesAtomically() (gas: 838440)
+[PASS] test_lifecycle_buildExitWithdrawEverything() (gas: 12592640)
+[PASS] test_onlyOwnerControls_andHandover() (gas: 1588690)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 6.82s (12.28s CPU time)
+
+Ran 3 test suites in 7.11s (14.97s CPU time): 6 tests passed, 0 failed, 0 skipped (6 total tests)

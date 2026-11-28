@@ -26,9 +26,9 @@ library StrategyLib {
     uint256 internal constant BPS = 10_000;
     uint256 internal constant UNIT = 0.01 ether;
     uint256 internal constant CROWN_EXIT_WINDOW = 12 hours; // FWA early crown exit costs 1%
-    uint256 internal constant MAX_LIQUIDATE_UNITS = 60; // ordinary packs: at most 60 Shapes burned
+    uint256 internal constant MAX_LIQUIDATE_UNITS = VaultLib.MAX_LIQUIDATE_UNITS; // ordinary packs: at most 60 Shapes burned
 
-    /// Operation ids passed to the keeper policy (stable across versions; 4 and 7 are retired).
+    /// Operation identifiers retained for shared payment entry points.
     uint256 internal constant OP_BUILD = 1;
     uint256 internal constant OP_LIST = 2;
     uint256 internal constant OP_SYNC = 3;
@@ -48,6 +48,8 @@ library StrategyLib {
     error Payment();
     error UnlistNotAllowed();
 
+    struct LiquidationWork { uint256 n; uint256 units; uint256 recovery; uint256 recoveryGas; }
+
     // ------------------------------------------------------------------ economics
 
     /// @notice Live economics for a pack of `units`: k, the backing a new listing posts (0 when it
@@ -55,7 +57,24 @@ library StrategyLib {
     function edge(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, IShapes shapes, uint256 units)
         public view returns (uint256, uint256, bool)
     {
-        return VaultLib.edge(s.params, f, address(packs), units, VaultLib.buildCost(s.params, units, shapes.mintFee()));
+        (, uint256 n) = VaultLib.makeup(units);
+        return VaultLib.edge(s.params, f, address(packs), units, shapes.mintFee(), true, n);
+    }
+
+    function relistEdge(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, IShapes shapes, uint256 units)
+        external view returns (uint256, uint256, bool)
+    {
+        // Unknown inventory composition is bounded by one 0.01 ETH Shape per unit.
+        return VaultLib.edge(s.params, f, address(packs), units, shapes.mintFee(), false, units);
+    }
+
+    function relistEdgeFor(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, IShapes shapes, uint256 packId)
+        external view returns (uint256, uint256, bool)
+    {
+        uint256 value = s.book.idleValueOf[packId];
+        if (value == 0 || s.book.idleIndex[packId] == 0) revert VaultLib.MissingInventory();
+        return VaultLib.edge(s.params, f, address(packs), value / UNIT, shapes.mintFee(), false,
+            s.book.packShapeCount[packId]);
     }
 
     // ------------------------------------------------------------------ inventory
@@ -64,7 +83,7 @@ library StrategyLib {
     ///         backing proposal per pack. Only while listing is open and a keep cycle repays the
     ///         build at today's quoted price (VaultLib.buildAndList).
     function build(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, IShapes shapes, uint256 units,
-        uint256[] calldata proposals, uint256 minPay) external returns (uint256)
+        uint256[] calldata proposals, uint256 minPay, uint256 gasStart) external returns (uint256)
     {
         _requireListing(s, f);
         _precheck(s, minPay, false);
@@ -72,14 +91,14 @@ library StrategyLib {
         uint256 count = proposals.length;
         emit Built(count, units);
         (, uint256 n) = VaultLib.makeup(units);
-        return _pay(s, OP_BUILD, VaultLib.Q_BUILD + count * (VaultLib.buildGas(n) + VaultLib.Q_LISTED), 2 * count,
-            false, minPay, type(uint256).max);
+        return _pay(s, OP_BUILD, s.params.gasSchedule.build + count * (VaultLib.buildGas(s.params, n) + s.params.gasSchedule.listed), 2 * count,
+            false, minPay, type(uint256).max, gasStart);
     }
 
     /// @notice Relist idle packs (returned by bids, withdrawals or expiry) at bounded proposals,
     ///         checked against live economics. No mint: a returned pack is reused as is.
     function list(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, IShapes shapes,
-        uint256[] calldata proposals, uint256 minPay) external returns (uint256)
+        uint256[] calldata proposals, uint256 minPay, uint256 gasStart) external returns (uint256)
     {
         _requireListing(s, f);
         _precheck(s, minPay, false);
@@ -93,14 +112,34 @@ library StrategyLib {
             uint256 units = b.idleValueOf[packId] / UNIT;
             uint256 backing = proposals[listed];
             VaultLib.validateBacking(s.params, b, f, address(packs), units, backing,
-                VaultLib.buildCost(s.params, units, fee), false);
-            if (available < backing) break;
+                fee, false, b.packShapeCount[packId]);
+            uint256 compensation = VaultLib.quote(s.params,
+                uint256(s.params.gasSchedule.list) + (listed + 1) * s.params.gasSchedule.listed, listed + 1, false);
+            if (available < backing + compensation) break;
             available -= backing;
             emit Listed(VaultLib.admit(b, f, packs, packId, backing), packId, backing);
             ++listed;
         }
         if (listed == 0) revert Nothing();
-        return _pay(s, OP_LIST, VaultLib.Q_LIST + listed * VaultLib.Q_LISTED, listed, false, minPay, type(uint256).max);
+        if (listed != proposals.length) revert VaultLib.UnusedPaidInput();
+        return _pay(s, OP_LIST, s.params.gasSchedule.list + listed * s.params.gasSchedule.listed, listed, false, minPay, type(uint256).max, gasStart);
+    }
+
+
+
+
+
+    function recover(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, uint256[] calldata ids,
+        uint256 witness, uint256 checkpointMode) external {
+        VaultLib.syncUnfunded(s.params, s.book, f, packs, ids, checkpointMode, witness, false);
+    }
+
+    function syncFunded(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, uint256[] calldata ids,
+        uint256 witness, uint256 checkpointMode, uint256 minPay, uint256 fundingCap, uint256 gasStart) external returns (uint256)
+    {
+        if (checkpointMode != 1) revert Nothing();
+        (uint256 gasQ, uint256 units) = VaultLib.syncUnfunded(s.params, s.book, f, packs, ids, checkpointMode, witness, true);
+        return VaultLib.payFunded(s.params, gasQ, units, true, minPay, fundingCap, gasStart);
     }
 
     function _requireListing(VaultLib.Strategy storage s, IFWAV2 f) private view {
@@ -115,11 +154,11 @@ library StrategyLib {
     /// @notice Bounded journal or scan job, terminal resolutions and allocation cleanup.
     ///         `checkpointMode` is 0 for an account without checkpoints.
     function sync(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, uint256[] calldata listingIds,
-        uint256 witnessId, uint256 checkpointMode, uint256 minPay) external returns (uint256)
+        uint256 witnessId, uint256 checkpointMode, uint256 minPay, uint256 gasStart) external returns (uint256)
     {
         (uint256 gasQ, uint256 units) =
             VaultLib.syncChanges(s.params, s.budget, s.book, f, packs, listingIds, checkpointMode, witnessId);
-        return _pay(s, OP_SYNC, gasQ, units, false, minPay, type(uint256).max);
+        return _pay(s, OP_SYNC, gasQ, units, false, minPay, type(uint256).max, gasStart);
     }
 
     /// @notice Withdraw active listings: in wind-down (exit), when `shortfall` ETH is owed beyond
@@ -127,7 +166,7 @@ library StrategyLib {
     ///         (routine). A stale quote or a gas spike stops new listings but never unwinds earning
     ///         ones. Exits never read FWA's economics, so a hostile oracle or fee cannot block them.
     function unlist(VaultLib.Strategy storage s, IFWAV2 f, IShapePacks packs, uint256[] calldata listingIds,
-        uint256 minPay, uint256 shortfall) external returns (uint256)
+        uint256 minPay, uint256 shortfall, uint256 gasStart) external returns (uint256)
     {
         if (listingIds.length > VaultLib.MAX_BATCH) revert Amount();
         bool essential = s.windingDown || shortfall != 0;
@@ -135,7 +174,7 @@ library StrategyLib {
             (uint256 k,,) = VaultLib.economics(f, address(packs));
             if (k >= 1e18 + uint256(s.params.minEdgeBps) * 1e14) revert UnlistNotAllowed();
         }
-        _precheck(s, minPay, essential);
+        _precheckPermission(s, minPay, essential);
         VaultLib.Book storage b = s.book;
         uint256 realized;
         uint256 moved;
@@ -153,51 +192,50 @@ library StrategyLib {
             if (!s.windingDown && shortfall != 0 && realized >= shortfall) break;
         }
         if (realized == 0) revert Nothing();
-        return _pay(s, OP_UNLIST, VaultLib.Q_UNLIST + moved * VaultLib.Q_UNLISTED, moved, essential, minPay,
-            type(uint256).max);
+        if (!s.callerFunded && moved != listingIds.length) revert VaultLib.UnusedPaidInput();
+        return _pay(s, OP_UNLIST, s.params.gasSchedule.unlist + moved * s.params.gasSchedule.unlisted, moved, essential, minPay,
+            type(uint256).max, gasStart);
     }
 
     /// @notice Redeem up to `maxCount` idle packs to ETH at their exact backing, or one bounded
     ///         recovery chunk, while `need` ETH is still owed beyond free ETH, or freely in wind-down.
     function liquidate(VaultLib.Strategy storage s, IShapePacks packs, IShapes shapes, uint256 maxCount,
-        uint256 minPay, uint256 need) external returns (uint256)
+        uint256 minPay, uint256 need, uint256 gasStart) external returns (uint256)
     {
         if (!s.windingDown && need == 0) revert Nothing();
-        _precheck(s, minPay, true);
+        _precheckPermission(s, minPay, true);
         VaultLib.Book storage b = s.book;
-        maxCount = M.min(maxCount, VaultLib.MAX_BATCH);
+        maxCount = M.min(M.min(maxCount, VaultLib.MAX_BATCH),
+            b.idlePacks.length + (b.recoveryPacks.length != 0 ? 1 : 0));
         uint256 before = address(this).balance;
         uint256 supplyBefore = shapes.totalSupply();
-        uint256 n;
-        uint256 units;
-        uint256 recovery;
-        uint256 recoveryGas;
-        while (n + recovery < maxCount && (s.windingDown || address(this).balance - before < need)) {
+        LiquidationWork memory w;
+        while (w.n + w.recovery < maxCount && (s.windingDown || address(this).balance - before < need)) {
             if (b.idlePacks.length != 0) {
                 uint256 packId = b.idlePacks[b.idlePacks.length - 1];
                 uint256 value = b.idleValueOf[packId];
-                if (units + value / UNIT > MAX_LIQUIDATE_UNITS) break;
-                units += value / UNIT;
+                if (w.units + value / UNIT > MAX_LIQUIDATE_UNITS) break;
+                w.units += value / UNIT;
                 VaultLib.redeemInventory(b, packId);
                 packs.redeem(packId);
-                ++n;
+                ++w.n;
             } else if (b.recoveryPacks.length != 0) {
-                if (n != 0) break;
+                if (w.n != 0) break;
                 // Recovery is one isolated chunk of at most 30 underlying Shapes.
-                recoveryGas = VaultLib.recoverInventory(b, packs, shapes);
-                ++recovery;
+                w.recoveryGas = VaultLib.recoverInventory(s.params, b, packs, shapes);
+                ++w.recovery;
                 break;
             } else {
                 break;
             }
         }
-        if (n + recovery == 0) revert Nothing();
-        // Pay only for the Shapes actually burned; recovery is isolated from this loop.
-        uint256 burned = n == 0 ? 0 : supplyBefore - shapes.totalSupply();
-        if (n != 0 && (burned == 0 || burned > MAX_LIQUIDATE_UNITS)) revert Amount();
-        emit Liquidated(n + recovery, burned, address(this).balance - before);
-        return _pay(s, OP_LIQUIDATE, VaultLib.Q_LIQUIDATE + n * VaultLib.Q_LIQ_PACK + burned * VaultLib.Q_REDEEM_SHAPE
-            + recoveryGas, n + recovery, true, minPay, type(uint256).max);
+        if (w.n + w.recovery == 0) revert Nothing();
+        // Pay only for the Shapes actually burned; w.recovery is isolated from this loop.
+        uint256 burned = w.n == 0 ? 0 : supplyBefore - shapes.totalSupply();
+        if (w.n != 0 && (burned == 0 || burned > MAX_LIQUIDATE_UNITS)) revert Amount();
+        emit Liquidated(w.n + w.recovery, burned, address(this).balance - before);
+        return _pay(s, OP_LIQUIDATE, s.params.gasSchedule.liquidate + w.n * s.params.gasSchedule.liquidatePack + burned * s.params.gasSchedule.redeemShape
+            + w.recoveryGas, w.n + w.recovery, true, minPay, type(uint256).max, gasStart);
     }
 
     // ------------------------------------------------------------------ fees, tokens, receipts
@@ -260,27 +298,40 @@ library StrategyLib {
 
     // ------------------------------------------------------------------ keeper pay
 
-    /// @notice Pay the caller for verified work (VaultLib.pay): the least of the policy's offer,
-    ///         the envelope, `cap`, the account's free ETH and its budget.
+    /// @notice Pay the caller for verified work (VaultLib.pay): the least of the quote, `cap`, the account's free ETH and its budget.
     function pay(VaultLib.Strategy storage s, uint256 op, uint256 gasQ, uint256 units, bool essential,
-        uint256 minPay, uint256 cap) external returns (uint256)
+        uint256 minPay, uint256 cap, uint256 gasStart) external returns (uint256)
     {
-        return _pay(s, op, gasQ, units, essential, minPay, cap);
+        return _pay(s, op, gasQ, units, essential, minPay, cap, gasStart);
     }
 
     /// @notice Revert before the work when `minPay` already exceeds what could be paid.
     function precheck(VaultLib.Strategy storage s, uint256 minPay, bool essential) external view {
-        _precheck(s, minPay, essential);
+        _precheckPermission(s, minPay, essential);
     }
 
-    function _pay(VaultLib.Strategy storage s, uint256 op, uint256 gasQ, uint256 units, bool essential,
-        uint256 minPay, uint256 cap) private returns (uint256)
+    function _pay(VaultLib.Strategy storage s, uint256, uint256 gasQ, uint256 units, bool essential,
+        uint256 minPay, uint256 cap, uint256 gasStart) private returns (uint256)
     {
-        return VaultLib.pay(s.params, s.budget, s.policy, op, gasQ, units, essential, minPay, cap,
-            IAccount(address(this)).freeEth());
+        if (s.callerFunded) return 0;
+        return VaultLib.pay(s.params, s.budget, gasQ, units, essential, minPay, cap,
+            essential ? IAccount(address(this)).freeEth() : IAccount(address(this)).keeperCash(), gasStart);
+    }
+
+    function payFunded(VaultLib.Strategy storage s, uint256, uint256 gasQ, uint256 units, bool essential,
+        uint256 minPay, uint256 fundingCap, uint256 gasStart) external returns (uint256)
+    {
+        return VaultLib.payFunded(s.params, gasQ, units, essential, minPay, fundingCap, gasStart);
     }
 
     function _precheck(VaultLib.Strategy storage s, uint256 minPay, bool essential) private view {
-        if (minPay != 0) VaultLib.precheck(s.params, s.budget, minPay, essential, IAccount(address(this)).freeEth());
+        if (minPay != 0) VaultLib.precheck(s.params, s.budget, minPay, essential,
+            essential ? IAccount(address(this)).freeEth() : IAccount(address(this)).keeperCash());
+    }
+
+    /// @dev Proceeds-realizing operations check the full actual cash source at final payment.
+    ///      Requiring cash before a withdrawal, redemption or fee sweep would reject funded work.
+    function _precheckPermission(VaultLib.Strategy storage s, uint256 minPay, bool essential) private view {
+        if (minPay != 0) VaultLib.precheck(s.params, s.budget, minPay, essential, type(uint256).max);
     }
 }

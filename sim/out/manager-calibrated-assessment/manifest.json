@@ -1,0 +1,753 @@
+{
+  "schema": 1,
+  "design": "Fixed paired descriptive cohort; agent-chosen size, no owner return hurdle",
+  "source_sha256": {
+    "deploy/manager.json": "24f8c18184fde67f007aaa3c94d8d0fc693e9879893f8aab0c59eb6054b07288",
+    "deploy/mint-fee-observation.json": "feb7d12387928144de212966dd3e431c4f2ba5b648ad3ea409f9ba61620ac29b",
+    "docs/receipts/manager-calibrated-cost-calibration.json": "3a1aa82707e1ef9e6116ad32b7bcdfb5ac6ae44c801a3b383cb3c169a3229137",
+    "docs/receipts/manager-calibrated-receipts.json": "2b8e6771aa2259c7a6782b109fa19a8ea15c325aba44be91c0366e18bc845099",
+    "docs/receipts/manager-calibrated-reconciliation.json": "91e16606d2661c61b72840d3facb5274b49e12c4dd3fb353a297237e875cc9a6",
+    "docs/receipts/manager-operating-cost-calibration.json": "e954c54974cf97f5d5aed9843df4137ef4be6df37bc05b6eb87a95981ea432af",
+    "docs/receipts/manager-operating-live-observation.json": "5a96c573fb52823e774ecfebe486b0b2ed7486ad936be7e5c881cc138a8e8bd1",
+    "docs/receipts/manager-operating-min-backing-continuity.json": "cdbf38270f26e9da67e4cb75defe2a20cae255664dd8072a39ace888a6f81c61",
+    "docs/receipts/manager-operating-osaka-receipts.json": "eb1ff1c81cfe085e46515bbaf0c9d474284cd092271654efb4652fc5b63b5beb",
+    "docs/receipts/manager-r2-closeout.json": "51f824ae75c58bfdb46875cf72cdf63ea944d583d80dea2278930e4d141522a8",
+    "docs/receipts/manager-r2-cost-calibration.json": "ff946f9c65a3f5dd40ccd1e4aed1258982a73484a44029ecd14640c942c6c977",
+    "keeper/config.py": "39acb35f93fb64916dd4c8c8ab64da76742ec8c8b1c90902c9c1b014a6a22f06",
+    "keeper/keeper.py": "5bfe7f9b9965dcab42eeb92e7707e2a791132c5880b03fa2b3b929e2426816a1",
+    "keeper/policy.py": "42a40400cee6acd7ad1b3342548bd5f0754d11636a9b890118caa346bd4f219a",
+    "keeper/rehearse_manager_r2.py": "b74f24d169ef0e10f0b8731a0f2879fa3fb9fa889c65fad9efcb4c72800f41a1",
+    "keeper/test_policy.py": "dc40b539bdaf5c5acf4ae8ad1e696beca3c6c9a366213622c404020c5953ed69",
+    "sim/data/fwa.sqlite": "9f05929e7d333f3b43d5c85ef3e8b03f0498523c1a7ab60a0267c87749cd019c",
+    "sim/formal.py": "c682cbb515c0487c51ef0b2e6f68b3b0a5d6e3683cbbdcd22c3ed661ed13c4dc",
+    "sim/forward.py": "dde8e57fa8090cf51c8aba741f7e3e19691dc98c5191c534ebf54167cd7a13d1",
+    "sim/manager.py": "901e776456b46b501af574562b41ac4f1b0e94f0e8edd3e6d5464e0a62a34a01",
+    "sim/manager_assessment.py": "7b3434eebda165b954abea6d62590fc95719337ef889a1eb66d24b1aca75cab4",
+    "sim/manager_monte_carlo.py": "99992c7ec87e58370b769239176f6162459b2cb161dd93a6828b7c0c7ce204a2",
+    "sim/manager_operating_assessment.py": "a386e262decbc74b6a2b14861df4e2dfa578e88b843881afbc6630c5856bb3d6",
+    "sim/manager_reconcile.py": "608cc8680c39ae885920d314944daa08b1d6bc0d4ce4bb3dbc04c3f266b6740a",
+    "sim/manager_standard_backing.py": "f4f471427189a8cd642cdb967d7d192c0ecbc4867ca43cc410fd166a1519f8c1",
+    "sim/replay.py": "2d1f0227026e7fe7690229717ff31b7ac37a056ad197bb85687939a128879262",
+    "sim/test_forward_randomness.py": "614f9cd3773c23e1bb38a6098552f3eb175763fb415f824ff9c0b820816bcfe9",
+    "sim/test_funding_holds.py": "e8c156034380f289cb3f06f2ca64cf81562e0ac753d7dc61707d456f1fa6769b",
+    "sim/test_manager_monte_carlo.py": "662ab42e60be7331a4fd9d404159288bfb0bc0f491b42d82d9707698879db207",
+    "sim/test_manager_operating_assessment.py": "f2290eb98585df4044c8f67a62dca4e486a845d9ce629fcb50744891e9a6f009",
+    "sim/vault.py": "4f22da5672c1d078c837c27252f068a7761541077616bafced1495830ffb1390"
+  },
+  "contract_source_sha256": {
+    "src/PackAccount.sol": "18effdf4eeddc1cde3eab969fe7cab29080985c1d4e35b0717cf1b26b15b0af2",
+    "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+    "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+    "src/PackVault.sol": "a2c1d7c4d0826722cc5658943a15bf5c5cafd119ff7ff56d35b7b876ce4d2aee",
+    "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+    "src/StrategyLib.sol": "9552d8c0b2581287e041a17a6fe9399775f3e37576a25051dff9af1f2f83c7ab",
+    "src/VaultLib.sol": "0b341caa2b97f279d3107963e15e30e35ce0e87e4cc54342a9fd39904f64f75f",
+    "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+  },
+  "archive": "sim/data/fwa.sqlite",
+  "archive_coverage": {
+    "first_timestamp": 1789014107,
+    "last_timestamp": 1795520759,
+    "top_block": 26484807
+  },
+  "windows": [
+    {
+      "id": "w1792929275",
+      "start": 1790337275,
+      "end": 1792929275,
+      "month_events_sha256": "7f909f02bb0eedcad92492707711e2e68e4f6080b6d5c340b10fa77716b317ad",
+      "burst_events_sha256": "6d6a547743a0f084b1ef7c8524ace1c52355838b07580c550759396e69b9ab03",
+      "burst": {
+        "actual_day_index": 6,
+        "requests": 16486,
+        "successful": 16486,
+        "method": "Actual busy-day pairs repeated at whole-day offsets; original request-to-completion delays and blackout phase retained. No new requests after day2."
+      },
+      "successful": 47553,
+      "refunded": 6,
+      "response_cohort": {
+        "method": "original-formal-eventual-response-adverse-v1",
+        "observed_until": 1795520759,
+        "allocations_in_window": 47553,
+        "sampled_allocations": 47553,
+        "responsive_allocations": 46341,
+        "unresolved_at_archive_cutoff": 1212,
+        "allocations_excluded": 0,
+        "responsive_after3600_seconds": 1121,
+        "responsive_delays_clamped_to3480": 1168,
+        "responses_observed_after_window_end": 0,
+        "allocation_followup_seconds": {
+          "minimum": 2592012,
+          "median": 4415808,
+          "maximum": 5183064
+        },
+        "unresolved_allocation_followup_seconds": {
+          "minimum": 2600064,
+          "median": 4638498.0,
+          "maximum": 5182176
+        },
+        "cohort_sha256": "c827a09e3d593f9a3be28eb96cdcd905b9d96275e9a2576060bb2ab0afb27e05",
+        "responses_sha256": "518520dd7a5fcc736505074d600e5815232ce3882f07a17efee67db25d9bf3b5"
+      },
+      "seeds": [
+        200000,
+        200001,
+        200002,
+        200003,
+        200004,
+        200005,
+        200006,
+        200007
+      ]
+    },
+    {
+      "id": "w1795521275",
+      "start": 1792929275,
+      "end": 1795521275,
+      "month_events_sha256": "16c8618f954e6cba72bb7fd10542e3105aab112a2aeeae227f1031822a6ecc6d",
+      "burst_events_sha256": "c1f35cd23e83b4e95230eec379ad407f43f2c79b281edc01dd54f3500852fb7e",
+      "burst": {
+        "actual_day_index": 5,
+        "requests": 20020,
+        "successful": 9840,
+        "method": "Actual busy-day pairs repeated at whole-day offsets; original request-to-completion delays and blackout phase retained. No new requests after day2."
+      },
+      "successful": 9856,
+      "refunded": 5090,
+      "response_cohort": {
+        "method": "original-formal-eventual-response-adverse-v1",
+        "observed_until": 1795520759,
+        "allocations_in_window": 9856,
+        "sampled_allocations": 9856,
+        "responsive_allocations": 9684,
+        "unresolved_at_archive_cutoff": 172,
+        "allocations_excluded": 0,
+        "responsive_after3600_seconds": 3089,
+        "responsive_delays_clamped_to3480": 3096,
+        "responses_observed_after_window_end": 0,
+        "allocation_followup_seconds": {
+          "minimum": 5016,
+          "median": 2107044.0,
+          "maximum": 2589252
+        },
+        "unresolved_allocation_followup_seconds": {
+          "minimum": 359952,
+          "median": 2097594.0,
+          "maximum": 2554392
+        },
+        "cohort_sha256": "2eb725399636a78c164696d09317da48e98341d49f148b6f9b6efc8f44be5671",
+        "responses_sha256": "0f82f409d834e5b6560e4b5b0c29d8c512110dbfd0e3199fae31c0c5154b93db"
+      },
+      "seeds": [
+        200008,
+        200009,
+        200010,
+        200011,
+        200012,
+        200013,
+        200014,
+        200015
+      ]
+    }
+  ],
+  "cells": [
+    {
+      "id": "m0-b70000-f250000000000000-g0.2",
+      "renewal_mode": 0,
+      "backing_bps": 70000,
+      "mint_fee_wei": 250000000000000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "m0-b70000-f250000000000000-g0.5",
+      "renewal_mode": 0,
+      "backing_bps": 70000,
+      "mint_fee_wei": 250000000000000,
+      "total_gas_gwei": 0.5
+    },
+    {
+      "id": "m0-b70000-f500000000000000-g0.2",
+      "renewal_mode": 0,
+      "backing_bps": 70000,
+      "mint_fee_wei": 500000000000000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "m0-b70000-f500000000000000-g0.5",
+      "renewal_mode": 0,
+      "backing_bps": 70000,
+      "mint_fee_wei": 500000000000000,
+      "total_gas_gwei": 0.5
+    },
+    {
+      "id": "m0-b70000-f1000000000000000-g0.2",
+      "renewal_mode": 0,
+      "backing_bps": 70000,
+      "mint_fee_wei": 1000000000000000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "m0-b70000-f1000000000000000-g0.5",
+      "renewal_mode": 0,
+      "backing_bps": 70000,
+      "mint_fee_wei": 1000000000000000,
+      "total_gas_gwei": 0.5
+    },
+    {
+      "id": "m0-b10000-f250000000000000-g0.2",
+      "renewal_mode": 0,
+      "backing_bps": 10000,
+      "mint_fee_wei": 250000000000000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "m0-b10000-f250000000000000-g0.5",
+      "renewal_mode": 0,
+      "backing_bps": 10000,
+      "mint_fee_wei": 250000000000000,
+      "total_gas_gwei": 0.5
+    },
+    {
+      "id": "m0-b10000-f500000000000000-g0.2",
+      "renewal_mode": 0,
+      "backing_bps": 10000,
+      "mint_fee_wei": 500000000000000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "m0-b10000-f500000000000000-g0.5",
+      "renewal_mode": 0,
+      "backing_bps": 10000,
+      "mint_fee_wei": 500000000000000,
+      "total_gas_gwei": 0.5
+    },
+    {
+      "id": "m0-b10000-f1000000000000000-g0.2",
+      "renewal_mode": 0,
+      "backing_bps": 10000,
+      "mint_fee_wei": 1000000000000000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "m0-b10000-f1000000000000000-g0.5",
+      "renewal_mode": 0,
+      "backing_bps": 10000,
+      "mint_fee_wei": 1000000000000000,
+      "total_gas_gwei": 0.5
+    },
+    {
+      "id": "m1-b70000-f250000000000000-g0.2",
+      "renewal_mode": 1,
+      "backing_bps": 70000,
+      "mint_fee_wei": 250000000000000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "m1-b70000-f250000000000000-g0.5",
+      "renewal_mode": 1,
+      "backing_bps": 70000,
+      "mint_fee_wei": 250000000000000,
+      "total_gas_gwei": 0.5
+    },
+    {
+      "id": "m1-b70000-f500000000000000-g0.2",
+      "renewal_mode": 1,
+      "backing_bps": 70000,
+      "mint_fee_wei": 500000000000000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "m1-b70000-f500000000000000-g0.5",
+      "renewal_mode": 1,
+      "backing_bps": 70000,
+      "mint_fee_wei": 500000000000000,
+      "total_gas_gwei": 0.5
+    },
+    {
+      "id": "m1-b70000-f1000000000000000-g0.2",
+      "renewal_mode": 1,
+      "backing_bps": 70000,
+      "mint_fee_wei": 1000000000000000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "m1-b70000-f1000000000000000-g0.5",
+      "renewal_mode": 1,
+      "backing_bps": 70000,
+      "mint_fee_wei": 1000000000000000,
+      "total_gas_gwei": 0.5
+    },
+    {
+      "id": "m1-b10000-f250000000000000-g0.2",
+      "renewal_mode": 1,
+      "backing_bps": 10000,
+      "mint_fee_wei": 250000000000000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "m1-b10000-f250000000000000-g0.5",
+      "renewal_mode": 1,
+      "backing_bps": 10000,
+      "mint_fee_wei": 250000000000000,
+      "total_gas_gwei": 0.5
+    },
+    {
+      "id": "m1-b10000-f500000000000000-g0.2",
+      "renewal_mode": 1,
+      "backing_bps": 10000,
+      "mint_fee_wei": 500000000000000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "m1-b10000-f500000000000000-g0.5",
+      "renewal_mode": 1,
+      "backing_bps": 10000,
+      "mint_fee_wei": 500000000000000,
+      "total_gas_gwei": 0.5
+    },
+    {
+      "id": "m1-b10000-f1000000000000000-g0.2",
+      "renewal_mode": 1,
+      "backing_bps": 10000,
+      "mint_fee_wei": 1000000000000000,
+      "total_gas_gwei": 0.2
+    },
+    {
+      "id": "m1-b10000-f1000000000000000-g0.5",
+      "renewal_mode": 1,
+      "backing_bps": 10000,
+      "mint_fee_wei": 1000000000000000,
+      "total_gas_gwei": 0.5
+    }
+  ],
+  "paths_per_window": 8,
+  "operating_days": 30,
+  "exit_days": 7,
+  "initial_funding_wei": 500000000000000000,
+  "owner_exit_spend_limit_wei": 10000000000000000,
+  "final_gas_qualification": true,
+  "gas_proxy": {
+    "build": 1924916,
+    "create": 606194,
+    "harvest": 58253,
+    "liquidate": 257554,
+    "list": 1138473,
+    "processAcquisitions": 115941,
+    "recover_sync": 199051,
+    "renew": 1841608,
+    "setExiting": 55573,
+    "sync": 522456,
+    "unlist": 538657,
+    "withdraw": 38926
+  },
+  "gas_estimate_proxy": {
+    "build": 2107326,
+    "create": 589094,
+    "harvest": 76540,
+    "liquidate": 413343,
+    "list": 1234107,
+    "processAcquisitions": 175159,
+    "recover_sync": 263092,
+    "renew": 2163847,
+    "setExiting": 59728,
+    "sync": 672915,
+    "unlist": 608021,
+    "withdraw": 55260
+  },
+  "gas_curves": {
+    "build": {
+      "single_billed_gas": 1924916,
+      "single_estimate_gas": 2107326,
+      "billed_per_extra_work": 1262823,
+      "estimate_per_extra_work": 1347308
+    },
+    "create": {
+      "single_billed_gas": 606194,
+      "single_estimate_gas": 589094,
+      "billed_per_extra_work": 0,
+      "estimate_per_extra_work": 0
+    },
+    "harvest": {
+      "single_billed_gas": 58253,
+      "single_estimate_gas": 76540,
+      "billed_per_extra_work": 0,
+      "estimate_per_extra_work": 0
+    },
+    "liquidate": {
+      "single_billed_gas": 257554,
+      "single_estimate_gas": 413343,
+      "billed_per_extra_work": 168029,
+      "estimate_per_extra_work": 270946
+    },
+    "list": {
+      "single_billed_gas": 1138473,
+      "single_estimate_gas": 1234107,
+      "billed_per_extra_work": 712709,
+      "estimate_per_extra_work": 758918
+    },
+    "processAcquisitions": {
+      "single_billed_gas": 115941,
+      "single_estimate_gas": 175159,
+      "billed_per_extra_work": 0,
+      "estimate_per_extra_work": 0
+    },
+    "recover_sync": {
+      "single_billed_gas": 199051,
+      "single_estimate_gas": 263092,
+      "billed_per_extra_work": 0,
+      "estimate_per_extra_work": 0
+    },
+    "renew": {
+      "single_billed_gas": 1841608,
+      "single_estimate_gas": 2163847,
+      "billed_per_extra_work": 0,
+      "estimate_per_extra_work": 0
+    },
+    "setExiting": {
+      "single_billed_gas": 55573,
+      "single_estimate_gas": 59728,
+      "billed_per_extra_work": 0,
+      "estimate_per_extra_work": 0
+    },
+    "sync": {
+      "single_billed_gas": 522456,
+      "single_estimate_gas": 672915,
+      "billed_per_extra_work": 0,
+      "estimate_per_extra_work": 0
+    },
+    "unlist": {
+      "single_billed_gas": 538657,
+      "single_estimate_gas": 608021,
+      "billed_per_extra_work": 266310,
+      "estimate_per_extra_work": 351973
+    },
+    "withdraw": {
+      "single_billed_gas": 38926,
+      "single_estimate_gas": 55260,
+      "billed_per_extra_work": 0,
+      "estimate_per_extra_work": 0
+    }
+  },
+  "estimate_curve_sources": {
+    "build": "rpc-estimate",
+    "create": "rpc-estimate",
+    "harvest": "rpc-estimate",
+    "liquidate": "signed-limit-upper",
+    "list": "rpc-estimate",
+    "processAcquisitions": "signed-limit-upper",
+    "recover_sync": "signed-limit-upper",
+    "renew": "rpc-estimate",
+    "setExiting": "rpc-estimate",
+    "sync": "rpc-estimate",
+    "unlist": "rpc-estimate",
+    "withdraw": "signed-limit-upper"
+  },
+  "unmeasured_operations": [],
+  "manager_values": {
+    "comment": "Unsigned local evaluation candidate, not approved production settings. 0.03 ETH packs, three paid 0.01 ETH primary mints. Adjustable 70000 bps backing and 25 bps unresolved uplift are provisional.",
+    "minEdgeBps": 100,
+    "bufferBps": 0,
+    "distributionBps": 0,
+    "payMarkupBps": 0,
+    "keeperShareBps": 2500,
+    "packUnitsMask": 8,
+    "gasCeilingWei": 500000000,
+    "essentialCeilingWei": 500000000,
+    "maxTipWei": 50000000,
+    "workFeeWei": 20000000000000,
+    "reserveWei": 5000000000000000,
+    "tvlCapWei": 0,
+    "routineCapWei": 30000000000000000,
+    "routineRatePerDayWei": 10000000000000000,
+    "essentialCapWei": 10000000000000000,
+    "essentialRatePerDayWei": 5000000000000000,
+    "upliftBoundBps": 25,
+    "backingRatioBps": 70000,
+    "renewalMode": 0,
+    "renewalFloatCount": 1,
+    "acceptedMintFeeWei": 1000000000000000,
+    "minDepositWei": 10000000000000000,
+    "minDistributionWei": 10000000000000000,
+    "gasSchedule": {
+      "checkpoint": 500000,
+      "allocationEntry": 6000,
+      "allocationRead": 30000,
+      "build": 360000,
+      "buildPack": 300000,
+      "buildShape": 130000,
+      "list": 380000,
+      "listed": 825000,
+      "sync": 125000,
+      "requiredTail": 120000,
+      "distributionProof": 80000,
+      "journal": 22000,
+      "scan": 30000,
+      "selected": 225000,
+      "synced": 285000,
+      "pruned": 45000,
+      "unlist": 340000,
+      "unlisted": 285000,
+      "liquidate": 75000,
+      "liquidatePack": 80000,
+      "redeemShape": 35000,
+      "recoveryBase": 100000,
+      "recoveryShape": 35000,
+      "recoveryUnseal": 70000,
+      "harvest": 125000,
+      "harvested": 80000,
+      "credit": 40000,
+      "fund": 40000
+    },
+    "expectedMintFeeWei": 1000000000000000
+  },
+  "mint_fee_observation": {
+    "readOnly": true,
+    "rpc": "https://mainnet.gateway.tenderly.co",
+    "block": 26492130,
+    "blockHash": "0x239460663af7174d45b183baebc7bb6b9e2a49733fb42b160b593cfe074c9a99",
+    "timestamp": 1795608911,
+    "baseFeeWei": 108088576,
+    "shapes": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+    "packs": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+    "fwa": "0x958C41181182e76F221331b2755b77D9e1426A98",
+    "mintFeeWei": 500000000000000,
+    "acceptedMaximumWei": 1000000000000000,
+    "economics": {
+      "ownerAcquisitionFeeBps": 100,
+      "ownerSettlementFeeBps": 100,
+      "topListingShareBps": 10,
+      "settlementDiscountBps": 9000,
+      "tokenSettlementDiscountBps": 9150,
+      "settlementWindow": 3600,
+      "finalizeWindow": 3600,
+      "activeListingCount": 2557,
+      "totalWeight": 53187242113858350996898,
+      "weightedBackingTotal": 2556999999999999999885439506305599909152,
+      "acquisitionFee": 50479210677111632,
+      "mainPacksOracleExempt": true,
+      "mainPacksCanDeposit": true,
+      "surchargeBps": 500
+    },
+    "oracleExempt": true,
+    "minBackingWei": 25000000000000000,
+    "configSetState": {
+      "23": {
+        "block": 26144054,
+        "valueWei": 8000
+      },
+      "61": {
+        "block": 26144022,
+        "valueWei": 1356601444931682158998139052495367640934077758016
+      },
+      "41": {
+        "block": 26126292,
+        "valueWei": 1
+      },
+      "29": {
+        "block": 26126290,
+        "valueWei": 9150
+      },
+      "65": {
+        "block": 26090542,
+        "valueWei": 1190950922593085277971512302638854613809555845969
+      },
+      "15": {
+        "block": 26078548,
+        "valueWei": 10
+      },
+      "62": {
+        "block": 25944649,
+        "valueWei": 61796977938233482145391871588020382772302905670
+      },
+      "44": {
+        "block": 25944618,
+        "valueWei": 1
+      },
+      "40": {
+        "block": 25944618,
+        "valueWei": 1
+      },
+      "27": {
+        "block": 25944617,
+        "valueWei": 21600
+      },
+      "25": {
+        "block": 25944617,
+        "valueWei": 0
+      },
+      "22": {
+        "block": 25944617,
+        "valueWei": 25000000000000000
+      },
+      "20": {
+        "block": 25944617,
+        "valueWei": 3600
+      },
+      "21": {
+        "block": 25944617,
+        "valueWei": 3600
+      },
+      "19": {
+        "block": 25944617,
+        "valueWei": 100
+      },
+      "18": {
+        "block": 25944616,
+        "valueWei": 100
+      },
+      "17": {
+        "block": 25944616,
+        "valueWei": 9000
+      },
+      "16": {
+        "block": 25944615,
+        "valueWei": 1000
+      },
+      "14": {
+        "block": 25944615,
+        "valueWei": 1000
+      },
+      "13": {
+        "block": 25944615,
+        "valueWei": 500
+      },
+      "12": {
+        "block": 25944614,
+        "valueWei": 5
+      },
+      "10": {
+        "block": 25944614,
+        "valueWei": 6
+      },
+      "7": {
+        "block": 25944614,
+        "valueWei": 3
+      },
+      "11": {
+        "block": 25944614,
+        "valueWei": 30
+      },
+      "1": {
+        "block": 25944609,
+        "valueWei": 900000
+      },
+      "24": {
+        "block": 25944609,
+        "valueWei": 58107840699933149319226264896379340422220575262651973310145411177421594153945
+      },
+      "43": {
+        "block": 25944609,
+        "valueWei": 1
+      },
+      "28": {
+        "block": 25944609,
+        "valueWei": 1000
+      },
+      "26": {
+        "block": 25944609,
+        "valueWei": 604800
+      },
+      "66": {
+        "block": 25944609,
+        "valueWei": 554796862146535778389938234499240263279840630480
+      },
+      "64": {
+        "block": 25944609,
+        "valueWei": 972258135870579478595537420462932229902532290524
+      },
+      "63": {
+        "block": 25944609,
+        "valueWei": 1157762043009029760719178682838687237985430563130
+      },
+      "2": {
+        "block": 25944609,
+        "valueWei": 105635216111862975908859364934260387362758947578681163548045548039867846446581
+      },
+      "60": {
+        "block": 25944609,
+        "valueWei": 1232972947259131235767155083770124610558295574842
+      }
+    },
+    "protocol": {
+      "ownerAcquisitionFeeBps": 100,
+      "ownerSettlementFeeBps": 100,
+      "topListingShareBps": 10,
+      "settlementDiscountBps": 9000,
+      "tokenSettlementDiscountBps": 9150,
+      "settlementWindow": 3600,
+      "finalizeWindow": 3600,
+      "activeListingCount": 2557,
+      "totalWeight": 53187242113858350996898,
+      "weightedBackingTotal": 2556999999999999999885439506305599909152,
+      "acquisitionFee": 50479210677111632,
+      "mainPacksOracleExempt": true,
+      "mainPacksCanDeposit": true,
+      "surchargeBps": 500,
+      "inferredGrossMultiplier1e18": 1038460499999999982,
+      "expectedValueWei": 48075438740106317,
+      "inferredGrossMultiplierRoundingBound": 23,
+      "retainedToProtocol": true
+    },
+    "configSetLogsSinceArchive": [],
+    "dependencyRuntimeContinuity": {
+      "FWA": {
+        "address": "0x958C41181182e76F221331b2755b77D9e1426A98",
+        "runtimeSha256": "20d0ec8fcea735357da6487d821e678a93232f4e867161682e21fadd36c2ba8e",
+        "verifiedSourceSha256": "1b5dbbe6a2c1d15e8df38c075da85036659aacb38936ccd94619b86a8240a425"
+      },
+      "Shapes": {
+        "address": "0x6fE9193276bF7aBCbEE44AB7aFd717d637D6FAf0",
+        "runtimeSha256": "3e666d62f32c901aee8b15a9fea1682eba7278b671e608935cd34ec8a81d6539",
+        "verifiedSourceSha256": "f008bf5ddcba042f6a286d4279e34c5b3c1759ec8e21ec6df6826d6aa831ec79"
+      },
+      "ShapePacks": {
+        "address": "0xf21514B090Da7dF4390803497d6ae673801E5cA7",
+        "runtimeSha256": "ebfaebd182f0366d571ea7bbfe0ac526b169c2a8e45112a9a97a5e7b590f214b",
+        "verifiedSourceSha256": "1425fabf99163f2c6a43132d42060a8ca70c88012f243aa3180ece94045a11e9"
+      }
+    }
+  },
+  "protocol_minimum_backing": {
+    "value_wei": 25000000000000000,
+    "block": 25944617,
+    "log_index": 384,
+    "method": "Latest archived actual FWA ConfigSet key22; not a fresh public-state read"
+  },
+  "fee_cases": {
+    "250000000000000": "Agent-chosen fork-only half-current sensitivity; not approved baseline",
+    "500000000000000": "Observed current mint fee",
+    "1000000000000000": "Historical/accepted maximum comparison"
+  },
+  "expected_rows": 960,
+  "buyer_regimes": [
+    "observed-choices",
+    "forced-responsive-bid-stress"
+  ],
+  "physical_sync_cost_basis": "Actual base, every consumed journal/scan item, selected/resolved/pruned work and actual fee claims; separate from payment eligibility",
+  "keeper_policy": "Production billed_ratio defaults then same-label receipt history, with additional known billed/physical cost floor; actual cost ledger uses billed curve; failure/minimum-return/max-loss all zero",
+  "keeper_initial_billed_ratios": {
+    "build": 0.92,
+    "list": 0.98,
+    "sync": 0.93,
+    "unlist": 0.8,
+    "liquidate": 0.8,
+    "checkpoint": 0.97,
+    "harvest": 0.95,
+    "burnTokens": 0.95
+  },
+  "keeper_receipt_history_start": "Fresh keeper, empty per scenario; no other account receipts",
+  "response_method": "Paired request-keyed response cohort. Observed choices retain first archived keep/bid and delay; stress forces every archived eventual responder to bid within3480seconds. Unresolved stays silent in both.",
+  "assumptions": [
+    "Thirty operating days and at most seven exit days. Recorded-month requests repeat during exit; quiet has no requests; early burst repeats the busiest actual day twice at whole-day offsets then has no requests.",
+    "The fixed path count is an agent choice for bounded descriptive evaluation; no sample-size threshold or future-return confidence is claimed. No outcome-dependent stopping or exclusion.",
+    "Foreign request timing, recorded success/refund and weights are fixed. Added manager listings dilute allocation/fees; external market participants do not react.",
+    "Response cohorts have unequal follow-up/right censoring. Observed choices preserve archived keeps and late delays; the second regime forces every eventual responder to bid by3480seconds, including late/archive-after-window responses. Neither is a forecast or exact VRF replay.",
+    "Current protocol fee rules and oracle exemption are applied to historical requests. Historical configuration changes are not individually replayed. The .00025ETH fee is an agent-chosen fork-only half-current sensitivity, not a production recommendation or approval of baseline economics; no public fee changes.",
+    "Standard .03 backing relaxes only admission in an isolated worker. Current manager rejects it; it is not an executable candidate configuration.",
+    "Fresh/Reuse use canonical cash holds, reserves, spending budgets, and strict fully paid ordinary work. No account topups or volunteer keeper subsidy.",
+    "Keeper acceptance reuses production billed_ratio: initial per-operation defaults, then after3 same-label receipts min(1,sum billed gas / sum estimates across the last20). Each path starts with a fresh keeper and no other-account history. Accepted ordinary calls add calibrated proxy bill/estimate pairs; owner recovery does not. A separate known billed/physical cost floor forbids assumed losses. Replacement/minPay-specific estimate changes, failed inclusion and external-account history are not modeled. Estimate curves prefer genuine RPC samples with an RPC single-work baseline, otherwise explicit historical signed-limit uppers; billed curves cover all samples. The25percent signing pad belongs only to the owner cap.",
+    "Gas is max(count-aware single-work baseline plus measured per-extra-work slope, canonical work allowance), not exact billed gas for every batch. Creator amounts are gross accrual; global deployment/service costs are outside per-clone owner returns.",
+    "Owner recovery and pending processing are paid from the owner wallet. Each call must fit the cumulative signed maximum:125percent of max(work allowance,actual estimate or signed-limit upper proxy,21000gas) at2basefee+tip. The default .01ETH exit cap excludes clone creation, stops before unaffordable mutations, and can leave incomplete assets.",
+    "Unfinished exits retain returned cash, unresolved cash/inventory/credit, and future-cost uncertainty. No monthly-to-annual extrapolation, APR, production viability or release authority follows."
+  ]
+}

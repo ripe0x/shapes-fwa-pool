@@ -1,0 +1,61 @@
+{
+ "sourceSha256": {
+  "sim/forward.py": "777a8c24ffb9d41f34e24d022f633ab8fbb27c4ddd442c8bda6ce1c689c13889",
+  "sim/test_manager.py": "ed34052aa2c3a5a093393b1af45fdf1b940d070386563b0202dc928372fc9916",
+  "sim/manager_operating_assessment.py": "139a93d94a3031fa718f3924fdf12ddf60600f4d31690769d637b3f906338ced",
+  "sim/test_manager_operating_assessment.py": "e6f83480e62951e3a32dd72e75f15a890de8d01f90ad9d282969fba9b35e49d5",
+  "sim/manager_closeout.py": "8e0058d9321b0265f2d19797910cbe2f49a922360301f62d4ef1bb93d231bad9"
+ },
+ "checks": [
+  {
+   "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "sim/test_manager.py"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 2.438,
+   "log": "docs/receipts/manager-operating-final-model-check-0.log"
+  },
+  {
+   "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "sim/test_manager_operating_assessment.py"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 0.747,
+   "log": "docs/receipts/manager-operating-final-model-check-1.log"
+  },
+  {
+   "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "sim/manager_reconcile.py",
+    "--funded",
+    "--output",
+    "docs/receipts/manager-operating-reconciliation.json"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 0.176,
+   "log": "docs/receipts/manager-operating-final-model-check-2.log"
+  },
+  {
+   "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "sim/test_manager_closeout.py"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 0.184,
+   "log": "docs/receipts/manager-operating-final-model-check-3.log"
+  },
+  {
+   "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "sim/manager_closeout.py",
+    "--out",
+    "docs/receipts/manager-closeout-economics"
+   ],
+   "exitStatus": 0,
+   "elapsedSeconds": 0.175,
+   "log": "docs/receipts/manager-operating-final-model-check-4.log"
+  }
+ ]
+}

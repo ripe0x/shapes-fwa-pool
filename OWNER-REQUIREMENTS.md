@@ -235,3 +235,71 @@ layers, or reopen decisions that are already supported by evidence."
 Update (owner, 2026-11-22): no canary, ever. Item 7 is withdrawn; deployment uses
 `deploy/mainnet.json`, which has no deposit cap (set 2026-11-17, cba0cf5).
 "Do not merge, deploy, sign acceptance documents, or spend real funds."
+
+
+## A5. Main pool completion (owner, 2026-11-24)
+
+The owner's implementation request supersedes six-unit launch assumptions, compulsory buyer-keep
+backing and the external keeper policy. Full acceptance scope is in
+`docs/MAIN-POOL-COMPLETION.md`; the originating chat remains authoritative.
+
+1. “Launch with **0.03 eth packs containing three directly minted 0.01 eth shapes**.” Launch
+   units are 3 and mask 8, immediately owner-adjustable for later operation.
+2. “The owner's revenue comes from shapes mint fees.” Every fresh Shape pays the live fee within
+   the explicitly accepted maximum. No bulk/split substitution or public mint-fee change.
+3. “Preserve unlimited total positions with bounded incremental work.” Preserve pooled vault,
+   independently owned managers and shared implementation; no factory control over existing managers.
+4. “Use one consistent calculation for the payment envelope, actual compensation and relevant
+   charge calculations.” Account-owned numerical gas calibration, verified operation counts and
+   routine markup; remove the external policy path and its deployment machinery.
+5. “Use one effective economic configuration per operation.” Expected configuration guards bind
+   economically sensitive work, while claims, cancellation and necessary recovery remain available.
+6. “Implement two account owned renewal modes”: FreshAfterAcquisition and ReuseReturned. Fresh
+   mode uses single-use verified acquisition eligibility, actual returned principal, paid fresh
+   mints, a separate float, protected maintenance reserves and explicit cash/permission waits.
+7. “Unused checkpoint contributions remain attributable and refundable to their payers.” Keep
+   canonical wei attribution across zero quotes, cancellations, topups, partial fills and successful
+   checkpoints. Gross escrow is priced for construction at commitment using lazy epoch issuance.
+8. Bound incremental unresolved keep uplift, replacing allocated face percentage. The local
+   evaluation uses backing70,000bps, uplift25bps, one fresh renewal float and reserve0.005ETH.
+   “The 0.21 backing and 25 bps threshold are provisional evaluation values, not approved
+   production defaults.” The existing net depositor return requirement remains in effect.
+9. “Provide an explicit caller funded exit path in the CLI and app.” Expected wallet spend and
+   caller limit cover necessary bounded work, settlements, checkpoints, partial fills and claims.
+10. Real-counterparty forks, measured transaction receipts and independent cash-flow reconciliation
+    must evaluate creator and holder economics together, separately at current fee and fork-only
+    half fee, at0.2/0.5gwei. Synthetic assumptions are labelled; no manufactured passing return.
+11. “Keep public network transactions, production mint fee changes, live application cutover and
+    merges outside this task. Prepare the deployment package unsigned.” Draft PRs are authorized.
+
+No historical asset-flow signature or deployment acceptance authorizes this changed candidate.
+
+## A6. Individual manager closeout (owner, 2026-11-24)
+
+“Go ahead and finish the individual manager: owner-paid exit flow, manager-only deployment
+package, economics and focused validation. Work autonomously, update the draft PRs, and keep the
+shared vault closed. No public transactions or merges.”
+
+Complete the manager's own wallet flow, independently deployable factory/implementation package
+through the existing deployment path, and manager-specific owner/keeper/creator cost accounting.
+The pooled-vault return result and pooled checkpoint uplift gate are not manager evidence. Preserve
+the fixed launch recipe, individually owned managers, common strategy implementation and existing
+community application. Production settings remain provisional; public deployment, production fee
+changes, live cutover, acceptance signing and merges retain their existing separate authority limits.
+
+
+## A7. Remaining manager operating validation (owner, 2026-11-25)
+
+The owner asked to complete the remaining billed operating measurements, realistic operating-period economics, keeper readiness, and unsigned deployment preparation: “do all those. i'm going to bed. have them all done when i wake up.” After an explicit request for more validation time, the owner answered: “no budget cap”. This removes the cumulative validation-time cap for this remaining task. It does not authorize public transactions, production fee changes, live application/service cutover, signatures, a shared-vault deployment or merges.
+
+The owner clarified that the new shared vault is undeployed; “closed” must not imply an existing deployed candidate. Its app launch remains disabled. Any local evaluation setting and simulation cohort is an agent-selected method, not an owner-approved production default or a newly required sample size. Complete available engineering and evidence, and report genuine economic failure or remaining release decisions honestly.
+
+## A8. Reuse-only manager, measured keeper pay and pack-preserving migration (owner, 2026-11-25)
+
+The owner superseded A5's two renewal modes: “we should only have one mode: reuse. no need for the other.” Returned packs are relisted intact; new packs are minted only for opening, funded growth or inventory that a buyer kept. Launch remains 0.03 ETH with three directly paid 0.01 ETH Shapes. Remove the FreshAfterAcquisition mode, eligibility/remint machinery and dedicated fresh-renewal float; retain immediate account-owned settings and actual inventory values/counts.
+
+The owner approved switching from fixed quoted compensation to the community pattern of **bounded measured-gas payment**, with safeguards and gas measurements for these main operations rather than copied community coefficients. Verified work allowances become payment caps; compensate measured work plus account-owned overhead at the bounded actual gas price, with consistent routine markup/work fees, budgets, protected cash and minimum payment. Numerical payment inputs remain adjustable. No automatic subsidy or unnecessary work is authorized.
+
+The owner approved UI-orchestrated migration and explicitly requested the destination import capability in the first version: “lets build this into the first version”. Owners must be able to unlist, transfer and register existing packs without redeeming/burning/reminting their Shapes. Imports must be bounded and owner-controlled, validate actual canonical assets/value/contents and record each pack once. Migration uses a stated durable wallet spending limit and verifies source/destination ownership; it must not enable automatic liquidation while awaiting transfers. A generic owner-paid unlist capability is permitted as necessary to make this preserve-assets workflow concrete. There is no approval here for factory authority over existing managers, an upgradeable manager, arbitrary pack makeup, or changing production settings.
+
+A7's no execution-time cap continues for this follow-up. No public transaction, production mint-fee change, acceptance signature, live cutover, new shared-vault deployment or PR merge is authorized. Earlier quoted/Fresh economic receipts and studies remain historical at their original source/configuration and cannot be used as current measured-payment acceptance. Carry forward valid unchanged evidence only.

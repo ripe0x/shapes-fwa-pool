@@ -11,12 +11,12 @@ import {Charges} from "../utils/Charges.sol";
 import {LISTING_ACTIVE} from "../../src/interfaces/External.sol";
 
 /// @notice One full cycle on real contracts with a real VRF selection, written step by step to
-///         sim/out/reconcile-trace.jsonl. sim/reconcile.py replays the same steps through the
+///         sim/out/reconcile-measured-trace.jsonl. sim/reconcile.py replays the same steps through the
 ///         Python vault model (sim/vault.py, the one the forward simulation uses) and must match
 ///         every vault number to the wei. Inputs the model takes as given: FWA's fee formula
 ///         inputs, observed fixed-quote keeper payouts, and each listing's live backing.
 contract ForkReconcileTest is SelectionBase {
-    string constant OUT = "sim/out/reconcile-trace.jsonl";
+    string constant OUT = "sim/out/reconcile-measured-trace.jsonl";
     address alice = makeAddr("pack-vault-test-alice");
     address bob = makeAddr("pack-vault-test-bob");
     uint256 lastBal; // this contract's balance before the step: keeper pay is the delta
@@ -47,11 +47,12 @@ contract ForkReconcileTest is SelectionBase {
         // permissionless processor expires them after their word deadline, draining the queue.
         if (FWA.unsettledAcquisitionCount() != 0) IFwaSettle(address(FWA)).processAcquisitions(50);
         assertEq(FWA.unsettledAcquisitionCount(), 0, "queue drained");
-        if (vault.acquisitionCursor() < FWA.nextSequenceToProcess()) vault.sync(new uint256[](0), 0, 0);
+        bytes32 _expected0 = TestVaultOps.configurationHash(vault);
+        if (vault.acquisitionCursor() < FWA.nextSequenceToProcess()) vault.sync(new uint256[](0), 0, 0, _expected0);
     }
 
     function test_reconcileFullCycle() public {
-        if (vm.exists(OUT)) vm.removeFile(OUT);
+        require(!vm.exists(OUT), "preserve prior measured pooled trace");
         Candidate memory c = primary();
         _select(c); // deploy (3 ETH seed), restock 30, list 30, real request + fulfillment
         _pendForeignAcquisition(); // real pending request: busy queue for the relist refusal, then a
@@ -61,11 +62,12 @@ contract ForkReconcileTest is SelectionBase {
         // selection fee credit; the explicit harvest below collects it instead, as the Python mirror
         // (sim/vault.py) models. The default share would sweep this fixture's larger credit in-sync.
         VaultLib.Params memory pr = vault.getParams(); pr.keeperShareBps = 500;
-        vm.prank(vault.owner()); vault.setParams(pr);
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
+        vm.prank(vault.owner()); vault.setParams(pr, _expected1);
         vm.writeLine(
             OUT,
             string.concat(
-                '{"step":"setup","deployBalance":', vm.toString(deployBalance),
+                '{"compensationMode":"bounded-measured-v1","step":"setup","actors":', ReconcileTrace.actors(vault, alice, bob, address(this)), ',"deployBalance":', vm.toString(deployBalance),
                 ',"selectPay":', vm.toString(selectPay),
                 ',"count":', vm.toString(COUNT), ',"units":6,"backing":', vm.toString(B),
                 ',"activationDebt":', vm.toString(activationDebt), ',"initCursor":', vm.toString(vault.acquisitionCursor()), ',"selectedListing":', vm.toString(selected), ',"backings":[', vm.toString(B), '],"acqFee":', vm.toString(acqFee), ',"acqCutBps":', vm.toString(acqCutBps),
@@ -78,6 +80,7 @@ contract ForkReconcileTest is SelectionBase {
         vm.fee(0.4 gwei);
         vm.txGasPrice(0.45 gwei);
         this.assertGasContext();
+        vm.recordLogs();
         _snap("selected");
 
         vm.prank(c.purchaser);
@@ -87,14 +90,16 @@ contract ForkReconcileTest is SelectionBase {
         // Holders fund their deposits and the request charges (D56) on top.
         uint256 ckA = vault.requestCharge();
         vm.deal(alice, 1 ether + ckA);
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.deposit{value: 1 ether + ckA}();
+        vault.deposit{value: 1 ether + ckA}(_expected2);
         uint256 ckB = vault.requestCharge();
         vm.deal(bob, 0.5 ether + ckB);
+        bytes32 _expected3 = TestVaultOps.configurationHash(vault);
         vm.prank(bob);
-        vault.deposit{value: 0.5 ether + ckB}();
-        (,, uint96 chA,) = vault.pendingDeposits(alice);
-        (,, uint96 chB,) = vault.pendingDeposits(bob);
+        vault.deposit{value: 0.5 ether + ckB}(_expected3);
+        uint256 chA = vault.constructionCharge(alice == alice ? 1 ether : 0.5 ether);
+        uint256 chB = vault.constructionCharge(bob == alice ? 1 ether : 0.5 ether);
         vm.writeLine(
             OUT,
             string.concat(
@@ -118,8 +123,9 @@ contract ForkReconcileTest is SelectionBase {
         uint256[] memory planned9 = TestVaultOps.proposals(vault, 1, UNITS);
 
         // FWA's queue is busy (the forked block's other request): the vault refuses to list into it.
+        bytes32 _expected4 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.list(planned9, 0);
+        vault.list(planned9, 0, _expected4);
         _toBlackout(); // FWA's own processor drains the queue
         _snap("catchup");
         g = gasleft();
@@ -146,8 +152,9 @@ contract ForkReconcileTest is SelectionBase {
         uint256 ckR = vault.requestCharge();
         uint256 rc = Charges.redeemCharge(vault, aShares);
         vm.deal(alice, rc);
+        bytes32 _expected5 = TestVaultOps.configurationHash(vault);
         vm.prank(alice);
-        vault.requestRedeem{value: rc}(aShares);
+        vault.requestRedeem{value: rc}(aShares, _expected5);
         vm.writeLine(OUT, string.concat('{"step":"redeemCharge","ck":', vm.toString(ckR), ',"total":', vm.toString(rc), "}"));
         _snap("redeem");
 

@@ -263,12 +263,12 @@ def exercise_vault_reorg(R):
     K.RPC = R.RPC
     deployment = R.num(R.call(R.VAULT, "deploymentBlock()(uint256)"))
     path = Path(R.KEEPER_STATE).with_name("actual-vault-index-reorg.sqlite")
-    book = I.EventIndex(path, 1, R.VAULT, deployment)
+    book = I.EventIndex(path, R.num(R.cast("chain-id")), R.VAULT, deployment)
     K.sync_index(book, R.num(R.cast("block-number")))
     before = snapshot(book)
     chain_snapshot = R.B.rpc("evm_snapshot")
     try:
-        shares = R.num(R.call(R.VAULT, "shareBalance(address)(uint256)", R.HOLDER)) // 5
+        shares = R.num(R.call(R.VAULT, "shareBalance(address)(uint256)", R.HOLDER))
         if not shares:
             raise RuntimeError("real index reorg witness needs the actual canary holder")
         R.send(R.HOLDER, R.VAULT, "requestRedeem(uint256)", shares, value=R.redeem_charge(shares))
@@ -281,7 +281,7 @@ def exercise_vault_reorg(R):
         if snapshot(book) == before or not book.idle(1):
             raise RuntimeError("actual withdrawals did not change indexed positions/inventory")
         book.close()
-        book = I.EventIndex(path, 1, R.VAULT, deployment)
+        book = I.EventIndex(path, R.num(R.cast("chain-id")), R.VAULT, deployment)
         if snapshot(book) == before:
             raise RuntimeError("actual changed projections did not survive index restart")
     finally:

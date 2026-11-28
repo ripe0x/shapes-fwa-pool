@@ -7,9 +7,9 @@ from vault import ACTIVE, ALLOCATED, OWED, BPS, E, UNIT, Vault
 
 
 def build_and_list(v, ids, units, mint_fee, backings, fee_debt=None):
-    """Build-and-list `ids` packs in VaultLib.MAX_LIST_BATCH (8) sized calls, as the keeper does."""
-    for start in range(0, len(ids), 8):
-        chunk = ids[start:start + 8]
+    """Build-and-list `ids` packs in VaultLib.MAX_BUILD_BATCH (4) sized calls, as the keeper does."""
+    for start in range(0, len(ids), 4):
+        chunk = ids[start:start + 4]
         v.build(chunk, units, mint_fee, backings[start:start + len(chunk)], fee_debt)
 
 
@@ -100,11 +100,10 @@ class VaultAccountingTest(unittest.TestCase):
         v = Vault(seed=10**16, balance=10**16, reserve=5 * 10**15)
         v.completed_prefix = 576
         v.deposit("alice", E, 100_000_000_000_000)
-        self.assertTrue(v.checkpoint())
+        self.assertTrue(v.checkpoint(keeper_payment=100_000_000_000_000))
         self.assertEqual(v.acquisition_cursor, 576)
         self.assertGreater(v.share_balance("alice"), 0)
-        self.assertEqual(v.keeper_paid, 0)
-        v.pay_keeper(100_000_000_000_000, cap=100_000_000_000_000)
+        self.assertEqual(v.keeper_paid, 100_000_000_000_000)
         self.assertEqual(v.balance, E + 10**16)
 
     def vault(self):
@@ -268,7 +267,7 @@ class VaultAccountingTest(unittest.TestCase):
         v.build([1], 3, 10**15, [363 * 10**14])
         v.select(1)
         v.deposit('holder', 10**17)
-        v.allocated_bound_bps = 0
+        v.uplift_bound_bps = 0
         v.fee_credit = 10**15
         before = copy.deepcopy(v.__dict__)
         for _ in range(2):

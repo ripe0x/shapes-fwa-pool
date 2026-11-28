@@ -1,0 +1,17 @@
+{
+  "stage": "finish",
+  "manager": "0xed1362EcFdE410735dfB70153D60FCFD20d38E74",
+  "checks": [
+    "Stable expected owner connected on31337 beforeanymanageraction",
+    "Manager-only navigation with shared vault closed and unset, no community-factory warning",
+    "Process a bounded FWA request queue",
+    "Reconcile bounded manager settlement",
+    "Unlist a bounded manager batch",
+    "Redeem manager packs to ETH",
+    "Withdraw all manager ETH to owner",
+    "ManagerETH/book/receipts/FWAfeecreditallzero"
+  ],
+  "writes": 5,
+  "errors": [],
+  "afterBlock": 26486734
+}

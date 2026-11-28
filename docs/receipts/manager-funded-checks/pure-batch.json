@@ -1,0 +1,107 @@
+[
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "sim",
+      "-p",
+      "test_funding_holds.py",
+      "-v"
+    ],
+    "exitStatus": 1,
+    "seconds": 0.05544710159301758,
+    "log": "/tmp/shapes-manager-funded-checks/pure-0.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "sim",
+      "-p",
+      "test_forward_randomness.py",
+      "-v"
+    ],
+    "exitStatus": 0,
+    "seconds": 6.993799924850464,
+    "log": "/tmp/shapes-manager-funded-checks/pure-1.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "keeper/test_policy.py"
+    ],
+    "exitStatus": 0,
+    "seconds": 0.035948753356933594,
+    "log": "/tmp/shapes-manager-funded-checks/pure-2.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "sim",
+      "-p",
+      "test_manager.py",
+      "-v"
+    ],
+    "exitStatus": 0,
+    "seconds": 0.28909969329833984,
+    "log": "/tmp/shapes-manager-funded-checks/pure-3.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "sim",
+      "-p",
+      "test_completion.py",
+      "-v"
+    ],
+    "exitStatus": 0,
+    "seconds": 0.034502267837524414,
+    "log": "/tmp/shapes-manager-funded-checks/pure-4.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "sim",
+      "-p",
+      "test_vault.py",
+      "-v"
+    ],
+    "exitStatus": 0,
+    "seconds": 0.03617572784423828,
+    "log": "/tmp/shapes-manager-funded-checks/pure-5.log"
+  },
+  {
+    "command": [
+      "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "sim",
+      "-p",
+      "test_forward.py",
+      "-v"
+    ],
+    "exitStatus": 0,
+    "seconds": 0.2064657211303711,
+    "log": "/tmp/shapes-manager-funded-checks/pure-6.log"
+  }
+]

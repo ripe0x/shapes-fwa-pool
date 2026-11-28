@@ -1,4 +1,108 @@
-> **Current: [docs/UNIFIED-SYSTEM.md](UNIFIED-SYSTEM.md)** and the release package [docs/release/](release/RUNBOOK.md) (2026-11-21). One strategy implementation for the pooled vault and personal managers (D77–D85). Everything below the line is history for earlier candidates.
+# Manager expanded operating assessment, 2026-11-25
+
+**The individual-manager code and unsigned manager-only package are prepared; production economics are not accepted.** The manager is reuse-only, pays for verified bounded measured work, and can import eligible intact packs from an old personal manager. The app exposes owner-controlled migration and caller-funded exit. The ownerless factory cannot retune old managers. The shared vault remains closed; no public transaction, signature, live cutover or merge was performed.
+
+The [A10 expanded assessment](receipts/manager-a10-economics.md) uses real-counterparty gas receipts and **16 recorded-month selection paths** over two archived demand windows, paired across 0.005/0.006 ETH reserves, 0.0005/0.001 ETH mint fees, 0.2/0.5 gwei and two buyer-response rules at fixed 0.21 ETH backing. At the observed fee and 0.2 gwei, observed-choice mean modeled owner net is **+0.157372898 ETH** on 0.5 ETH funding, but **4/16 paths lose** and the worst loses **0.343045061 ETH**. Forced bids have **7/16 losing paths**; quiet and early-bid stress lose money. This is a conditional replay, **not APR or validated reuse-cycle profit**. In all 320 rows the ordinary keeper performs **zero syncs**; the owner performs necessary recovery at exit. The [independent A10 review](receipts/manager-a10-independent-review.md) confirmed cash partition and the keeper bootstrap limit. The 0.006 ETH reserve covers the conservative **one maximum-work batch plus journal/prune** cash envelope of 0.0055305 ETH if separately funded, but changes none of 160 paired owner returns. A passive keeper-only deployment remains unproven.
+
+The [pinned public readback at block 26,494,800](receipts/manager-a10-public-readback.json) found a 0.0005 ETH live Shape mint fee, legacy vault balance 0.01 ETH, old factory manager count zero and known claim/credit fields zero. The deployment signer nonce advanced from 4180 in A9 to **4181**; no transaction was sent by this work. The old unsigned deployment address was stale, so the manager-only simulation and unsigned package were refreshed for nonce 4181. The new predicted factory still had no code at the pinned block. The owner's 0.177336592479995704 ETH wallet balance cannot fund the evaluated 0.5 ETH creation template without another 0.322663407520004296 ETH plus gas. The earlier [A9 two-seed loss](receipts/manager-measured-economics.md) remains historical evidence; its sign changed when more selection seeds were tested. No old approval or signature is promoted. Prior assessments below are historical for their named revision/configuration, even where their prose says “current.”
+
+---
+
+# Individual manager operating validation, 2026-11-25
+
+**Individual-manager engineering and unsigned preparation are complete; production economics remain unaccepted.** The owner removed the validation-time cap (A7). Authenticated billed operating costs, the recorded-period assessment and current keeper runtime checks are complete within the scope below. The new shared vault is **undeployed**, its app launch remains disabled, and no public transaction, production fee change, live cutover, signature or merge is authorized. The old fixed 8,192-path campaigns stay preserved and incomplete; they are not resumed or promoted into acceptance requirements.
+
+The uncalibrated 960-case baseline is complete and preserved at `ce0950c`, with independent financial review `f5da6e8`. Its positive conditional averages coexist with severe losses and verified cold-keeper underquotes. Those fixable quote defects are now repaired in the **manager-only local candidate**: selected 225000, synced 285000 and list base 380000. No pack, backing, fee acceptance, renewal, float, reserve, markup, ceiling or budget setting changed. Actual corrected validation has 43 branched Osaka receipt observations (29 distinct hashes), 14 production CLI runs and a complete zero-budget caller-paid exit; independent repair review is `501d6a1`. The corrected candidate is `5701f84`. The same 960-case cohort is complete against its new receipt profile in `sim/out/manager-calibrated-assessment/`: 957/960 exits complete, including all 480 cases at 0.21 ETH backing. Three hypothetical 0.03-backing paths stop at the stated wallet cap and retain assets; their final/group returns are suppressed. The [final scorecard](receipts/manager-operating-economics.md) reports positive conditional means, large losing paths and explicit limits, without an APR or production recommendation. Core Solidity remains `1bbe54c`. The current runtime image passed, and the corrected unsigned package was prepared through the production manager-only path; final manifest identity is checked after committing.
+
+The prior engineering closeout below remains valid for its named runtime and receipt inputs. New work retains ordinary keeper acceptance, caller wallet limits and separate owner/keeper/creator accounting.
+
+---
+
+# Individual manager completion, 2026-11-24
+
+**The owner resumed individual-manager closeout on 2026-11-24.** Owner-paid exit, manager-only unsigned tooling and app integration retain their verified runtime source below. Final closeout uses the [bounded economic scorecard](receipts/manager-closeout-economics.md), actual receipt accounting and [focused final checks](receipts/manager-final-verification.md). The new shared vault remains undeployed and its app launch stays disabled. The 8,192-path / 49,152-scenario study size was chosen by the agent, not approved by the owner; its interrupted campaigns remain preserved and incomplete and are not a completion requirement. No campaign was restarted.
+
+**Manager engineering is prepared; production economics remain unaccepted.**
+Runtime source and study inputs are frozen at `1bbe54c94eed34818d5e2c7ccd95d5f83a892b90`;
+app ABI follow-up is `1330b18ee3bb38b85e9439b3c7213ac37fc9f1d8`.
+The new shared vault remains undeployed and both public app launch switches remain disabled. No public transaction, mint-fee
+change, live cutover, merge or acceptance signature was performed.
+
+The old −28.5% / two-draw result is withdrawn. A simulator cash-hold error could commit unpaid
+ordinary keeper work after consuming its renewal float. Both partial campaigns, 34,308 saved
+rows, remain preserved and marked invalid. The corrected study was stopped: 8,192 paired
+path IDs over two recorded months, three backing levels and two gas prices, 49,152 scenario runs.
+No partial return supports a recommendation. The final scorecard separates billed round trips from quoted cycle sensitivities; it makes no monthly-return or APR claim. The standard .03 ETH backing reference is hypothetical
+under current manager admission guards; actual MAIN FWA receipts separately prove protocol admission.
+
+Incoming fees and principal now refill the protected float/reserve shortfall before becoming
+spendable. The contract chooses the first actually funded fee prefix and rechecks cash. The model
+rejects unaccepted zero/partial ordinary compensation. No storage or individual ownership right
+changed, and no large configuration load or external call was added to the receipt callback.
+
+Owner-paid CLI/app closeout stops reinvestment, handles bounded real settlement/queue progress,
+unlists, redeems, collects actual credit and withdraws ETH under the caller's explicit wallet cap.
+The fresh current-source rehearsal has 23 actual local receipts, four .03 ETH packs and twelve
+paid primary mints. Both .5 ETH and 1 ETH accounts exit with zero keeper permission, no account
+topups and zero remaining cash, inventory, receipts or fee credit. All actor ledgers reconcile.
+The manager-only unsigned production path creates libraries plus factory/implementation without
+a PackVault or vault seed. Existing factory authority over individual managers remains absent.
+
+- [Current focused scorecard and limits](receipts/manager-funded-verification.md).
+- [43-step current funding reconciliation](receipts/manager-funded-reconciliation.json).
+- [Corrected backing study and frozen design](receipts/manager-monte-carlo.md).
+- [Independent correction/receipt review; numerical review still open](receipts/manager-monte-carlo-independent-review.md).
+- [Unsigned manager-only runbook](release/MANAGER-RUNBOOK.md) and [settings inventory](release/SETTINGS.md).
+
+The R2 mint-fee observation is .0005 ETH per Shape at block26488707, externally changed before
+this task's read; acceptance remains capped at .001 ETH. Backing .21 ETH, FreshAfterAcquisition,
+one float and .005 ETH reserve remain evaluation inputs. No manager production return hurdle
+is inferred from the pooled-vault hurdle. Authenticated billed renewal, standalone harvest and
+variable paid sync/list gas remain unmeasured; their modeling uses declared proxies. Historical
+UI/container evidence keeps its original revision and compatibility scope.
+
+Things that don't make sense: a spent float cannot be counted again as maintenance cash; positive
+creator revenue is not owner profit; uncapped model completion cannot prove exit within a real
+caller's .01 ETH wallet limit. The bounded closeout does not recommend production launch; full operating-return evidence is unavailable.
+
+## Prior combined implementation evidence
+
+**Engineering candidate implemented; production remains unsigned and economically unaccepted.**
+The launch recipe is three paid 0.01 ETH Shape mints in each 0.03 ETH pack, mask 8. Shared vault and
+individually owned managers retain shared linked-library logic. The external keeper policy and
+compulsory buyer-keep backing rule are removed. Account owners control immediate numerical
+calibration, backing, renewal mode, accepted mint fee and funding settings.
+
+Contribution eras/refunds use canonical wei accounting; gross deposits are charged at commitment.
+Fresh renewal requires single-use verified acquisition eligibility and actual returned assets.
+Bounded fee collection can fund a genuine renewal; cash and permission shortages remain distinct.
+Caller-funded CLI and app exits handle actual unlisting, redemption, checkpointing, claims and refunds.
+Community contracts, deployment selection and legacy routes are preserved. The main live app gate
+remains closed.
+
+- [Verification and limits](receipts/completion-verification.md): final source identities, exact
+  commands, real-counterparty forks, 103 billed calibration receipts, reconciliation and failures.
+- [Economic scorecard](receipts/completion-economics.md): holder, keeper and gross creator fee
+  results under the same bounded scenarios. This is not demonstrated APR.
+- [Independent combined review](receipts/completion-independent-review.md): repaired findings and
+  bounded review scope.
+- [Settings inventory](release/SETTINGS.md) and [unsigned deployment runbook](release/RUNBOOK.md).
+  Five unsigned deployment transactions and separate predicted keeper address data are prepared.
+
+The 0.001 ETH mint fee was observed again at mainnet block 26485995. No public transaction,
+production fee change, live cutover, merge or new acceptance signature was made. Backing 70,000 bps,
+uplift 25 bps, one renewal float and 0.005 ETH reserve remain local evaluation values. The existing
+10% net holder-return requirement and historical 0.0002 ETH checkpoint comparison were not relaxed.
+
+Things that don't make sense: creator fee accrual can coexist with holder losses; one float cannot
+fund repeated early acquisitions; a small pool can wait for unresolved allocations at 25 bps;
+the configured required checkpoint can exceed the historical expense target. See the scorecard
+for the resulting recommendation and narrow remaining production decisions.
+
+---
+
+Everything below is historical evidence for its named revision. Its “current” labels, proposed
+next steps, measurements and approvals do not apply to this completion candidate.
 
 # Unified system, release candidate (2026-11-21)
 

@@ -1,19 +1,49 @@
-# Owner acceptance: unified candidate
+# Completion candidate acceptance
 
-[acceptance.json](acceptance.json) binds commit `7ad76a0`, the release manifest (`86ef5984…`), the
-mainnet values (`deploy/mainnet.json`, no deposit cap) and the asset-flow outcomes O1–O11. Signing its sha256 accepts the
-items below. It authorizes nothing else: no broadcast, funding, Fly deployment or public offer of
-personal managers.
+> The shared vault remains closed. Individual-manager A8 evidence and unsigned status are in
+> [MANAGER-RUNBOOK.md](MANAGER-RUNBOOK.md), [manager-acceptance.json](manager-acceptance.json)
+> and [REPORT.md](../REPORT.md). Earlier pooled-vault outcome numbers below do not evaluate A8.
 
-| Item | What you accept | Numbers |
-|---|---|---|
-| U1 Holder return | Small pools have a wide return tail | Formal gate median +70.6%, p10 −55.3%, 5 of 16 years lose; quieter demand median +0.6% (all bid) to +9.8% (all keep), below the 10% hurdle |
-| U2 Recipe | 0.06 ETH packs, direct mint (one 0.05 + one 0.01 Shape) | 2.6 to 5.4× the creator revenue of 0.03 bulk-split; at 1.96 ETH 0.03 bulk-split's median is slightly higher under all-bid (+25.1% vs +22.8%) and observed (+37.5% vs +34.3%) behaviour |
-| U3 Purchaser gas | Fixed 2 gwei bound in the keep incentive | Backing 0.06489617 ETH; keep beats the best bid by 0.0003 ETH after 160,000 gas |
-| U4 Payment receipts | Settlement from FWA's record; kick refunds checked while kicks are possible, up to 32 open listings | Above 32 the check is skipped, never refused; a forced kick refund left unsynced across an exemption restore prices NAV 0.0649 ETH high per kick until sync |
-| U5 Spending | Keeper budgets and checkpoint pay | 0.12 ETH routine in 24 h, then 0.02 ETH a day; essential budget 0 |
-| U6 Asset flow | Outcomes O1–O11 replace the 2026-11-17 signature for this candidate | outcomes sha256 `dbe267c3…` |
-| U7 Coverage limits | What was not shown for real | Image fork rehearsal in CI only; VRF outcomes via coordinator impersonation; mirror lacks the in-sync credit sweep; 6.8 and 50 ETH matched cells as a pilot only; the passing image run had no redemption shortfall for the holder to unwind; local rehearsal fork upstream was Alchemy |
-| U8 Authority | Signing is acceptance only | Broadcast, funding, Fly and the manager product are separate decisions |
+**Unsigned. No production launch approval.** Launch uses 0.03 ETH packs, three paid 0.01 ETH primary
+mints. Numerical settings, backing and gas calibration remain account-owned and immediate. The prior
+package is preserved under `history/e94fd99/` with its original identities.
 
-Evidence: [RUNBOOK.md](RUNBOOK.md) section 2. Earlier packages: `docs/release/history/`.
+The local candidate uses 70,000 bps backing, 25 bps unresolved uplift, reuse-only returned packs and a 0.005 ETH maintenance reserve. Backing and uplift are provisional evaluation
+inputs. `acceptance.json` records measured engineering and economic status. A passing compilation,
+test, reconciliation or local rehearsal does not approve production or prove safety.
+
+Delivery requires an exact combined revision, regenerated interfaces/manifests, real-counterparty
+fork regressions and local billed receipts, holder/keeper/creator reconciliation, an economic
+scorecard, complete caller-funded exits and independent review with substantiated findings repaired.
+Skipped checks and unreachable scenarios must stay explicit.
+
+The existing holder-return requirement remains 10% annual net of all costs at trailing 30-day
+successful activity, with tokens zero. Current-fee and fork-only half-fee scenarios must remain
+separate, including 0.2 and 0.5 gwei. Synthetic sensitivities are not demonstrated APR. Report a
+failed candidate honestly; failure authorizes no fee reduction, subsidy or public action.
+
+Future owner decisions concern measured outcome changes and production backing/funding tradeoffs.
+Broadcast, production fee changes, live cutover and merges retain separate authority requirements.
+No old signature applies to changed code.
+
+Historical pre-A8 assessment (fixed quoted pay and fresh renewal): the completed bounded assessment fails the unchanged return gate. At 1.9601 ETH/current fee/0.5
+gwei, the standard median is -53.68%, the worst draw -83.80%, and three of four draws lose. The
+half-fee cases also fail. Four draws do not justify a new minimum TVL or a production return promise.
+
+| Future owner decision | Amounts and tradeoff | Recommendation |
+| --- | --- | --- |
+| Retain the 10% net holder requirement and defer launch | No public spending. Preserve the selected 0.03 recipe and completed implementation while economic acceptance remains failed. | **Recommended.** Positive creator accrual and upside outliers do not resolve holder downside. |
+| Explicitly replace the production economic requirement | Requires a new stated outcome and acceptance of measured downside and settlement waits. This package supplies no approved replacement target, fee reduction or subsidy. | Do not infer approval from test passes or larger-capital samples. |
+
+The historical 0.0002 ETH checkpoint comparison also remains failed: the configured 2 gwei bare
+checkpoint quote is 0.00102 ETH. Its target and any operating-price/availability tradeoff require
+explicit future acceptance; no limit was raised here. Billed authenticated-VRF renewal costs and
+production keystore transport remain evidence gaps, separately from the economic failure.
+
+Things that don't make sense: creator fees can earn revenue while fresh replacement and holder
+processing leave depositors losing money. Both sides must be measured together.
+
+A8 removes fresh-return reminting and changes actual compensation to bounded measured work.
+The preceding returns and checkpoint costs are historical, not results for A8. Current manager-only
+engineering and economic status lives in `manager-acceptance.json` and the new measured scorecard.
+The shared vault remains undeployed and its app closed.

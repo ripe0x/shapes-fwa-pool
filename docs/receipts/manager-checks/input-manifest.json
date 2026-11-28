@@ -1,0 +1,39 @@
+{
+ "implementationRevision": "8463c52476246a6a669ae82a8346d36355347c83",
+ "appRevision": "6425e785269fc7a4178a381162180b08fdf83cc0",
+ "sourceSha256": {
+  "keeper/keeper.py": "5bfe7f9b9965dcab42eeb92e7707e2a791132c5880b03fa2b3b929e2426816a1",
+  "keeper/entrypoint.sh": "0ab01e4338fe6ea851b09ac2679ca0cfa45ab8919ad4865e76f96801e7b2a6f0",
+  "keeper/rehearse_manager.py": "745a2583a8733eab1fa02f997b4235f5493edbd40da73bc63121c73c582b9637",
+  "keeper/rehearse_image.py": "e324882182f885345ac7205701a0c5f5c34dca2065debdddf19773fea6882efe",
+  "script/Deploy.s.sol": "d14764d15a8acb4006eae58c116085d7587c7f784599e92793cacec478c6b77c",
+  "script/deploy.sh": "c5b30d187511c553971faf989e66e16aa2638a0e7a808438a4e7988da60256b5",
+  "script/release.py": "69c46e7fb787169d5195942bda836a64ffb668a920ef6b5c61573e01ebcbb39b",
+  "sim/forward.py": "34dcbf6f7c927d4cb8423dfeb6d3681e427394d344a16ea907378315756f293b",
+  "sim/manager.py": "901e776456b46b501af574562b41ac4f1b0e94f0e8edd3e6d5464e0a62a34a01",
+  "sim/manager_assessment.py": "7b3434eebda165b954abea6d62590fc95719337ef889a1eb66d24b1aca75cab4",
+  "sim/manager_reconcile.py": "2c9c5e3590720151decd47902746cb6a737cae8a0c4627b82eeac1871b2e07c8",
+  "keeper/config.py": "39acb35f93fb64916dd4c8c8ab64da76742ec8c8b1c90902c9c1b014a6a22f06",
+  "keeper/policy.py": "b56d5b11c6cd387c6c623419a5c31012bbae509680d29f403c2ef5954ac7f107",
+  "keeper/tx.py": "23ef4eeb579994c28343ec58612afdaf1972317e5c43110fcdd60fcf139ede3e",
+  "keeper/index.py": "321946551c971b6374cb37c37de93c6a79895e87492e08421956472376d3d96a",
+  "deploy/manager.json": "f216770efacfe587770fe3d3821d0f2489d40c4e4f7758a051be77195ac0c026"
+ },
+ "contracts": {
+  "src/PackAccount.sol": "a4286b894ae4131fcee5bb24e38d31a56ff9dc669e94b5b27c7ceb5d1352d940",
+  "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+  "src/PackVault.sol": "05c5d2db28aae1064362fbf7730da7f27540b1b68c01679fc189b9350f753b2f",
+  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+  "src/StrategyLib.sol": "23c387fd44c39e4c5939ef8e984d9a0b8ac16605c142fc1fd8c23f1573eb930e",
+  "src/VaultLib.sol": "e15213f9c80a3336fcff847654a56743be6278f9624e1248d9e329487458e788",
+  "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+ },
+ "scope": "Final personal-manager implementation only; documentary/package refreshes follow without changing runtime sources.",
+ "reusedEvidence": [
+  "docs/receipts/completion-calibration.json",
+  "docs/receipts/completion-final-source.json",
+  "docs/receipts/completion-verification.md"
+ ],
+ "publicTransactions": 0
+}

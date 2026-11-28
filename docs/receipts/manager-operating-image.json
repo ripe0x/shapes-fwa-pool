@@ -1,0 +1,58 @@
+{
+ "status": "PASS",
+ "ciRun": 45619850908,
+ "ciUrl": "https://github.com/ripe0x/shapes-fwa-pool/actions/runs/45619850908",
+ "ciRevision": "a81a11cc77e0129a3739597664b492f969df3c3b",
+ "workflowTarget": "manager",
+ "executionHardfork": "Osaka",
+ "publicTransactions": 0,
+ "sharedVaultDeployed": false,
+ "rawReceipt": "docs/receipts/manager-operating-image-raw.json",
+ "rawReceiptSha256": "9bd705bd75c284c78928f062d0f85232c085d06b2c0398e8f448d0f45185ee52",
+ "contractSourceSha256": {
+  "src/PackAccount.sol": "18effdf4eeddc1cde3eab969fe7cab29080985c1d4e35b0717cf1b26b15b0af2",
+  "src/PackManager.sol": "5c23cb253699b76a78e8bb06fc12c7b77516a2e30625729538fafbb5c6545c88",
+  "src/PackManagerFactory.sol": "a2f0154daf881185bbd7cefac5cd0e54666f5003621d4d830a1d489d23bfeea2",
+  "src/PackVault.sol": "a2c1d7c4d0826722cc5658943a15bf5c5cafd119ff7ff56d35b7b876ce4d2aee",
+  "src/ScanLib.sol": "342dbc5b8998a6bf74ca84bdddc28bca71663972abaccb196d52df6af8a62a2c",
+  "src/StrategyLib.sol": "9552d8c0b2581287e041a17a6fe9399775f3e37576a25051dff9af1f2f83c7ab",
+  "src/VaultLib.sol": "0b341caa2b97f279d3107963e15e30e35ce0e87e4cc54342a9fd39904f64f75f",
+  "src/interfaces/External.sol": "aa0a1d3c0c965e664eade6854a03fc803e09caa7116c62a2966249f9a588b879"
+ },
+ "runtimeKeeperSourceSha256": {
+  "keeper/Dockerfile": "54675df4109b6b91f5e750816fdf20fb410942992fbebacb9b14d82dc5211243",
+  "keeper/entrypoint.sh": "0ab01e4338fe6ea851b09ac2679ca0cfa45ab8919ad4865e76f96801e7b2a6f0",
+  "keeper/requirements.txt": "aed414c4157dd12cba962363a8c9f561a2e5dcddbf20ee4c2ea9ff41ad4e913c",
+  "keeper/keeper.py": "5bfe7f9b9965dcab42eeb92e7707e2a791132c5880b03fa2b3b929e2426816a1",
+  "keeper/policy.py": "42a40400cee6acd7ad1b3342548bd5f0754d11636a9b890118caa346bd4f219a",
+  "keeper/config.py": "39acb35f93fb64916dd4c8c8ab64da76742ec8c8b1c90902c9c1b014a6a22f06",
+  "keeper/tx.py": "23ef4eeb579994c28343ec58612afdaf1972317e5c43110fcdd60fcf139ede3e",
+  "keeper/index.py": "321946551c971b6374cb37c37de93c6a79895e87492e08421956472376d3d96a"
+ },
+ "transactions": 11,
+ "paidShapeMintCount": 15,
+ "ownerLedger": {
+  "startWei": 10000000000000000000,
+  "endWei": 9991604353779737161,
+  "initialManagerFundingWei": 1000000000000000000,
+  "additionalManagerFundingWei": 500000000000000000,
+  "walletNetWei": -8395646220262839,
+  "withdrawnWei": 1491851909602270000,
+  "ownerGasCostWei": 247555822532839,
+  "keeperCompensationWei": 648090397730000,
+  "creatorPrimaryFeesAccruedWei": 7500000000000000,
+  "exitSignedUpperWei": 217622712330074,
+  "exitGasCostWei": 137619099603389,
+  "exitKeeperPayWei": 0
+ },
+ "keeperCompensationWei": 648090397730000,
+ "keeperBilledGasWei": 398315631865707,
+ "keeperNetWei": 249774765864293,
+ "allCheckedReceiptStatuses": 1,
+ "allCheckedTransactionGasLimitsAtMost": 16777216,
+ "limits": [
+  "The CI image revision predates later offline calibration/model/evidence files. Every actual runtime keeper input and Solidity source matches the final working source; no claim that all later unused helper files were in that image.",
+  "One ETH initial plus explicit .5 ETH growth funding: this is an operational restart/exit proof, not the no-topup .5 ETH operating-return assessment.",
+  "Unlocked local fork actors, no encrypted-keystore/hardware signing, production Fly mounts/networking or public inclusion."
+ ]
+}

@@ -1,0 +1,47 @@
+[
+ {
+  "command": [
+   "python3",
+   "script/test_release.py"
+  ],
+  "exit_status": 1,
+  "seconds": 0.08,
+  "log": "/tmp/shapes-manager-closeout-run/test_release.log"
+ },
+ {
+  "command": [
+   "python3",
+   "keeper/test_manager_exit.py"
+  ],
+  "exit_status": 1,
+  "seconds": 0.07,
+  "log": "/tmp/shapes-manager-closeout-run/test_manager_exit.log"
+ },
+ {
+  "command": [
+   "python3",
+   "keeper/test_entrypoint.py"
+  ],
+  "exit_status": 1,
+  "seconds": 0.3,
+  "log": "/tmp/shapes-manager-closeout-run/test_entrypoint.log"
+ },
+ {
+  "command": [
+   "python3",
+   "keeper/test_config.py"
+  ],
+  "exit_status": 1,
+  "seconds": 0.06,
+  "log": "/tmp/shapes-manager-closeout-run/test_config.log"
+ },
+ {
+  "command": [
+   "python3",
+   "keeper/test_policy.py"
+  ],
+  "exit_status": 0,
+  "seconds": 0.04,
+  "log": "/tmp/shapes-manager-closeout-run/test_policy.log"
+ }
+]

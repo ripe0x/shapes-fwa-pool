@@ -20,8 +20,9 @@ contract AuditWorkFeeManufactureTest is ForkBase {
         uint256 fee = vault.getParams().workFee;
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            bytes32 _expected0 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected0);
         }
 
         toBlackout();
@@ -32,18 +33,20 @@ contract AuditWorkFeeManufactureTest is ForkBase {
         uint256 planned22 = TestVaultOps.witness(vault);
 
         // Same interval: a second checkpoint is refused outright (no second fee this interval).
+        bytes32 _expected1 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper);
         vm.expectRevert(PackVault.AlreadyCheckpointed.selector);
-        vault.checkpoint(planned22, 0);
+        vault.checkpoint(planned22, 0, _expected1);
 
         // Next interval with NO holder flow: refused (distributionBps is 0). So the fee cannot be
         // farmed by just calling checkpoint every interval; a real deposit/redeem is required.
         toOpen();
         toBlackout();
         uint256 planned21 = TestVaultOps.witness(vault);
+        bytes32 _expected2 = TestVaultOps.configurationHash(vault);
         vm.prank(keeper);
         vm.expectRevert(PackVault.Nothing.selector);
-        vault.checkpoint(planned21, 0);
+        vault.checkpoint(planned21, 0, _expected2);
 
         // The cheapest manufacture: the attacker escrows the 0.01 ETH minimum deposit (their own
         // money, recoverable as shares) to force one paid checkpoint. Measure the drain.
@@ -51,8 +54,9 @@ contract AuditWorkFeeManufactureTest is ForkBase {
         vm.deal(bob, 1 ether);
         {
             uint256 gross_ = Charges.grossFor(vault, 0.01 ether);
+            bytes32 _expected3 = TestVaultOps.configurationHash(vault);
             vm.prank(bob);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected3);
         } // MIN_DEPOSIT
         toBlackout();
         uint256 kb = keeper.balance;
@@ -71,8 +75,9 @@ contract AuditWorkFeeManufactureTest is ForkBase {
     function test_listUnlistLoopIsGated() public {
         {
             uint256 gross_ = Charges.grossFor(vault, 1 ether);
+            bytes32 _expected4 = TestVaultOps.configurationHash(vault);
             vm.prank(alice);
-            vault.deposit{value: gross_}();
+            vault.deposit{value: gross_}(_expected4);
         }
         toBlackout();
         checkpoint();
@@ -92,7 +97,8 @@ contract AuditWorkFeeManufactureTest is ForkBase {
 
         // Healthy edge, not winding down, no redemption request: unlist must revert. No fee loop.
         vm.prank(keeper);
+        bytes32 expectedRegression1 = TestVaultOps.configurationHash(vault);
         vm.expectRevert(StrategyLib.UnlistNotAllowed.selector);
-        TestVaultOps.unlist(vault, ids, 0);
+        vault.unlist(ids, 0, expectedRegression1);
     }
 }

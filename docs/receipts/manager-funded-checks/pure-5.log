@@ -1,0 +1,23 @@
+test_distribution_credit_cannot_skip_the_unfunded_reserve (test_vault.VaultAccountingTest.test_distribution_credit_cannot_skip_the_unfunded_reserve) ... ok
+test_distribution_tail_needs_real_gain_after_maintenance (test_vault.VaultAccountingTest.test_distribution_tail_needs_real_gain_after_maintenance) ... ok
+test_fee_histogram_zero_witness_and_harvest_rounding (test_vault.VaultAccountingTest.test_fee_histogram_zero_witness_and_harvest_rounding) ... ok
+test_journal_stops_before_seventeenth_own_transition (test_vault.VaultAccountingTest.test_journal_stops_before_seventeenth_own_transition) ... ok
+test_keep_removes_old_principal_then_adopts_current_gift_once (test_vault.VaultAccountingTest.test_keep_removes_old_principal_then_adopts_current_gift_once) ... ok
+test_oversized_gift_recovery_preserves_exact_remaining_value (test_vault.VaultAccountingTest.test_oversized_gift_recovery_preserves_exact_remaining_value) ... ok
+test_owed_return_cannot_be_spent_until_recovered (test_vault.VaultAccountingTest.test_owed_return_cannot_be_spent_until_recovered) ... ok
+test_paid_mint_inventory_bid_and_redemption (test_vault.VaultAccountingTest.test_paid_mint_inventory_bid_and_redemption) ... ok
+test_partial_holder_exit_protects_escrow_and_claims (test_vault.VaultAccountingTest.test_partial_holder_exit_protects_escrow_and_claims) ... ok
+test_randomized_book_transitions (test_vault.VaultAccountingTest.test_randomized_book_transitions) ... ok
+test_receipt_precedes_selection_and_retains_payment_fee (test_vault.VaultAccountingTest.test_receipt_precedes_selection_and_retains_payment_fee) ... ok
+test_rejected_checkpoint_cannot_duplicate_harvested_credit (test_vault.VaultAccountingTest.test_rejected_checkpoint_cannot_duplicate_harvested_credit) ... ok
+test_returned_pack_funding_is_not_reused_for_a_build (test_vault.VaultAccountingTest.test_returned_pack_funding_is_not_reused_for_a_build) ... ok
+test_sync_collection_never_borrows_protected_cash_or_permission (test_vault.VaultAccountingTest.test_sync_collection_never_borrows_protected_cash_or_permission) ... ok
+test_sync_credit_is_economic_and_no_work_cannot_collect (test_vault.VaultAccountingTest.test_sync_credit_is_economic_and_no_work_cannot_collect) ... ok
+test_sync_funding_claims_only_cash_covering_prefix (test_vault.VaultAccountingTest.test_sync_funding_claims_only_cash_covering_prefix) ... ok
+test_sync_funding_stops_at_first_covering_prefix_even_when_fee_share_fails (test_vault.VaultAccountingTest.test_sync_funding_stops_at_first_covering_prefix_even_when_fee_share_fails) ... ok
+test_unexposed_history_preserves_seed_and_first_deposit_prices (test_vault.VaultAccountingTest.test_unexposed_history_preserves_seed_and_first_deposit_prices) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 0.003s
+
+OK

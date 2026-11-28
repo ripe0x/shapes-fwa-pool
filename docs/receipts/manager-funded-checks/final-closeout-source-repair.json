@@ -1,0 +1,18 @@
+{
+  "command": [
+    "/Users/dd/.pyenv/versions/3.11.8/bin/python",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "sim",
+    "-p",
+    "test_manager_closeout.py"
+  ],
+  "exit_status": 0,
+  "tests": 4,
+  "result": "PASS",
+  "scope": "Independent P2 source-provenance repair; actual diagnostic/proposal file mutation checks",
+  "output": "Ran 4 tests in 0.006s; OK",
+  "record": "Executed tool transcript during final closeout; no new run implied"
+}

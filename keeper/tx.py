@@ -60,11 +60,29 @@ EXPECTED = {  # selector -> name: the vault refused because the work is done, ea
 
 # A competitor may advance the journal, consume a receipt, change the fee witness or reserve a
 # proposed backing between our pinned read and preflight. Refresh the index and quote again.
-REFRESH_ERRORS = {"BadWitness", "InvalidBacking", "CatchUpFirst", "PendingReceipts", "NeedsPrune", "SyncFirst"}
+REFRESH_ERRORS = {"ConfigurationChanged", "BadWitness", "InvalidBacking", "CatchUpFirst", "PendingReceipts", "NeedsPrune", "SyncFirst", "UnusedPaidInput"}
 EXPECTED.update({"0x" + keccak(text=f"{name}()").hex()[:8]: name for name in REFRESH_ERRORS})
 
 ADMISSION_WAIT = {"InvalidListing", "InvalidBacking", "InsufficientBacking"}
 ADMISSION_EXPECTED = {"0x" + keccak(text=f"{name}()").hex()[:8]: name for name in ADMISSION_WAIT}
+
+
+def receipt_financials(to, label, transaction_value, receipt, sender):
+    """Re-decode every cash field when a receipt is re-included after a reorg."""
+    ok = int(receipt['status'], 16) == 1
+    gas, price = int(receipt['gasUsed'],16), int(receipt['effectiveGasPrice'],16)
+    logs = [l for l in receipt['logs'] if ok and l['address'].lower()==to.lower()]
+    pay = sum(int(l['data'],16) for l in logs if len(l['topics'])>=2 and l['topics'][0]==KEEPER_PAID and l['topics'][1][-40:].lower()==sender[2:].lower())
+    funded='0x'+keccak(text='ContributionFunded(uint256,address,uint256,uint256)').hex()
+    refunded='0x'+keccak(text='ContributionRefunded(uint256,address,uint256)').hex()
+    own=[l for l in logs if len(l['topics'])>=3 and l['topics'][2][-40:].lower()==sender[2:].lower()]
+    contributed=sum(int(l['data'],16) for l in own if l['topics'][0]==funded)
+    refund=sum(int(l['data'],16) for l in own if l['topics'][0]==refunded)
+    return dict(status=int(ok),gas_used=gas,price=price,cost=gas*price,pay=pay,net=pay-gas*price,
+                transaction_value_wei=transaction_value,value_sent_wei=transaction_value if ok else 0,
+                checkpoint_contributed_wei=contributed,checkpoint_refunded_wei=refund,
+                overpayment_returned_wei=transaction_value-contributed if ok and label=='fundCheckpoint' else 0)
+
 
 
 class StaleContext(Exception):
@@ -89,12 +107,22 @@ class Locked(Exception):
     pass
 
 
+class IdentityMismatch(ValueError):
+    pass
+
+
+class SpendLimit(ValueError):
+    pass
+
+
 class TxManager:
     def __init__(self, rpc, state_file, sender, auth, confirmations=1, replace_after=3, max_replacements=5,
                  max_fee=None, reorg_window=64, log=print):
         self.rpc, self.path, self.sender, self.auth = rpc, state_file, sender, auth
         self.conf, self.replace_after, self.max_repl = confirmations, replace_after, max_replacements
         self.max_fee, self.reorg_window, self.log = max_fee, reorg_window, log
+        self.signed_limit = None
+        self.signed_start = 0
         self._lockf = open(state_file + ".lock", "w")
         try:
             fcntl.flock(self._lockf, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -103,10 +131,47 @@ class TxManager:
         self.state = {"pending": None, "counted": [], "errors": [],
                       "stats": dict(sent=0, mined=0, reverted=0, replaced=0, dropped=0, reorged=0,
                                     skipped_expected=0, skipped_loss=0, spent_wei=0, paid_wei=0)}
-        if os.path.exists(state_file):
-            saved = json.load(open(state_file))
-            self.state.update(saved)
-            self.state["stats"] = {**self.state["stats"], **saved.get("stats", {})}
+        try:
+            if os.path.exists(state_file):
+                saved = json.load(open(state_file))
+                self.state.update(saved)
+                self.state["stats"] = {**self.state["stats"], **saved.get("stats", {})}
+            identity = dict(chain_id=int(self.rpc_call('eth_chainId'),16), sender=sender.lower())
+            saved_identity = self.state.get('identity')
+            if saved_identity is None and (self.state['pending'] or self.state['counted'] or any(self.state['stats'].values())):
+                raise IdentityMismatch('legacy keeper state contains history without signer/chain identity; preserve it and choose a new --state path')
+            if saved_identity is not None and saved_identity != identity:
+                raise IdentityMismatch('keeper state belongs to another signer or chain; preserve it and choose a different --state path')
+            history=self.state['pending'] or self.state['counted'] or any(self.state['stats'].values())
+            if 'signed_nonce_max_wei' not in self.state and history:
+                raise IdentityMismatch('legacy keeper state has no signed maximum reservations; preserve it and choose a new --state path')
+            self.state.setdefault('signed_nonce_max_wei',{})
+            self.state.setdefault('signed_upper_wei',0)
+            self.state['identity'] = identity
+            self.save()
+        except Exception:
+            self._lockf.close()
+            raise
+
+    def begin_signed_limit(self, limit):
+        self.signed_start=self.state['signed_upper_wei']
+        self.signed_limit=int(limit)
+
+    def signed_delta(self, nonce, gas, max_fee, value=0):
+        return max(0,value+gas*max_fee-self.state['signed_nonce_max_wei'].get(str(nonce),0))
+
+    def can_reserve(self, nonce, gas, max_fee, value=0):
+        return self.signed_limit is None or self.state['signed_upper_wei']-self.signed_start+self.signed_delta(nonce,gas,max_fee,value)<=self.signed_limit
+
+    def _reserve_signed(self, p):
+        value=int(p['args'][p['args'].index('--value')+1]) if '--value' in p['args'] else 0
+        if not self.can_reserve(p['nonce'],p['gas'],p['max_fee'],value):
+            raise SpendLimit('signed maximum reservation exceeds the accepted wallet spending limit')
+        delta=self.signed_delta(p['nonce'],p['gas'],p['max_fee'],value)
+        if delta:
+            self.state['signed_nonce_max_wei'][str(p['nonce'])]=value+p['gas']*p['max_fee']
+            self.state['signed_upper_wei']+=delta
+            self.save()  # Persists before signing/broadcast, including lost or rejected responses.
 
     # ------------------------------------------------------------------ plumbing
 
@@ -158,6 +223,7 @@ class TxManager:
             return None, msg.splitlines()[-1][:200] if msg else "estimate failed", False
 
     def _broadcast(self, p):
+        self._reserve_signed(p)
         out = self.cast("send", p["to"], *p["args"], *self.auth, "--nonce", p["nonce"], "--gas-limit", p["gas"],
                         "--priority-gas-price", p["prio"], "--gas-price", p["max_fee"], "--async")
         h = out.split()[-1]
@@ -175,6 +241,7 @@ class TxManager:
         p = dict(label=label, to=to, args=[str(a) for a in args], nonce=self.nonce("pending"), gas=(est * 5 + 3) // 4,
                  est=est, prio=tip, max_fee=max_fee, sent_block=self.head(), replacements=0, hashes=[],
                  expected_pay=expected_pay, submitted=int(time.time()))
+        self._reserve_signed(p)
         self.state["pending"] = p
         self.save()
         try:
@@ -196,18 +263,12 @@ class TxManager:
             if old["hash"] == h and not old.get("reorged"):
                 self._apply(old, -1)
         self.state["counted"] = [old for old in self.state["counted"] if old["hash"] != h]
-        gas_used, price = int(r["gasUsed"], 16), int(r["effectiveGasPrice"], 16)
-        pay = sum(int(l["data"], 16) for l in r["logs"]
-                  if l["topics"] and l["topics"][0] == KEEPER_PAID and l["address"].lower() == p["to"].lower()
-                  and l["topics"][1][-40:].lower() == self.sender[2:].lower())
-        ok = int(r["status"], 16) == 1
-        s = self.state["stats"]
-        s["mined" if ok else "reverted"] += 1
-        s["spent_wei"] += gas_used * price
-        s["paid_wei"] += pay
-        entry = dict(label=p["label"], to=p["to"], hash=h, block=int(r["blockNumber"], 16), block_hash=r["blockHash"],
-                     status=int(ok), gas_used=gas_used, price=price, cost=gas_used * price, pay=pay,
-                     net=pay - gas_used * price, est=p["est"], gas_limit=p["gas"], expected_pay=p["expected_pay"])
+        value = int(p['args'][p['args'].index('--value')+1]) if '--value' in p['args'] else 0
+        financials = receipt_financials(p['to'], p['label'], value, r, self.sender)
+        ok, gas_used, price, pay = (financials[k] for k in ('status','gas_used','price','pay'))
+        entry = dict(label=p['label'], function=p['args'][0].split('(')[0], to=p['to'], hash=h, block=int(r['blockNumber'],16), block_hash=r['blockHash'],
+                     est=p['est'], gas_limit=p['gas'], expected_pay=p['expected_pay'], **financials)
+        self._apply(entry, 1)
         self.state["counted"] = (self.state["counted"] + [entry])[-200:]
         self.log(f"{'mined' if ok else 'REVERTED'} {p['label']} gas {gas_used} (est {p['est']}) cost {gas_used * price} "
                  f"pay {pay} net {pay - gas_used * price} wei")
@@ -228,6 +289,8 @@ class TxManager:
         st = self.state["stats"]
         st["mined" if e["status"] else "reverted"] += sign
         st["spent_wei"] += sign * e["cost"]
+        for key in ('value_sent_wei', 'checkpoint_contributed_wei', 'checkpoint_refunded_wei'):
+            st[key] = st.get(key, 0) + sign * e.get(key, 0)
         st["paid_wei"] += sign * e["pay"]
 
     def check_reorgs(self, head):
@@ -249,12 +312,9 @@ class TxManager:
                 continue
             if not e.get("reorged"):
                 self._apply(e, -1)
-            gas_used, price = int(r["gasUsed"], 16), int(r["effectiveGasPrice"], 16)
-            pay = sum(int(l["data"], 16) for l in r["logs"]
-                      if l["topics"] and l["topics"][0] == KEEPER_PAID and l["address"].lower() == e["to"].lower()
-                      and l["topics"][1][-40:].lower() == self.sender[2:].lower())
-            e.update(block=int(r["blockNumber"], 16), block_hash=r["blockHash"], status=int(int(r["status"], 16) == 1),
-                     gas_used=gas_used, price=price, cost=gas_used * price, pay=pay, net=pay - gas_used * price, reorged=False)
+            financials = receipt_financials(e['to'], e['label'],
+                e.get('transaction_value_wei', e.get('value_sent_wei',0)), r, self.sender)
+            e.update(block=int(r['blockNumber'],16), block_hash=r['blockHash'], reorged=False, **financials)
             self._apply(e, 1)
             self.log(f"reorg moved {e['label']} {e['hash']} to block {e['block']}; recounted")
 
@@ -320,6 +380,10 @@ class TxManager:
         gas = (estimate * 5 + 3) // 4
         if gas > 16_777_216:
             self.error(f"replacement of {p['label']} needs gas above the EIP7825 bound")
+            return True
+        value=int(p['args'][p['args'].index('--value')+1]) if '--value' in p['args'] else 0
+        if not self.can_reserve(p['nonce'],gas,max_fee,value):
+            self.log('waiting: replacement exceeds signed wallet reservation limit')
             return True
         # The attempt and current estimate survive an accepted broadcast whose response is lost.
         p.update(prio=prio, max_fee=max_fee, sent_block=head, est=estimate, gas=gas,

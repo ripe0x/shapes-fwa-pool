@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import {Vm, VmSafe} from "forge-std/Vm.sol";
 import {PackVault} from "../../src/PackVault.sol";
 import {PackAccount} from "../../src/PackAccount.sol";
+import {PackManagerFactory} from "../../src/PackManagerFactory.sol";
 import {IFloorOracle} from "../../src/interfaces/External.sol";
 import {VaultLib} from "../../src/VaultLib.sol";
 
@@ -11,6 +12,13 @@ import {VaultLib} from "../../src/VaultLib.sol";
 library TestVaultOps {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
     uint256 private constant QUANTUM = 10_000;
+
+    /// @dev Fund through the real receive path; never fabricate an account's balance.
+    function fundTo(PackAccount account, uint256 balance) internal {
+        require(balance >= address(account).balance, "funding cannot remove account cash");
+        (bool ok,) = address(account).call{value: balance - address(account).balance}("");
+        require(ok, "account funding failed");
+    }
 
     function open(PackAccount v) internal view returns (uint256[] memory ids) {
         ids = new uint256[](v.openListingCount());
@@ -41,8 +49,7 @@ library TestVaultOps {
         quotes = new uint256[](n);
         (, uint256 target,) = v.edge(units);
         if (target == 0) return quotes;
-        // A keep never loses at FWA's 5% settlement-fee cap: at least P / 0.95.
-        uint256 minimum = (units * 0.01 ether * 10_000 + 9_499) / 9_500;
+        uint256 minimum = 1;
         uint256 radius = v.reservedCount() + n + 1;
         uint256 base = (target + QUANTUM - 1) / QUANTUM * QUANTUM;
         bool exempt = v.fwa().oracleExemptCollections(address(v.packs()));
@@ -80,14 +87,27 @@ library TestVaultOps {
         if (p.mode == VmSafe.CallerMode.Prank) vm.prank(p.sender, p.origin);
     }
 
-    /// @dev Build-and-list `n` new packs of `units`, in batches of MAX_LIST_BATCH.
+    function configurationHash(PackAccount account) internal returns (bytes32 expected) {
+        Prank memory p = _pausePrank();
+        expected = account.configurationHash();
+        _resumePrank(p);
+    }
+
+    function factoryHash(PackManagerFactory factory, VaultLib.Params memory params) internal returns (bytes32 expected) {
+        Prank memory p = _pausePrank();
+        expected = factory.configHashFor(params);
+        _resumePrank(p);
+    }
+
+    /// @dev Build-and-list `n` new packs of `units`, in batches of MAX_BUILD_BATCH.
     function restock(PackAccount v, uint256 n, uint256 units, uint256 minPay) internal returns (uint256 pay) {
         Prank memory _pk = _pausePrank();
         while (n != 0) {
-            uint256 batch = n < v.MAX_LIST_BATCH() ? n : v.MAX_LIST_BATCH();
+            uint256 batch = n < v.MAX_BUILD_BATCH() ? n : v.MAX_BUILD_BATCH();
             uint256[] memory quotes = proposals(v, batch, units);
             _resumePrank(_pk);
-            pay += v.build(units, quotes, minPay);
+            bytes32 _expected0 = configurationHash(v);
+            pay += v.build(units, quotes, minPay, _expected0);
             n -= batch;
         }
     }
@@ -102,26 +122,41 @@ library TestVaultOps {
             return 0;
         }
         while (n != 0) {
-            uint256 limit = v.MAX_LIST_BATCH();
-            uint256 batch = n < limit ? n : limit;
+            uint256 batch = 1;
             uint256 pack = v.idlePackAt(v.idlePackCount() - 1);
-            uint256 units = v.packs().valueOf(pack) / 0.01 ether;
-            uint256[] memory quotes = proposals(v, batch, units);
+            (, uint256 target,) = v.relistEdgeFor(pack);
+            uint256[] memory quotes = new uint256[](1);
+            uint256 radius = v.reservedCount() + 1;
+            uint256 base = (target + QUANTUM - 1) / QUANTUM * QUANTUM;
+            bool found;
+            for (uint256 d; d <= radius && !found; ++d) {
+                for (uint256 side; side < 2; ++side) {
+                    if (side == 0 && base < d * QUANTUM) continue;
+                    uint256 candidate = side == 0 ? base - d * QUANTUM : base + (d + 1) * QUANTUM;
+                    if (candidate != 0 && v.idForBacking(candidate) == 0) {
+                        quotes[0] = candidate; found = true; break;
+                    }
+                }
+            }
+            require(found, "test relist interval exhausted");
             _resumePrank(_pk);
-            pay += v.list(quotes, minPay);
+            bytes32 _expected1 = configurationHash(v);
+            pay += v.list(quotes, minPay, _expected1);
             n -= batch;
         }
     }
 
     function sync(PackAccount v, uint256[] memory ids, uint256 minPay) internal returns (uint256 pay) {
         Prank memory _pk = _pausePrank();
-        if (ids.length <= 16) { _resumePrank(_pk); return v.sync(ids, 0, minPay); }
+        bytes32 _expected2 = configurationHash(v);
+        if (ids.length <= 16) { _resumePrank(_pk); return v.sync(ids, 0, minPay, _expected2); }
         for (uint256 start; start < ids.length; start += 16) {
             uint256 count = ids.length - start < 16 ? ids.length - start : 16;
             uint256[] memory batch = new uint256[](count);
             for (uint256 i; i < count; ++i) batch[i] = ids[start + i];
             _resumePrank(_pk);
-            pay += v.sync(batch, 0, minPay);
+            bytes32 _expected3 = configurationHash(v);
+            pay += v.sync(batch, 0, minPay, _expected3);
         }
     }
 
@@ -140,11 +175,13 @@ library TestVaultOps {
 
     function unlist(PackAccount v, uint256[] memory ids, uint256 minPay) internal returns (uint256 pay) {
         Prank memory _pk = _pausePrank();
-        if (ids.length == 0) { _resumePrank(_pk); return v.unlist(ids, minPay); }
+        bytes32 _expected4 = configurationHash(v);
+        if (ids.length == 0) { _resumePrank(_pk); return v.unlist(ids, minPay, _expected4); }
         for (uint256 start; start < ids.length; start += 16) {
             uint256 n = ids.length - start < 16 ? ids.length - start : 16;
             _resumePrank(_pk);
-            pay += v.unlist(_slice(ids, start, n), minPay);
+            bytes32 _expected5 = configurationHash(v);
+            pay += v.unlist(_slice(ids, start, n), minPay, _expected5);
         }
     }
 
@@ -174,6 +211,7 @@ library TestVaultOps {
         Prank memory _pk = _pausePrank();
         uint256 id = witness(v);
         _resumePrank(_pk);
-        return v.checkpoint(id, minPay);
+        bytes32 _expected6 = configurationHash(v);
+        return v.checkpoint(id, minPay, _expected6);
     }
 }
